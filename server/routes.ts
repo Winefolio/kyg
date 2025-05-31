@@ -146,8 +146,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update participant progress and lastActive
       const currentSlide = await storage.getSlideById(validatedData.slideId!);
       if (currentSlide) {
+        const currentProgress = participant.progressPtr || 0;
+        
         // Only update progress if the current slide's position is further than current progress
-        if (currentSlide.position > (participant.progressPtr || 0)) {
+        if (currentSlide.position > currentProgress) {
           await storage.updateParticipantProgress(
             participant.id,
             currentSlide.position
@@ -157,9 +159,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // If re-answering a previous slide, still update lastActive but maintain current progress
           await storage.updateParticipantProgress(
             participant.id,
-            participant.progressPtr || 0
+            currentProgress
           );
-          console.log(`Participant ${participant.id} re-answered slide or answered out of order. Progress pointer maintained at ${participant.progressPtr}. Last active updated.`);
+          console.log(`Participant ${participant.id} re-answered slide or answered out of order. Progress pointer maintained at ${currentProgress}. Last active updated.`);
         }
       }
       
