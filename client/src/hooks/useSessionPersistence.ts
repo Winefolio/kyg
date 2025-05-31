@@ -104,25 +104,6 @@ export function useSessionPersistence() {
     }
   };
 
-  // Clear stale offline data on startup
-  useEffect(() => {
-    const clearStaleData = async () => {
-      if (db) {
-        try {
-          // Clear all offline responses to prevent stale participant data from causing errors
-          const tx = db.transaction('offlineResponses', 'readwrite');
-          const store = tx.objectStore('offlineResponses');
-          await store.clear();
-          console.log('Cleared stale offline responses');
-        } catch (error) {
-          console.warn('Failed to clear stale offline data:', error);
-        }
-      }
-    };
-    
-    clearStaleData();
-  }, [db]);
-
   // Background sync when online
   useEffect(() => {
     const syncOfflineData = async () => {

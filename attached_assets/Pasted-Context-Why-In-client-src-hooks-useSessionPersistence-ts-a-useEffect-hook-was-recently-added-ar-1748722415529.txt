@@ -1,0 +1,45 @@
+Context & Why:
+In client/src/hooks/useSessionPersistence.ts, a useEffect hook was recently added (around lines 108-120) that clears the entire "offlineResponses" IndexedDB object store (await store.clear();) every time the database connection is initialized (effectively on app startup).
+
+While this was likely added to combat issues with stale data (responses for participants that no longer exist), it's an overly aggressive solution. It will cause any legitimately saved offline responses (e.g., from a user who was temporarily offline, completed some work, and then reloaded the app before it could sync) to be deleted before they have a chance to sync.
+
+The hook also contains more targeted logic within its syncOfflineData function (around lines 150-159) to delete specific offline responses from IndexedDB if the server returns a 404 status (indicating the participant no longer exists). This targeted deletion is the correct way to handle stale individual records.
+
+Objective (What):
+Modify client/src/hooks/useSessionPersistence.ts to remove the unconditional clearing of all offline responses from IndexedDB on startup. The system should rely on the existing logic that removes individual stale responses only when a 404 error (participant not found) is encountered during an attempt to sync that specific response.
+
+Implementation Details (How):
+
+Remove Aggressive useEffect for Clearing Data:
+
+In client/src/hooks/useSessionPersistence.ts, locate the useEffect hook that contains the clearStaleData function and calls await store.clear(); (around lines 108-120).
+Delete this entire useEffect block.
+TypeScript
+
+// REMOVE THIS ENTIRE BLOCK:
+// useEffect(() => {
+//   const clearStaleData = async () => {
+//     if (db) {
+//       try {
+//         // Clear all offline responses to prevent stale participant data from causing errors
+//         const tx = db.transaction('offlineResponses', 'readwrite');
+//         const store = tx.objectStore('offlineResponses');
+//         await store.clear(); 
+//         console.log('Cleared stale offline responses');
+//       } catch (error) {
+//         console.warn('Failed to clear stale offline data:', error);
+//       }
+//     }
+//   };
+//   clearStaleData();
+// }, [db]);
+Verify Existing Stale Data Handling in syncOfflineData:
+
+Confirm that the logic within the syncOfflineData function's catch block (around lines 150-159) correctly deletes an offline response from IndexedDB if a 404 error (or similar indicating participant not found) is received from the server for that specific item. This logic is already present and should be retained as the primary mechanism for cleaning up truly stale individual records.
+Acceptance Criteria:
+
+The useEffect hook that unconditionally clears the 'offlineResponses' IndexedDB object store on startup is removed from client/src/hooks/useSessionPersistence.ts.
+Legitimate offline responses saved in IndexedDB from a previous session are no longer wiped out when the application is reloaded.
+The application continues to load previously unsynced responses from IndexedDB into the offlineQueue on startup (as per lines 40-44).
+The logic within syncOfflineData that deletes an individual offline response from IndexedDB if the server returns a 404 for its participant remains functional.
+The 500 errors on POST /api/responses (related to non-existent participants) remain resolved due to the server-side checks and the client-side 404 handling during sync.
