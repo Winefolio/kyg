@@ -54,17 +54,7 @@ export default function SommelierDashboard() {
   // Create custom wine package
   const createPackageMutation = useMutation({
     mutationFn: async ({ code, name, description }: { code: string; name: string; description: string }) => {
-      const response = await fetch('/api/packages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, name, description })
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create package');
-      }
-      
+      const response = await apiRequest('POST', '/api/packages', { code, name, description });
       return response.json();
     },
     onSuccess: (newPackage) => {
@@ -72,6 +62,7 @@ export default function SommelierDashboard() {
         title: "Wine Package Created!",
         description: `Package "${newPackage.code}" is ready for tastings`
       });
+      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
       setCustomCode("");
       setPackageName("");
       setPackageDescription("");
@@ -89,29 +80,15 @@ export default function SommelierDashboard() {
   // Create new tasting session
   const createSessionMutation = useMutation({
     mutationFn: async () => {
-      // First get the package
-      const packageResponse = await fetch(`/api/packages/${selectedPackage}`);
-      
-      if (!packageResponse.ok) {
-        throw new Error('Wine package not found');
-      }
-      
+      // First get the package using apiRequest for consistency
+      const packageResponse = await apiRequest('GET', `/api/packages/${selectedPackage}`, null);
       const winePackage = await packageResponse.json();
       
-      // Create session
-      const sessionResponse = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          packageId: winePackage.id,
-          name: newSessionName
-        })
+      // Create session using apiRequest
+      const sessionResponse = await apiRequest('POST', '/api/sessions', {
+        packageId: winePackage.id,
+        name: newSessionName
       });
-      
-      if (!sessionResponse.ok) {
-        throw new Error('Failed to create session');
-      }
-      
       return sessionResponse.json();
     },
     onSuccess: (session) => {
