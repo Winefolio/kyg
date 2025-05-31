@@ -10,8 +10,8 @@ import { ScaleQuestion } from "@/components/questions/ScaleQuestion";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import { useHaptics } from "@/hooks/useHaptics";
 import { apiRequest } from "@/lib/queryClient";
-import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle } from "lucide-react";
-import type { Slide, Participant } from "@shared/schema";
+import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause } from "lucide-react";
+import type { Slide, Participant, Session } from "@shared/schema";
 
 export default function TastingSession() {
   const { sessionId, participantId } = useParams();
@@ -23,6 +23,13 @@ export default function TastingSession() {
   const { saveResponse, syncStatus } = useSessionPersistence();
   const { triggerHaptic } = useHaptics();
   const queryClient = useQueryClient();
+
+  // Get session details including status
+  const { data: currentSession, isLoading: sessionDetailsLoading } = useQuery<Session & { packageCode?: string }>({
+    queryKey: [`/api/sessions/${sessionId}`],
+    enabled: !!sessionId,
+    refetchInterval: 3000, // Refetch every 3 seconds to check status
+  });
 
   // Get participant data
   const { data: participant } = useQuery<Participant>({
@@ -168,7 +175,7 @@ export default function TastingSession() {
     return null;
   };
 
-  if (isLoading) {
+  if (isLoading || sessionDetailsLoading) {
     return (
       <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
         <div className="text-white">Loading session...</div>
@@ -176,6 +183,58 @@ export default function TastingSession() {
     );
   }
 
+  if (!currentSession) {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex flex-col items-center justify-center text-white p-8">
+        <X size={48} className="mb-4 text-red-300" />
+        <h2 className="text-2xl font-semibold mb-2">Session Not Found</h2>
+        <p className="text-purple-200 text-center">This session does not exist or has been removed.</p>
+      </div>
+    );
+  }
+
+  // Check session status and display appropriate messages for non-active states
+  if (currentSession.status === 'waiting') {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex flex-col items-center justify-center text-white p-8">
+        <Clock size={48} className="mb-4 text-purple-300" />
+        <h2 className="text-2xl font-semibold mb-2">Session Starting Soon</h2>
+        <p className="text-purple-200 text-center">Please wait for the host to begin the tasting.</p>
+      </div>
+    );
+  }
+
+  if (currentSession.status === 'paused') {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex flex-col items-center justify-center text-white p-8">
+        <Pause size={48} className="mb-4 text-yellow-300" />
+        <h2 className="text-2xl font-semibold mb-2">Session Paused</h2>
+        <p className="text-purple-200 text-center">The host has currently paused the tasting. Please wait.</p>
+      </div>
+    );
+  }
+
+  if (currentSession.status === 'completed') {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex flex-col items-center justify-center text-white p-8">
+        <CheckCircle size={48} className="mb-4 text-green-300" />
+        <h2 className="text-2xl font-semibold mb-2">Session Completed</h2>
+        <p className="text-purple-200 text-center">This tasting session has ended. Thank you!</p>
+      </div>
+    );
+  }
+
+  if (currentSession.status !== 'active') {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex flex-col items-center justify-center text-white p-8">
+        <Clock size={48} className="mb-4 text-purple-300" />
+        <h2 className="text-2xl font-semibold mb-2">Waiting for Session</h2>
+        <p className="text-purple-200 text-center">Waiting for session to become active...</p>
+      </div>
+    );
+  }
+
+  // Only render tasting content if session is active
   return (
     <div className="min-h-screen bg-gradient-primary">
       {/* Progress Header */}

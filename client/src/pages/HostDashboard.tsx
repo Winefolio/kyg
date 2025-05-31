@@ -12,6 +12,7 @@ import {
   Play, Pause, RotateCcw, Eye, Clock, TrendingUp, CheckCircle 
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import type { Session, Participant, Slide, Response } from "@shared/schema";
 
 // Analytics data types
@@ -153,30 +154,69 @@ export default function HostDashboard() {
     window.open(qrUrl, '_blank');
   };
 
+  // Session status update mutation
+  const updateSessionStatusMutation = useMutation({
+    mutationFn: async (status: string) => {
+      const response = await apiRequest('PATCH', `/api/sessions/${sessionId}/status`, { status });
+      return response.json();
+    },
+    onSuccess: () => {
+      // Refetch session data to get updated status
+      refetchSession();
+    }
+  });
+
   // Session control functions
-  const startSession = () => {
-    setSessionStatus('active');
-    toast({
-      title: "Session Started!",
-      description: "Participants can now begin the tasting"
-    });
+  const startSession = async () => {
+    try {
+      await updateSessionStatusMutation.mutateAsync('active');
+      setSessionStatus('active');
+      toast({
+        title: "Session Started!",
+        description: "Participants can now begin the tasting"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to start session",
+        variant: "destructive"
+      });
+    }
   };
 
-  const pauseSession = () => {
-    setSessionStatus('paused');
-    toast({
-      title: "Session Paused",
-      description: "Participants will see a pause message"
-    });
+  const pauseSession = async () => {
+    try {
+      await updateSessionStatusMutation.mutateAsync('paused');
+      setSessionStatus('paused');
+      toast({
+        title: "Session Paused",
+        description: "Participants will see a pause message"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to pause session",
+        variant: "destructive"
+      });
+    }
   };
 
-  const resetSession = () => {
-    setSessionStatus('waiting');
-    setCurrentSlideIndex(0);
-    toast({
-      title: "Session Reset",
-      description: "All participants will return to the beginning"
-    });
+  const resetSession = async () => {
+    try {
+      await updateSessionStatusMutation.mutateAsync('waiting');
+      setSessionStatus('waiting');
+      setCurrentSlideIndex(0);
+      toast({
+        title: "Session Reset",
+        description: "All participants will return to the beginning"
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to reset session",
+        variant: "destructive"
+      });
+    }
   };
 
   // Use analytics data for completion statistics when available
