@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useHaptics } from "@/hooks/useHaptics";
 import { animations } from "@/lib/animations";
+import { apiRequest } from "@/lib/queryClient";
 import { Wine, Camera, Keyboard, WifiOff, Wifi } from "lucide-react";
 import { QRScanner } from "@/components/QRScanner";
 
@@ -35,17 +36,13 @@ export default function Gateway() {
     setIsValidating(true);
     
     try {
-      const response = await fetch(`/api/packages/${packageCode}`);
-      if (response.ok) {
-        triggerHaptic('success');
-        setLocation(`/session/${packageCode}`);
-      } else {
-        triggerHaptic('error');
-        // Handle error
-      }
+      const response = await apiRequest('GET', `/api/packages/${packageCode}`, null);
+      const packageData = await response.json();
+      triggerHaptic('success');
+      setLocation(`/session/${packageCode}`);
     } catch (error) {
       triggerHaptic('error');
-      // Handle error
+      // Handle error - package not found or network issue
     } finally {
       setIsValidating(false);
     }

@@ -34,7 +34,7 @@ export default function TastingSession() {
   const { data: slidesData, isLoading } = useQuery<{ slides: Slide[]; totalCount: number }>({
     queryKey: [`/api/packages/WINE01/slides`],
     queryFn: async () => {
-      const response = await fetch(`/api/packages/WINE01/slides?participantId=${participantId}`);
+      const response = await apiRequest('GET', `/api/packages/WINE01/slides?participantId=${participantId}`, null);
       return response.json();
     },
     enabled: !!participantId
