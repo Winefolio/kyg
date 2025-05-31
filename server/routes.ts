@@ -141,7 +141,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(updatedSession);
     } catch (error: any) {
-      console.error(`Error updating session ${sessionId} status:`, error);
+      console.error(`Error updating session ${req.params.sessionId} status:`, error);
       if (error.message?.includes('Invalid session status')) {
         return res.status(400).json({ message: error.message });
       }

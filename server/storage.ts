@@ -275,6 +275,7 @@ export class DatabaseStorage implements IStorage {
         startedAt: sessions.startedAt,
         completedAt: sessions.completedAt,
         activeParticipants: sessions.activeParticipants,
+        updatedAt: sessions.updatedAt,
         packageCode: packages.code
       })
       .from(sessions)
@@ -293,6 +294,7 @@ export class DatabaseStorage implements IStorage {
       startedAt: sessionData.startedAt,
       completedAt: sessionData.completedAt,
       activeParticipants: sessionData.activeParticipants,
+      updatedAt: sessionData.updatedAt,
       packageCode: sessionData.packageCode || undefined
     };
     
@@ -315,7 +317,10 @@ export class DatabaseStorage implements IStorage {
 
     const updatedSessions = await db
       .update(sessions)
-      .set({ status })
+      .set({ 
+        status,
+        updatedAt: new Date()
+      })
       .where(eq(sessions.id, sessionId))
       .returning();
     

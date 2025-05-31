@@ -33,7 +33,8 @@ export const sessions = pgTable("sessions", {
   status: varchar("status", { length: 20 }).default('waiting').notNull(),
   startedAt: timestamp("started_at").defaultNow(),
   completedAt: timestamp("completed_at"),
-  activeParticipants: integer("active_participants").default(0)
+  activeParticipants: integer("active_participants").default(0),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
 });
 
 // Participants table
