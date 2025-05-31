@@ -379,35 +379,25 @@ export class DatabaseStorage implements IStorage {
       throw new Error('Participant not found');
     }
 
-    const existingResponse = await db
-      .select()
-      .from(responses)
-      .where(
-        and(
-          eq(responses.participantId, participantId),
-          eq(responses.slideId, slideId)
-        )
-      )
-      .limit(1);
-
-    if (existingResponse.length > 0) {
-      const updated = await db
-        .update(responses)
-        .set({ 
+    // Use upsert with ON CONFLICT to handle race conditions
+    const result = await db
+      .insert(responses)
+      .values({
+        participantId,
+        slideId,
+        answerJson,
+        synced: true
+      })
+      .onConflictDoUpdate({
+        target: [responses.participantId, responses.slideId],
+        set: {
           answerJson,
           answeredAt: new Date()
-        })
-        .where(eq(responses.id, existingResponse[0].id))
-        .returning();
-      return updated[0];
-    } else {
-      return this.createResponse({ 
-        participantId, 
-        slideId, 
-        answerJson, 
-        synced: true 
-      });
-    }
+        }
+      })
+      .returning();
+    
+    return result[0];
   }
 
   // Analytics method

@@ -1,0 +1,53 @@
+Ensure Accurate Participant Progress Percentage in Host Dashboard
+Context & Why:
+In client/src/pages/HostDashboard.tsx, the "Participants" tab displays each participant's progress as a percentage (around lines 288-314). This percentage is currently calculated using:
+const progress = Math.round(((participant.progressPtr || 0) / slides.length) * 100);
+where slides is derived from the useQuery fetching /api/packages/${session?.packageCode}/slides?participantId=${participantId}.
+
+The backend route GET /api/packages/:code/slides (in server/routes.ts) and the underlying storage.getSlidesByPackageId(packageId, isHost) method correctly filter slides based on the isHost status of the requester (in this case, the host viewing the dashboard). This means the slides array fetched by HostDashboard.tsx likely contains all slides, including host-only ones, because the participantId in the URL (/host/:sessionId/:participantId) refers to the host.
+
+However, when calculating the progress percentage for a non-host participant displayed in the list, the denominator should be the total number of slides that specific non-host participant is expected to see (i.e., excluding host-only slides). Using the total length of all slides (including host-only ones) as the denominator for non-host participants will result in an artificially low progress percentage for them.
+
+Objective (What):
+Modify client/src/pages/HostDashboard.tsx to ensure that when calculating the progress percentage for each participant in the "Participants" tab:
+
+The total number of slides used as the denominator correctly reflects the number of slides visible to a non-host participant (if the current participant being displayed is not a host).
+The progress for a host participant can still be calculated against the total number of slides they see (which might be all slides).
+Implementation Details (How):
+
+Fetch or Determine Participant-Visible Slide Count:
+
+The slides array fetched by the Host Dashboard (around line 39) contains all slides visible to the host.
+We need to determine the count of slides that are not host-only.
+You can filter the existing slides array on the client-side to get this count:
+TypeScript
+
+const participantViewableSlides = slides.filter(slide => !(slide.payloadJson as any)?.for_host);
+const participantViewableSlideCount = participantViewableSlides.length;
+// For a host participant, their total slide count would be `slides.length` (all slides they can see)
+Modify Progress Calculation within the participants.map function (around line 290):
+
+Inside the loop where each participant's progress is displayed:
+Determine the correct totalSlidesForPercentage for the current participant being iterated over.
+If participant.isHost is true, totalSlidesForPercentage = slides.length.
+If participant.isHost is false, totalSlidesForPercentage = participantViewableSlideCount.
+Ensure totalSlidesForPercentage is not zero to avoid division by zero errors.
+Update the progress calculation:
+TypeScript
+
+// Inside participants.map((participant) => { ... })
+const totalSlidesForThisParticipant = participant.isHost ? slides.length : participantViewableSlideCount;
+const progressDenominator = totalSlidesForThisParticipant > 0 ? totalSlidesForThisParticipant : 1; // Avoid division by zero
+const progress = Math.round(((participant.progressPtr || 0) / progressDenominator) * 100);
+
+// Also update the text display:
+// <p className="text-purple-200 text-xs mt-1">
+//   Step {participant.progressPtr || 0} of {totalSlidesForThisParticipant}
+// </p>
+Acceptance Criteria:
+
+In the "Participants" tab of HostDashboard.tsx:
+The progress percentage displayed for non-host participants is calculated against the total number of slides that are not host-only.
+The progress percentage displayed for host participants is calculated against the total number of slides visible to the host (which may include host-only slides).
+The "Step X of Y" text also reflects the correct total Y for that participant type.
+The dashboard remains functional and does not introduce new errors.

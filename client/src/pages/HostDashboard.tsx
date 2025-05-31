@@ -312,8 +312,13 @@ export default function HostDashboard() {
                 <div className="space-y-4">
                   {participants.length > 0 ? (
                     participants.map((participant) => {
-                      const progress = Math.round(((participant.progressPtr || 0) / slides.length) * 100);
-                      const isCompleted = (participant.progressPtr || 0) >= slides.length;
+                      // Calculate the correct total slides count for this participant
+                      const participantViewableSlides = slides.filter(slide => !(slide.payloadJson as any)?.for_host);
+                      const totalSlidesForThisParticipant = participant.isHost ? slides.length : participantViewableSlides.length;
+                      const progressDenominator = totalSlidesForThisParticipant > 0 ? totalSlidesForThisParticipant : 1;
+                      
+                      const progress = Math.round(((participant.progressPtr || 0) / progressDenominator) * 100);
+                      const isCompleted = (participant.progressPtr || 0) >= totalSlidesForThisParticipant;
                       
                       return (
                         <div key={participant.id} className="flex items-center space-x-4 p-4 rounded-lg bg-white/5">
@@ -342,7 +347,7 @@ export default function HostDashboard() {
                             </div>
                             <Progress value={progress} className="h-2" />
                             <p className="text-purple-200 text-xs mt-1">
-                              Step {participant.progressPtr || 0} of {slides.length}
+                              Step {participant.progressPtr || 0} of {totalSlidesForThisParticipant}
                             </p>
                           </div>
                         </div>
