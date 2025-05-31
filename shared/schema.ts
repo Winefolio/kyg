@@ -101,9 +101,9 @@ export const insertParticipantSchema = createInsertSchema(participants, {
 });
 
 export const insertResponseSchema = createInsertSchema(responses, {
-  participantId: z.string(),
-  slideId: z.string(),
-  synced: z.boolean().default(true)
+  participantId: z.string().nullable().optional(),
+  slideId: z.string().nullable().optional(),
+  synced: z.boolean().nullable().optional()
 }).omit({
   id: true,
   answeredAt: true
