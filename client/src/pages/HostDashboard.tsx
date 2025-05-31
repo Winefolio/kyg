@@ -14,6 +14,41 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { Session, Participant, Slide, Response } from "@shared/schema";
 
+// Analytics data types
+interface SlideAnalytics {
+  slideId: string;
+  slidePosition: number;
+  slideTitle: string;
+  slideType: string;
+  questionType?: string;
+  totalResponses: number;
+  aggregatedData: {
+    optionsSummary?: Array<{
+      optionId: string;
+      optionText: string;
+      count: number;
+      percentage: number;
+    }>;
+    notesSubmittedCount?: number;
+    averageScore?: number;
+    minScore?: number;
+    maxScore?: number;
+    scoreDistribution?: { [key: string]: number };
+  };
+}
+
+interface SessionAnalyticsData {
+  sessionId: string;
+  sessionName: string;
+  packageName: string;
+  packageCode: string;
+  totalParticipants: number;
+  completedParticipants: number;
+  averageProgressPercent: number;
+  totalQuestions: number;
+  slidesAnalytics: SlideAnalytics[];
+}
+
 export default function HostDashboard() {
   const { sessionId, participantId } = useParams();
   const { toast } = useToast();
@@ -42,11 +77,15 @@ export default function HostDashboard() {
   });
   const slides = slideData?.slides || [];
 
-  // Fetch all responses for analytics (temporarily disabled until endpoint is created)
-  const { data: allResponses = [] } = useQuery<Response[]>({
-    queryKey: [`/api/sessions/${sessionId}/responses`],
-    enabled: false, // Temporarily disabled - endpoint doesn't exist yet
-    refetchInterval: 5000,
+  // Fetch analytics data from the new endpoint
+  const { 
+    data: analyticsData, 
+    isLoading: analyticsLoading, 
+    error: analyticsError 
+  } = useQuery<SessionAnalyticsData>({
+    queryKey: [`/api/sessions/${sessionId}/analytics`],
+    enabled: !!sessionId,
+    refetchInterval: 10000, // Refresh analytics every 10 seconds
   });
 
   // Generate QR and sharing functions
@@ -107,18 +146,9 @@ export default function HostDashboard() {
     });
   };
 
-  // Calculate completion statistics
-  const getCompletionStats = () => {
-    if (!participants.length || !slides.length) return { avgProgress: 0, completedCount: 0 };
-    
-    const totalProgress = participants.reduce((sum, p) => sum + (p.progressPtr || 0), 0);
-    const avgProgress = Math.round((totalProgress / participants.length / slides.length) * 100);
-    const completedCount = participants.filter(p => (p.progressPtr || 0) >= slides.length).length;
-    
-    return { avgProgress, completedCount };
-  };
-
-  const { avgProgress, completedCount } = getCompletionStats();
+  // Use analytics data for completion statistics when available
+  const avgProgress = analyticsData?.averageProgressPercent || 0;
+  const completedCount = analyticsData?.completedParticipants || 0;
 
   if (sessionLoading || participantsLoading) {
     return (
@@ -338,11 +368,15 @@ export default function HostDashboard() {
                   <div className="space-y-4">
                     <div className="flex justify-between">
                       <span>Total Responses:</span>
-                      <span className="font-bold">{allResponses.length}</span>
+                      <span className="font-bold">
+                        {analyticsData?.slidesAnalytics.reduce((total, slide) => total + slide.totalResponses, 0) || 0}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Questions Answered:</span>
-                      <span className="font-bold">{slides.filter(s => s.type === 'question').length}</span>
+                      <span className="font-bold">
+                        {analyticsData?.slidesAnalytics.filter(slide => slide.totalResponses > 0).length || 0} / {analyticsData?.totalQuestions || 0}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Completion Rate:</span>
@@ -362,23 +396,127 @@ export default function HostDashboard() {
                 <CardContent className="text-white">
                   <div className="space-y-4">
                     <div className="flex justify-between">
-                      <span>Active Time:</span>
-                      <span className="font-bold">
-                        {sessionStatus === 'active' ? '5m 23s' : '0m 0s'}
-                      </span>
+                      <span>Package:</span>
+                      <span className="font-bold">{analyticsData?.packageName || session?.packageCode || 'Loading...'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Average Session Time:</span>
-                      <span className="font-bold">12m 45s</span>
+                      <span>Total Questions:</span>
+                      <span className="font-bold">{analyticsData?.totalQuestions || 0}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Engagement Rate:</span>
-                      <span className="font-bold text-green-400">94%</span>
+                      <span>Active Participants:</span>
+                      <span className="font-bold text-green-400">{analyticsData?.totalParticipants || 0}</span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
+            
+            {/* Per-Slide Analytics Breakdown */}
+            {analyticsLoading ? (
+              <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
+                <CardContent className="text-white text-center py-8">
+                  Loading detailed analytics...
+                </CardContent>
+              </Card>
+            ) : analyticsError ? (
+              <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
+                <CardContent className="text-white text-center py-8">
+                  <p className="text-red-400">Error loading analytics data</p>
+                  <p className="text-sm text-purple-200 mt-2">Please try refreshing the page</p>
+                </CardContent>
+              </Card>
+            ) : analyticsData?.slidesAnalytics && analyticsData.slidesAnalytics.length > 0 ? (
+              <div className="space-y-6">
+                <h3 className="text-2xl font-bold text-white text-center">Question Analytics Breakdown</h3>
+                {analyticsData.slidesAnalytics.map((slideAnalytic) => (
+                  <Card key={slideAnalytic.slideId} className="bg-gradient-card border-white/20 backdrop-blur-xl">
+                    <CardHeader>
+                      <CardTitle className="text-white">
+                        Q{slideAnalytic.slidePosition}: {slideAnalytic.slideTitle}
+                      </CardTitle>
+                      <CardDescription className="text-purple-200">
+                        {slideAnalytic.totalResponses} response{slideAnalytic.totalResponses !== 1 ? 's' : ''}
+                        {slideAnalytic.questionType && ` • ${slideAnalytic.questionType.replace('_', ' ')}`}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-white">
+                      {slideAnalytic.questionType === 'multiple_choice' && slideAnalytic.aggregatedData.optionsSummary ? (
+                        <div className="space-y-4">
+                          <h4 className="font-semibold">Response Distribution:</h4>
+                          <div className="space-y-2">
+                            {slideAnalytic.aggregatedData.optionsSummary.map((option) => (
+                              <div key={option.optionId} className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm">{option.optionText}</span>
+                                  <span className="font-bold">{option.count} ({option.percentage}%)</span>
+                                </div>
+                                <div className="w-full bg-white/10 rounded-full h-2">
+                                  <div 
+                                    className="bg-gradient-button h-2 rounded-full transition-all duration-300"
+                                    style={{ width: `${option.percentage}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {slideAnalytic.aggregatedData.notesSubmittedCount !== undefined && slideAnalytic.aggregatedData.notesSubmittedCount > 0 && (
+                            <div className="mt-4 pt-4 border-t border-white/20">
+                              <p className="text-sm text-purple-200">
+                                {slideAnalytic.aggregatedData.notesSubmittedCount} participant{slideAnalytic.aggregatedData.notesSubmittedCount !== 1 ? 's' : ''} added notes
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ) : slideAnalytic.questionType === 'scale' && slideAnalytic.aggregatedData.averageScore !== undefined ? (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-green-400">{slideAnalytic.aggregatedData.averageScore}</div>
+                              <div className="text-sm text-purple-200">Average Score</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xl font-bold">{slideAnalytic.aggregatedData.minScore} - {slideAnalytic.aggregatedData.maxScore}</div>
+                              <div className="text-sm text-purple-200">Range</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xl font-bold">{slideAnalytic.aggregatedData.totalResponses || 0}</div>
+                              <div className="text-sm text-purple-200">Total Responses</div>
+                            </div>
+                          </div>
+                          {slideAnalytic.aggregatedData.scoreDistribution && Object.keys(slideAnalytic.aggregatedData.scoreDistribution).length > 0 && (
+                            <div className="mt-4">
+                              <h4 className="font-semibold mb-2">Score Distribution:</h4>
+                              <div className="grid grid-cols-5 gap-2">
+                                {Object.entries(slideAnalytic.aggregatedData.scoreDistribution)
+                                  .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                                  .map(([score, count]) => (
+                                    <div key={score} className="text-center text-sm">
+                                      <div className="font-bold">{score}</div>
+                                      <div className="text-purple-200">{count} vote{count !== 1 ? 's' : ''}</div>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center text-purple-200">
+                          No response data available for this question
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
+                <CardContent className="text-white text-center py-8">
+                  <p className="text-purple-200">No question analytics available yet</p>
+                  <p className="text-sm text-purple-300 mt-2">Analytics will appear once participants start answering questions</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="controls" className="space-y-6">
