@@ -66,9 +66,18 @@ export default function TastingSession() {
   };
 
   const handleNext = () => {
+    // Mark current slide as completed
+    if (!completedSlides.includes(currentSlideIndex)) {
+      setCompletedSlides(prev => [...prev, currentSlideIndex]);
+    }
+    
     if (currentSlideIndex < slides.length - 1) {
       triggerHaptic('navigation');
       setCurrentSlideIndex(prev => prev + 1);
+    } else {
+      // Session completed
+      triggerHaptic('success');
+      // Could redirect to completion page or show summary
     }
   };
 
@@ -159,7 +168,12 @@ export default function TastingSession() {
         <div className="px-6 py-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-3">
-              <Button variant="ghost" size="sm" className="p-2 hover:bg-white/10 text-white">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="p-2 hover:bg-white/10 text-white"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+              >
                 <Menu size={20} />
               </Button>
               <div>
@@ -201,6 +215,96 @@ export default function TastingSession() {
           <Progress value={progress} className="h-2 bg-white/20" />
         </div>
       </div>
+
+      {/* Sidebar Navigation */}
+      <div className={`fixed top-0 left-0 h-full w-80 bg-gradient-primary/95 backdrop-blur-xl border-r border-white/10 transform transition-transform duration-300 z-40 ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-white font-semibold text-lg">Progress Overview</h3>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="p-2 hover:bg-white/10 text-white"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X size={16} />
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {slides.map((slide, index) => {
+              const isCompleted = completedSlides.includes(index);
+              const isCurrent = index === currentSlideIndex;
+              const isAccessible = index <= currentSlideIndex || isCompleted;
+              
+              return (
+                <div
+                  key={slide.id}
+                  className={`p-3 rounded-lg border transition-all cursor-pointer ${
+                    isCurrent 
+                      ? 'bg-white/20 border-white/30 text-white' 
+                      : isCompleted
+                        ? 'bg-green-500/20 border-green-400/30 text-green-200 hover:bg-green-500/30'
+                        : isAccessible
+                          ? 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
+                          : 'bg-white/5 border-white/5 text-white/30 cursor-not-allowed'
+                  }`}
+                  onClick={() => {
+                    if (isAccessible) {
+                      setCurrentSlideIndex(index);
+                      setSidebarOpen(false);
+                      triggerHaptic('navigation');
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
+                        isCompleted ? 'bg-green-500 text-white' : 'bg-white/20 text-white'
+                      }`}>
+                        {isCompleted ? <CheckCircle size={14} /> : index + 1}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">
+                          {slide.type === 'interlude' ? 'Introduction' : `Question ${index}`}
+                        </p>
+                        <p className="text-xs opacity-75 truncate">
+                          {(slide.payloadJson as any).title || 'Wine Information'}
+                        </p>
+                      </div>
+                    </div>
+                    {isCurrent && <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Summary Stats */}
+          <div className="mt-6 p-4 bg-white/5 rounded-lg">
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between text-white">
+                <span>Completed:</span>
+                <span className="font-semibold">{completedSlides.length}/{slides.length}</span>
+              </div>
+              <div className="flex justify-between text-white">
+                <span>Progress:</span>
+                <span className="font-semibold">{Math.round((completedSlides.length / slides.length) * 100)}%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
       {/* Question Content */}
       <div className="p-6 pb-32">

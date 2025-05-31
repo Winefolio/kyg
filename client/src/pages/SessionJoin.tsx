@@ -11,9 +11,11 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { UserProfileModal } from "@/components/UserProfileModal";
 import { useHaptics } from "@/hooks/useHaptics";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { apiRequest } from "@/lib/queryClient";
-import { Wine, Users } from "lucide-react";
+import { Wine, Users, User } from "lucide-react";
 import type { Package, Participant } from "@shared/schema";
 
 const joinFormSchema = z.object({
@@ -28,19 +30,21 @@ export default function SessionJoin() {
   const { packageCode } = useParams();
   const [, setLocation] = useLocation();
   const [isJoining, setIsJoining] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   
   // Get URL parameters for QR code flow
   const urlParams = new URLSearchParams(window.location.search);
   const sessionParam = urlParams.get('session');
   const codeParam = urlParams.get('code') || packageCode;
   const { triggerHaptic } = useHaptics();
+  const { user, updateUser, addTastingSession, isAuthenticated } = useUserProfile();
   const queryClient = useQueryClient();
 
   const form = useForm<JoinFormData>({
     resolver: zodResolver(joinFormSchema),
     defaultValues: {
-      displayName: "",
-      email: "",
+      displayName: user?.displayName || "",
+      email: user?.email || "",
       isHost: false
     }
   });
