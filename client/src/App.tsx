@@ -7,12 +7,15 @@ import Gateway from "@/pages/Gateway";
 import SessionJoin from "@/pages/SessionJoin";
 import TastingSession from "@/pages/TastingSession";
 import HostDashboard from "@/pages/HostDashboard";
+import SommelierDashboard from "@/pages/SommelierDashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Gateway} />
+      <Route path="/" component={SommelierDashboard} />
+      <Route path="/gateway" component={Gateway} />
+      <Route path="/join" component={SessionJoin} />
       <Route path="/session/:packageCode" component={SessionJoin} />
       <Route path="/tasting/:sessionId/:participantId" component={TastingSession} />
       <Route path="/host/:sessionId/:participantId" component={HostDashboard} />

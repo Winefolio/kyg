@@ -220,10 +220,9 @@ export default function TastingSession() {
           </Button>
           <Button
             onClick={handleNext}
-            disabled={currentSlideIndex === slides.length - 1}
             className="flex-1 py-4 px-6 bg-gradient-button text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300"
           >
-            Next
+            {currentSlideIndex === slides.length - 1 ? 'Finish' : 'Next'}
             <ArrowRight className="ml-2" size={16} />
           </Button>
         </div>
