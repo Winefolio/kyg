@@ -1,5 +1,7 @@
-import { useState, useRef, useCallback } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 import { useHaptics } from "@/hooks/useHaptics";
 
 interface ScaleQuestionProps {
@@ -18,96 +20,26 @@ interface ScaleQuestionProps {
 export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps) {
   const { triggerHaptic } = useHaptics();
   const [isDragging, setIsDragging] = useState(false);
-  const [localValue, setLocalValue] = useState(value);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Enhanced constants for premium circular slider
-  const centerX = 150;
-  const centerY = 150;
-  const radius = 135;
-  const strokeWidth = 6;
-  const progressStrokeWidth = 10;
-  const thumbRadius = 14;
-
-  // Calculate angle from value (270-degree arc from -135 to +135 degrees)
-  const valueToAngle = useCallback((val: number) => {
-    const range = question.scale_max - question.scale_min;
-    const normalizedValue = (val - question.scale_min) / range;
-    // Start from bottom-left (-135 degrees) and go to bottom-right (135 degrees)
-    return -135 + (normalizedValue * 270);
-  }, [question.scale_min, question.scale_max]);
-
-  // Calculate value from angle
-  const angleToValue = useCallback((angle: number) => {
-    // Constrain angle to -135 to 135 degrees
-    let constrainedAngle = Math.max(-135, Math.min(135, angle));
-    
-    // Normalize angle to 0-1 range
-    const normalizedAngle = (constrainedAngle + 135) / 270;
-    const range = question.scale_max - question.scale_min;
-    return Math.round(question.scale_min + (normalizedAngle * range));
-  }, [question.scale_min, question.scale_max]);
-
-  // Calculate thumb position
-  const getThumbPosition = useCallback((val: number) => {
-    const angle = valueToAngle(val);
-    const angleRad = (angle * Math.PI) / 180;
-    return {
-      x: centerX + radius * Math.cos(angleRad),
-      y: centerY + radius * Math.sin(angleRad)
-    };
-  }, [valueToAngle]);
-
-  // Handle mouse/touch interaction anywhere in the container
-  const handlePointerMove = useCallback((event: any) => {
-    if (!containerRef.current) return;
-
-    const rect = containerRef.current.getBoundingClientRect();
-    const centerXPage = rect.left + rect.width / 2;
-    const centerYPage = rect.top + rect.height / 2;
-    
-    let clientX, clientY;
-    if (event.touches && event.touches[0]) {
-      clientX = event.touches[0].clientX;
-      clientY = event.touches[0].clientY;
-    } else {
-      clientX = event.clientX;
-      clientY = event.clientY;
-    }
-    
-    const deltaX = clientX - centerXPage;
-    const deltaY = clientY - centerYPage;
-    
-    const angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
-    const newValue = angleToValue(angle);
-    
-    if (newValue !== localValue && newValue >= question.scale_min && newValue <= question.scale_max) {
-      setLocalValue(newValue);
+  const handleValueChange = (newValue: number[]) => {
+    const val = newValue[0];
+    if (val !== value) {
       triggerHaptic('selection');
+      onChange(val);
     }
-  }, [localValue, angleToValue, triggerHaptic, question.scale_min, question.scale_max]);
+  };
 
-  const handlePointerStart = useCallback((event: any) => {
+  const handlePointerDown = () => {
     setIsDragging(true);
     triggerHaptic('selection');
-    handlePointerMove(event);
-  }, [triggerHaptic, handlePointerMove]);
+  };
 
-  const handlePointerEnd = useCallback(() => {
+  const handlePointerUp = () => {
     setIsDragging(false);
-    onChange(localValue);
-    triggerHaptic('success');
-  }, [localValue, onChange, triggerHaptic]);
+  };
 
-  // Calculate progress for the arc (fixed to start from bottom-left)
-  const progress = (localValue - question.scale_min) / (question.scale_max - question.scale_min);
-  const circumference = 2 * Math.PI * radius;
-  const arcLength = circumference * 0.75; // 270 degrees = 75% of full circle
-  const strokeDasharray = `${arcLength} ${circumference}`;
-  // Start empty and fill clockwise from -135° to +135°
-  const strokeDashoffset = arcLength * (1 - progress);
-
-  const thumbPosition = getThumbPosition(localValue);
+  // Calculate fill percentage for wine glass animation
+  const fillPercentage = ((value - question.scale_min) / (question.scale_max - question.scale_min)) * 100;
 
   return (
     <motion.div
@@ -125,162 +57,165 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
         <p className="text-white/70">{question.description}</p>
       </div>
 
-      <div className="flex flex-col items-center space-y-6">
-        {/* Premium Circular SVG Slider */}
-        <div 
-          ref={containerRef}
-          className="relative cursor-pointer select-none"
-          onMouseDown={handlePointerStart}
-          onMouseMove={isDragging ? handlePointerMove : undefined}
-          onMouseUp={handlePointerEnd}
-          onMouseLeave={handlePointerEnd}
-          onTouchStart={handlePointerStart}
-          onTouchMove={isDragging ? handlePointerMove : undefined}
-          onTouchEnd={handlePointerEnd}
-        >
-          <svg
-            width="320"
-            height="320"
-            viewBox="0 0 300 300"
-            className="drop-shadow-2xl pointer-events-none"
-          >
-            {/* Premium gradient definitions */}
-            <defs>
-              <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#8B5CF6" />
-                <stop offset="30%" stopColor="#A855F7" />
-                <stop offset="70%" stopColor="#C084FC" />
-                <stop offset="100%" stopColor="#DDD6FE" />
-              </linearGradient>
-              <radialGradient id="thumbGradient" cx="30%" cy="30%">
-                <stop offset="0%" stopColor="#ffffff" />
-                <stop offset="40%" stopColor="#F3F4F6" />
-                <stop offset="100%" stopColor="#8B5CF6" />
-              </radialGradient>
-              <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-                <feMerge> 
-                  <feMergeNode in="coloredBlur"/>
-                  <feMergeNode in="SourceGraphic"/>
-                </feMerge>
-              </filter>
-              <filter id="thumbShadow" x="-100%" y="-100%" width="300%" height="300%">
-                <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000000" floodOpacity="0.3"/>
-              </filter>
-            </defs>
+      <div className="space-y-8">
+        {/* Animated Wine Glass */}
+        <div className="flex justify-center mb-8">
+          <div className="relative">
+            <svg
+              viewBox="0 0 120 160"
+              className="w-32 h-40"
+              style={{ filter: 'drop-shadow(0 10px 25px rgba(0,0,0,0.3))' }}
+            >
+              <defs>
+                {/* Wine gradient */}
+                <linearGradient id="wine-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" style={{ stopColor: '#7c3aed', stopOpacity: 0.9 }} />
+                  <stop offset="50%" style={{ stopColor: '#a855f7', stopOpacity: 0.8 }} />
+                  <stop offset="100%" style={{ stopColor: '#c084fc', stopOpacity: 0.7 }} />
+                </linearGradient>
+                
+                {/* Glass reflection gradient */}
+                <linearGradient id="glass-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" style={{ stopColor: 'rgba(255,255,255,0.3)', stopOpacity: 1 }} />
+                  <stop offset="50%" style={{ stopColor: 'rgba(255,255,255,0.1)', stopOpacity: 1 }} />
+                  <stop offset="100%" style={{ stopColor: 'rgba(255,255,255,0.05)', stopOpacity: 1 }} />
+                </linearGradient>
 
-            {/* Background ring */}
-            <circle
-              className="ring"
-              cx={centerX}
-              cy={centerY}
-              r={radius}
-              fill="none"
-              stroke="rgba(255, 255, 255, 0.15)"
-              strokeWidth={strokeWidth}
-              strokeLinecap="round"
-              strokeDasharray={strokeDasharray}
-              transform={`rotate(45 ${centerX} ${centerY})`}
-            />
+                {/* Clipping path for wine fill */}
+                <clipPath id="wine-fill-clip">
+                  <motion.rect
+                    x="25"
+                    width="70"
+                    height="85"
+                    initial={{ y: 85 }}
+                    animate={{ 
+                      y: 85 - (fillPercentage * 0.85),
+                      transition: { 
+                        type: "spring", 
+                        stiffness: 200, 
+                        damping: 20,
+                        duration: 0.6
+                      }
+                    }}
+                  />
+                </clipPath>
+              </defs>
 
-            {/* Progress ring with enhanced visuals */}
-            <motion.circle
-              className="progress-ring"
-              cx={centerX}
-              cy={centerY}
-              r={radius}
-              fill="none"
-              stroke="url(#progressGradient)"
-              strokeWidth={progressStrokeWidth}
-              strokeLinecap="round"
-              strokeDasharray={strokeDasharray}
-              strokeDashoffset={strokeDashoffset}
-              transform={`rotate(45 ${centerX} ${centerY})`}
-              filter="url(#softGlow)"
-              animate={{
-                strokeDashoffset: strokeDashoffset,
-              }}
-              transition={{
-                type: "spring",
-                stiffness: 500,
-                damping: 35,
-                duration: 0.5
-              }}
-            />
+              {/* Wine glass bowl outline */}
+              <path
+                d="M25 30 Q25 20 35 20 L85 20 Q95 20 95 30 L95 85 Q95 95 85 95 L35 95 Q25 95 25 85 Z"
+                fill="url(#glass-gradient)"
+                stroke="rgba(255,255,255,0.4)"
+                strokeWidth="1.5"
+              />
 
-            {/* Premium thumb with shadow */}
-            <motion.circle
-              cx={thumbPosition.x}
-              cy={thumbPosition.y}
-              r={thumbRadius}
-              fill="url(#thumbGradient)"
-              stroke="#ffffff"
-              strokeWidth="2"
-              className="pointer-events-none"
-              animate={{
-                cx: thumbPosition.x,
-                cy: thumbPosition.y,
-                r: isDragging ? thumbRadius * 1.2 : thumbRadius,
-              }}
-              transition={{
-                type: "spring",
-                stiffness: 500,
-                damping: 30
-              }}
-              filter="url(#thumbShadow)"
-            />
-          </svg>
+              {/* Wine liquid */}
+              <motion.path
+                d="M25 30 Q25 20 35 20 L85 20 Q95 20 95 30 L95 85 Q95 95 85 95 L35 95 Q25 95 25 85 Z"
+                fill="url(#wine-gradient)"
+                clipPath="url(#wine-fill-clip)"
+                animate={{
+                  opacity: fillPercentage > 0 ? 1 : 0,
+                  transition: { duration: 0.3 }
+                }}
+              />
 
-          {/* Enhanced center value display */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              {/* Wine glass stem */}
+              <rect
+                x="57"
+                y="95"
+                width="6"
+                height="35"
+                fill="rgba(255,255,255,0.2)"
+                stroke="rgba(255,255,255,0.3)"
+                strokeWidth="1"
+              />
+
+              {/* Wine glass base */}
+              <ellipse
+                cx="60"
+                cy="145"
+                rx="20"
+                ry="8"
+                fill="rgba(255,255,255,0.15)"
+                stroke="rgba(255,255,255,0.3)"
+                strokeWidth="1"
+              />
+
+              {/* Glass highlight */}
+              <path
+                d="M30 25 Q30 22 32 22 L40 22 Q42 22 42 25 L42 40 Q40 42 38 42 L34 42 Q32 42 32 40 Z"
+                fill="rgba(255,255,255,0.3)"
+                opacity="0.6"
+              />
+            </svg>
+
+            {/* Fill level indicator */}
             <motion.div
-              className="text-center"
-              animate={isDragging ? { scale: 1.05 } : { scale: 1 }}
-              transition={{
-                type: "spring",
-                stiffness: 300,
-                damping: 25
+              className="absolute -right-12 top-1/2 transform -translate-y-1/2"
+              animate={{
+                opacity: isDragging ? 1 : 0.7,
+                scale: isDragging ? 1.1 : 1
               }}
             >
-              <motion.p
-                className="text-5xl font-bold text-white mb-2 filter drop-shadow-lg"
-                animate={isDragging ? { scale: 1.2 } : { scale: 1 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 400,
-                  damping: 25
-                }}
-              >
-                {Math.round(localValue)}
-              </motion.p>
-              <span className="text-white/60 text-xs font-medium tracking-wide">
-                {question.category.toUpperCase()}
-              </span>
+              <div className="bg-purple-600/20 backdrop-blur-sm rounded-lg px-3 py-2 border border-purple-400/30">
+                <div className="text-white font-semibold text-lg">{Math.round(fillPercentage)}%</div>
+                <div className="text-purple-200 text-xs">filled</div>
+              </div>
             </motion.div>
           </div>
+        </div>
 
-          {/* Min/Max labels positioned at arc endpoints */}
-          <p 
-            className="min-label absolute text-sm text-white/70 font-medium"
-            style={{ 
-              left: centerX - 95, 
-              top: centerY + 95,
-              transform: 'translate(-50%, -50%)'
-            }}
-          >
-            {question.scale_labels?.[0]}
-          </p>
-
-          <p 
-            className="max-label absolute text-sm text-white/70 font-medium"
-            style={{ 
-              left: centerX + 95, 
-              top: centerY + 95,
-              transform: 'translate(-50%, -50%)'
-            }}
-          >
-            {question.scale_labels?.[1]}
-          </p>
+        <div className="relative">
+          <Slider
+            value={[value]}
+            onValueChange={handleValueChange}
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
+            min={question.scale_min}
+            max={question.scale_max}
+            step={1}
+            className="slider"
+          />
+          <div className="flex justify-between text-white/60 text-sm mt-2">
+            <span>{question.scale_labels[0]}</span>
+            <motion.span 
+              className="text-xl font-semibold text-white"
+              animate={isDragging ? { scale: 1.1 } : { scale: 1 }}
+            >
+              {value}
+            </motion.span>
+            <span>{question.scale_labels[1]}</span>
+          </div>
+        </div>
+        
+        {/* Enhanced scale indicators with wine theme */}
+        <div className="flex justify-between">
+          {Array.from({ length: question.scale_max - question.scale_min + 1 }, (_, i) => {
+            const stepValue = i + question.scale_min;
+            const isActive = stepValue <= value;
+            const intensity = isActive ? (stepValue / question.scale_max) : 0;
+            
+            return (
+              <motion.div
+                key={i}
+                className={`w-3 h-8 rounded-full transition-all duration-500 ${
+                  isActive 
+                    ? 'bg-gradient-to-t from-purple-600 to-purple-400 shadow-lg shadow-purple-500/30' 
+                    : 'bg-white/20'
+                }`}
+                animate={{
+                  scale: isActive && isDragging ? 1.3 : 1,
+                  opacity: isActive ? 0.8 + (intensity * 0.2) : 0.4
+                }}
+                style={{
+                  background: isActive 
+                    ? `linear-gradient(to top, hsl(${270 + intensity * 20}, 70%, ${50 + intensity * 10}%), hsl(${270 + intensity * 20}, 70%, ${65 + intensity * 10}%))`
+                    : undefined
+                }}
+              />
+            );
+          })}
         </div>
       </div>
     </motion.div>

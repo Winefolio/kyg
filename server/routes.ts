@@ -124,40 +124,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Save response (with update-or-create logic)
+  // Save response
   app.post("/api/responses", async (req, res) => {
     try {
-      console.log("Received response data:", req.body);
+      console.log("POST /api/responses - Request body:", req.body);
       const validatedData = insertResponseSchema.parse(req.body);
-      console.log("Validated data:", validatedData);
+      console.log("POST /api/responses - Validated data:", validatedData);
       
-      // Try to update existing response first, then create if it doesn't exist
-      try {
-        const response = await storage.updateResponse(
-          validatedData.participantId!, 
-          validatedData.slideId!, 
-          validatedData.answerJson
+      const response = await storage.createResponse(validatedData);
+      console.log("POST /api/responses - Created response:", response);
+      
+      // Update participant progress
+      const participant = await storage.getParticipantById(validatedData.participantId);
+      if (participant) {
+        await storage.updateParticipantProgress(
+          participant.id, 
+          (participant.progressPtr || 0) + 1
         );
-        console.log("Updated existing response:", response);
-        res.json(response);
-      } catch (updateError) {
-        // If update fails (response doesn't exist), create new one
-        const response = await storage.createResponse(validatedData);
-        console.log("Created new response:", response);
-        
-        // Update participant progress
-        const participant = await storage.getParticipantById(validatedData.participantId!);
-        if (participant) {
-          await storage.updateParticipantProgress(
-            participant.id, 
-            participant.progressPtr! + 1
-          );
-        }
-        
-        res.json(response);
       }
+
+      res.json(response);
     } catch (error) {
-      console.error("Error creating/updating response:", error);
+      console.error("POST /api/responses - Error:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
       }
