@@ -1,0 +1,39 @@
+Prompt 2.1: Make Slides Query Dynamic in HostDashboard.tsx to Support All Packages
+Context & Why:
+In client/src/pages/HostDashboard.tsx, the useQuery call that fetches slides for the tasting session (around line 36) currently has the package code hardcoded as "WINE01" in its queryKey: queryKey: [\/api/packages/WINE01/slides?participantId=${participantId}`]`.
+
+This is problematic because:
+
+The Host Dashboard needs to display slides for the specific wine package associated with the current session (identified by sessionId from useParams()). Different sessions will be for different packages (e.g., "WINE01," "ITALY01," or any other package created via the Sommelier Dashboard or a future ETL process).
+Hardcoding "WINE01" means the dashboard will always show slides for the "WINE01" package, making it incorrect for any other session.
+The goal is to make this dynamic. The "WINE01" package (defined in database-setup.sql) will still serve as an excellent test case when you load a session specifically created for it. This change ensures the dashboard works correctly for all packages, including "WINE01" when it's the relevant one.
+
+The session object, fetched around line 24 of HostDashboard.tsx (const { data: session, ... }), contains session.packageId. However, the backend API endpoint GET /api/packages/:code/slides in server/routes.ts requires a package code, not a package ID.
+
+Objective (What):
+Modify client/src/pages/HostDashboard.tsx so that the query to fetch slides uses the correct, dynamic packageCode associated with the current session.packageId.
+
+Implementation Details (How):
+
+To achieve this, the frontend needs to obtain the packageCode using the session.packageId. There are two main approaches:
+
+Option A (Preferred for Efficiency): Modify Backend to Include packageCode in Session Data
+This is the most efficient approach as it avoids an extra frontend network request.
+
+Backend Modification (server/storage.ts and server/routes.ts):
+In server/storage.ts, modify the getSessionById(id: string) method in the DatabaseStorage class. When fetching a session, also fetch the associated package details (specifically the code) from the packages table using the session.packageId and include this packageCode in the returned Session object.
+You might need to adjust the Session type in @shared/schema.ts or create a new type for the API response if packageCode is added. A simple way is to return an object like { ...sessionData, packageCode: foundPackage.code }.
+Ensure the API route GET /api/sessions/:sessionId in server/routes.ts returns this enriched session object containing the packageCode.
+Frontend Modification (client/src/pages/HostDashboard.tsx):
+Once the backend provides session.packageCode, update the slides query (around line 36) to use it:
+TypeScript
+
+// const { data: session, ... } = useQuery<Session & { packageCode: string }>(...) // Update type if needed
+
+const { data: slideData } = useQuery<{slides: Slide[], totalCount: number}>({
+  // Use the packageCode from the fetched session data
+  queryKey: [\`/api/packages/<span class="math-inline">\{session?\.packageCode\}/slides?participantId\=</span>{participantId}\`],
+  // Ensure this query only runs if session and session.packageCode are available
+  enabled: !!session?.packageCode && !!participantId, 
+});
+const slides = slideData?.slides || [];

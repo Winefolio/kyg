@@ -21,7 +21,7 @@ export interface IStorage {
   
   // Sessions
   createSession(session: InsertSession): Promise<Session>;
-  getSessionById(id: string): Promise<Session | undefined>;
+  getSessionById(id: string): Promise<(Session & { packageCode?: string }) | undefined>;
   updateSessionParticipantCount(sessionId: string, count: number): Promise<void>;
   
   // Participants
@@ -262,13 +262,35 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getSessionById(id: string): Promise<Session | undefined> {
+  async getSessionById(id: string): Promise<(Session & { packageCode?: string }) | undefined> {
     const result = await db
-      .select()
+      .select({
+        id: sessions.id,
+        packageId: sessions.packageId,
+        startedAt: sessions.startedAt,
+        completedAt: sessions.completedAt,
+        activeParticipants: sessions.activeParticipants,
+        packageCode: packages.code
+      })
       .from(sessions)
+      .leftJoin(packages, eq(sessions.packageId, packages.id))
       .where(eq(sessions.id, id))
       .limit(1);
-    return result[0];
+    
+    const sessionData = result[0];
+    if (!sessionData) return undefined;
+    
+    // Convert the result to match our expected type
+    const session: Session & { packageCode?: string } = {
+      id: sessionData.id,
+      packageId: sessionData.packageId,
+      startedAt: sessionData.startedAt,
+      completedAt: sessionData.completedAt,
+      activeParticipants: sessionData.activeParticipants,
+      packageCode: sessionData.packageCode || undefined
+    };
+    
+    return session;
   }
 
   async updateSessionParticipantCount(sessionId: string, count: number): Promise<void> {

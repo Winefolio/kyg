@@ -21,7 +21,7 @@ export default function HostDashboard() {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
 
   // Fetch session information
-  const { data: session, isLoading: sessionLoading, refetch: refetchSession } = useQuery<Session>({
+  const { data: session, isLoading: sessionLoading, refetch: refetchSession } = useQuery<Session & { packageCode?: string }>({
     queryKey: [`/api/sessions/${sessionId}`],
     enabled: !!sessionId,
     refetchInterval: 5000, // Real-time updates
@@ -34,10 +34,10 @@ export default function HostDashboard() {
     refetchInterval: 3000, // Real-time updates
   });
 
-  // Fetch slides for this session (using package code instead of ID)
+  // Fetch slides for this session (using dynamic package code from session)
   const { data: slideData } = useQuery<{slides: Slide[], totalCount: number}>({
-    queryKey: [`/api/packages/WINE01/slides?participantId=${participantId}`],
-    enabled: !!session && !!participantId,
+    queryKey: [`/api/packages/${session?.packageCode}/slides?participantId=${participantId}`],
+    enabled: !!session?.packageCode && !!participantId,
   });
   const slides = slideData?.slides || [];
 
