@@ -51,7 +51,7 @@ export default function HostDashboard() {
   // Generate QR and sharing functions
   const generateQRData = () => {
     const baseUrl = window.location.origin;
-    return `${baseUrl}/join?code=WINE01`; // Using the package code for now
+    return `${baseUrl}/join?code=${session?.packageCode || 'WINE01'}`;
   };
 
   const copySessionLink = () => {
