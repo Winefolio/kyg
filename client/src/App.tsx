@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Gateway from "@/pages/Gateway";
 import SessionJoin from "@/pages/SessionJoin";
 import TastingSession from "@/pages/TastingSession";
+import TastingCompletion from "@/pages/TastingCompletion";
 import HostDashboard from "@/pages/HostDashboard";
 import SommelierDashboard from "@/pages/SommelierDashboard";
 import NotFound from "@/pages/not-found";
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/join" component={SessionJoin} />
       <Route path="/session/:packageCode" component={SessionJoin} />
       <Route path="/tasting/:sessionId/:participantId" component={TastingSession} />
+      <Route path="/completion/:sessionId/:participantId" component={TastingCompletion} />
       <Route path="/host/:sessionId/:participantId" component={HostDashboard} />
       <Route component={NotFound} />
     </Switch>

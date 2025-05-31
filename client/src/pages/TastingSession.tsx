@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -15,6 +15,7 @@ import type { Slide, Participant } from "@shared/schema";
 
 export default function TastingSession() {
   const { sessionId, participantId } = useParams();
+  const [, setLocation] = useLocation();
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -77,7 +78,7 @@ export default function TastingSession() {
     } else {
       // Session completed
       triggerHaptic('success');
-      // Could redirect to completion page or show summary
+      completeSession();
     }
   };
 
@@ -86,6 +87,20 @@ export default function TastingSession() {
       triggerHaptic('navigation');
       setCurrentSlideIndex(prev => prev - 1);
     }
+  };
+
+  const completeSession = () => {
+    // Mark final slide as completed
+    if (!completedSlides.includes(currentSlideIndex)) {
+      setCompletedSlides(prev => [...prev, currentSlideIndex]);
+    }
+
+    // Calculate final progress and session data
+    const finalProgress = Math.round(((completedSlides.length + 1) / slides.length) * 100);
+    
+    // Save session to user profile if user is authenticated
+    // For now, redirect to a completion summary
+    setLocation(`/completion/${sessionId}/${participantId}?progress=${finalProgress}`);
   };
 
   const renderQuestion = (slide: Slide) => {
