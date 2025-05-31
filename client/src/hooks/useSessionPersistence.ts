@@ -104,6 +104,25 @@ export function useSessionPersistence() {
     }
   };
 
+  // Clear stale offline data on startup
+  useEffect(() => {
+    const clearStaleData = async () => {
+      if (db) {
+        try {
+          // Clear all offline responses to prevent stale participant data from causing errors
+          const tx = db.transaction('offlineResponses', 'readwrite');
+          const store = tx.objectStore('offlineResponses');
+          await store.clear();
+          console.log('Cleared stale offline responses');
+        } catch (error) {
+          console.warn('Failed to clear stale offline data:', error);
+        }
+      }
+    };
+    
+    clearStaleData();
+  }, [db]);
+
   // Background sync when online
   useEffect(() => {
     const syncOfflineData = async () => {
@@ -146,8 +165,17 @@ export function useSessionPersistence() {
           if (db) {
             await db.delete('offlineResponses', item.id);
           }
-        } catch (error) {
-          failed.push(item);
+        } catch (error: any) {
+          // If participant not found (404), remove the stale offline response
+          if (error.status === 404 || error.message?.includes('Participant not found')) {
+            console.log('Removing stale offline response for non-existent participant:', item.participantId);
+            if (db) {
+              await db.delete('offlineResponses', item.id);
+            }
+          } else {
+            // For other errors, keep trying to sync
+            failed.push(item);
+          }
         }
       }
       

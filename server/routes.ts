@@ -129,6 +129,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertResponseSchema.parse(req.body);
       
+      // First check if participant exists
+      const participant = await storage.getParticipantById(validatedData.participantId!);
+      if (!participant) {
+        console.log(`Participant ${validatedData.participantId} not found - likely from stale offline sync`);
+        return res.status(404).json({ message: "Participant not found" });
+      }
+      
       // Try to update existing response first, create if it doesn't exist
       const response = await storage.updateResponse(
         validatedData.participantId!,
@@ -136,14 +143,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         validatedData.answerJson
       );
       
+      // Update participant progress and lastActive
+      const currentSlide = await storage.getSlideById(validatedData.slideId!);
+      if (currentSlide) {
+        // Only update progress if the current slide's position is further than current progress
+        if (currentSlide.position > (participant.progressPtr || 0)) {
+          await storage.updateParticipantProgress(
+            participant.id,
+            currentSlide.position
+          );
+          console.log(`Updated progress for participant ${participant.id} to slide position ${currentSlide.position}`);
+        } else {
+          // If re-answering a previous slide, still update lastActive but maintain current progress
+          await storage.updateParticipantProgress(
+            participant.id,
+            participant.progressPtr || 0
+          );
+          console.log(`Participant ${participant.id} re-answered slide or answered out of order. Progress pointer maintained at ${participant.progressPtr}. Last active updated.`);
+        }
+      }
+      
       res.json(response);
-    } catch (error) {
+    } catch (error: any) {
       console.log("POST /api/responses - Request body:", req.body);
       console.log("POST /api/responses - Error:", error);
       
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
       }
+      
+      // Handle participant not found errors specifically
+      if (error.message === 'Participant not found') {
+        return res.status(404).json({ message: "Participant not found" });
+      }
+      
       res.status(500).json({ message: "Internal server error" });
     }
   });

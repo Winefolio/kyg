@@ -373,6 +373,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateResponse(participantId: string, slideId: string, answerJson: any): Promise<Response> {
+    // First check if participant exists
+    const participant = await this.getParticipantById(participantId);
+    if (!participant) {
+      throw new Error('Participant not found');
+    }
+
     const existingResponse = await db
       .select()
       .from(responses)

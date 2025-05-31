@@ -1,0 +1,68 @@
+Reinstate and Refine Participant Progress Update Logic
+Context & Why:
+When a participant submits a response via POST /api/responses, their progress through the tasting session (tracked by participant.progressPtr) should be updated. This logic seems to have been inadvertently removed or altered in the current version of the POST /api/responses handler in server/routes.ts.
+
+Additionally, the progress should ideally only advance if the participant is answering a new, further slide, not if they are re-submitting an answer for an already passed slide. The "Ultimate Prompt" implied linear progression.
+
+Objective (What):
+
+Reinstate the logic in the POST /api/responses handler in server/routes.ts to update the participant.progressPtr after a response is successfully saved (created or updated).
+Refine this logic so that progressPtr is set to the position of the current slide being answered if that position is greater than the participant's current progressPtr.
+Implementation Details (How):
+
+Modify POST /api/responses in server/routes.ts (around lines 140-148):
+After successfully saving/upserting the response using storage.updateResponse(...):
+TypeScript
+
+// ... after const response = await storage.updateResponse(...);
+// and res.json(response); (or before res.json if you want to include updated participant in response)
+
+const participant = await storage.getParticipantById(validatedData.participantId);
+const currentSlide = await storage.getSlideById(validatedData.slideId);
+
+if (participant && currentSlide) {
+  // Only update progress if the current slide's position is further than current progress
+  // and ensure progressPtr doesn't exceed total number of slides (if known, otherwise cap later)
+  if (currentSlide.position > (participant.progressPtr || 0)) {
+    await storage.updateParticipantProgress(
+      participant.id,
+      currentSlide.position // Set progress to the position of the slide just answered
+    );
+    console.log(`Updated progress for participant ${participant.id} to slide position ${currentSlide.position}`);
+  } else {
+    // If re-answering a previous slide, or an out-of-order slide,
+    // still update lastActive but don't necessarily rewind progressPtr.
+    // The current storage.updateParticipantProgress also updates lastActive.
+    // If it doesn't, ensure lastActive is updated here or in storage method.
+    await storage.updateParticipantProgress( // This call primarily to update lastActive if not changing progressPtr
+        participant.id,
+        participant.progressPtr || 0 // Keep current progress if not advancing
+    );
+     console.log(`Participant ${participant.id} re-answered slide or answered out of order. Progress pointer maintained at ${participant.progressPtr}. Last active updated.`);
+  }
+}
+// The res.json(response) should likely come after these operations if client needs updated participant
+// or if these operations are critical to the success of the POST.
+// For now, having it before is fine for basic response saving.
+Review storage.updateParticipantProgress (in server/storage.ts):
+Confirm this method updates both progressPtr and lastActive:
+TypeScript
+
+// Current implementation:
+// async updateParticipantProgress(participantId: string, progress: number): Promise<void> {
+//   await db
+//     .update(participants)
+//     .set({ 
+//       progressPtr: progress,
+//       lastActive: new Date() // This is good, updates lastActive
+//     })
+//     .where(eq(participants.id, participantId));
+// }
+This is correct as it updates lastActive.
+Acceptance Criteria:
+
+When a participant submits a response via POST /api/responses:
+The participant.progressPtr in the database is updated to the position of the slideId they just responded to, but only if this slide.position is greater than their current progressPtr.
+The participant.lastActive timestamp is updated.
+If a participant re-submits an answer to an already completed slide (or a slide with a position less than or equal to their current progressPtr), their progressPtr does not decrease, but their lastActive timestamp should still be updated.
+The response saving itself remains functional.
