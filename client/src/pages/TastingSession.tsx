@@ -4,18 +4,21 @@ import { useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { MultipleChoiceQuestion } from "@/components/questions/MultipleChoiceQuestion";
 import { ScaleQuestion } from "@/components/questions/ScaleQuestion";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import { useHaptics } from "@/hooks/useHaptics";
 import { apiRequest } from "@/lib/queryClient";
-import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight } from "lucide-react";
+import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle } from "lucide-react";
 import type { Slide, Participant } from "@shared/schema";
 
 export default function TastingSession() {
   const { sessionId, participantId } = useParams();
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [completedSlides, setCompletedSlides] = useState<number[]>([]);
   const { saveResponse, syncStatus } = useSessionPersistence();
   const { triggerHaptic } = useHaptics();
   const queryClient = useQueryClient();
