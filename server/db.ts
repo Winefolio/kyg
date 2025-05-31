@@ -2,7 +2,8 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "@shared/schema";
 
-const connectionString = process.env.DATABASE_URL;
+// Force connection to Supabase database
+const connectionString = "postgresql://postgres:wineboyman1@db.byearryckdwmajygqdpx.supabase.co:5432/postgres";
 
 if (!connectionString) {
   console.error("FATAL ERROR: DATABASE_URL environment variable is not set. The application cannot connect to the database. Please ensure DATABASE_URL is configured in your Replit Secrets or environment.");
