@@ -62,6 +62,196 @@ export default function Gateway() {
     }
   };
 
+  // Join Session Flow Component
+  const JoinSessionFlow = ({ joinMethod, setJoinMethod, sessionId, setSessionId, onJoin, onBack }: {
+    joinMethod: JoinMethod;
+    setJoinMethod: (method: JoinMethod) => void;
+    sessionId: string;
+    setSessionId: (id: string) => void;
+    onJoin: (id: string) => void;
+    onBack: () => void;
+  }) => (
+    <motion.div
+      key="join"
+      className="w-full max-w-2xl"
+      initial={{ opacity: 0, x: 50 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -50 }}
+      transition={{ duration: 0.6 }}
+    >
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8">
+        <div className="flex items-center mb-8">
+          <Button
+            onClick={onBack}
+            variant="ghost"
+            className="text-white/60 hover:text-white p-2 mr-4"
+          >
+            ←
+          </Button>
+          <div>
+            <h2 className="text-3xl font-bold text-white mb-2">Join a Tasting</h2>
+            <p className="text-white/70">Enter your session ID to join the experience</p>
+          </div>
+        </div>
+
+        {/* Method Toggle */}
+        <div className="flex bg-white/10 rounded-2xl p-2 mb-8">
+          <Button
+            onClick={() => setJoinMethod('qr')}
+            className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all duration-300 ${
+              joinMethod === 'qr'
+                ? 'bg-purple-600 text-white shadow-lg'
+                : 'bg-transparent text-white/60 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <QrCode className="mr-2" size={16} />
+            Scan QR
+          </Button>
+          <Button
+            onClick={() => setJoinMethod('manual')}
+            className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all duration-300 ${
+              joinMethod === 'manual'
+                ? 'bg-purple-600 text-white shadow-lg'
+                : 'bg-transparent text-white/60 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <span className="mr-2">✍️</span>
+            Enter ID
+          </Button>
+        </div>
+
+        {/* Content */}
+        <AnimatePresence mode="wait">
+          {joinMethod === 'qr' ? (
+            <motion.div
+              key="qr-scanner"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-6"
+            >
+              <QRScanner
+                onScan={(result) => {
+                  const sessionMatch = result.match(/sessionId=([^&]+)/);
+                  if (sessionMatch) {
+                    onJoin(sessionMatch[1]);
+                  } else {
+                    onJoin(result);
+                  }
+                }}
+                onError={() => setJoinMethod('manual')}
+                className="w-full"
+              />
+              <Button
+                onClick={() => setJoinMethod('manual')}
+                variant="outline"
+                className="w-full py-3 bg-white/10 border-white/20 text-white/80 hover:bg-white/20"
+              >
+                Enter Session ID manually instead
+              </Button>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="manual-entry"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-6"
+            >
+              <div className="space-y-4">
+                <Input
+                  type="text"
+                  value={sessionId}
+                  onChange={(e) => setSessionId(e.target.value)}
+                  placeholder="Enter Session ID"
+                  className="w-full py-4 px-6 text-lg bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl text-white placeholder-white/40 focus:border-purple-400 focus:ring-4 focus:ring-purple-400/20"
+                />
+                <Button
+                  onClick={() => onJoin(sessionId)}
+                  disabled={!sessionId.trim()}
+                  className="w-full py-4 px-6 bg-gradient-to-r from-purple-600 to-purple-700 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:transform-none"
+                >
+                  Join Tasting Session →
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+
+  // Host Session Flow Component
+  const HostSessionFlow = ({ packageCode, setPackageCode, hostName, setHostName, onHost, onBack }: {
+    packageCode: string;
+    setPackageCode: (code: string) => void;
+    hostName: string;
+    setHostName: (name: string) => void;
+    onHost: (code: string, name: string) => void;
+    onBack: () => void;
+  }) => (
+    <motion.div
+      key="host"
+      className="w-full max-w-2xl"
+      initial={{ opacity: 0, x: 50 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -50 }}
+      transition={{ duration: 0.6 }}
+    >
+      <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8">
+        <div className="flex items-center mb-8">
+          <Button
+            onClick={onBack}
+            variant="ghost"
+            className="text-white/60 hover:text-white p-2 mr-4"
+          >
+            ←
+          </Button>
+          <div>
+            <h2 className="text-3xl font-bold text-white mb-2">Host a Tasting</h2>
+            <p className="text-white/70">Create a new session for participants to join</p>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-white/80 text-sm font-medium mb-2">Your Name</label>
+              <Input
+                type="text"
+                value={hostName}
+                onChange={(e) => setHostName(e.target.value)}
+                placeholder="Enter your name"
+                className="w-full py-4 px-6 text-lg bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl text-white placeholder-white/40 focus:border-amber-400 focus:ring-4 focus:ring-amber-400/20"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-white/80 text-sm font-medium mb-2">Package Code</label>
+              <Input
+                type="text"
+                value={packageCode}
+                onChange={(e) => setPackageCode(e.target.value.toUpperCase())}
+                placeholder="WINE01"
+                maxLength={6}
+                className="w-full py-4 px-6 text-lg font-mono bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl text-white placeholder-white/40 focus:border-amber-400 focus:ring-4 focus:ring-amber-400/20 uppercase"
+              />
+              <p className="text-white/50 text-xs mt-1">Find this code on your tasting package</p>
+            </div>
+
+            <Button
+              onClick={() => onHost(packageCode, hostName)}
+              disabled={!packageCode.trim() || !hostName.trim()}
+              className="w-full py-4 px-6 bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:transform-none"
+            >
+              Create Tasting Session →
+            </Button>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
       {/* Premium Background Elements */}
