@@ -1,0 +1,54 @@
+Implement IndexedDB for Offline Response Persistence
+Context & Why:
+The "Ultimate Wine Tasting Platform" prompt placed a strong emphasis on "zero data loss even in a wine cellar with spotty connection" and specified "PWA with service workers for offline" and "Persist to IndexedDB for offline support" for session resume (F-2).
+
+Currently, the client/src/hooks/useSessionPersistence.ts hook uses localStorage to queue responses when the application is offline. localStorage is synchronous, has relatively small storage limits (typically 5-10MB), and is not designed for storing a large number of structured records like individual tasting responses. For robust offline capabilities, especially if users might answer many questions across multiple sessions while offline, IndexedDB is a much more suitable browser storage mechanism. One of the "Key Insights" in the main prompt was also "Don't use localStorage in artifacts (it fails)."
+
+Objective (What):
+Refactor the client/src/hooks/useSessionPersistence.ts hook to use IndexedDB instead of localStorage for storing the queue of OfflineResponse objects. Ensure that responses saved offline are reliably stored in IndexedDB and synced to the server when the network connection is restored.
+
+Implementation Details (How):
+
+Choose an IndexedDB Interaction Method:
+
+Option 1 (Wrapper Library - Recommended for Simplicity): Use a lightweight library that simplifies IndexedDB operations, such as idb (by Jake Archibald) or Dexie.js. These libraries provide Promise-based APIs and handle many of the complexities of IndexedDB. If choosing a library, add it as a dependency: npm install idb or npm install dexie.
+Option 2 (Native IndexedDB API): Use the browser's native IndexedDB API directly. This offers more control but is more verbose and complex to manage (transactions, cursors, versioning).
+Modify client/src/hooks/useSessionPersistence.ts:
+
+Database Setup:
+Initialize an IndexedDB database (e.g., named "KnowYourGrapeDB") with an object store (e.g., "offlineResponses"). This store should have an appropriate key path (e.g., a unique id for each offline response, perhaps a composite key or an auto-incrementing key) and potentially indexes on fields like timestamp or synced if needed for querying.
+saveResponse Function:
+When saveResponse is called, instead of pushing to a localStorage array, add the OfflineResponse object (which includes participantId, slideId, answerJson, timestamp, synced) to the "offlineResponses" object store in IndexedDB.
+queueForSync Function:
+This function might become redundant if all unsynced responses are directly managed in IndexedDB. The offlineQueue state variable might now primarily reflect items actively being synced or items that failed a sync attempt, rather than the entire persisted queue.
+syncOfflineData Function (in useEffect):
+When the network is online or on an interval, this function should:
+Query the "offlineResponses" object store in IndexedDB for all records where synced is false.
+Attempt to POST each of these responses to the /api/responses endpoint.
+Upon successful POST to the server:
+Update the corresponding record in IndexedDB to set synced: true, OR
+Delete the successfully synced record from the IndexedDB object store. (Deleting is often simpler if you don't need to keep a history of synced items locally in this specific store).
+Manage the offlineQueue state based on items currently being processed or items that failed to sync, to provide correct syncStatus feedback.
+Initial Load: On hook initialization, you might want to read any unsynced items from IndexedDB into the offlineQueue state to attempt syncing them.
+Define OfflineResponse Structure:
+
+Ensure the OfflineResponse interface includes a unique identifier for each record if one isn't naturally present, especially if you need to update/delete specific records in IndexedDB. A timestamp or a crypto.randomUUID() could work.
+TypeScript
+
+interface OfflineResponse {
+  id: string; // Add a unique ID for IndexedDB records
+  participantId: string;
+  slideId: string;
+  answerJson: any;
+  timestamp: number;
+  synced: boolean;
+}
+Acceptance Criteria:
+
+The useSessionPersistence.ts hook no longer uses localStorage for queueing offline responses.
+Offline responses are saved to an IndexedDB object store.
+The OfflineResponse objects in IndexedDB include all necessary data fields and a synced status.
+When the application comes online, the hook attempts to sync unsynced responses from IndexedDB to the server.
+Successfully synced responses are either marked as synced: true or removed from the IndexedDB offline queue.
+The syncStatus state variable accurately reflects the current offline/syncing state.
+The application remains functional if IndexedDB is blocked or fails to initialize (though offline saving would not work, it shouldn't crash the app).

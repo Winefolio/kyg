@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { openDB, IDBPDatabase } from 'idb';
 import { apiRequest } from "@/lib/queryClient";
 
 type SyncStatus = 'synced' | 'pending' | 'offline' | 'syncing' | 'partial';
 
 interface OfflineResponse {
+  id: string;
   participantId: string;
   slideId: string;
   answerJson: any;
@@ -11,24 +13,71 @@ interface OfflineResponse {
   synced: boolean;
 }
 
+// Initialize IndexedDB
+const initDB = async (): Promise<IDBPDatabase | null> => {
+  try {
+    return await openDB('KnowYourGrapeDB', 1, {
+      upgrade(db) {
+        const store = db.createObjectStore('offlineResponses', { keyPath: 'id' });
+        store.createIndex('by-synced', 'synced');
+        store.createIndex('by-timestamp', 'timestamp');
+      },
+    });
+  } catch (error) {
+    console.warn('IndexedDB initialization failed:', error);
+    return null;
+  }
+};
+
 export function useSessionPersistence() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
   const [offlineQueue, setOfflineQueue] = useState<OfflineResponse[]>([]);
+  const [db, setDb] = useState<IDBPDatabase | null>(null);
 
-  // Save response with offline support
+  // Initialize IndexedDB on mount
+  useEffect(() => {
+    const setupDB = async () => {
+      const database = await initDB();
+      setDb(database);
+      
+      // Load any existing unsynced responses from IndexedDB
+      if (database) {
+        try {
+          const unsynced = await database.getAllFromIndex('offlineResponses', 'by-synced', false);
+          setOfflineQueue(unsynced);
+        } catch (error) {
+          console.warn('Failed to load unsynced responses:', error);
+        }
+      }
+    };
+    
+    setupDB();
+  }, []);
+
+  // Save response with offline support using IndexedDB
   const saveResponse = async (participantId: string, slideId: string, answerJson: any) => {
     const response: OfflineResponse = {
+      id: crypto.randomUUID(),
       participantId,
       slideId,
       answerJson,
       timestamp: Date.now(),
-      synced: navigator.onLine
+      synced: false
     };
     
-    // Always save locally first (in a real implementation, this would use IndexedDB)
-    const localResponses = JSON.parse(localStorage.getItem('wineResponses') || '[]');
-    localResponses.push(response);
-    localStorage.setItem('wineResponses', JSON.stringify(localResponses));
+    // Save to IndexedDB first for offline persistence
+    if (db) {
+      try {
+        await db.add('offlineResponses', response);
+      } catch (error) {
+        console.warn('Failed to save to IndexedDB:', error);
+        // Fallback to memory queue if IndexedDB fails
+        setOfflineQueue(prev => [...prev, response]);
+      }
+    } else {
+      // Fallback if IndexedDB is not available
+      setOfflineQueue(prev => [...prev, response]);
+    }
     
     if (navigator.onLine) {
       try {
@@ -38,30 +87,47 @@ export function useSessionPersistence() {
           answerJson,
           synced: true
         });
+        
+        // Remove from IndexedDB after successful sync
+        if (db) {
+          await db.delete('offlineResponses', response.id);
+        }
         setSyncStatus('synced');
       } catch (error) {
         setSyncStatus('pending');
-        queueForSync(response);
       }
     } else {
       setSyncStatus('offline');
-      queueForSync(response);
     }
-  };
-
-  const queueForSync = (response: OfflineResponse) => {
-    setOfflineQueue(prev => [...prev, response]);
   };
 
   // Background sync when online
   useEffect(() => {
     const syncOfflineData = async () => {
-      if (!navigator.onLine || offlineQueue.length === 0) return;
+      if (!navigator.onLine) return;
+      
+      let unsyncedResponses: OfflineResponse[] = [];
+      
+      // Get unsynced responses from IndexedDB
+      if (db) {
+        try {
+          unsyncedResponses = await db.getAllFromIndex('offlineResponses', 'by-synced', false);
+        } catch (error) {
+          console.warn('Failed to get unsynced responses from IndexedDB:', error);
+          // Fall back to memory queue
+          unsyncedResponses = offlineQueue.filter(item => !item.synced);
+        }
+      } else {
+        // Use memory queue if IndexedDB not available
+        unsyncedResponses = offlineQueue.filter(item => !item.synced);
+      }
+      
+      if (unsyncedResponses.length === 0) return;
       
       setSyncStatus('syncing');
       const failed: OfflineResponse[] = [];
       
-      for (const item of offlineQueue) {
+      for (const item of unsyncedResponses) {
         try {
           await apiRequest('POST', '/api/responses', {
             participantId: item.participantId,
@@ -69,6 +135,11 @@ export function useSessionPersistence() {
             answerJson: item.answerJson,
             synced: true
           });
+          
+          // Remove successfully synced item from IndexedDB
+          if (db) {
+            await db.delete('offlineResponses', item.id);
+          }
         } catch (error) {
           failed.push(item);
         }
@@ -78,14 +149,21 @@ export function useSessionPersistence() {
       setSyncStatus(failed.length > 0 ? 'partial' : 'synced');
     };
     
+    // Sync when coming online
     window.addEventListener('online', syncOfflineData);
-    const interval = setInterval(syncOfflineData, 30000); // Try every 30s
+    
+    // Try syncing every 30 seconds if there are items to sync
+    const interval = setInterval(() => {
+      if (offlineQueue.length > 0) {
+        syncOfflineData();
+      }
+    }, 30000);
     
     return () => {
       window.removeEventListener('online', syncOfflineData);
       clearInterval(interval);
     };
-  }, [offlineQueue]);
+  }, [db, offlineQueue]);
 
   return { saveResponse, syncStatus, offlineQueue };
 }
