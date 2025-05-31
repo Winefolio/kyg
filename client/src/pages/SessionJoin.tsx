@@ -28,6 +28,11 @@ export default function SessionJoin() {
   const { packageCode } = useParams();
   const [, setLocation] = useLocation();
   const [isJoining, setIsJoining] = useState(false);
+  
+  // Get URL parameters for QR code flow
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionParam = urlParams.get('session');
+  const codeParam = urlParams.get('code') || packageCode;
   const { triggerHaptic } = useHaptics();
   const queryClient = useQueryClient();
 
