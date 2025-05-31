@@ -40,8 +40,15 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   // Package methods
   async getPackageByCode(code: string): Promise<Package | undefined> {
-    const result = await db.select().from(packages).where(eq(packages.code, code.toUpperCase())).limit(1);
-    return result[0];
+    try {
+      console.log(`DatabaseStorage: Looking for package with code: ${code}`);
+      const result = await db.select().from(packages).where(eq(packages.code, code.toUpperCase())).limit(1);
+      console.log(`DatabaseStorage: Query result:`, result);
+      return result[0];
+    } catch (error) {
+      console.error(`DatabaseStorage: Error in getPackageByCode:`, error);
+      throw error;
+    }
   }
 
   async createPackage(pkg: InsertPackage): Promise<Package> {

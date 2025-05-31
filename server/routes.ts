@@ -13,6 +13,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/packages/:code", async (req, res) => {
     try {
       const { code } = req.params;
+      console.log(`Looking for package with code: ${code}`);
       const pkg = await storage.getPackageByCode(code.toUpperCase());
       
       if (!pkg) {
@@ -21,7 +22,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(pkg);
     } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
+      console.error("Error fetching package:", error);
+      res.status(500).json({ message: "Internal server error", error: String(error) });
     }
   });
 

@@ -8,6 +8,7 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useHaptics } from "@/hooks/useHaptics";
 import { animations } from "@/lib/animations";
 import { Wine, Camera, Keyboard, WifiOff, Wifi } from "lucide-react";
+import { QRScanner } from "@/components/QRScanner";
 
 export default function Gateway() {
   const [, setLocation] = useLocation();
@@ -149,29 +150,11 @@ export default function Gateway() {
                 {...animations.slideIn}
                 className="space-y-6"
               >
-                {/* QR Scanner Placeholder */}
-                <div className="relative bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
-                  <div className="aspect-square bg-black/30 rounded-2xl flex items-center justify-center relative overflow-hidden">
-                    {/* QR Scanner corners */}
-                    <div className="absolute top-4 left-4 w-8 h-8 border-l-4 border-t-4 border-white"></div>
-                    <div className="absolute top-4 right-4 w-8 h-8 border-r-4 border-t-4 border-white"></div>
-                    <div className="absolute bottom-4 left-4 w-8 h-8 border-l-4 border-b-4 border-white"></div>
-                    <div className="absolute bottom-4 right-4 w-8 h-8 border-r-4 border-b-4 border-white"></div>
-                    
-                    {/* Scanning line animation */}
-                    <motion.div
-                      className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-green-400 to-transparent"
-                      animate={{ y: [0, 280, 0] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    />
-                    
-                    <div className="text-center text-white/60">
-                      <div className="text-6xl mb-4">📱</div>
-                      <p className="text-lg font-medium">Position QR code within frame</p>
-                      <p className="text-sm mt-2">Camera will auto-detect your tasting package</p>
-                    </div>
-                  </div>
-                </div>
+                <QRScanner
+                  onScan={handleCodeSubmit}
+                  onError={() => setScanMode('manual')}
+                  className="w-full"
+                />
 
                 <Button
                   onClick={() => setScanMode('manual')}
