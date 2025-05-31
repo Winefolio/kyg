@@ -10,6 +10,7 @@ if (!connectionString) {
 }
 
 console.log("Connecting to PostgreSQL database...");
+console.log("Connection string (masked):", connectionString?.replace(/:[^:@]*@/, ':***@'));
 
 // Create the database connection
 const sql = postgres(connectionString as string);
