@@ -99,13 +99,13 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
     triggerHaptic('success');
   }, [localValue, onChange, triggerHaptic]);
 
-  // Calculate progress for the arc (corrected for proper visual alignment)
+  // Calculate progress for the arc (fixed to start from bottom-left)
   const progress = (localValue - question.scale_min) / (question.scale_max - question.scale_min);
   const circumference = 2 * Math.PI * radius;
   const arcLength = circumference * 0.75; // 270 degrees = 75% of full circle
   const strokeDasharray = `${arcLength} ${circumference}`;
-  // Corrected: start from full arc length and reduce by progress
-  const strokeDashoffset = arcLength - (arcLength * progress);
+  // Start empty and fill clockwise from -135° to +135°
+  const strokeDashoffset = arcLength * (1 - progress);
 
   const thumbPosition = getThumbPosition(localValue);
 
@@ -180,7 +180,7 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
               strokeWidth={strokeWidth}
               strokeLinecap="round"
               strokeDasharray={strokeDasharray}
-              transform={`rotate(-135 ${centerX} ${centerY})`}
+              transform={`rotate(45 ${centerX} ${centerY})`}
             />
 
             {/* Progress ring with enhanced visuals */}
@@ -195,7 +195,7 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
               strokeLinecap="round"
               strokeDasharray={strokeDasharray}
               strokeDashoffset={strokeDashoffset}
-              transform={`rotate(-135 ${centerX} ${centerY})`}
+              transform={`rotate(45 ${centerX} ${centerY})`}
               filter="url(#softGlow)"
               animate={{
                 strokeDashoffset: strokeDashoffset,
