@@ -47,10 +47,15 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event: Serve cached assets with cache-first strategy for shell resources
 self.addEventListener('fetch', (event) => {
+  // Only handle http/https requests to avoid chrome-extension and other schemes
+  if (!event.request.url.startsWith('http')) {
+    return;
+  }
+  
   const requestUrl = new URL(event.request.url);
   
-  // Only handle GET requests
-  if (event.request.method !== 'GET') {
+  // Only handle GET requests from same origin
+  if (event.request.method !== 'GET' || requestUrl.origin !== self.location.origin) {
     return;
   }
   

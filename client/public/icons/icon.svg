@@ -1,0 +1,29 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="256" fill="#581c87"/>
+  
+  <!-- Wine glass -->
+  <path d="M200 120 L312 120 L300 220 C298 260 280 290 256 290 C232 290 214 260 212 220 L200 120 Z" fill="#f8fafc" stroke="#e2e8f0" stroke-width="4"/>
+  
+  <!-- Wine in glass -->
+  <path d="M208 140 L304 140 L296 210 C294 240 278 260 256 260 C234 260 218 240 216 210 L208 140 Z" fill="#dc2626"/>
+  
+  <!-- Stem -->
+  <rect x="252" y="290" width="8" height="80" fill="#f8fafc"/>
+  
+  <!-- Base -->
+  <ellipse cx="256" cy="380" rx="40" ry="12" fill="#f8fafc"/>
+  
+  <!-- Grape cluster decoration -->
+  <g transform="translate(320, 160)">
+    <circle cx="0" cy="0" r="8" fill="#22c55e"/>
+    <circle cx="12" cy="8" r="8" fill="#22c55e"/>
+    <circle cx="-12" cy="8" r="8" fill="#22c55e"/>
+    <circle cx="6" cy="20" r="8" fill="#22c55e"/>
+    <circle cx="-6" cy="20" r="8" fill="#22c55e"/>
+    <circle cx="0" cy="32" r="8" fill="#22c55e"/>
+  </g>
+  
+  <!-- Leaf -->
+  <path d="M340 140 Q350 130 360 140 Q350 150 340 160 Q330 150 340 140 Z" fill="#16a34a"/>
+</svg>
