@@ -1,0 +1,41 @@
+Currently, when a host is on the HostDashboard.tsx for a specific session (e.g., WINE01 tasting), the "Share Session" functionality (Quick Actions card) generates a QR code and a join link based on the packageCode (e.g., /join?code=WINE01) via the generateQRData function.
+
+If a new participant uses this packageCode-based link, the current logic in SessionJoin.tsx (as diagnosed by the Replit assistant you consulted) tends to create a brand new session for that package, rather than adding the participant to the host's existing, active session. This results in the host and participant being isolated in different sessions, defeating the purpose of a group tasting.
+
+To fix this, participants need a way to join a specific session instance identified by its unique sessionId.
+
+Objective (What):
+Modify client/src/pages/HostDashboard.tsx so that the "Share Session" QR code and link generated direct new participants to join using the current sessionId, not just the packageCode.
+
+Implementation Details (How):
+
+Update generateQRData Function (in client/src/pages/HostDashboard.tsx):
+
+This function (around line 81) currently returns a URL like: ${baseUrl}/join?code=${session?.packageCode || 'WINE01'}.
+Modify it to generate a URL that includes the current sessionId. The sessionId is available from useParams().
+The new URL format should be something like: ${baseUrl}/join?sessionId=${sessionId}.
+TypeScript
+
+// Inside HostDashboard.tsx
+const generateQRData = () => {
+  if (!sessionId) { // sessionId comes from useParams()
+    toast({ title: "Error", description: "Session ID not available to generate link.", variant: "destructive" });
+    return null; 
+  }
+  const baseUrl = window.location.origin;
+  return `<span class="math-inline">\{baseUrl\}/join?sessionId\=</span>{sessionId}`; // Use sessionId
+};
+Remove any fallback to 'WINE01' or direct use of session?.packageCode for constructing the join path itself. The packageCode is still useful for display on the dashboard (e.g., "Bordeaux Discovery Collection • WINE01"), but the join mechanism must use the unique sessionId.
+Ensure Share Buttons Use the New URL:
+
+The functions copySessionLink, downloadQR, and viewQR all use the output of generateQRData(). No changes should be needed to these functions themselves if generateQRData() is correctly updated, but verify they still work.
+Ensure the buttons that trigger these functions are appropriately enabled/disabled based on whether sessionId (and thus a valid URL from generateQRData) is available. The disabled={!session?.packageCode} on the "Copy Link" button should now be disabled={!sessionId} or disabled={!generateQRData()}. Apply similar logic to other share buttons.
+Display Information (No change needed, but for context):
+
+The Host Dashboard should still clearly display which package this session is for (e.g., using session?.packageName or session?.packageCode in the header). This task is only about changing the join mechanism URL.
+Acceptance Criteria:
+
+The generateQRData function in HostDashboard.tsx now produces a URL containing sessionId (e.g., /join?sessionId=xxxxxxxx-xxxx...) instead of packageCode.
+The "Copy Link," "View QR Code," and "Download QR" buttons in the Host Dashboard generate links/QR codes based on this new session-ID-specific URL.
+These buttons are disabled if the sessionId is not available.
+The visual display of the package name/code on the Host Dashboard remains unchanged and correct.

@@ -89,13 +89,26 @@ export default function HostDashboard() {
   });
 
   // Generate QR and sharing functions
-  const generateQRData = () => {
+  const generateQRData = (): string => {
+    if (!sessionId) {
+      return "";
+    }
     const baseUrl = window.location.origin;
-    return `${baseUrl}/join?code=${session?.packageCode || 'WINE01'}`;
+    return `${baseUrl}/join?sessionId=${sessionId}`;
   };
 
   const copySessionLink = () => {
-    navigator.clipboard.writeText(generateQRData());
+    const qrData = generateQRData();
+    if (!qrData) {
+      toast({ 
+        title: "Error", 
+        description: "Session ID not available to generate link.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    navigator.clipboard.writeText(qrData);
     toast({
       title: "Session Link Copied!",
       description: "Share this with your guests"
@@ -103,7 +116,17 @@ export default function HostDashboard() {
   };
 
   const downloadQR = () => {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&data=${encodeURIComponent(generateQRData())}`;
+    const qrData = generateQRData();
+    if (!qrData) {
+      toast({ 
+        title: "Error", 
+        description: "Session ID not available to generate QR code.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&data=${encodeURIComponent(qrData)}`;
     const link = document.createElement('a');
     link.href = qrUrl;
     link.download = `wine-tasting-session-qr.png`;
@@ -116,7 +139,17 @@ export default function HostDashboard() {
   };
 
   const viewQR = () => {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&data=${encodeURIComponent(generateQRData())}`;
+    const qrData = generateQRData();
+    if (!qrData) {
+      toast({ 
+        title: "Error", 
+        description: "Session ID not available to generate QR code.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&data=${encodeURIComponent(qrData)}`;
     window.open(qrUrl, '_blank');
   };
 
@@ -226,24 +259,27 @@ export default function HostDashboard() {
                 <CardContent className="space-y-3">
                   <Button
                     onClick={copySessionLink}
+                    disabled={!sessionId}
                     variant="outline"
-                    className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20"
+                    className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20 disabled:opacity-50"
                   >
                     <Copy size={16} className="mr-2" />
                     Copy Link
                   </Button>
                   <Button
                     onClick={viewQR}
+                    disabled={!sessionId}
                     variant="outline"
-                    className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20"
+                    className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20 disabled:opacity-50"
                   >
                     <Eye size={16} className="mr-2" />
                     View QR Code
                   </Button>
                   <Button
                     onClick={downloadQR}
+                    disabled={!sessionId}
                     variant="outline"
-                    className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20"
+                    className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20 disabled:opacity-50"
                   >
                     <Download size={16} className="mr-2" />
                     Download QR
