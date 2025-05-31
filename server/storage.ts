@@ -23,7 +23,7 @@ export interface IStorage {
   createSession(session: InsertSession): Promise<Session>;
   getSessionById(id: string): Promise<(Session & { packageCode?: string }) | undefined>;
   updateSessionParticipantCount(sessionId: string, count: number): Promise<void>;
-  updateSessionStatus(sessionId: string, status: string): Promise<void>;
+  updateSessionStatus(sessionId: string, status: string): Promise<Session | undefined>;
   
   // Participants
   createParticipant(participant: InsertParticipant): Promise<Participant>;
@@ -306,11 +306,20 @@ export class DatabaseStorage implements IStorage {
       .where(eq(sessions.id, sessionId));
   }
 
-  async updateSessionStatus(sessionId: string, status: string): Promise<void> {
-    await db
+  async updateSessionStatus(sessionId: string, status: string): Promise<Session | undefined> {
+    // Add validation for allowed status values
+    const allowedStatuses = ['waiting', 'active', 'paused', 'completed'];
+    if (!allowedStatuses.includes(status)) {
+      throw new Error(`Invalid session status: ${status}`);
+    }
+
+    const updatedSessions = await db
       .update(sessions)
       .set({ status })
-      .where(eq(sessions.id, sessionId));
+      .where(eq(sessions.id, sessionId))
+      .returning();
+    
+    return updatedSessions[0];
   }
 
   // Participant methods

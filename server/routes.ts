@@ -130,16 +130,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { sessionId } = req.params;
       const { status } = req.body;
       
-      // Validate status
-      const validStatuses = ['waiting', 'active', 'paused', 'completed'];
-      if (!validStatuses.includes(status)) {
-        return res.status(400).json({ message: "Invalid status" });
+      if (!status || typeof status !== 'string') {
+        return res.status(400).json({ message: "Invalid status provided in request body." });
       }
 
-      await storage.updateSessionStatus(sessionId, status);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
+      const updatedSession = await storage.updateSessionStatus(sessionId, status);
+      if (!updatedSession) {
+        return res.status(404).json({ message: "Session not found or failed to update." });
+      }
+      
+      res.json(updatedSession);
+    } catch (error: any) {
+      console.error(`Error updating session ${sessionId} status:`, error);
+      if (error.message?.includes('Invalid session status')) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Internal server error updating session status." });
     }
   });
 

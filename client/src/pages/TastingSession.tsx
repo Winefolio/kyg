@@ -37,14 +37,14 @@ export default function TastingSession() {
     enabled: !!participantId
   });
 
-  // Get session slides
+  // Get session slides - use dynamic package code from session
   const { data: slidesData, isLoading } = useQuery<{ slides: Slide[]; totalCount: number }>({
-    queryKey: [`/api/packages/WINE01/slides`],
+    queryKey: [`/api/packages/${currentSession?.packageCode}/slides`, participantId],
     queryFn: async () => {
-      const response = await apiRequest('GET', `/api/packages/WINE01/slides?participantId=${participantId}`, null);
+      const response = await apiRequest('GET', `/api/packages/${currentSession?.packageCode}/slides?participantId=${participantId}`, null);
       return response.json();
     },
-    enabled: !!participantId
+    enabled: !!currentSession?.packageCode && !!participantId
   });
 
   // Get participant responses
