@@ -124,28 +124,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Save response
+  // Save response (with update-or-create logic)
   app.post("/api/responses", async (req, res) => {
     try {
       console.log("Received response data:", req.body);
       const validatedData = insertResponseSchema.parse(req.body);
       console.log("Validated data:", validatedData);
       
-      const response = await storage.createResponse(validatedData);
-      console.log("Created response:", response);
-      
-      // Update participant progress
-      const participant = await storage.getParticipantById(validatedData.participantId!);
-      if (participant) {
-        await storage.updateParticipantProgress(
-          participant.id, 
-          participant.progressPtr! + 1
+      // Try to update existing response first, then create if it doesn't exist
+      try {
+        const response = await storage.updateResponse(
+          validatedData.participantId!, 
+          validatedData.slideId!, 
+          validatedData.answerJson
         );
+        console.log("Updated existing response:", response);
+        res.json(response);
+      } catch (updateError) {
+        // If update fails (response doesn't exist), create new one
+        const response = await storage.createResponse(validatedData);
+        console.log("Created new response:", response);
+        
+        // Update participant progress
+        const participant = await storage.getParticipantById(validatedData.participantId!);
+        if (participant) {
+          await storage.updateParticipantProgress(
+            participant.id, 
+            participant.progressPtr! + 1
+          );
+        }
+        
+        res.json(response);
       }
-
-      res.json(response);
     } catch (error) {
-      console.error("Error creating response:", error);
+      console.error("Error creating/updating response:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
       }
