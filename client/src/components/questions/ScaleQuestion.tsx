@@ -25,9 +25,9 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
   const centerX = 150;
   const centerY = 150;
   const radius = 135;
-  const strokeWidth = 8;
-  const progressStrokeWidth = 12;
-  const thumbRadius = 16;
+  const strokeWidth = 6;
+  const progressStrokeWidth = 10;
+  const thumbRadius = 14;
 
   // Calculate angle from value (270-degree arc from -135 to +135 degrees)
   const valueToAngle = useCallback((val: number) => {
@@ -99,12 +99,13 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
     triggerHaptic('success');
   }, [localValue, onChange, triggerHaptic]);
 
-  // Calculate progress for the arc
+  // Calculate progress for the arc (corrected for proper visual alignment)
   const progress = (localValue - question.scale_min) / (question.scale_max - question.scale_min);
   const circumference = 2 * Math.PI * radius;
   const arcLength = circumference * 0.75; // 270 degrees = 75% of full circle
   const strokeDasharray = `${arcLength} ${circumference}`;
-  const strokeDashoffset = arcLength * (1 - progress);
+  // Corrected: start from full arc length and reduce by progress
+  const strokeDashoffset = arcLength - (arcLength * progress);
 
   const thumbPosition = getThumbPosition(localValue);
 
@@ -143,23 +144,28 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
             viewBox="0 0 300 300"
             className="drop-shadow-2xl pointer-events-none"
           >
-            {/* Enhanced gradient definitions */}
+            {/* Premium gradient definitions */}
             <defs>
-              <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="hsl(var(--primary))" />
-                <stop offset="50%" stopColor="hsl(var(--primary) / 0.8)" />
-                <stop offset="100%" stopColor="hsl(var(--primary) / 0.6)" />
+              <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#8B5CF6" />
+                <stop offset="30%" stopColor="#A855F7" />
+                <stop offset="70%" stopColor="#C084FC" />
+                <stop offset="100%" stopColor="#DDD6FE" />
               </linearGradient>
-              <linearGradient id="thumbGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <radialGradient id="thumbGradient" cx="30%" cy="30%">
                 <stop offset="0%" stopColor="#ffffff" />
-                <stop offset="100%" stopColor="hsl(var(--primary))" />
-              </linearGradient>
-              <filter id="glow">
-                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                <stop offset="40%" stopColor="#F3F4F6" />
+                <stop offset="100%" stopColor="#8B5CF6" />
+              </radialGradient>
+              <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
                 <feMerge> 
                   <feMergeNode in="coloredBlur"/>
                   <feMergeNode in="SourceGraphic"/>
                 </feMerge>
+              </filter>
+              <filter id="thumbShadow" x="-100%" y="-100%" width="300%" height="300%">
+                <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000000" floodOpacity="0.3"/>
               </filter>
             </defs>
 
@@ -170,58 +176,58 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
               cy={centerY}
               r={radius}
               fill="none"
-              stroke="hsl(var(--muted) / 0.3)"
+              stroke="rgba(255, 255, 255, 0.15)"
               strokeWidth={strokeWidth}
               strokeLinecap="round"
               strokeDasharray={strokeDasharray}
               transform={`rotate(-135 ${centerX} ${centerY})`}
             />
 
-            {/* Progress ring */}
+            {/* Progress ring with enhanced visuals */}
             <motion.circle
               className="progress-ring"
               cx={centerX}
               cy={centerY}
               r={radius}
               fill="none"
-              stroke="url(#gradient)"
+              stroke="url(#progressGradient)"
               strokeWidth={progressStrokeWidth}
               strokeLinecap="round"
               strokeDasharray={strokeDasharray}
               strokeDashoffset={strokeDashoffset}
               transform={`rotate(-135 ${centerX} ${centerY})`}
-              filter="url(#glow)"
+              filter="url(#softGlow)"
               animate={{
                 strokeDashoffset: strokeDashoffset,
               }}
               transition={{
                 type: "spring",
-                stiffness: 400,
-                damping: 30,
-                duration: 0.6
+                stiffness: 500,
+                damping: 35,
+                duration: 0.5
               }}
             />
 
-            {/* Thumb constrained to the circle */}
+            {/* Premium thumb with shadow */}
             <motion.circle
               cx={thumbPosition.x}
               cy={thumbPosition.y}
               r={thumbRadius}
               fill="url(#thumbGradient)"
-              stroke="hsl(var(--primary))"
-              strokeWidth="3"
+              stroke="#ffffff"
+              strokeWidth="2"
               className="pointer-events-none"
               animate={{
                 cx: thumbPosition.x,
                 cy: thumbPosition.y,
-                r: isDragging ? thumbRadius * 1.3 : thumbRadius,
+                r: isDragging ? thumbRadius * 1.2 : thumbRadius,
               }}
               transition={{
                 type: "spring",
-                stiffness: 400,
-                damping: 25
+                stiffness: 500,
+                damping: 30
               }}
-              filter="url(#glow)"
+              filter="url(#thumbShadow)"
             />
           </svg>
 
@@ -253,12 +259,12 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
             </motion.div>
           </div>
 
-          {/* Min/Max labels positioned around circle */}
+          {/* Min/Max labels positioned at arc endpoints */}
           <p 
             className="min-label absolute text-sm text-white/70 font-medium"
             style={{ 
-              left: centerX - 110, 
-              top: centerY + 5,
+              left: centerX - 95, 
+              top: centerY + 95,
               transform: 'translate(-50%, -50%)'
             }}
           >
@@ -268,8 +274,8 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
           <p 
             className="max-label absolute text-sm text-white/70 font-medium"
             style={{ 
-              left: centerX + 110, 
-              top: centerY + 5,
+              left: centerX + 95, 
+              top: centerY + 95,
               transform: 'translate(-50%, -50%)'
             }}
           >
