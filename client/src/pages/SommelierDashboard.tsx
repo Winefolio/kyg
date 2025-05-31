@@ -12,7 +12,32 @@ import { Link } from "wouter";
 export default function SommelierDashboard() {
   const [newSessionName, setNewSessionName] = useState("");
   const [selectedPackage, setSelectedPackage] = useState("WINE01");
+  const [customCode, setCustomCode] = useState("");
+  const [packageName, setPackageName] = useState("");
+  const [packageDescription, setPackageDescription] = useState("");
+  const [isCreatingCustom, setIsCreatingCustom] = useState(false);
   const { toast } = useToast();
+
+  // Generate random wine codes
+  const generateRandomCode = () => {
+    const wineWords = ['VINE', 'GRAPE', 'CORK', 'VINO', 'CELLAR', 'BARREL', 'TANNIN'];
+    const randomWord = wineWords[Math.floor(Math.random() * wineWords.length)];
+    const randomNum = Math.floor(Math.random() * 999) + 1;
+    return `${randomWord}${randomNum.toString().padStart(3, '0')}`;
+  };
+
+  const generateShortCode = () => {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const numbers = '0123456789';
+    let result = '';
+    for (let i = 0; i < 3; i++) {
+      result += letters.charAt(Math.floor(Math.random() * letters.length));
+    }
+    for (let i = 0; i < 3; i++) {
+      result += numbers.charAt(Math.floor(Math.random() * numbers.length));
+    }
+    return result;
+  };
 
   // Fetch available wine packages
   const { data: packages = [] } = useQuery({
@@ -24,6 +49,41 @@ export default function SommelierDashboard() {
   const { data: sessions = [] } = useQuery({
     queryKey: ['/api/sessions'],
     enabled: false // We'll implement this when needed
+  });
+
+  // Create custom wine package
+  const createPackageMutation = useMutation({
+    mutationFn: async ({ code, name, description }: { code: string; name: string; description: string }) => {
+      const response = await fetch('/api/packages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, name, description })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create package');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (newPackage) => {
+      toast({
+        title: "Wine Package Created!",
+        description: `Package "${newPackage.code}" is ready for tastings`
+      });
+      setCustomCode("");
+      setPackageName("");
+      setPackageDescription("");
+      setIsCreatingCustom(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   });
 
   // Create new tasting session
@@ -122,15 +182,97 @@ export default function SommelierDashboard() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+          {/* Create Custom Wine Package */}
+          <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Wine size={20} />
+                Create Wine Package
+              </CardTitle>
+              <CardDescription className="text-purple-200">
+                Design your custom wine tasting experience
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="packageName" className="text-white">
+                  Package Name
+                </Label>
+                <Input
+                  id="packageName"
+                  value={packageName}
+                  onChange={(e) => setPackageName(e.target.value)}
+                  placeholder="e.g., Italian Reds Collection"
+                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="customCode" className="text-white">
+                  Package Code
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="customCode"
+                    value={customCode}
+                    onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
+                    placeholder="e.g., ITALY01"
+                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                    maxLength={10}
+                  />
+                  <Button
+                    onClick={() => setCustomCode(generateRandomCode())}
+                    variant="outline"
+                    className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  >
+                    🎲 Random
+                  </Button>
+                  <Button
+                    onClick={() => setCustomCode(generateShortCode())}
+                    variant="outline"
+                    className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  >
+                    Short
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="packageDescription" className="text-white">
+                  Description
+                </Label>
+                <Input
+                  id="packageDescription"
+                  value={packageDescription}
+                  onChange={(e) => setPackageDescription(e.target.value)}
+                  placeholder="Describe your wine selection..."
+                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                />
+              </div>
+
+              <Button
+                onClick={() => createPackageMutation.mutate({ 
+                  code: customCode, 
+                  name: packageName, 
+                  description: packageDescription 
+                })}
+                disabled={!customCode.trim() || !packageName.trim() || createPackageMutation.isPending}
+                className="w-full bg-gradient-button text-white font-semibold"
+              >
+                {createPackageMutation.isPending ? "Creating..." : "Create Package & QR Code"}
+              </Button>
+            </CardContent>
+          </Card>
+
           {/* Create New Session */}
           <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
                 <Plus size={20} />
-                Create New Tasting Session
+                Create Tasting Session
               </CardTitle>
               <CardDescription className="text-purple-200">
-                Start a new wine tasting experience for your guests
+                Start a session with existing wine packages
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -158,8 +300,7 @@ export default function SommelierDashboard() {
                   className="w-full mt-1 px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white"
                 >
                   <option value="WINE01">Bordeaux Discovery Collection</option>
-                  <option value="WINE02">Burgundy Classics (Coming Soon)</option>
-                  <option value="WINE03">Champagne Selection (Coming Soon)</option>
+                  {/* Add created packages dynamically here */}
                 </select>
               </div>
 
