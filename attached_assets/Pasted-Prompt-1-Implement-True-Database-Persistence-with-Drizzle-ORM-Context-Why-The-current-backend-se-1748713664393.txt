@@ -1,0 +1,36 @@
+Prompt 1: Implement True Database Persistence with Drizzle ORM
+Context & Why:
+The current backend server (server/storage.ts) uses an in-memory data storage system with JavaScript Maps. This means all application data (tasting packages, slides, sessions, participant responses) is lost whenever the server restarts. The project's core requirement, as per the "Ultimate Prompt," is to use Supabase (PostgreSQL) for persistent database storage, with Drizzle ORM as the query builder. This change is critical for data integrity, persistence, and the proper functioning of features like analytics and session resume.
+
+Objective (What):
+Refactor server/storage.ts to replace the current in-memory WorkingStorage class with an implementation that uses Drizzle ORM to interact with the PostgreSQL database connected via server/db.ts.
+
+Implementation Details (How):
+
+Modify server/storage.ts:
+Remove or comment out the existing WorkingStorage class and its in-memory Map data structures.
+Create a new class or a set of functions that implement the IStorage interface defined in the same file.
+Import the Drizzle db instance from server/db.ts and the table schemas from shared/schema.ts.
+Implement IStorage Methods with Drizzle:
+For each method in the IStorage interface (e.g., getPackageByCode, createSession, getSlidesByPackageId, createResponse, getParticipantsBySessionId, etc.), rewrite its logic to perform the corresponding CRUD (Create, Read, Update, Delete) operations on the PostgreSQL database using Drizzle ORM queries.
+Example for getPackageByCode(code: string):
+TypeScript
+
+import { db } from '../db'; // Adjust path if necessary
+import { packages } from '@shared/schema';
+import { eq } from 'drizzle-orm';
+
+async getPackageByCode(code: string): Promise<Package | undefined> {
+  const result = await db.select().from(packages).where(eq(packages.code, code.toUpperCase())).limit(1);
+  return result[0];
+}
+Ensure all methods correctly handle async/await for database operations and return Promises with the correct types.
+Remove In-Memory Initialization:
+Delete the initializeWineTastingData() method. Initial data should be solely managed by the database-setup.sql script or a dedicated database seeding script if needed later.
+Utilize Drizzle Schemas: Ensure all data inserted or queried conforms to the Drizzle schemas defined in shared/schema.ts.
+Acceptance Criteria:
+
+All methods in the IStorage interface in server/storage.ts now interact directly with the PostgreSQL database using Drizzle ORM.
+Application data (packages, slides, sessions, participants, responses) persists across server restarts.
+The application can successfully read the sample data inserted by database-setup.sql via the API endpoints.
+API endpoints that create or modify data correctly save these changes to the database.
