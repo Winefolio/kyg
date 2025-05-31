@@ -21,32 +21,33 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
   const [localValue, setLocalValue] = useState(value);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Constants for the circular slider
+  // Enhanced constants for premium circular slider
   const centerX = 150;
   const centerY = 150;
-  const radius = 100;
-  const strokeWidth = 12;
+  const radius = 135; // Larger radius for better UX
+  const strokeWidth = 8; // Background stroke
+  const progressStrokeWidth = 12; // Progress stroke
   const thumbRadius = 16;
 
-  // Calculate angle from value
+  // Calculate angle from value (following Ultimate Prompt specifications)
   const valueToAngle = useCallback((val: number) => {
     const range = question.scale_max - question.scale_min;
     const normalizedValue = (val - question.scale_min) / range;
-    // Start from top (-90 degrees) and go clockwise
-    return -90 + (normalizedValue * 270); // 270 degrees total arc
+    // Start from bottom-left (-135 degrees) and go to bottom-right (135 degrees)
+    return -135 + (normalizedValue * 270); // 270 degrees total arc
   }, [question.scale_min, question.scale_max]);
 
   // Calculate value from angle
   const angleToValue = useCallback((angle: number) => {
-    // Normalize angle to 0-270 range
-    let normalizedAngle = angle + 90;
-    if (normalizedAngle < 0) normalizedAngle += 360;
-    if (normalizedAngle > 270) normalizedAngle = 270;
-    if (normalizedAngle < 0) normalizedAngle = 0;
+    // Constrain angle to -135 to 135 degrees
+    let constrainedAngle = angle;
+    if (constrainedAngle < -135) constrainedAngle = -135;
+    if (constrainedAngle > 135) constrainedAngle = 135;
     
+    // Normalize angle to 0-1 range
+    const normalizedAngle = (constrainedAngle + 135) / 270;
     const range = question.scale_max - question.scale_min;
-    const normalizedValue = normalizedAngle / 270;
-    return Math.round(question.scale_min + (normalizedValue * range));
+    return Math.round(question.scale_min + (normalizedAngle * range));
   }, [question.scale_min, question.scale_max]);
 
   // Calculate thumb position
@@ -90,10 +91,11 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
     triggerHaptic('success');
   }, [localValue, onChange, triggerHaptic]);
 
-  // Calculate progress for the arc
+  // Calculate progress for the arc (Ultimate Prompt style)
   const progress = (localValue - question.scale_min) / (question.scale_max - question.scale_min);
-  const progressArcLength = 270 * progress; // 270 degrees total arc
-  const circumference = 2 * Math.PI * radius * (270 / 360); // Partial circumference for 270 degrees
+  const circumference = 2 * Math.PI * radius;
+  const strokeDasharray = circumference;
+  const strokeDashoffset = circumference * (1 - progress * 0.75); // 75% of circle for visual appeal
 
   const thumbPosition = getThumbPosition(localValue);
 
@@ -114,115 +116,179 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
       </div>
 
       <div className="flex flex-col items-center space-y-6">
-        {/* Circular Slider */}
+        {/* Premium Circular SVG Slider */}
         <div className="relative">
           <svg
             ref={svgRef}
-            width="300"
-            height="300"
+            width="320"
+            height="320"
             viewBox="0 0 300 300"
-            className="drop-shadow-lg"
+            className="drop-shadow-2xl"
           >
-            {/* Gradient definitions */}
+            {/* Enhanced gradient definitions */}
             <defs>
-              <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#8B5CF6" />
-                <stop offset="50%" stopColor="#A855F7" />
-                <stop offset="100%" stopColor="#C084FC" />
+              <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="hsl(var(--primary))" />
+                <stop offset="50%" stopColor="hsl(var(--primary) / 0.8)" />
+                <stop offset="100%" stopColor="hsl(var(--primary) / 0.6)" />
               </linearGradient>
               <linearGradient id="thumbGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#FBBF24" />
-                <stop offset="100%" stopColor="#F59E0B" />
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="100%" stopColor="hsl(var(--primary))" />
               </linearGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                <feMerge> 
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
             </defs>
 
-            {/* Background track */}
+            {/* Background ring */}
             <circle
+              className="ring"
               cx={centerX}
               cy={centerY}
               r={radius}
               fill="none"
-              stroke="rgba(255, 255, 255, 0.1)"
+              stroke="hsl(var(--muted) / 0.3)"
               strokeWidth={strokeWidth}
-              strokeDasharray={`${circumference} ${2 * Math.PI * radius}`}
-              strokeDashoffset={0}
-              transform={`rotate(-135 ${centerX} ${centerY})`}
               strokeLinecap="round"
             />
 
-            {/* Progress track */}
-            <circle
+            {/* Progress ring with enhanced animation */}
+            <motion.circle
+              className="progress-ring"
               cx={centerX}
               cy={centerY}
               r={radius}
               fill="none"
-              stroke="url(#progressGradient)"
-              strokeWidth={strokeWidth}
-              strokeDasharray={`${circumference} ${2 * Math.PI * radius}`}
-              strokeDashoffset={circumference - (progressArcLength / 270) * circumference}
-              transform={`rotate(-135 ${centerX} ${centerY})`}
+              stroke="url(#gradient)"
+              strokeWidth={progressStrokeWidth}
               strokeLinecap="round"
-              className="transition-all duration-300 ease-out"
+              strokeDasharray={strokeDasharray}
+              strokeDashoffset={strokeDashoffset}
+              transform={`rotate(-135 ${centerX} ${centerY})`}
+              filter="url(#glow)"
+              animate={{
+                strokeDashoffset: strokeDashoffset,
+              }}
+              transition={{
+                type: "spring",
+                stiffness: 400,
+                damping: 30,
+                duration: 0.6
+              }}
             />
 
-            {/* Draggable thumb */}
+            {/* Draggable thumb with enhanced styling */}
             <motion.circle
               cx={thumbPosition.x}
               cy={thumbPosition.y}
               r={thumbRadius}
               fill="url(#thumbGradient)"
-              stroke="rgba(255, 255, 255, 0.3)"
-              strokeWidth="2"
-              className="cursor-grab"
+              stroke="hsl(var(--primary))"
+              strokeWidth="3"
+              className="cursor-grab active:cursor-grabbing"
               drag
               dragConstraints={svgRef}
               dragElastic={0}
               onDrag={handleDrag}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
-              animate={isDragging ? { scale: 1.2 } : { scale: 1 }}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 1.2 }}
+              animate={isDragging ? { scale: 1.3, r: thumbRadius * 1.2 } : { scale: 1, r: thumbRadius }}
+              whileHover={{ scale: 1.1, r: thumbRadius * 1.1 }}
+              whileTap={{ scale: 1.3 }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 20
+              }}
+              filter="url(#glow)"
             />
           </svg>
 
-          {/* Center value display */}
-          <div className="absolute inset-0 flex items-center justify-center">
+          {/* Enhanced center value display */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <motion.div
               className="text-center"
-              animate={isDragging ? { scale: 1.1 } : { scale: 1 }}
+              animate={isDragging ? { scale: 1.05 } : { scale: 1 }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 25
+              }}
             >
-              <motion.span 
-                className="text-4xl font-bold text-white block"
+              <motion.p
+                className="text-5xl font-bold text-white mb-2 filter drop-shadow-lg"
                 animate={isDragging ? { scale: 1.2 } : { scale: 1 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 400,
+                  damping: 25
+                }}
               >
-                {localValue}
-              </motion.span>
-              <span className="text-white/60 text-sm">
-                {question.scale_labels[0]} - {question.scale_labels[1]}
+                {Math.round(localValue)}
+              </motion.p>
+              <span className="text-white/60 text-xs font-medium tracking-wide">
+                {question.category.toUpperCase()}
               </span>
             </motion.div>
           </div>
+
+          {/* Min/Max labels positioned around circle */}
+          <p 
+            className="min-label absolute text-sm text-white/70 font-medium"
+            style={{ 
+              left: centerX - 110, 
+              top: centerY + 5,
+              transform: 'translate(-50%, -50%)'
+            }}
+          >
+            {question.scale_labels?.[0]}
+          </p>
+
+          <p 
+            className="max-label absolute text-sm text-white/70 font-medium"
+            style={{ 
+              left: centerX + 110, 
+              top: centerY + 5,
+              transform: 'translate(-50%, -50%)'
+            }}
+          >
+            {question.scale_labels?.[1]}
+          </p>
         </div>
 
-        {/* Min/Max labels */}
-        <div className="flex justify-between w-full max-w-xs text-white/70 text-sm">
-          <span className="font-medium">{question.scale_labels[0]}</span>
-          <span className="font-medium">{question.scale_labels[1]}</span>
-        </div>
-
-        {/* Value indicators */}
-        <div className="flex justify-center space-x-2">
+        {/* Enhanced value indicators */}
+        <div className="flex justify-center space-x-3 mt-4">
           {Array.from({ length: question.scale_max - question.scale_min + 1 }, (_, i) => {
             const indicatorValue = i + question.scale_min;
             const isActive = indicatorValue <= localValue;
+            const isCurrent = indicatorValue === localValue;
             return (
               <motion.div
                 key={i}
-                className={`w-2 h-6 rounded-full transition-all duration-300 ${
-                  isActive ? 'bg-purple-400' : 'bg-white/20'
+                className={`rounded-full transition-all duration-300 ${
+                  isCurrent 
+                    ? 'w-3 h-8 bg-gradient-to-t from-primary to-primary/60 shadow-lg' 
+                    : isActive 
+                      ? 'w-2 h-6 bg-primary/60' 
+                      : 'w-2 h-4 bg-white/20'
                 }`}
-                animate={isActive && isDragging ? { scale: 1.2, y: -2 } : { scale: 1, y: 0 }}
+                animate={
+                  isCurrent && isDragging 
+                    ? { scale: 1.3, y: -4 } 
+                    : isActive && isDragging 
+                      ? { scale: 1.1, y: -1 } 
+                      : { scale: 1, y: 0 }
+                }
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 25
+                }}
               />
             );
           })}
