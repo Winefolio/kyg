@@ -1,0 +1,35 @@
+isually Distinguish Host in Participant List on HostDashboard.tsx
+Context & Why:
+In client/src/pages/HostDashboard.tsx, the "Participants" tab (around lines 282-327) lists all participants in the current session along with their progress. Currently, there's no visual distinction for the participant who is marked as the host (isHost: true in their participant data).
+
+When a host views this list (especially if they are also listed as a participant, which might be the case if participantId in the URL refers to the host), it would improve clarity if their own entry or any designated host's entry is visually highlighted or marked.
+
+Objective (What):
+Modify the rendering of the participant list within the "Participants" tab of client/src/pages/HostDashboard.tsx to visually indicate which participant(s) have the isHost flag set to true.
+
+Implementation Details (How):
+
+Access isHost Flag:
+When mapping through the participants array (around line 288), each participant object contains the isHost boolean property.
+Apply Conditional Styling or Add an Indicator:
+Within the map function, for each participant entry, check the value of participant.isHost.
+If participant.isHost is true, apply a distinct visual treatment. Examples:
+Add a "(Host)" text label or a specific "Host" Badge component next to their displayName.
+Apply a slightly different background color or border to the host's entire list item (<div key={participant.id} ...>).
+Add a specific icon (e.g., a star or a crown icon from lucide-react) next to the host's name.
+Example (adding a Badge):
+TypeScript
+
+// Inside the participants.map function (around line 300)
+// ...
+<span className="text-white font-medium">{participant.displayName}</span>
+{participant.isHost && (
+  <Badge variant="outline" className="ml-2 bg-amber-500/20 border-amber-500 text-amber-300">Host</Badge>
+)}
+// ...
+Choose a visual style that is clear but doesn't clutter the UI excessively. The "Ultimate Prompt" used <Badge variant="premium">Host Mode</Badge> in its example for HostModeToggle.jsx. A similar badge here would be consistent.
+Acceptance Criteria:
+
+In the "Participants" tab of the HostDashboard.tsx, any participant entry where participant.isHost === true is visually distinct from non-host participants.
+The visual distinction is clear (e.g., a "Host" badge, icon, or subtle background change).
+The display of other participant information (name, progress) remains unaffected.

@@ -325,7 +325,14 @@ export default function HostDashboard() {
                           
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-white font-medium">{participant.displayName}</span>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-white font-medium">{participant.displayName}</span>
+                                {participant.isHost && (
+                                  <Badge variant="outline" className="bg-amber-500/20 border-amber-500 text-amber-300 text-xs">
+                                    Host
+                                  </Badge>
+                                )}
+                              </div>
                               <div className="flex items-center space-x-2">
                                 {isCompleted && <CheckCircle size={16} className="text-green-400" />}
                                 <Badge variant={isCompleted ? "default" : "secondary"}>
@@ -480,7 +487,7 @@ export default function HostDashboard() {
                               <div className="text-sm text-purple-200">Range</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-xl font-bold">{slideAnalytic.aggregatedData.totalResponses || 0}</div>
+                              <div className="text-xl font-bold">{slideAnalytic.totalResponses}</div>
                               <div className="text-sm text-purple-200">Total Responses</div>
                             </div>
                           </div>
