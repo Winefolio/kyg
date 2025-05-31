@@ -231,6 +231,21 @@ export default function Gateway() {
             </>
           )}
         </motion.div>
+
+        {/* Host Access Link */}
+        <motion.div
+          className="absolute bottom-6 right-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2 }}
+        >
+          <a
+            href="/sommelier"
+            className="text-white/30 hover:text-white/70 text-xs transition-colors duration-300"
+          >
+            Sommelier
+          </a>
+        </motion.div>
       </div>
 
       <LoadingOverlay isVisible={isValidating} message="Validating package..." />
