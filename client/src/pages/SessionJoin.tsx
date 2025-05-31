@@ -16,7 +16,7 @@ import { useHaptics } from "@/hooks/useHaptics";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { apiRequest } from "@/lib/queryClient";
 import { Wine, Users, User } from "lucide-react";
-import type { Package, Participant } from "@shared/schema";
+import type { Package, Participant, Session } from "@shared/schema";
 
 const joinFormSchema = z.object({
   displayName: z.string().min(1, "Name is required"),
@@ -32,10 +32,10 @@ export default function SessionJoin() {
   const [isJoining, setIsJoining] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   
-  // Get URL parameters for QR code flow
+  // Get URL parameters for both QR code and sessionId flows
   const urlParams = new URLSearchParams(window.location.search);
-  const sessionParam = urlParams.get('session');
-  const codeParam = urlParams.get('code') || packageCode;
+  const sessionIdFromUrl = urlParams.get('sessionId');
+  const packageCodeFromUrl = urlParams.get('code') || packageCode;
   const { triggerHaptic } = useHaptics();
   const { user, updateUser, addTastingSession, isAuthenticated } = useUserProfile();
   const queryClient = useQueryClient();
@@ -49,10 +49,17 @@ export default function SessionJoin() {
     }
   });
 
-  // Get package details
+  // Get existing session details if joining via sessionId
+  const { data: existingSession, isLoading: sessionLoading } = useQuery<Session & {packageCode?: string}>({
+    queryKey: [`/api/sessions/${sessionIdFromUrl}`],
+    enabled: !!sessionIdFromUrl
+  });
+
+  // Get package details - use packageCode from session or URL
+  const effectivePackageCode = existingSession?.packageCode || packageCodeFromUrl;
   const { data: packageData, isLoading: packageLoading } = useQuery<Package>({
-    queryKey: [`/api/packages/${packageCode}`],
-    enabled: !!packageCode
+    queryKey: [`/api/packages/${effectivePackageCode}`],
+    enabled: !!effectivePackageCode
   });
 
   // Create session mutation
@@ -72,38 +79,64 @@ export default function SessionJoin() {
   });
 
   const onSubmit = async (data: JoinFormData) => {
-    if (!packageCode) return;
-    
     setIsJoining(true);
     triggerHaptic('selection');
 
     try {
-      // Create session
-      const session = await createSessionMutation.mutateAsync(packageCode);
-      
-      // Join as participant
-      const participant = await joinSessionMutation.mutateAsync({
-        sessionId: session.id,
-        participant: data
-      });
+      if (sessionIdFromUrl) {
+        // Joining an existing session via sessionId
+        if (!existingSession) {
+          throw new Error('Session not found');
+        }
 
-      triggerHaptic('success');
-      
-      // Navigate to appropriate screen
-      if (data.isHost) {
-        setLocation(`/host/${session.id}/${participant.id}`);
+        // Add participant to existing session
+        const participant = await joinSessionMutation.mutateAsync({
+          sessionId: sessionIdFromUrl,
+          participant: {
+            ...data,
+            isHost: false // Participants joining via link are not hosts
+          }
+        });
+
+        triggerHaptic('success');
+        
+        // Navigate to tasting session
+        setLocation(`/tasting/${sessionIdFromUrl}/${participant.id}`);
+        
       } else {
-        setLocation(`/tasting/${session.id}/${participant.id}`);
+        // Creating a new session (original flow for hosts or package code entry)
+        if (!packageCodeFromUrl) {
+          throw new Error('Package code is required');
+        }
+
+        // Create new session
+        const session = await createSessionMutation.mutateAsync(packageCodeFromUrl);
+        
+        // Join as participant (usually host in this flow)
+        const participant = await joinSessionMutation.mutateAsync({
+          sessionId: session.id,
+          participant: data
+        });
+
+        triggerHaptic('success');
+        
+        // Navigate to appropriate screen
+        if (data.isHost) {
+          setLocation(`/host/${session.id}/${participant.id}`);
+        } else {
+          setLocation(`/tasting/${session.id}/${participant.id}`);
+        }
       }
     } catch (error) {
+      console.error('Error joining session:', error);
       triggerHaptic('error');
     } finally {
       setIsJoining(false);
     }
   };
 
-  if (packageLoading) {
-    return <LoadingOverlay isVisible={true} message="Loading package details..." />;
+  if (packageLoading || sessionLoading) {
+    return <LoadingOverlay isVisible={true} message="Loading session details..." />;
   }
 
   return (
