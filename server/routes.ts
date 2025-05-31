@@ -124,6 +124,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update session status
+  app.patch("/api/sessions/:sessionId/status", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { status } = req.body;
+      
+      // Validate status
+      const validStatuses = ['waiting', 'active', 'paused', 'completed'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      await storage.updateSessionStatus(sessionId, status);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Save response
   app.post("/api/responses", async (req, res) => {
     try {

@@ -23,6 +23,7 @@ export interface IStorage {
   createSession(session: InsertSession): Promise<Session>;
   getSessionById(id: string): Promise<(Session & { packageCode?: string }) | undefined>;
   updateSessionParticipantCount(sessionId: string, count: number): Promise<void>;
+  updateSessionStatus(sessionId: string, status: string): Promise<void>;
   
   // Participants
   createParticipant(participant: InsertParticipant): Promise<Participant>;
@@ -270,6 +271,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: sessions.id,
         packageId: sessions.packageId,
+        status: sessions.status,
         startedAt: sessions.startedAt,
         completedAt: sessions.completedAt,
         activeParticipants: sessions.activeParticipants,
@@ -287,6 +289,7 @@ export class DatabaseStorage implements IStorage {
     const session: Session & { packageCode?: string } = {
       id: sessionData.id,
       packageId: sessionData.packageId,
+      status: sessionData.status,
       startedAt: sessionData.startedAt,
       completedAt: sessionData.completedAt,
       activeParticipants: sessionData.activeParticipants,
@@ -300,6 +303,13 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(sessions)
       .set({ activeParticipants: count })
+      .where(eq(sessions.id, sessionId));
+  }
+
+  async updateSessionStatus(sessionId: string, status: string): Promise<void> {
+    await db
+      .update(sessions)
+      .set({ status })
       .where(eq(sessions.id, sessionId));
   }
 

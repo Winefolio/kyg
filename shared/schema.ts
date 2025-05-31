@@ -30,6 +30,7 @@ export const slides = pgTable("slides", {
 export const sessions = pgTable("sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
   packageId: uuid("package_id").references(() => packages.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 20 }).default('waiting').notNull(),
   startedAt: timestamp("started_at").defaultNow(),
   completedAt: timestamp("completed_at"),
   activeParticipants: integer("active_participants").default(0)
