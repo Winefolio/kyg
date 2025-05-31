@@ -2,11 +2,12 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "@shared/schema";
 
-// Use the correct Supabase connection string for direct PostgreSQL access
-const connectionString = `postgresql://postgres.byearryckdwmajygqdpx:Wineman25@aws-0-us-east-1.pooler.supabase.com:5432/postgres`;
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is required");
+}
 
-console.log("Connecting to Supabase database...");
+console.log("Connecting to PostgreSQL database...");
 
 // Create the database connection
-const sql = postgres(connectionString, { ssl: 'require' });
+const sql = postgres(process.env.DATABASE_URL);
 export const db = drizzle(sql, { schema });

@@ -3,8 +3,11 @@ import {
   type Slide, type InsertSlide,
   type Session, type InsertSession,
   type Participant, type InsertParticipant,
-  type Response, type InsertResponse
+  type Response, type InsertResponse,
+  packages, slides, sessions, participants, responses
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
 
 export interface IStorage {
   // Packages
@@ -34,32 +37,26 @@ export interface IStorage {
   updateResponse(participantId: string, slideId: string, answerJson: any): Promise<Response>;
 }
 
-export class WorkingStorage implements IStorage {
-  private packages: Map<string, Package> = new Map();
-  private slides: Map<string, Slide> = new Map();
-  private sessions: Map<string, Session> = new Map();
-  private participants: Map<string, Participant> = new Map();
-  private responses: Map<string, Response> = new Map();
-
+export class DatabaseStorage implements IStorage {
   constructor() {
     this.initializeWineTastingData();
   }
 
-  private generateId(): string {
-    return crypto.randomUUID();
-  }
+  private async initializeWineTastingData() {
+    // Check if data already exists
+    const existingPackage = await this.getPackageByCode("WINE01");
+    if (existingPackage) {
+      return; // Data already exists
+    }
 
-  private initializeWineTastingData() {
+    console.log("Initializing wine tasting data...");
+
     // Create the Bordeaux wine package
-    const bordeauxPackage: Package = {
-      id: this.generateId(),
+    const bordeauxPackage = await this.createPackage({
       code: "WINE01",
       name: "Bordeaux Discovery Collection",
-      description: "Explore the finest wines from France's most prestigious region",
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.packages.set(bordeauxPackage.id, bordeauxPackage);
+      description: "Explore the finest wines from France's most prestigious region"
+    });
 
     // Create all 8 wine tasting slides
     const slideData = [
@@ -178,167 +175,200 @@ export class WorkingStorage implements IStorage {
       }
     ];
 
-    slideData.forEach(slideInfo => {
-      const slide: Slide = {
-        id: this.generateId(),
+    for (const slideInfo of slideData) {
+      await this.createSlide({
         packageId: bordeauxPackage.id,
         position: slideInfo.position,
         type: slideInfo.type,
-        payloadJson: slideInfo.payloadJson,
-        createdAt: new Date()
-      };
-      this.slides.set(slide.id, slide);
-    });
+        payloadJson: slideInfo.payloadJson
+      });
+    }
+
+    console.log("Wine tasting data initialized successfully!");
   }
 
   // Package methods
   async getPackageByCode(code: string): Promise<Package | undefined> {
-    return Array.from(this.packages.values()).find(pkg => pkg.code === code.toUpperCase());
+    const result = await db
+      .select()
+      .from(packages)
+      .where(eq(packages.code, code.toUpperCase()))
+      .limit(1);
+    return result[0];
   }
 
   async createPackage(pkg: InsertPackage): Promise<Package> {
-    const id = this.generateId();
-    const newPackage: Package = {
-      id,
-      code: pkg.code,
-      name: pkg.name,
-      description: pkg.description || null,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    this.packages.set(id, newPackage);
-    return newPackage;
+    const result = await db
+      .insert(packages)
+      .values({
+        code: pkg.code.toUpperCase(),
+        name: pkg.name,
+        description: pkg.description
+      })
+      .returning();
+    return result[0];
   }
 
   // Slide methods
   async getSlidesByPackageId(packageId: string, isHost = false): Promise<Slide[]> {
-    let slides = Array.from(this.slides.values())
-      .filter(slide => slide.packageId === packageId)
-      .sort((a, b) => a.position - b.position);
+    let result = await db
+      .select()
+      .from(slides)
+      .where(eq(slides.packageId, packageId))
+      .orderBy(slides.position);
 
     if (!isHost) {
-      slides = slides.filter(slide => {
+      result = result.filter(slide => {
         const payload = slide.payloadJson as any;
         return !payload.for_host;
       });
     }
 
-    return slides;
+    return result;
   }
 
   async getSlideById(id: string): Promise<Slide | undefined> {
-    return this.slides.get(id);
+    const result = await db
+      .select()
+      .from(slides)
+      .where(eq(slides.id, id))
+      .limit(1);
+    return result[0];
   }
 
   async createSlide(slide: InsertSlide): Promise<Slide> {
-    const id = this.generateId();
-    const newSlide: Slide = {
-      id,
-      packageId: slide.packageId || null,
-      position: slide.position,
-      type: slide.type,
-      payloadJson: slide.payloadJson,
-      createdAt: new Date()
-    };
-    this.slides.set(id, newSlide);
-    return newSlide;
+    const result = await db
+      .insert(slides)
+      .values({
+        packageId: slide.packageId,
+        position: slide.position,
+        type: slide.type,
+        payloadJson: slide.payloadJson
+      })
+      .returning();
+    return result[0];
   }
 
   // Session methods
   async createSession(session: InsertSession): Promise<Session> {
-    const id = this.generateId();
-    const newSession: Session = {
-      id,
-      packageId: session.packageId || null,
-      startedAt: new Date(),
-      completedAt: session.completedAt || null,
-      activeParticipants: session.activeParticipants || 0
-    };
-    this.sessions.set(id, newSession);
-    return newSession;
+    const result = await db
+      .insert(sessions)
+      .values({
+        packageId: session.packageId,
+        completedAt: session.completedAt,
+        activeParticipants: session.activeParticipants || 0
+      })
+      .returning();
+    return result[0];
   }
 
   async getSessionById(id: string): Promise<Session | undefined> {
-    return this.sessions.get(id);
+    const result = await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.id, id))
+      .limit(1);
+    return result[0];
   }
 
   async updateSessionParticipantCount(sessionId: string, count: number): Promise<void> {
-    const session = this.sessions.get(sessionId);
-    if (session) {
-      session.activeParticipants = count;
-      this.sessions.set(sessionId, session);
-    }
+    await db
+      .update(sessions)
+      .set({ activeParticipants: count })
+      .where(eq(sessions.id, sessionId));
   }
 
   // Participant methods
   async createParticipant(participant: InsertParticipant): Promise<Participant> {
-    const id = this.generateId();
-    const newParticipant: Participant = {
-      id,
-      sessionId: participant.sessionId || null,
-      email: participant.email || null,
-      displayName: participant.displayName,
-      isHost: participant.isHost || false,
-      progressPtr: participant.progressPtr || 0,
-      lastActive: new Date(),
-      createdAt: new Date()
-    };
-    this.participants.set(id, newParticipant);
-    return newParticipant;
+    const result = await db
+      .insert(participants)
+      .values({
+        sessionId: participant.sessionId,
+        email: participant.email,
+        displayName: participant.displayName,
+        isHost: participant.isHost || false,
+        progressPtr: participant.progressPtr || 0
+      })
+      .returning();
+    return result[0];
   }
 
   async getParticipantById(id: string): Promise<Participant | undefined> {
-    return this.participants.get(id);
+    const result = await db
+      .select()
+      .from(participants)
+      .where(eq(participants.id, id))
+      .limit(1);
+    return result[0];
   }
 
   async getParticipantsBySessionId(sessionId: string): Promise<Participant[]> {
-    return Array.from(this.participants.values())
-      .filter(participant => participant.sessionId === sessionId);
+    return await db
+      .select()
+      .from(participants)
+      .where(eq(participants.sessionId, sessionId));
   }
 
   async updateParticipantProgress(participantId: string, progress: number): Promise<void> {
-    const participant = this.participants.get(participantId);
-    if (participant) {
-      participant.progressPtr = progress;
-      participant.lastActive = new Date();
-      this.participants.set(participantId, participant);
-    }
+    await db
+      .update(participants)
+      .set({ 
+        progressPtr: progress,
+        lastActive: new Date()
+      })
+      .where(eq(participants.id, participantId));
   }
 
   // Response methods
   async createResponse(response: InsertResponse): Promise<Response> {
-    const id = this.generateId();
-    const newResponse: Response = {
-      id,
-      participantId: response.participantId || null,
-      slideId: response.slideId || null,
-      answerJson: response.answerJson,
-      answeredAt: new Date(),
-      synced: response.synced || true
-    };
-    this.responses.set(id, newResponse);
-    return newResponse;
+    const result = await db
+      .insert(responses)
+      .values({
+        participantId: response.participantId,
+        slideId: response.slideId,
+        answerJson: response.answerJson,
+        synced: response.synced || true
+      })
+      .returning();
+    return result[0];
   }
 
   async getResponsesByParticipantId(participantId: string): Promise<Response[]> {
-    return Array.from(this.responses.values())
-      .filter(response => response.participantId === participantId);
+    return await db
+      .select()
+      .from(responses)
+      .where(eq(responses.participantId, participantId));
   }
 
   async getResponsesBySlideId(slideId: string): Promise<Response[]> {
-    return Array.from(this.responses.values())
-      .filter(response => response.slideId === slideId);
+    return await db
+      .select()
+      .from(responses)
+      .where(eq(responses.slideId, slideId));
   }
 
   async updateResponse(participantId: string, slideId: string, answerJson: any): Promise<Response> {
-    const existingResponse = Array.from(this.responses.values())
-      .find(r => r.participantId === participantId && r.slideId === slideId);
+    const existingResponse = await db
+      .select()
+      .from(responses)
+      .where(
+        and(
+          eq(responses.participantId, participantId),
+          eq(responses.slideId, slideId)
+        )
+      )
+      .limit(1);
 
-    if (existingResponse) {
-      existingResponse.answerJson = answerJson;
-      existingResponse.answeredAt = new Date();
-      this.responses.set(existingResponse.id, existingResponse);
-      return existingResponse;
+    if (existingResponse.length > 0) {
+      const updated = await db
+        .update(responses)
+        .set({ 
+          answerJson,
+          answeredAt: new Date()
+        })
+        .where(eq(responses.id, existingResponse[0].id))
+        .returning();
+      return updated[0];
     } else {
       return this.createResponse({ 
         participantId, 
@@ -350,4 +380,4 @@ export class WorkingStorage implements IStorage {
   }
 }
 
-export const storage = new WorkingStorage();
+export const storage = new DatabaseStorage();
