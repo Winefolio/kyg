@@ -71,31 +71,40 @@ export default function SommelierDashboard() {
     }
   });
 
-  const generateQRData = (sessionId: string) => {
+  const generateQRData = (code: string) => {
     const baseUrl = window.location.origin;
-    return `${baseUrl}/join?session=${sessionId}`;
+    return `${baseUrl}/join?code=${code}`;
   };
 
-  const copyQRLink = (sessionId: string) => {
-    navigator.clipboard.writeText(generateQRData(sessionId));
+  const copyQRLink = (code: string) => {
+    navigator.clipboard.writeText(generateQRData(code));
     toast({
       title: "Link Copied!",
       description: "Share this link with your guests"
     });
   };
 
-  const downloadQR = (sessionId: string, sessionName: string) => {
-    // We'll implement QR code generation here
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(generateQRData(sessionId))}`;
+  const downloadQR = (code: string, sessionName: string) => {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&data=${encodeURIComponent(generateQRData(code))}`;
     
     const link = document.createElement('a');
     link.href = qrUrl;
-    link.download = `${sessionName}-qr-code.png`;
+    link.download = `${sessionName.replace(/\s+/g, '-')}-qr-code.png`;
     link.click();
     
     toast({
       title: "QR Code Downloaded!",
       description: "Print and display for your guests"
+    });
+  };
+
+  const viewQR = (code: string, sessionName: string) => {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&data=${encodeURIComponent(generateQRData(code))}`;
+    window.open(qrUrl, '_blank');
+    
+    toast({
+      title: "QR Code Opened!",
+      description: "QR code opened in new tab"
     });
   };
 
@@ -226,7 +235,7 @@ export default function SommelierDashboard() {
             <CardContent>
               <div className="flex flex-wrap gap-4">
                 <Button
-                  onClick={() => copyQRLink('demo-session')}
+                  onClick={() => copyQRLink('WINE01')}
                   variant="outline"
                   className="bg-white/10 border-white/20 text-white hover:bg-white/20"
                 >
@@ -235,7 +244,16 @@ export default function SommelierDashboard() {
                 </Button>
                 
                 <Button
-                  onClick={() => downloadQR('demo-session', 'Bordeaux Demo')}
+                  onClick={() => viewQR('WINE01', 'Bordeaux Demo')}
+                  variant="outline"
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                >
+                  <QrCode size={16} className="mr-2" />
+                  View QR Code
+                </Button>
+                
+                <Button
+                  onClick={() => downloadQR('WINE01', 'Bordeaux Demo')}
                   variant="outline"
                   className="bg-white/10 border-white/20 text-white hover:bg-white/20"
                 >
