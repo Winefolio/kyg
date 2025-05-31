@@ -1,0 +1,56 @@
+When a participant submits a response via the POST /api/responses endpoint, their progress through the tasting session (tracked by the progressPtr field in the participants table) needs to be accurately updated. This logic might have been inadvertently altered or removed during recent refactoring of the /api/responses handler in server/routes.ts.
+
+Currently, the server/routes.ts code for POST /api/responses (after being modified by the AI to fix duplicate key issues) focuses on the upsert logic for the response itself but seems to have lost the explicit participant progress update. The storage.updateParticipantProgress method correctly updates progressPtr and lastActive.
+
+We need to reinstate this progress update and refine it so that progressPtr only advances. It should be set to the position of the slide just answered if that slide's position is greater than the participant's current progressPtr. The lastActive timestamp should always be updated on any valid response submission.
+
+Objective (What):
+
+Ensure that within the POST /api/responses handler in server/routes.ts, after a response is successfully saved or updated via storage.updateResponse(), the participant's progress (progressPtr) and lastActive timestamp are correctly updated in the database.
+The progressPtr should be set to the position of the slideId for which the response was submitted, but only if this slide position is greater than the participant's current progressPtr.
+The lastActive timestamp for the participant should always be updated upon successful response submission.
+Implementation Details (How):
+
+Modify POST /api/responses handler in server/routes.ts (around lines 140-148, after the response variable is set):
+After the const response = await storage.updateResponse(...) call and before res.json(response):
+Fetch the participant details using validatedData.participantId.
+Fetch the currentSlide details using validatedData.slideId (you'll need currentSlide.position).
+Implement the conditional progress update:
+TypeScript
+
+// ... after response is successfully saved/upserted by storage.updateResponse
+const participant = await storage.getParticipantById(validatedData.participantId);
+const currentSlide = await storage.getSlideById(validatedData.slideId); // Ensure slideId from validatedData is used
+
+if (participant && currentSlide) {
+  let newProgress = participant.progressPtr || 0;
+  if (currentSlide.position > newProgress) {
+    newProgress = currentSlide.position;
+  }
+  // The storage.updateParticipantProgress method already updates lastActive.
+  await storage.updateParticipantProgress(participant.id, newProgress);
+  console.log(`Participant ${participant.id} progress potentially updated to ${newProgress}, lastActive refreshed.`);
+}
+
+res.json(response); // Send response back to client
+Verify storage.updateParticipantProgress (in server/storage.ts):
+Confirm that this method updates both progressPtr to the given progress value AND sets lastActive to new Date(). The current implementation already does this, which is correct.
+TypeScript
+
+async updateParticipantProgress(participantId: string, progress: number): Promise<void> {
+  await db
+    .update(participants)
+    .set({ 
+      progressPtr: progress,
+      lastActive: new Date() // This is correctly updating lastActive
+    })
+    .where(eq(participants.id, participantId));
+}
+Acceptance Criteria:
+
+When a participant submits a response via POST /api/responses:
+If the response is for a slide position greater than their current progressPtr, their progressPtr in the database is updated to this new, higher position.
+If the response is for a slide position less than or equal to their current progressPtr (e.g., re-answering an old question), their progressPtr does not change (does not go backward or get re-set unnecessarily).
+The participant.lastActive timestamp in the database is updated on every successful response submission, regardless of whether progressPtr changed.
+The response saving functionality remains correct.
+The API continues to handle errors gracefully.
