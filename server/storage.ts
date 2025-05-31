@@ -7,7 +7,7 @@ import {
   packages, slides, sessions, participants, responses
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Packages
@@ -425,12 +425,14 @@ export class DatabaseStorage implements IStorage {
     // 4. Fetch all slides for this package
     const sessionSlides = await this.getSlidesByPackageId(session.packageId!, true); // Include host slides
     
-    // 5. Fetch all responses for all participants in this session
-    const sessionResponses: Response[] = [];
-    for (const participant of sessionParticipants) {
-      const participantResponses = await this.getResponsesByParticipantId(participant.id);
-      sessionResponses.push(...participantResponses);
-    }
+    // 5. Fetch all responses for all participants in this session (optimized single query)
+    const participantIds = sessionParticipants.map(p => p.id).filter(id => id !== null);
+    const sessionResponses = participantIds.length > 0 
+      ? await db
+          .select()
+          .from(responses)
+          .where(inArray(responses.participantId, participantIds))
+      : [];
 
     // Calculate overall session statistics
     const totalParticipants = sessionParticipants.length;
