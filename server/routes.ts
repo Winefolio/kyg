@@ -212,6 +212,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get aggregated analytics for a session
+  app.get("/api/sessions/:sessionId/analytics", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const analyticsData = await storage.getAggregatedSessionAnalytics(sessionId);
+      res.json(analyticsData);
+    } catch (error) {
+      console.error("Error fetching session analytics:", error);
+      if (error instanceof Error && error.message === 'Session not found') {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Get participant by ID
   app.get("/api/participants/:participantId", async (req, res) => {
     try {

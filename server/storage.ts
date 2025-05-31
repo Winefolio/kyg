@@ -35,6 +35,9 @@ export interface IStorage {
   getResponsesByParticipantId(participantId: string): Promise<Response[]>;
   getResponsesBySlideId(slideId: string): Promise<Response[]>;
   updateResponse(participantId: string, slideId: string, answerJson: any): Promise<Response>;
+  
+  // Analytics
+  getAggregatedSessionAnalytics(sessionId: string): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -399,6 +402,163 @@ export class DatabaseStorage implements IStorage {
         synced: true 
       });
     }
+  }
+
+  // Analytics method
+  async getAggregatedSessionAnalytics(sessionId: string): Promise<any> {
+    // 1. Fetch session details and validate existence
+    const session = await this.getSessionById(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    // 2. Get package details for the session
+    const packageData = await db
+      .select()
+      .from(packages)
+      .where(eq(packages.id, session.packageId!))
+      .limit(1);
+    
+    // 3. Fetch all participants for this session
+    const sessionParticipants = await this.getParticipantsBySessionId(sessionId);
+    
+    // 4. Fetch all slides for this package
+    const sessionSlides = await this.getSlidesByPackageId(session.packageId!, true); // Include host slides
+    
+    // 5. Fetch all responses for all participants in this session
+    const sessionResponses: Response[] = [];
+    for (const participant of sessionParticipants) {
+      const participantResponses = await this.getResponsesByParticipantId(participant.id);
+      sessionResponses.push(...participantResponses);
+    }
+
+    // Calculate overall session statistics
+    const totalParticipants = sessionParticipants.length;
+    const questionSlides = sessionSlides.filter(slide => slide.type === 'question');
+    const totalQuestions = questionSlides.length;
+    
+    const completedParticipants = sessionParticipants.filter(
+      participant => (participant.progressPtr || 0) >= totalQuestions
+    ).length;
+
+    const averageProgressPercent = totalParticipants > 0 
+      ? Math.round((sessionParticipants.reduce((sum, p) => sum + (p.progressPtr || 0), 0) / totalParticipants / totalQuestions) * 100)
+      : 0;
+
+    // Process slide-by-slide analytics
+    const slidesAnalytics = [];
+
+    for (const slide of questionSlides) {
+      const slideResponses = sessionResponses.filter(response => response.slideId === slide.id);
+      const slidePayload = slide.payloadJson as any;
+      
+      let aggregatedData: any = {};
+
+      if (slidePayload.question_type === 'multiple_choice') {
+        // Process multiple choice questions
+        const optionsSummary = [];
+        const options = slidePayload.options || [];
+        
+        for (const option of options) {
+          let count = 0;
+          
+          for (const response of slideResponses) {
+            const answerData = response.answerJson as any;
+            if (answerData && answerData.selected) {
+              if (Array.isArray(answerData.selected)) {
+                if (answerData.selected.includes(option.id)) {
+                  count++;
+                }
+              } else if (answerData.selected === option.id) {
+                count++;
+              }
+            }
+          }
+          
+          const percentage = slideResponses.length > 0 ? Math.round((count / slideResponses.length) * 100) : 0;
+          
+          optionsSummary.push({
+            optionId: option.id,
+            optionText: option.text,
+            count,
+            percentage
+          });
+        }
+
+        // Count notes if allowed
+        let notesSubmittedCount = 0;
+        if (slidePayload.allow_notes) {
+          notesSubmittedCount = slideResponses.filter(response => {
+            const answerData = response.answerJson as any;
+            return answerData && answerData.notes && answerData.notes.trim().length > 0;
+          }).length;
+        }
+
+        aggregatedData = {
+          optionsSummary,
+          notesSubmittedCount
+        };
+
+      } else if (slidePayload.question_type === 'scale') {
+        // Process scale questions
+        const scores = slideResponses
+          .map(response => {
+            const answerData = response.answerJson as any;
+            return typeof answerData === 'number' ? answerData : null;
+          })
+          .filter(score => score !== null);
+
+        if (scores.length > 0) {
+          const averageScore = Math.round((scores.reduce((sum, score) => sum + score, 0) / scores.length) * 10) / 10;
+          const minScore = Math.min(...scores);
+          const maxScore = Math.max(...scores);
+          
+          // Create score distribution
+          const scoreDistribution: { [key: string]: number } = {};
+          for (const score of scores) {
+            scoreDistribution[score.toString()] = (scoreDistribution[score.toString()] || 0) + 1;
+          }
+
+          aggregatedData = {
+            averageScore,
+            minScore,
+            maxScore,
+            scoreDistribution,
+            totalResponses: scores.length
+          };
+        } else {
+          aggregatedData = {
+            averageScore: 0,
+            minScore: 0,
+            maxScore: 0,
+            scoreDistribution: {},
+            totalResponses: 0
+          };
+        }
+      }
+
+      slidesAnalytics.push({
+        slideId: slide.id,
+        slidePosition: slide.position,
+        slideTitle: slidePayload.title || 'Untitled Question',
+        slideType: slide.type,
+        questionType: slidePayload.question_type,
+        totalResponses: slideResponses.length,
+        aggregatedData
+      });
+    }
+
+    return {
+      sessionId: session.id,
+      sessionName: `Session ${session.id.substring(0, 8)}`, // Generate a session name
+      packageName: packageData[0]?.name || 'Unknown Package',
+      packageCode: session.packageCode || 'UNKNOWN',
+      totalParticipants,
+      completedParticipants,
+      averageProgressPercent,
+      totalQuestions,
+      slidesAnalytics
+    };
   }
 }
 
