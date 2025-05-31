@@ -43,7 +43,10 @@ export function useSessionPersistence() {
       // Load any existing unsynced responses from IndexedDB
       if (database) {
         try {
-          const unsynced = await database.getAllFromIndex('offlineResponses', 'by-synced', false);
+          const tx = database.transaction('offlineResponses', 'readonly');
+          const store = tx.objectStore('offlineResponses');
+          const all = await store.getAll();
+          const unsynced = all.filter(item => !item.synced);
           setOfflineQueue(unsynced);
         } catch (error) {
           console.warn('Failed to load unsynced responses:', error);
@@ -111,7 +114,10 @@ export function useSessionPersistence() {
       // Get unsynced responses from IndexedDB
       if (db) {
         try {
-          unsyncedResponses = await db.getAllFromIndex('offlineResponses', 'by-synced', false);
+          const tx = db.transaction('offlineResponses', 'readonly');
+          const store = tx.objectStore('offlineResponses');
+          const all = await store.getAll();
+          unsyncedResponses = all.filter(item => !item.synced);
         } catch (error) {
           console.warn('Failed to get unsynced responses from IndexedDB:', error);
           // Fall back to memory queue
