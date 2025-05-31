@@ -128,19 +128,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/responses", async (req, res) => {
     try {
       const validatedData = insertResponseSchema.parse(req.body);
-      const response = await storage.createResponse(validatedData);
       
-      // Update participant progress
-      const participant = await storage.getParticipantById(validatedData.participantId!);
-      if (participant) {
-        await storage.updateParticipantProgress(
-          participant.id, 
-          participant.progressPtr! + 1
-        );
-      }
-
+      // Try to update existing response first, create if it doesn't exist
+      const response = await storage.updateResponse(
+        validatedData.participantId!,
+        validatedData.slideId!,
+        validatedData.answerJson
+      );
+      
       res.json(response);
     } catch (error) {
+      console.log("POST /api/responses - Request body:", req.body);
+      console.log("POST /api/responses - Error:", error);
+      
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
       }
