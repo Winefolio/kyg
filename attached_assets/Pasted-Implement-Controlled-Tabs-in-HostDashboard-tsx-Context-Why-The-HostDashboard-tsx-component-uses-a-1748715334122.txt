@@ -1,0 +1,44 @@
+Implement Controlled Tabs in HostDashboard.tsx
+Context & Why:
+The HostDashboard.tsx component uses a Tabs component (from shadcn/ui, around line 150) to allow hosts to switch between "Overview," "Participants," "Analytics," and "Controls" views. This Tabs component is currently "uncontrolled," meaning its active tab state is managed internally.
+
+Several data queries in this dashboard have refetchInterval options set (e.g., for sessions and participants), causing the component to re-render periodically when data is refetched. When an uncontrolled Tabs component's parent re-renders, the Tabs component can reset to its defaultValue (which is "overview"). This likely causes the observed issue where the dashboard view (selected tab) periodically refreshes or resets, disrupting the host's interaction.
+
+Objective (What):
+Modify the Tabs component in client/src/pages/HostDashboard.tsx to be a "controlled" component. This means its active tab will be managed by a React state variable within HostDashboard.tsx, preventing it from resetting to the default tab on unrelated parent re-renders.
+
+Implementation Details (How):
+
+Introduce State for Active Tab:
+In HostDashboard.tsx (near other state declarations like sessionStatus), add a new React state variable to store and manage the currently active tab. Initialize it to the current defaultValue of the Tabs component.
+TypeScript
+
+const [activeTab, setActiveTab] = useState<string>('overview');
+Control the Tabs Component:
+Locate the <Tabs ...> component (around line 150).
+Pass the value prop to it, setting it to your new activeTab state variable.
+Pass the onValueChange prop to it, using this callback to update the activeTab state with the new tab value provided by the component (i.e., onValueChange={setActiveTab}).
+The modified <Tabs> component should look similar to this:
+TypeScript
+
+<Tabs 
+  value={activeTab} 
+  onValueChange={setActiveTab} 
+  defaultValue="overview" // This can be kept for initial render or removed if `value` fully controls it
+  className="max-w-6xl mx-auto"
+>
+  <TabsList className="grid w-full grid-cols-4 bg-white/10 backdrop-blur-xl">
+    <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20">Overview</TabsTrigger>
+    <TabsTrigger value="participants" className="text-white data-[state=active]:bg-white/20">Participants</TabsTrigger>
+    <TabsTrigger value="analytics" className="text-white data-[state=active]:bg-white/20">Analytics</TabsTrigger>
+    <TabsTrigger value="controls" className="text-white data-[state=active]:bg-white/20">Controls</TabsTrigger>
+  </TabsList>
+
+  {/* TabsContent components follow */}
+</Tabs>
+Acceptance Criteria:
+
+The selected tab in the HostDashboard.tsx (e.g., "Participants," "Analytics," or "Controls") remains active and does not automatically switch back to the "Overview" tab when background data re-fetches occur due to refetchInterval.
+The host can manually switch between tabs, and the content updates accordingly.
+The dashboard refresh/reset issue (where the view changes unexpectedly) is resolved or significantly mitigated.
+This should stabilize the tab behavior.

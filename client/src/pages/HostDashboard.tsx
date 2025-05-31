@@ -19,6 +19,7 @@ export default function HostDashboard() {
   const { toast } = useToast();
   const [sessionStatus, setSessionStatus] = useState<'waiting' | 'active' | 'paused' | 'completed'>('waiting');
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [activeTab, setActiveTab] = useState<string>('overview');
 
   // Fetch session information
   const { data: session, isLoading: sessionLoading, refetch: refetchSession } = useQuery<Session & { packageCode?: string }>({
@@ -147,7 +148,7 @@ export default function HostDashboard() {
           </Badge>
         </div>
 
-        <Tabs defaultValue="overview" className="max-w-6xl mx-auto">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-6xl mx-auto">
           <TabsList className="grid w-full grid-cols-4 bg-white/10 backdrop-blur-xl">
             <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20">Overview</TabsTrigger>
             <TabsTrigger value="participants" className="text-white data-[state=active]:bg-white/20">Participants</TabsTrigger>
