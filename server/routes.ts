@@ -52,10 +52,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create session
+  // Create session (with optional host participant)
   app.post("/api/sessions", async (req, res) => {
     try {
-      const { packageId, packageCode, name } = req.body;
+      const { packageId, packageCode, name, hostName, createHost } = req.body;
       
       let pkg;
       if (packageId) {
@@ -71,13 +71,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Package not found" });
       }
 
+      // Create the session
       const session = await storage.createSession({
         packageId: (pkg as any).id,
         completedAt: null,
         activeParticipants: 0
       });
 
-      res.json(session);
+      // If createHost is true, also create the host participant
+      let hostParticipant = null;
+      if (createHost) {
+        const hostParticipantData = insertParticipantSchema.parse({
+          sessionId: session.id,
+          displayName: hostName || 'Host',
+          email: '', // Default empty email for host
+          isHost: true,
+          progress: 0
+        });
+
+        hostParticipant = await storage.createParticipant(hostParticipantData);
+        
+        // Update session participant count
+        await storage.updateSessionParticipantCount(session.id, 1);
+      }
+
+      // Return both session and host participant info
+      res.json({
+        session,
+        hostParticipantId: hostParticipant?.id || null
+      });
     } catch (error) {
       console.error("Error creating session:", error);
       res.status(500).json({ message: "Internal server error", error: String(error) });

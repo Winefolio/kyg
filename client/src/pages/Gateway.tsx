@@ -10,6 +10,7 @@ import { animations } from "@/lib/animations";
 import { apiRequest } from "@/lib/queryClient";
 import { Wine, Camera, Users, UserPlus, QrCode, WifiOff, Wifi, ArrowRight, Sparkles } from "lucide-react";
 import { QRScanner } from "@/components/QRScanner";
+import { CodeInput } from "@/components/CodeInput";
 
 type UserMode = 'selection' | 'join' | 'host';
 
@@ -24,14 +25,10 @@ export default function Gateway() {
   // Mutation for creating a new session (host flow)
   const createSessionMutation = useMutation({
     mutationFn: async (packageCode: string) => {
-      const packageResponse = await apiRequest('GET', `/api/packages/${packageCode}`);
-      if (!packageResponse.ok) {
-        throw new Error('Package not found');
-      }
-      
       const sessionResponse = await apiRequest('POST', '/api/sessions', {
         packageCode,
-        hostName: 'Host' // Default host name
+        hostName: 'Host',
+        createHost: true // Flag to create host participant
       });
       
       if (!sessionResponse.ok) {
@@ -42,7 +39,7 @@ export default function Gateway() {
     },
     onSuccess: (sessionData) => {
       triggerHaptic('success');
-      setLocation(`/host/${sessionData.sessionId}/${sessionData.hostParticipantId}`);
+      setLocation(`/host/${sessionData.session.id}/${sessionData.hostParticipantId}`);
     },
     onError: () => {
       triggerHaptic('error');
@@ -105,10 +102,10 @@ export default function Gateway() {
         </motion.div>
       </div>
 
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 relative z-10">
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 relative z-10">
         {/* Enhanced Animated Logo */}
         <motion.div
-          className="text-center mb-16"
+          className="text-center mb-20"
           initial={{ opacity: 0, y: -50 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
@@ -156,7 +153,7 @@ export default function Gateway() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.6 }}
-                className="space-y-6"
+                className="space-y-8"
               >
                 {/* Join Session Card */}
                 <motion.div
@@ -221,9 +218,9 @@ export default function Gateway() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -50 }}
                 transition={{ duration: 0.6 }}
-                className="space-y-6"
+                className="space-y-8"
               >
-                <div className="flex items-center mb-8">
+                <div className="flex items-center">
                   <Button
                     variant="ghost"
                     onClick={() => {
@@ -231,18 +228,22 @@ export default function Gateway() {
                       setUserMode('selection');
                       setSessionId('');
                     }}
-                    className="text-white/60 hover:text-white p-2 mr-4"
+                    className="text-white/60 hover:text-white p-2 mr-4 rounded-xl"
                   >
                     ← Back
                   </Button>
                   <div>
                     <h2 className="text-3xl font-bold text-white">Join Session</h2>
-                    <p className="text-white/70">Enter your session identifier</p>
+                    <p className="text-white/70 mt-1">Enter your session identifier</p>
                   </div>
                 </div>
 
-                <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl space-y-6">
-                  <div className="space-y-4">
+                <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
+                  <div className="text-center mb-8">
+                    <p className="text-white/80 text-lg">Enter the session ID provided by your host</p>
+                  </div>
+
+                  <div className="space-y-8">
                     <Input
                       type="text"
                       value={sessionId}
@@ -250,11 +251,11 @@ export default function Gateway() {
                         triggerHaptic('selection');
                         setSessionId(e.target.value);
                       }}
-                      placeholder="Enter Session ID"
-                      className="w-full py-4 px-6 text-lg bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl text-white placeholder-white/50 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/20"
+                      placeholder="Session ID"
+                      className="w-full py-4 px-6 text-lg bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl text-white placeholder-white/50 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/20 text-center font-mono tracking-wider"
                     />
 
-                    <div className="flex space-x-3">
+                    <div className="flex space-x-4">
                       <Button
                         onClick={handleJoinSession}
                         disabled={!sessionId.trim()}
@@ -282,9 +283,9 @@ export default function Gateway() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -50 }}
                 transition={{ duration: 0.6 }}
-                className="space-y-6"
+                className="space-y-8"
               >
-                <div className="flex items-center mb-8">
+                <div className="flex items-center">
                   <Button
                     variant="ghost"
                     onClick={() => {
@@ -292,31 +293,33 @@ export default function Gateway() {
                       setUserMode('selection');
                       setPackageCode('');
                     }}
-                    className="text-white/60 hover:text-white p-2 mr-4"
+                    className="text-white/60 hover:text-white p-2 mr-4 rounded-xl"
                   >
                     ← Back
                   </Button>
                   <div>
                     <h2 className="text-3xl font-bold text-white">Host Session</h2>
-                    <p className="text-white/70">Start with your package code</p>
+                    <p className="text-white/70 mt-1">Start with your package code</p>
                   </div>
                 </div>
 
-                <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl space-y-6">
-                  <div className="space-y-4">
-                    <Input
-                      type="text"
+                <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
+                  <div className="text-center mb-8">
+                    <p className="text-white/80 text-lg">Enter your 6-character package code</p>
+                    <p className="text-white/60 text-sm mt-2">Find this on your wine tasting card</p>
+                  </div>
+
+                  <div className="space-y-8">
+                    <CodeInput
                       value={packageCode}
-                      onChange={(e) => {
-                        triggerHaptic('selection');
-                        setPackageCode(e.target.value.toUpperCase().slice(0, 6));
-                      }}
+                      onChange={setPackageCode}
                       maxLength={6}
                       placeholder="WINE01"
-                      className="w-full py-4 px-6 text-lg font-mono tracking-wider bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl text-white placeholder-white/50 focus:border-amber-400 focus:ring-4 focus:ring-amber-400/20 uppercase text-center"
+                      onComplete={handleHostSession}
+                      className="mb-2"
                     />
 
-                    <div className="flex space-x-3">
+                    <div className="flex space-x-4">
                       <Button
                         onClick={handleHostSession}
                         disabled={packageCode.length !== 6 || createSessionMutation.isPending}
