@@ -1,4 +1,4 @@
-import { pgTable, text, serial, uuid, integer, boolean, timestamptz, jsonb, varchar, index, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, uuid, integer, boolean, timestamp, jsonb, varchar, index, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -8,8 +8,8 @@ export const packages = pgTable("packages", {
   code: varchar("code", { length: 10 }).notNull().unique(),
   name: text("name").notNull(),
   description: text("description"),
-  createdAt: timestamptz("created_at").defaultNow(),
-  updatedAt: timestamptz("updated_at").defaultNow()
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
 }, (table) => ({
   codeIdx: index("idx_packages_code").on(table.code)
 }));
@@ -21,7 +21,7 @@ export const slides = pgTable("slides", {
   position: integer("position").notNull(),
   type: varchar("type", { length: 50 }).notNull(), // 'question', 'media', 'interlude'
   payloadJson: jsonb("payload_json").notNull(),
-  createdAt: timestamptz("created_at").defaultNow()
+  createdAt: timestamp("created_at").defaultNow()
 }, (table) => ({
   packagePositionIdx: index("idx_slides_package_position").on(table.packageId, table.position)
 }));
@@ -30,8 +30,8 @@ export const slides = pgTable("slides", {
 export const sessions = pgTable("sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
   packageId: uuid("package_id").references(() => packages.id, { onDelete: "cascade" }),
-  startedAt: timestamptz("started_at").defaultNow(),
-  completedAt: timestamptz("completed_at"),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
   activeParticipants: integer("active_participants").default(0)
 });
 
@@ -43,8 +43,8 @@ export const participants = pgTable("participants", {
   displayName: varchar("display_name", { length: 100 }).notNull(),
   isHost: boolean("is_host").default(false),
   progressPtr: integer("progress_ptr").default(0),
-  lastActive: timestamptz("last_active").defaultNow(),
-  createdAt: timestamptz("created_at").defaultNow()
+  lastActive: timestamp("last_active").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow()
 }, (table) => ({
   sessionIdx: index("idx_participants_session").on(table.sessionId),
   emailSessionIdx: index("idx_participants_email_session").on(table.email, table.sessionId)
@@ -56,7 +56,7 @@ export const responses = pgTable("responses", {
   participantId: uuid("participant_id").references(() => participants.id, { onDelete: "cascade" }),
   slideId: uuid("slide_id").references(() => slides.id, { onDelete: "cascade" }),
   answerJson: jsonb("answer_json").notNull(),
-  answeredAt: timestamptz("answered_at").defaultNow(),
+  answeredAt: timestamp("answered_at").defaultNow(),
   synced: boolean("synced").default(true)
 }, (table) => ({
   participantIdx: index("idx_responses_participant").on(table.participantId),
@@ -65,29 +65,46 @@ export const responses = pgTable("responses", {
 }));
 
 // Insert schemas
-export const insertPackageSchema = createInsertSchema(packages).omit({
+export const insertPackageSchema = createInsertSchema(packages, {
+  description: z.string().nullable().optional()
+}).omit({
   id: true,
   createdAt: true,
   updatedAt: true
 });
 
-export const insertSlideSchema = createInsertSchema(slides).omit({
+export const insertSlideSchema = createInsertSchema(slides, {
+  packageId: z.string().nullable().optional()
+}).omit({
   id: true,
   createdAt: true
 });
 
-export const insertSessionSchema = createInsertSchema(sessions).omit({
+export const insertSessionSchema = createInsertSchema(sessions, {
+  packageId: z.string().nullable().optional(),
+  completedAt: z.date().nullable().optional(),
+  activeParticipants: z.number().nullable().optional()
+}).omit({
   id: true,
   startedAt: true
 });
 
-export const insertParticipantSchema = createInsertSchema(participants).omit({
+export const insertParticipantSchema = createInsertSchema(participants, {
+  sessionId: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  isHost: z.boolean().nullable().optional(),
+  progressPtr: z.number().nullable().optional()
+}).omit({
   id: true,
   lastActive: true,
   createdAt: true
 });
 
-export const insertResponseSchema = createInsertSchema(responses).omit({
+export const insertResponseSchema = createInsertSchema(responses, {
+  participantId: z.string().nullable().optional(),
+  slideId: z.string().nullable().optional(),
+  synced: z.boolean().nullable().optional()
+}).omit({
   id: true,
   answeredAt: true
 });
