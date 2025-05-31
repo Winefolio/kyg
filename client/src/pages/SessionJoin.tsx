@@ -184,7 +184,9 @@ export default function SessionJoin() {
           transition={{ delay: 0.1 }}
           className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl"
         >
-          <h3 className="text-xl font-semibold text-white mb-6">Join the Tasting</h3>
+          <h3 className="text-xl font-semibold text-white mb-6">
+            {sessionIdFromUrl ? "Join the Tasting" : "Start New Tasting Session"}
+          </h3>
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -225,43 +227,45 @@ export default function SessionJoin() {
                 )}
               />
 
-              {/* Host Mode Toggle */}
-              <FormField
-                control={form.control}
-                name="isHost"
-                render={({ field }) => (
-                  <FormItem className="pt-4">
-                    <div className="flex items-center space-x-3">
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={(checked) => {
-                            triggerHaptic('selection');
-                            field.onChange(checked);
-                          }}
-                          className="data-[state=checked]:bg-gradient-button"
-                        />
-                      </FormControl>
-                      <FormLabel className="text-white font-medium cursor-pointer">
-                        I'm hosting this session
-                      </FormLabel>
-                      {field.value && (
-                        <motion.div
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                        >
-                          <Badge variant="secondary" className="bg-purple-600/30 text-purple-200">
-                            Host Mode
-                          </Badge>
-                        </motion.div>
-                      )}
-                    </div>
-                    <p className="text-white/60 text-sm mt-2">
-                      Hosts can control the session pace and see participant responses
-                    </p>
-                  </FormItem>
-                )}
-              />
+              {/* Host Mode Toggle - Only show when NOT joining via sessionId */}
+              {!sessionIdFromUrl && (
+                <FormField
+                  control={form.control}
+                  name="isHost"
+                  render={({ field }) => (
+                    <FormItem className="pt-4">
+                      <div className="flex items-center space-x-3">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={(checked) => {
+                              triggerHaptic('selection');
+                              field.onChange(checked);
+                            }}
+                            className="data-[state=checked]:bg-gradient-button"
+                          />
+                        </FormControl>
+                        <FormLabel className="text-white font-medium cursor-pointer">
+                          I'm hosting this session
+                        </FormLabel>
+                        {field.value && (
+                          <motion.div
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                          >
+                            <Badge variant="secondary" className="bg-purple-600/30 text-purple-200">
+                              Host Mode
+                            </Badge>
+                          </motion.div>
+                        )}
+                      </div>
+                      <p className="text-white/60 text-sm mt-2">
+                        Hosts can control the session pace and see participant responses
+                      </p>
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <Button
                 type="submit"
@@ -269,7 +273,7 @@ export default function SessionJoin() {
                 className="w-full py-4 px-6 bg-gradient-button rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 mt-6"
               >
                 <Users className="mr-2" size={16} />
-                Join Tasting Session
+                {sessionIdFromUrl ? "Join Session" : "Start Tasting Session"}
               </Button>
             </form>
           </Form>
