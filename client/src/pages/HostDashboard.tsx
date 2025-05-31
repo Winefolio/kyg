@@ -22,28 +22,29 @@ export default function HostDashboard() {
 
   // Fetch session information
   const { data: session, isLoading: sessionLoading, refetch: refetchSession } = useQuery<Session>({
-    queryKey: ['/api/sessions', sessionId],
+    queryKey: [`/api/sessions/${sessionId}`],
     enabled: !!sessionId,
     refetchInterval: 5000, // Real-time updates
   });
 
   // Fetch participants
   const { data: participants = [], isLoading: participantsLoading, refetch: refetchParticipants } = useQuery<Participant[]>({
-    queryKey: ['/api/sessions', sessionId, 'participants'],
+    queryKey: [`/api/sessions/${sessionId}/participants`],
     enabled: !!sessionId,
     refetchInterval: 3000, // Real-time updates
   });
 
-  // Fetch slides for this session
-  const { data: slides = [] } = useQuery<Slide[]>({
-    queryKey: ['/api/packages', session?.packageId, 'slides'],
-    enabled: !!session?.packageId,
+  // Fetch slides for this session (using package code instead of ID)
+  const { data: slideData } = useQuery<{slides: Slide[], totalCount: number}>({
+    queryKey: [`/api/packages/WINE01/slides?participantId=${participantId}`],
+    enabled: !!session && !!participantId,
   });
+  const slides = slideData?.slides || [];
 
-  // Fetch all responses for analytics
+  // Fetch all responses for analytics (temporarily disabled until endpoint is created)
   const { data: allResponses = [] } = useQuery<Response[]>({
-    queryKey: ['/api/sessions', sessionId, 'responses'],
-    enabled: !!sessionId && sessionStatus === 'active',
+    queryKey: [`/api/sessions/${sessionId}/responses`],
+    enabled: false, // Temporarily disabled - endpoint doesn't exist yet
     refetchInterval: 5000,
   });
 
