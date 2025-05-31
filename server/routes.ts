@@ -127,29 +127,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Save response
   app.post("/api/responses", async (req, res) => {
     try {
-      console.log("POST /api/responses - Request body:", req.body);
       const validatedData = insertResponseSchema.parse(req.body);
-      console.log("POST /api/responses - Validated data:", validatedData);
-      
       const response = await storage.createResponse(validatedData);
-      console.log("POST /api/responses - Created response:", response);
       
       // Update participant progress
-      const participant = await storage.getParticipantById(validatedData.participantId);
+      const participant = await storage.getParticipantById(validatedData.participantId!);
       if (participant) {
         await storage.updateParticipantProgress(
           participant.id, 
-          (participant.progressPtr || 0) + 1
+          participant.progressPtr! + 1
         );
       }
 
       res.json(response);
     } catch (error) {
-      console.error("POST /api/responses - Error:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
       }
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
