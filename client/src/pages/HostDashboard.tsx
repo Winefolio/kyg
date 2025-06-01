@@ -53,7 +53,10 @@ interface SessionAnalyticsData {
 export default function HostDashboard() {
   const { sessionId, participantId } = useParams();
   const { toast } = useToast();
-  const [sessionStatus, setSessionStatus] = useState<'waiting' | 'active' | 'paused' | 'completed'>('waiting');
+  const [localSessionStatus, setLocalSessionStatus] = useState<'waiting' | 'active' | 'paused' | 'completed'>('waiting');
+  
+  // Use session status from server as source of truth
+  const sessionStatus = session?.status || localSessionStatus;
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<string>('overview');
 
@@ -222,6 +225,13 @@ export default function HostDashboard() {
   // Use analytics data for completion statistics when available
   const avgProgress = analyticsData?.averageProgressPercent || 0;
   const completedCount = analyticsData?.completedParticipants || 0;
+
+  // Update local session status when session data changes
+  useEffect(() => {
+    if (session?.status) {
+      setLocalSessionStatus(session.status as 'waiting' | 'active' | 'paused' | 'completed');
+    }
+  }, [session?.status]);
 
   if (sessionLoading || participantsLoading) {
     return (

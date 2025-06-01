@@ -50,7 +50,7 @@ export default function Gateway() {
   const handleJoinSession = () => {
     if (sessionId.trim().length >= 4) {
       triggerHaptic('success');
-      setLocation(`/join?sessionId=${encodeURIComponent(sessionId.trim())}`);
+      setLocation(`/join?sessionId=${encodeURIComponent(sessionId.trim().toUpperCase())}`);
     }
   };
 

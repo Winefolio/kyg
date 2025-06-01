@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { CheckCircle, Star, Trophy, Wine, Home, Repeat } from "lucide-react";
-import type { Participant, Response } from "@shared/schema";
+import type { Participant, Response, Session } from "@shared/schema";
 
 export default function TastingCompletion() {
   const { sessionId, participantId } = useParams();
@@ -20,6 +20,12 @@ export default function TastingCompletion() {
   // Get URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const progress = parseInt(urlParams.get('progress') || '100');
+
+  // Get session data
+  const { data: session } = useQuery<Session & { packageCode?: string }>({
+    queryKey: [`/api/sessions/${sessionId}`],
+    enabled: !!sessionId
+  });
 
   // Get participant data
   const { data: participant } = useQuery<Participant>({
@@ -35,10 +41,10 @@ export default function TastingCompletion() {
 
   // Save session to user profile
   useEffect(() => {
-    if (user && participant && !sessionSaved && responses.length > 0) {
+    if (user && participant && session && !sessionSaved && responses.length > 0) {
       addTastingSession({
-        packageName: "Bordeaux Discovery Collection", // This should come from the session data
-        packageCode: "WINE01", // This should come from the session data
+        packageName: "Wine Tasting Session",
+        packageCode: session.packageCode || "UNKNOWN",
         completedAt: new Date(),
         progress: progress,
         answers: responses.reduce((acc, response) => {
@@ -49,7 +55,7 @@ export default function TastingCompletion() {
       });
       setSessionSaved(true);
     }
-  }, [user, participant, responses, progress, rating, sessionSaved, addTastingSession]);
+  }, [user, participant, session, responses, progress, rating, sessionSaved, addTastingSession]);
 
   const handleRating = (newRating: number) => {
     setRating(newRating);

@@ -88,13 +88,14 @@ export default function SommelierDashboard() {
       });
       return sessionResponse.json();
     },
-    onSuccess: (session) => {
+    onSuccess: (sessionData) => {
       toast({
         title: "Session Created!",
         description: `Your tasting session "${newSessionName}" is ready.`
       });
       setNewSessionName("");
-      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      // Navigate to host dashboard
+      window.location.href = `/host/${sessionData.session.id}/${sessionData.hostParticipantId}`;
     },
     onError: (error: any) => {
       toast({
