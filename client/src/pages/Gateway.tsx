@@ -71,7 +71,7 @@ export default function Gateway() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-primary relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-primary relative overflow-hidden font-sans">
       {/* Enhanced Background Elements */}
       <div className="absolute inset-0 opacity-5">
         <motion.div
@@ -100,53 +100,54 @@ export default function Gateway() {
         </motion.div>
       </div>
 
-      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 relative z-10">
-        {/* Enhanced Animated Logo */}
-        <motion.div
-          className="text-center mb-12 md:mb-20"
-          initial={{ opacity: 0, y: -50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-        >
-          <motion.div
-            className="inline-flex items-center justify-center w-28 h-28 md:w-40 md:h-40 mb-6 md:mb-8 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl"
-            animate={{ 
-              rotate: [0, 3, -3, 0], 
-              scale: [1, 1.02, 1],
-              boxShadow: [
-                "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                "0 30px 60px -12px rgba(139, 92, 246, 0.3)",
-                "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
-              ]
-            }}
-            transition={{ duration: 6, repeat: Infinity }}
-          >
-            <Wine className="text-white" size={userMode === 'selection' ? 56 : 40} />
-          </motion.div>
-          <motion.h1 
-            className={`font-bold text-white mb-2 md:mb-3 tracking-tight ${
-              userMode === 'selection' ? 'text-4xl md:text-5xl' : 'text-3xl md:text-4xl'
-            }`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            KnowYourGrape
-          </motion.h1>
-          <motion.p 
-            className={`text-white/80 font-light tracking-wide ${
-              userMode === 'selection' ? 'text-lg md:text-xl' : 'text-base md:text-lg'
-            }`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-          >
-            Premium Wine Tasting Experience
-          </motion.p>
-        </motion.div>
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-6 md:py-8 relative z-10">
+        {/* Enhanced Animated Logo - Only visible in selection mode */}
+        <AnimatePresence>
+          {userMode === 'selection' && (
+            <motion.div
+              className="text-center mb-16 md:mb-24"
+              initial={{ opacity: 0, y: -50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -30 }}
+              transition={{ duration: 0.8 }}
+            >
+              <motion.div
+                className="inline-flex items-center justify-center w-32 h-32 md:w-44 md:h-44 mb-8 md:mb-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl"
+                animate={{ 
+                  rotate: [0, 3, -3, 0], 
+                  scale: [1, 1.02, 1],
+                  boxShadow: [
+                    "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                    "0 30px 60px -12px rgba(139, 92, 246, 0.3)",
+                    "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+                  ]
+                }}
+                transition={{ duration: 6, repeat: Infinity }}
+              >
+                <Wine className="text-white" size={56} />
+              </motion.div>
+              <motion.h1 
+                className="text-5xl md:text-6xl font-bold text-white mb-4 md:mb-5 tracking-tight"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+              >
+                KnowYourGrape
+              </motion.h1>
+              <motion.p 
+                className="text-xl md:text-2xl text-white/80 font-light tracking-wide"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+              >
+                Premium Wine Tasting Experience
+              </motion.p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Main Content Area */}
-        <div className="w-full max-w-lg">
+        <div className={`w-full ${userMode === 'selection' ? 'max-w-lg' : 'max-w-xl'}`}>
           <AnimatePresence mode="wait">
             {userMode === 'selection' && (
               <motion.div
@@ -155,11 +156,11 @@ export default function Gateway() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.6 }}
-                className="space-y-8"
+                className="space-y-6 md:space-y-8"
               >
                 {/* Join Session Card */}
                 <motion.div
-                  className="group bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl hover:bg-white/15 transition-all duration-500"
+                  className="group bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl hover:bg-white/15 transition-all duration-500 cursor-pointer"
                   whileHover={{ scale: 1.02, y: -4 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => {
@@ -167,26 +168,26 @@ export default function Gateway() {
                     setUserMode('join');
                   }}
                 >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-2xl shadow-lg">
-                        <Users className="text-white" size={32} />
+                  <div className="flex items-center justify-between mb-4 md:mb-5">
+                    <div className="flex items-center space-x-4 md:space-x-5">
+                      <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-3 md:p-4 rounded-2xl shadow-lg">
+                        <Users className="text-white" size={28} />
                       </div>
                       <div>
-                        <h3 className="text-2xl font-bold text-white mb-1">Join Session</h3>
-                        <p className="text-white/70 text-sm">Enter with Session ID</p>
+                        <h3 className="text-xl md:text-2xl font-bold text-white mb-1">Join Session</h3>
+                        <p className="text-white/70 text-sm md:text-base">Enter with Session ID</p>
                       </div>
                     </div>
-                    <ArrowRight className="text-white/60 group-hover:text-white group-hover:translate-x-1 transition-all duration-300" size={24} />
+                    <ArrowRight className="text-white/60 group-hover:text-white group-hover:translate-x-1 transition-all duration-300" size={20} />
                   </div>
-                  <p className="text-white/80 leading-relaxed">
+                  <p className="text-white/80 leading-relaxed text-sm md:text-base">
                     Join an ongoing wine tasting session with your unique session identifier.
                   </p>
                 </motion.div>
 
                 {/* Host Session Card */}
                 <motion.div
-                  className="group bg-white/10 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl hover:bg-white/15 transition-all duration-500"
+                  className="group bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl hover:bg-white/15 transition-all duration-500 cursor-pointer"
                   whileHover={{ scale: 1.02, y: -4 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => {
@@ -194,19 +195,19 @@ export default function Gateway() {
                     setUserMode('host');
                   }}
                 >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-4 rounded-2xl shadow-lg">
-                        <UserPlus className="text-white" size={32} />
+                  <div className="flex items-center justify-between mb-4 md:mb-5">
+                    <div className="flex items-center space-x-4 md:space-x-5">
+                      <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-3 md:p-4 rounded-2xl shadow-lg">
+                        <UserPlus className="text-white" size={28} />
                       </div>
                       <div>
-                        <h3 className="text-2xl font-bold text-white mb-1">Host Session</h3>
-                        <p className="text-white/70 text-sm">Start with Package Code</p>
+                        <h3 className="text-xl md:text-2xl font-bold text-white mb-1">Host Session</h3>
+                        <p className="text-white/70 text-sm md:text-base">Start with Package Code</p>
                       </div>
                     </div>
-                    <ArrowRight className="text-white/60 group-hover:text-white group-hover:translate-x-1 transition-all duration-300" size={24} />
+                    <ArrowRight className="text-white/60 group-hover:text-white group-hover:translate-x-1 transition-all duration-300" size={20} />
                   </div>
-                  <p className="text-white/80 leading-relaxed">
+                  <p className="text-white/80 leading-relaxed text-sm md:text-base">
                     Create a new tasting experience and invite participants to join.
                   </p>
                 </motion.div>
@@ -216,59 +217,65 @@ export default function Gateway() {
             {userMode === 'join' && (
               <motion.div
                 key="join"
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.6 }}
-                className="space-y-8"
+                className="min-h-[80vh] flex flex-col justify-center"
               >
-                <div className="flex items-center">
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      triggerHaptic('navigation');
-                      setUserMode('selection');
-                      setSessionId('');
-                    }}
-                    className="text-white/60 hover:text-white p-2 mr-4 rounded-xl"
-                  >
-                    ← Back
-                  </Button>
-                  <div>
-                    <h2 className="text-3xl font-bold text-white">Join Session</h2>
-                    <p className="text-white/70 mt-1">Enter your session identifier</p>
-                  </div>
-                </div>
-
-                <div className="space-y-6 md:space-y-8">
-                  <div className="text-center">
-                    <p className="text-white/80 text-base md:text-lg mb-2">Enter session ID or package code</p>
-                    <p className="text-white/60 text-sm">Example: WINE01 or ABC123</p>
+                <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl">
+                  {/* Header with Back Button */}
+                  <div className="flex items-center mb-8 md:mb-10">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        triggerHaptic('navigation');
+                        setUserMode('selection');
+                        setSessionId('');
+                      }}
+                      className="text-white/60 hover:text-white p-2 mr-4 rounded-xl hover:bg-white/10 transition-all duration-300"
+                    >
+                      ← Back
+                    </Button>
+                    <div className="text-center flex-1">
+                      <h2 className="text-3xl md:text-4xl font-bold text-white mb-2">Join Session</h2>
+                      <p className="text-white/70 text-base md:text-lg">Enter your session identifier</p>
+                    </div>
                   </div>
 
-                  <SessionIdInput
-                    value={sessionId}
-                    onChange={setSessionId}
-                    onComplete={handleJoinSession}
-                    maxLength={20}
-                  />
+                  {/* Content */}
+                  <div className="space-y-8 md:space-y-10">
+                    <div className="text-center">
+                      <p className="text-white/80 text-lg md:text-xl mb-3">Enter session ID or package code</p>
+                      <p className="text-white/60 text-sm md:text-base">Example: WINE01 or ABC123</p>
+                    </div>
 
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <Button
-                      onClick={handleJoinSession}
-                      disabled={!sessionId.trim() || sessionId.length < 4}
-                      className="flex-1 py-5 px-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-lg"
-                    >
-                      Join Session
-                    </Button>
-                    <Button
-                      onClick={() => setShowQRScanner(true)}
-                      variant="outline"
-                      className="py-4 md:py-5 px-6 bg-white/20 backdrop-blur-xl border-white/20 text-white hover:bg-white/30 rounded-2xl flex items-center justify-center min-w-[60px]"
-                    >
-                      <QrCode size={20} />
-                      <span className="ml-2 sm:hidden">Scan QR</span>
-                    </Button>
+                    <div className="px-2">
+                      <SessionIdInput
+                        value={sessionId}
+                        onChange={setSessionId}
+                        onComplete={handleJoinSession}
+                        maxLength={20}
+                      />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <Button
+                        onClick={handleJoinSession}
+                        disabled={!sessionId.trim() || sessionId.length < 4}
+                        className="flex-1 py-5 md:py-6 px-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-lg md:text-xl"
+                      >
+                        Join Session
+                      </Button>
+                      <Button
+                        onClick={() => setShowQRScanner(true)}
+                        variant="outline"
+                        className="py-5 md:py-6 px-6 bg-white/20 backdrop-blur-xl border-white/20 text-white hover:bg-white/30 rounded-2xl flex items-center justify-center min-w-[140px] transition-all duration-300"
+                      >
+                        <QrCode size={20} />
+                        <span className="ml-2">Scan QR</span>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -277,37 +284,39 @@ export default function Gateway() {
             {userMode === 'host' && (
               <motion.div
                 key="host"
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.6 }}
-                className="space-y-8"
+                className="min-h-[80vh] flex flex-col justify-center"
               >
-                <div className="flex items-center">
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      triggerHaptic('navigation');
-                      setUserMode('selection');
-                      setPackageCode('');
-                    }}
-                    className="text-white/60 hover:text-white p-2 mr-4 rounded-xl"
-                  >
-                    ← Back
-                  </Button>
-                  <div>
-                    <h2 className="text-3xl font-bold text-white">Host Session</h2>
-                    <p className="text-white/70 mt-1">Start with your package code</p>
-                  </div>
-                </div>
-
                 <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl">
-                  <div className="text-center mb-6 md:mb-8">
-                    <p className="text-white/80 text-base md:text-lg">Enter your 6-character package code</p>
-                    <p className="text-white/60 text-sm md:text-base mt-2">Find this on your wine tasting card</p>
+                  {/* Header with Back Button */}
+                  <div className="flex items-center mb-8 md:mb-10">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        triggerHaptic('navigation');
+                        setUserMode('selection');
+                        setPackageCode('');
+                      }}
+                      className="text-white/60 hover:text-white p-2 mr-4 rounded-xl hover:bg-white/10 transition-all duration-300"
+                    >
+                      ← Back
+                    </Button>
+                    <div className="text-center flex-1">
+                      <h2 className="text-3xl md:text-4xl font-bold text-white mb-2">Host Session</h2>
+                      <p className="text-white/70 text-base md:text-lg">Start with your package code</p>
+                    </div>
                   </div>
 
-                  <div className="space-y-6 md:space-y-8">
+                  {/* Content */}
+                  <div className="space-y-8 md:space-y-10">
+                    <div className="text-center">
+                      <p className="text-white/80 text-lg md:text-xl mb-3">Enter your 6-character package code</p>
+                      <p className="text-white/60 text-sm md:text-base">Find this on your wine tasting card</p>
+                    </div>
+
                     <div className="px-2">
                       <CodeInput
                         value={packageCode}
@@ -325,18 +334,28 @@ export default function Gateway() {
                         animate={{ opacity: 1, y: 0 }}
                         className="text-center"
                       >
-                        <p className="text-green-400 text-sm md:text-base font-medium">
-                          Ready to create session! 🍷
-                        </p>
+                        <div className="inline-flex items-center px-4 py-2 rounded-full bg-green-500/20 border border-green-400/30">
+                          <div className="w-2 h-2 bg-green-400 rounded-full mr-3 animate-pulse"></div>
+                          <p className="text-green-400 text-sm md:text-base font-medium">
+                            Ready to create session
+                          </p>
+                        </div>
                       </motion.div>
                     )}
 
                     <Button
                       onClick={handleHostSession}
                       disabled={packageCode.length !== 6 || createSessionMutation.isPending}
-                      className="w-full py-4 md:py-5 px-6 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-base md:text-lg"
+                      className="w-full py-5 md:py-6 px-6 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-lg md:text-xl"
                     >
-                      {createSessionMutation.isPending ? 'Creating...' : 'Create Session'}
+                      {createSessionMutation.isPending ? (
+                        <div className="flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-3"></div>
+                          Creating...
+                        </div>
+                      ) : (
+                        'Create Session'
+                      )}
                     </Button>
                   </div>
                 </div>
