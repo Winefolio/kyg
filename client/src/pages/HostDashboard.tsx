@@ -54,9 +54,6 @@ export default function HostDashboard() {
   const { sessionId, participantId } = useParams();
   const { toast } = useToast();
   const [localSessionStatus, setLocalSessionStatus] = useState<'waiting' | 'active' | 'paused' | 'completed'>('waiting');
-  
-  // Use session status from server as source of truth
-  const sessionStatus = session?.status || localSessionStatus;
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<string>('overview');
 
@@ -66,6 +63,9 @@ export default function HostDashboard() {
     enabled: !!sessionId,
     refetchInterval: 5000, // Real-time updates
   });
+
+  // Use session status from server as source of truth
+  const sessionStatus = session?.status || localSessionStatus;
 
   // Fetch participants
   const { data: participants = [], isLoading: participantsLoading, refetch: refetchParticipants } = useQuery<Participant[]>({
@@ -173,7 +173,7 @@ export default function HostDashboard() {
   const startSession = async () => {
     try {
       await updateSessionStatusMutation.mutateAsync('active');
-      setSessionStatus('active');
+      setLocalSessionStatus('active');
       toast({
         title: "Session Started!",
         description: "Participants can now begin the tasting"
@@ -190,7 +190,7 @@ export default function HostDashboard() {
   const pauseSession = async () => {
     try {
       await updateSessionStatusMutation.mutateAsync('paused');
-      setSessionStatus('paused');
+      setLocalSessionStatus('paused');
       toast({
         title: "Session Paused",
         description: "Participants will see a pause message"
@@ -207,7 +207,7 @@ export default function HostDashboard() {
   const resetSession = async () => {
     try {
       await updateSessionStatusMutation.mutateAsync('waiting');
-      setSessionStatus('waiting');
+      setLocalSessionStatus('waiting');
       setCurrentSlideIndex(0);
       toast({
         title: "Session Reset",
