@@ -66,12 +66,12 @@ export function CodeInput({
         <motion.div
           key={i}
           className={`
-            relative w-14 h-16 rounded-xl border-2 flex items-center justify-center text-2xl font-bold
-            transition-all duration-300 backdrop-blur-xl cursor-pointer
+            relative w-12 h-14 sm:w-14 sm:h-16 rounded-xl border-2 flex items-center justify-center text-xl sm:text-2xl font-bold
+            transition-all duration-300 backdrop-blur-xl cursor-pointer touch-manipulation
             ${isCurrent 
               ? 'border-white/60 bg-white/20 scale-105' 
               : isEmpty 
-                ? 'border-white/30 bg-white/10 hover:border-white/40' 
+                ? 'border-white/30 bg-white/10 hover:border-white/40 active:border-white/50' 
                 : 'border-white/50 bg-white/15'
             }
             ${hasCompleted && i < value.length ? 'border-green-400/60 bg-green-400/10' : ''}
@@ -140,14 +140,14 @@ export function CodeInput({
 
       {/* Character slots */}
       <div 
-        className="flex justify-center gap-3 cursor-pointer"
+        className="flex justify-center gap-2 sm:gap-3 cursor-pointer px-2"
         onClick={handleClick}
       >
         {renderCharacterSlots()}
       </div>
 
       {/* Progress dots */}
-      <div className="flex justify-center gap-2">
+      <div className="flex justify-center gap-2 mt-4">
         {renderProgressDots()}
       </div>
     </div>
