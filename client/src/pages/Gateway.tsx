@@ -86,7 +86,7 @@ export default function Gateway() {
 
   return (
     <div className="min-h-screen bg-gradient-primary relative overflow-hidden font-sans">
-      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 relative z-10">
+      <div className="min-h-screen flex flex-col items-center justify-start px-4 py-8 relative z-10">
         {/* Top Navigation - Only show back button when not in selection mode */}
         <AnimatePresence>
           {userMode !== "selection" && (
@@ -112,8 +112,8 @@ export default function Gateway() {
           )}
         </AnimatePresence>
 
-        {/* Main Content Area - Centered and responsive */}
-        <div className="w-full h-full flex items-center justify-center">
+        {/* Main Content Area - Responsive */}
+        <div className="w-full flex-1 flex items-start justify-center">
           <AnimatePresence mode="wait">
             {userMode === "selection" && (
               <motion.div

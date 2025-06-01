@@ -50,7 +50,7 @@ export function SelectionView({ setUserMode, triggerHaptic }: SelectionViewProps
       </div>
 
       {/* Logo Section */}
-      <div className="text-center mb-32 md:mb-40 mt-8 md:mt-12">
+      <div className="text-center mb-16 md:mb-20 mt-4 md:mt-8">
         <motion.div
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
