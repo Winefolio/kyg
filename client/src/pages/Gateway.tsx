@@ -24,15 +24,16 @@ export default function Gateway() {
   const [userMode, setUserMode] = useState<UserMode>("selection");
   const [sessionId, setSessionId] = useState("");
   const [packageCode, setPackageCode] = useState("");
+  const [hostDisplayName, setHostDisplayName] = useState("");
   const [showQRScanner, setShowQRScanner] = useState(false);
   const { triggerHaptic } = useHaptics();
 
   // Mutation for creating a new session (host flow)
   const createSessionMutation = useMutation({
-    mutationFn: async (packageCode: string) => {
+    mutationFn: async (data: { packageCode: string; hostDisplayName: string }) => {
       const sessionResponse = await apiRequest("POST", "/api/sessions", {
-        packageCode,
-        hostName: "Host",
+        packageCode: data.packageCode,
+        hostDisplayName: data.hostDisplayName.trim() || 'Host',
         createHost: true, // Flag to create host participant
       });
 
@@ -63,9 +64,12 @@ export default function Gateway() {
   };
 
   const handleHostSession = () => {
-    if (packageCode.trim().length === 6) {
+    if (packageCode.trim().length === 6 && hostDisplayName.trim()) {
       triggerHaptic("success");
-      createSessionMutation.mutate(packageCode.trim().toUpperCase());
+      createSessionMutation.mutate({
+        packageCode: packageCode.trim().toUpperCase(),
+        hostDisplayName: hostDisplayName.trim()
+      });
     }
   };
 
@@ -82,6 +86,7 @@ export default function Gateway() {
     setUserMode("selection");
     setSessionId("");
     setPackageCode("");
+    setHostDisplayName("");
   };
 
   return (
@@ -173,6 +178,8 @@ export default function Gateway() {
                 <HostSessionView
                   packageCode={packageCode}
                   setPackageCode={setPackageCode}
+                  hostDisplayName={hostDisplayName}
+                  setHostDisplayName={setHostDisplayName}
                   handleHostSession={handleHostSession}
                   isCreatingSession={createSessionMutation.isPending}
                   triggerHaptic={triggerHaptic}
