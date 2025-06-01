@@ -80,14 +80,11 @@ export default function SommelierDashboard() {
   // Create new tasting session
   const createSessionMutation = useMutation({
     mutationFn: async () => {
-      // First get the package using apiRequest for consistency
-      const packageResponse = await apiRequest('GET', `/api/packages/${selectedPackage}`, null);
-      const winePackage = await packageResponse.json();
-      
-      // Create session using apiRequest
+      // Create session using the correct endpoint that matches our backend
       const sessionResponse = await apiRequest('POST', '/api/sessions', {
-        packageId: winePackage.id,
-        name: newSessionName
+        packageCode: selectedPackage,
+        hostName: 'Sommelier',
+        createHost: true
       });
       return sessionResponse.json();
     },

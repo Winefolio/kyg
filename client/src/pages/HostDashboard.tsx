@@ -238,7 +238,7 @@ export default function HostDashboard() {
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">Host Dashboard</h1>
           <p className="text-purple-200">
-            Bordeaux Discovery Collection • {participants.length} participants
+            {analyticsData?.packageName || session?.packageCode || 'Wine Collection'} • {participants.length} participants
           </p>
           <Badge 
             className={`mt-2 ${
