@@ -72,7 +72,7 @@ export function SessionIdInput({
         <motion.div
           key={i}
           className={`
-            relative w-10 h-12 sm:w-12 sm:h-14 rounded-xl border-2 flex items-center justify-center text-base sm:text-lg font-bold
+            relative w-12 h-14 rounded-xl border-2 flex items-center justify-center text-lg font-bold
             transition-all duration-300 backdrop-blur-xl cursor-pointer touch-manipulation
             ${isCurrent 
               ? 'border-blue-400/80 bg-blue-400/20 scale-105 shadow-lg shadow-blue-400/25' 
@@ -88,6 +88,7 @@ export function SessionIdInput({
           } : {}}
           transition={{ duration: 1.2, repeat: isCurrent ? Infinity : 0 }}
           whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           layout
         >
           <span className={`

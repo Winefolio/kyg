@@ -7,7 +7,7 @@ import {
   packages, slides, sessions, participants, responses
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Packages
@@ -267,7 +267,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSessionById(id: string): Promise<(Session & { packageCode?: string }) | undefined> {
-    const result = await db
+    // First try to find by session ID (UUID)
+    let result = await db
       .select({
         id: sessions.id,
         packageId: sessions.packageId,
@@ -282,6 +283,26 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(packages, eq(sessions.packageId, packages.id))
       .where(eq(sessions.id, id))
       .limit(1);
+    
+    // If not found and the ID looks like a package code (not UUID), try finding active session by package code
+    if (result.length === 0 && !id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      result = await db
+        .select({
+          id: sessions.id,
+          packageId: sessions.packageId,
+          status: sessions.status,
+          startedAt: sessions.startedAt,
+          completedAt: sessions.completedAt,
+          activeParticipants: sessions.activeParticipants,
+          updatedAt: sessions.updatedAt,
+          packageCode: packages.code
+        })
+        .from(sessions)
+        .leftJoin(packages, eq(sessions.packageId, packages.id))
+        .where(eq(packages.code, id.toUpperCase()))
+        .orderBy(sessions.updatedAt)
+        .limit(1);
+    }
     
     const sessionData = result[0];
     if (!sessionData) return undefined;

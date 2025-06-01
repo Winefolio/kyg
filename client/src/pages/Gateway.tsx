@@ -245,21 +245,22 @@ export default function Gateway() {
 
                 <div className="space-y-6 md:space-y-8">
                   <div className="text-center">
-                    <p className="text-white/80 text-base md:text-lg mb-2">Enter the session ID provided by your host</p>
-                    <p className="text-white/60 text-sm">Type your unique session identifier</p>
+                    <p className="text-white/80 text-base md:text-lg mb-2">Enter session ID or package code</p>
+                    <p className="text-white/60 text-sm">Example: WINE01 or ABC123</p>
                   </div>
 
                   <SessionIdInput
                     value={sessionId}
                     onChange={setSessionId}
                     onComplete={handleJoinSession}
+                    maxLength={20}
                   />
 
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                  <div className="flex flex-col sm:flex-row gap-4">
                     <Button
                       onClick={handleJoinSession}
                       disabled={!sessionId.trim() || sessionId.length < 4}
-                      className="flex-1 py-4 md:py-5 px-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-base md:text-lg"
+                      className="flex-1 py-5 px-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-lg"
                     >
                       Join Session
                     </Button>
