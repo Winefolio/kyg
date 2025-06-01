@@ -30,12 +30,16 @@ export const slides = pgTable("slides", {
 export const sessions = pgTable("sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
   packageId: uuid("package_id").references(() => packages.id, { onDelete: "cascade" }),
+  short_code: varchar("short_code", { length: 8 }).unique(),
   status: varchar("status", { length: 20 }).default('waiting').notNull(),
   startedAt: timestamp("started_at").defaultNow(),
   completedAt: timestamp("completed_at"),
   activeParticipants: integer("active_participants").default(0),
   updatedAt: timestamp("updated_at").defaultNow().notNull()
-});
+}, (table) => ({
+  packageIdIdx: index("idx_sessions_package_id").on(table.packageId),
+  shortCodeIdx: index("idx_sessions_short_code").on(table.short_code)
+}));
 
 // Participants table
 export const participants = pgTable("participants", {
@@ -85,7 +89,10 @@ export const insertSlideSchema = createInsertSchema(slides, {
 export const insertSessionSchema = createInsertSchema(sessions, {
   packageId: z.string().nullable().optional(),
   completedAt: z.date().nullable().optional(),
-  activeParticipants: z.number().nullable().optional()
+  activeParticipants: z.number().int().min(0).nullable().optional(),
+  status: z.string().optional(),
+  updatedAt: z.date().optional(),
+  short_code: z.string().length(6, "Short code must be 6 characters").optional()
 }).omit({
   id: true,
   startedAt: true

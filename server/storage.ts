@@ -8,6 +8,34 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, desc } from "drizzle-orm";
+import crypto from 'crypto';
+
+// Utility function to generate unique short codes
+async function generateUniqueShortCode(length: number = 6): Promise<string> {
+  const characters = 'ABCDEFGHIJKLMNPQRSTUVWXYZ123456789'; // Removed O, 0 to avoid confusion
+  let attempts = 0;
+  const maxAttempts = 20; // Increased max attempts
+
+  while (attempts < maxAttempts) {
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+
+    const existingSession = await db.query.sessions.findFirst({
+      columns: { id: true }, // Only fetch necessary column for existence check
+      where: eq(sessions.short_code, result),
+    });
+
+    if (!existingSession) {
+      return result;
+    }
+    attempts++;
+  }
+  // Fallback if a unique code can't be generated (highly unlikely for 6 chars from 34 options if table isn't enormous)
+  console.error(`Failed to generate a unique ${length}-char code after ${maxAttempts} attempts. Falling back.`);
+  return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length).toUpperCase();
+}
 
 export interface IStorage {
   // Packages
@@ -255,10 +283,13 @@ export class DatabaseStorage implements IStorage {
 
   // Session methods
   async createSession(session: InsertSession): Promise<Session> {
+    const uniqueShortCode = await generateUniqueShortCode(6);
+
     const result = await db
       .insert(sessions)
       .values({
         packageId: session.packageId,
+        short_code: uniqueShortCode,
         completedAt: session.completedAt,
         activeParticipants: session.activeParticipants || 0
       })
@@ -271,6 +302,8 @@ export class DatabaseStorage implements IStorage {
     
     // Check if the ID looks like a UUID first
     const isUUID = id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    // Check if it's a 6-character short code
+    const isShortCode = id.length === 6 && id.match(/^[A-Z0-9]{6}$/);
     
     if (isUUID) {
       // Try to find by session ID (UUID)
@@ -278,6 +311,7 @@ export class DatabaseStorage implements IStorage {
         .select({
           id: sessions.id,
           packageId: sessions.packageId,
+          short_code: sessions.short_code,
           status: sessions.status,
           startedAt: sessions.startedAt,
           completedAt: sessions.completedAt,
@@ -289,12 +323,31 @@ export class DatabaseStorage implements IStorage {
         .leftJoin(packages, eq(sessions.packageId, packages.id))
         .where(eq(sessions.id, id))
         .limit(1);
-    } else {
-      // If not UUID, treat as package code and find most recent active session
+    } else if (isShortCode) {
+      // Try to find by short code
       result = await db
         .select({
           id: sessions.id,
           packageId: sessions.packageId,
+          short_code: sessions.short_code,
+          status: sessions.status,
+          startedAt: sessions.startedAt,
+          completedAt: sessions.completedAt,
+          activeParticipants: sessions.activeParticipants,
+          updatedAt: sessions.updatedAt,
+          packageCode: packages.code
+        })
+        .from(sessions)
+        .leftJoin(packages, eq(sessions.packageId, packages.id))
+        .where(eq(sessions.short_code, id.toUpperCase()))
+        .limit(1);
+    } else {
+      // If not UUID or short code, treat as package code and find most recent active session
+      result = await db
+        .select({
+          id: sessions.id,
+          packageId: sessions.packageId,
+          short_code: sessions.short_code,
           status: sessions.status,
           startedAt: sessions.startedAt,
           completedAt: sessions.completedAt,
@@ -316,6 +369,7 @@ export class DatabaseStorage implements IStorage {
     const session: Session & { packageCode?: string } = {
       id: sessionData.id,
       packageId: sessionData.packageId,
+      short_code: sessionData.short_code,
       status: sessionData.status,
       startedAt: sessionData.startedAt,
       completedAt: sessionData.completedAt,
@@ -326,6 +380,8 @@ export class DatabaseStorage implements IStorage {
     
     return session;
   }
+
+
 
   async updateSessionParticipantCount(sessionId: string, count: number): Promise<void> {
     await db
