@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { QrCode } from "lucide-react";
-import { SessionIdInput } from "@/components/SessionIdInput";
 import { hapticPatterns } from "@/lib/animations";
 
 interface JoinSessionViewProps {
@@ -30,24 +30,9 @@ export function JoinSessionView({
         ease: [0.4, 0, 0.2, 1],
         delay: 0.1,
       }}
-      className="w-full max-w-xl mx-auto px-4"
+      className="w-full max-w-xl mx-auto px-4 mt-24 md:mt-32"
     >
       <div className="space-y-8 md:space-y-12">
-        {/* Page Header */}
-        <motion.div
-          className="text-center space-y-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-        >
-          <h2 className="text-4xl md:text-5xl font-bold text-white">
-            Join Session
-          </h2>
-          <p className="text-white/70 text-lg md:text-xl">
-            Enter your session identifier
-          </p>
-        </motion.div>
-
         {/* Main Content Card */}
         <motion.div
           className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/20 shadow-2xl"
@@ -56,7 +41,10 @@ export function JoinSessionView({
           transition={{ delay: 0.4, duration: 0.5 }}
         >
           <div className="space-y-8 md:space-y-10">
-            <div className="text-center space-y-3">
+            <div className="text-center space-y-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-white">
+                Join Session
+              </h2>
               <p className="text-white/80 text-lg md:text-xl">
                 Enter session ID or package code
               </p>
@@ -66,11 +54,17 @@ export function JoinSessionView({
             </div>
 
             <div className="px-4">
-              <SessionIdInput
+              <Input
                 value={sessionId}
-                onChange={setSessionId}
-                onComplete={handleJoinSession}
+                onChange={(e) => setSessionId(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && sessionId.trim().length >= 4) {
+                    handleJoinSession();
+                  }
+                }}
+                placeholder="Enter session ID..."
                 maxLength={20}
+                className="w-full h-14 px-6 text-lg bg-white/10 backdrop-blur-xl border-white/20 text-white placeholder:text-white/50 rounded-2xl focus:border-white/40 focus:ring-0 transition-all duration-300"
               />
             </div>
 

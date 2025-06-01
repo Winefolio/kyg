@@ -9,7 +9,10 @@ interface SelectionViewProps {
   triggerHaptic: (type: keyof typeof hapticPatterns) => void;
 }
 
-export function SelectionView({ setUserMode, triggerHaptic }: SelectionViewProps) {
+export function SelectionView({
+  setUserMode,
+  triggerHaptic,
+}: SelectionViewProps) {
   return (
     <div className="w-full relative">
       {/* Enhanced Background Elements */}
@@ -60,7 +63,7 @@ export function SelectionView({ setUserMode, triggerHaptic }: SelectionViewProps
           }}
         >
           <motion.div
-            className="inline-flex items-center justify-center w-24 h-24 md:w-32 md:h-32 mb-6 md:mb-8 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl"
+            className="inline-flex items-center justify-center w-32 h-32 md:w-32 md:h-32 mb-8 md:mb-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl"
             animate={{
               rotate: [0, 3, -3, 0],
               scale: [1, 1.02, 1],
@@ -72,7 +75,7 @@ export function SelectionView({ setUserMode, triggerHaptic }: SelectionViewProps
             }}
             transition={{ duration: 6, repeat: Infinity }}
           >
-            <Wine className="text-white" size={40} />
+            <Wine className="text-white" size={56} />
           </motion.div>
           <motion.h1
             className="text-4xl md:text-5xl font-bold text-white mb-3 md:mb-4 tracking-tight"
@@ -125,8 +128,8 @@ export function SelectionView({ setUserMode, triggerHaptic }: SelectionViewProps
             />
           </div>
           <p className="text-white/80 leading-relaxed text-sm md:text-base">
-            Join an ongoing wine tasting session with your unique
-            session identifier.
+            Join an ongoing wine tasting session with your unique session
+            identifier.
           </p>
         </motion.div>
 
@@ -160,8 +163,7 @@ export function SelectionView({ setUserMode, triggerHaptic }: SelectionViewProps
             />
           </div>
           <p className="text-white/80 leading-relaxed text-sm md:text-base">
-            Create a new tasting experience and invite participants to
-            join.
+            Create a new tasting experience and invite participants to join.
           </p>
         </motion.div>
       </div>
