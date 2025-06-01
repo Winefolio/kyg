@@ -1,136 +1,166 @@
-const CACHE_NAME = 'knowyourgrape-shell-v1';
+// client/public/service-worker.js
 
-// URLs to cache for the app shell
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
+// IMPORTANT: Increment this version string every time you deploy a new build!
+const CACHE_VERSION = "v1.2.0"; // Example: Change to 'v1.2.1' for your next deploy
+const CACHE_PREFIX = "knowyourgrape-shell-";
+const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
+
+// App shell files - these are critical for the app to load.
+const APP_SHELL_FILES = [
+  "/",
+  "/index.html", // This will be cached.
+  "/manifest.json",
+  "/icons/icon-192x192.png",
+  "/icons/icon-512x512.png",
+  "/icons/icon.svg", // Assuming this is also part of your app shell
+  // If you have a specific offline page, add it here: '/offline.html'
 ];
 
-// Install event: Cache the app shell
-self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Install event');
+// Install event: Cache the app shell.
+self.addEventListener("install", (event) => {
+  console.log(
+    `[Service Worker] Attempting to install version: ${CACHE_VERSION}`,
+  );
   event.waitUntil(
-    caches.open(CACHE_NAME)
+    caches
+      .open(CACHE_NAME)
       .then((cache) => {
-        console.log('[Service Worker] Caching app shell:', urlsToCache);
-        return cache.addAll(urlsToCache);
+        console.log(
+          `[Service Worker] Caching app shell for ${CACHE_NAME}:`,
+          APP_SHELL_FILES,
+        );
+        return cache.addAll(APP_SHELL_FILES);
       })
-      .catch(error => {
-        console.error('[Service Worker] Failed to cache app shell:', error);
-      })
+      .catch((error) => {
+        console.error(
+          `[Service Worker] Failed to cache app shell for ${CACHE_NAME}:`,
+          error,
+        );
+      }),
   );
-  // Skip waiting to activate immediately
-  self.skipWaiting();
+  self.skipWaiting(); // Force the new service worker to activate immediately.
 });
 
-// Activate event: Clean up old caches
-self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] Activate event');
+// Activate event: Clean up old caches.
+self.addEventListener("activate", (event) => {
+  console.log(`[Service Worker] Activating version: ${CACHE_VERSION}`);
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('[Service Worker] Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches
+      .keys()
+      .then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            // Delete all caches that start with our prefix but are not the current version.
+            if (
+              cacheName.startsWith(CACHE_PREFIX) &&
+              cacheName !== CACHE_NAME
+            ) {
+              console.log("[Service Worker] Deleting old cache:", cacheName);
+              return caches.delete(cacheName);
+            }
+          }),
+        );
+      })
+      .then(() => {
+        console.log("[Service Worker] Claiming clients.");
+        return self.clients.claim(); // Take control of uncontrolled pages.
+      }),
   );
-  // Take control of uncontrolled clients
-  return self.clients.claim();
 });
 
-// Fetch event: Serve cached assets with cache-first strategy for shell resources
-self.addEventListener('fetch', (event) => {
-  // Only handle http/https requests to avoid chrome-extension and other schemes
-  if (!event.request.url.startsWith('http')) {
+// Fetch event: How to respond to network requests.
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Only handle http/https requests.
+  if (!request.url.startsWith("http")) {
     return;
   }
-  
-  const requestUrl = new URL(event.request.url);
-  
-  // Only handle GET requests from same origin
-  if (event.request.method !== 'GET' || requestUrl.origin !== self.location.origin) {
-    return;
-  }
-  
-  // For API requests, use network-first strategy
-  if (requestUrl.pathname.startsWith('/api/')) {
+
+  // For API calls, always go to the network first.
+  // If network fails, return a generic error (or nothing, depending on desired offline UX for API).
+  if (url.pathname.startsWith("/api/")) {
     event.respondWith(
-      fetch(event.request)
-        .catch(() => {
-          // If network fails for API requests, we don't have a cache fallback
-          return new Response('{"error": "Network unavailable"}', {
-            status: 503,
-            headers: { 'Content-Type': 'application/json' }
-          });
-        })
+      fetch(request).catch(() => {
+        return new Response(
+          JSON.stringify({ error: "Network error: API unavailable offline." }),
+          {
+            status: 503, // Service Unavailable
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }),
     );
     return;
   }
-  
-  // For app shell assets, use cache-first strategy
-  if (urlsToCache.includes(requestUrl.pathname) || requestUrl.pathname === '/') {
+
+  // For navigation requests (e.g., loading the main page or a route):
+  // Try network first to get the freshest index.html.
+  // If network fails, serve the cached index.html from the app shell.
+  // This ensures that if the user has an updated SW, they get the new app shell.
+  if (request.mode === "navigate") {
     event.respondWith(
-      caches.match(event.request)
-        .then((response) => {
-          if (response) {
-            return response; // Serve from cache
+      fetch(request)
+        .then((networkResponse) => {
+          // If fetched successfully, clone and cache it for the app shell
+          // This is important if index.html itself is not fingerprinted
+          if (
+            networkResponse &&
+            networkResponse.status === 200 &&
+            (url.pathname === "/" || url.pathname.endsWith("/index.html"))
+          ) {
+            const responseToCache = networkResponse.clone();
+            caches
+              .open(CACHE_NAME)
+              .then((cache) => cache.put(request, responseToCache));
           }
-          // If not in cache, fetch from network
-          return fetch(event.request);
+          return networkResponse;
         })
         .catch(() => {
-          // If both cache and network fail, return offline page for navigation requests
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
-          }
-        })
+          // If network fails, serve the main index.html from cache.
+          return caches.match("/index.html") || caches.match("/");
+        }),
     );
     return;
   }
-  
-  // For other assets (CSS, JS, images), use network-first strategy
-  // Don't cache JS modules that could have MIME type issues
-  if (requestUrl.pathname.endsWith('.js') && requestUrl.searchParams.has('t')) {
-    // This is likely a Vite HMR JS module, always fetch fresh
-    event.respondWith(fetch(event.request));
-    return;
-  }
-  
+
+  // For other static assets (JS, CSS, images, fonts):
+  // Cache-First strategy: Serve from cache if available, otherwise fetch from network and cache.
+  // This is good for fingerprinted assets (like index-XYZ.js) because if the URL changes,
+  // it's a cache miss, and the new version is fetched and cached.
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        // Only cache successful responses with correct content types
-        if (response.status === 200 && response.headers.get('content-type')) {
-          const contentType = response.headers.get('content-type');
-          // Only cache if we have a proper content type and it's not an HTML error page
-          if (!contentType.includes('text/html') && 
-              (contentType.includes('text/css') || 
-               contentType.includes('image/') || 
-               contentType.includes('font/') ||
-               (contentType.includes('javascript') && !requestUrl.pathname.includes('index-')))) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseClone);
+    caches
+      .match(request)
+      .then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse; // Serve from cache.
+        }
+
+        // Not in cache, fetch from network.
+        return fetch(request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            // Cache the new asset if it's from the same origin and not an opaque response (e.g. no-cors).
+            if (
+              url.origin === self.location.origin &&
+              networkResponse.type !== "opaque"
+            ) {
+              const responseToCache = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(request, responseToCache);
               });
+            }
           }
-        }
-        return response;
+          return networkResponse;
+        });
       })
-      .catch(() => {
-        // If network fails, try to serve from cache only for non-JS assets
-        if (!requestUrl.pathname.endsWith('.js')) {
-          return caches.match(event.request);
-        }
-        // For JS assets, let them fail rather than serve wrong content
-        throw new Error('JS asset unavailable');
-      })
+      .catch((error) => {
+        console.warn(
+          `[Service Worker] Fetch failed for ${request.url}; error:`,
+          error,
+        );
+        // Optionally, return a placeholder for images or a generic offline response.
+        // For JS/CSS, if it's not cached and network fails, the app might break, which is expected.
+      }),
   );
 });
