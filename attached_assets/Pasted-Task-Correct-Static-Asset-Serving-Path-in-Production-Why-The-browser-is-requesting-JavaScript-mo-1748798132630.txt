@@ -1,0 +1,31 @@
+Task: Correct Static Asset Serving Path in Production
+
+Why:
+
+The browser is requesting JavaScript module scripts (e.g., /assets/index-XYZ.js as referenced in the built dist/public/index.html).
+The Express server in production is mistakenly serving the main index.html file instead of the actual JavaScript file for these requests. This happens because the express.static middleware is likely looking in the wrong directory for these built assets.
+What:
+
+Modify the serveStatic function in server/vite.ts.
+Correct the distPath variable to accurately point to the dist/public directory at the project root, relative to the server/vite.ts file's location.
+How:
+
+Open server/vite.ts.
+Locate the serveStatic function.
+Modify the distPath variable definition:
+Current:
+TypeScript
+
+const distPath = path.resolve(import.meta.dirname, "public");
+Change to:
+TypeScript
+
+const distPath = path.resolve(import.meta.dirname, "..", "dist/public");
+(This change assumes vite.ts is inside the server directory, and dist is at the project root, which is consistent with the structure.)
+Verify Build Output:
+Confirm that the vite.config.ts indeed builds to dist/public relative to the project root. This is correct.
+Consider index.html in development vs. production:
+The development index.html (client/index.html) references /src/main.tsx.
+The production index.html (which will be in dist/public/index.html after npm run build) should be automatically modified by Vite to reference the bundled and fingerprinted JS/CSS assets (e.g., /assets/index-XYZ.js). The corrected distPath ensures express.static can find these /assets/* files.
+Service Worker Note (for future reference, not primary fix here):
+The service-worker.js caches / and /index.html. If you make significant changes to how assets are named or where index.html expects them, the service worker cache might need to be versioned or updated to avoid serving stale asset references. For this specific MIME type issue, the path correction is the priority. The service worker's strategy for JS assets appears to be network-first then cache, which is reasonable, but the express.static must work correctly first.
