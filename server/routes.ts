@@ -118,45 +118,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Join session as participant
-  app.post("/api/sessions/:sessionId/participants", async (req, res) => {
+  app.post("/api/sessions/:sessionIdOrShortCode/participants", async (req, res) => {
     try {
-      const { sessionId } = req.params;
-      const validatedData = insertParticipantSchema.parse({
-        ...req.body,
-        sessionId
-      });
+      const { sessionIdOrShortCode } = req.params; // This can be either UUID or short_code
 
-      const session = await storage.getSessionById(sessionId);
+      // 1. Fetch the session using the provided identifier
+      // storage.getSessionById handles both UUIDs and short_codes
+      const session = await storage.getSessionById(sessionIdOrShortCode);
       if (!session) {
+        console.log(`[JOIN_ATTEMPT_FAIL] Session not found with identifier: ${sessionIdOrShortCode}`);
         return res.status(404).json({ message: "Session not found" });
       }
 
-      // Check if session is active and has a host
+      // 2. Check session status
       if (session.status !== 'active') {
+        console.log(`[JOIN_ATTEMPT_FAIL] Attempt to join inactive session ${session.id} (status: ${session.status}). Identifier used: ${sessionIdOrShortCode}`);
         return res.status(400).json({ message: "Session is not active. Please check with the host." });
       }
 
-      // Verify there's an active host for this session
-      const participants = await storage.getParticipantsBySessionId(sessionId);
-      const hasActiveHost = participants.some(p => p.isHost);
+      // 3. Parse participant data from request body
+      // Omit sessionId from initial parsing since we'll set it correctly
+      const participantInputData = insertParticipantSchema
+        .omit({ sessionId: true })
+        .parse(req.body);
+
+      // 4. Verify active host using the actual session UUID
+      const currentParticipants = await storage.getParticipantsBySessionId(session.id);
+      const hasActiveHost = currentParticipants.some(p => p.isHost);
       
       if (!hasActiveHost) {
+        console.log(`[JOIN_ATTEMPT_FAIL] Session ${session.id} has no active host. Identifier used: ${sessionIdOrShortCode}`);
         return res.status(400).json({ message: "Session does not have an active host. Please contact the session organizer." });
       }
 
-      // Create the participant
-      const participant = await storage.createParticipant(validatedData);
-      
-      // Update participant count (refresh the list after adding new participant)
-      const updatedParticipants = await storage.getParticipantsBySessionId(sessionId);
-      await storage.updateSessionParticipantCount(sessionId, updatedParticipants.length);
+      // 5. Create the participant using the actual session UUID
+      const newParticipant = await storage.createParticipant({
+        ...participantInputData,
+        sessionId: session.id  // CRITICAL FIX: Use actual session UUID, not short code
+      });
 
-      res.json(participant);
+      // 6. Update participant count using the actual session UUID
+      const updatedParticipantsList = await storage.getParticipantsBySessionId(session.id);
+      await storage.updateSessionParticipantCount(session.id, updatedParticipantsList.length);
+
+      console.log(`[JOIN_SUCCESS] Participant ${newParticipant.displayName} (ID: ${newParticipant.id}) joined session ${session.id} (Short Code: ${session.short_code || 'N/A'})`);
+      res.json(newParticipant);
+
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+        console.error("[JOIN_ERROR] Validation error for participant data:", error.errors);
+        return res.status(400).json({ message: "Invalid participant data", errors: error.errors });
       }
-      res.status(500).json({ message: "Internal server error" });
+
+      // Log the full error for debugging
+      console.error(`[JOIN_ERROR] Critical error in /api/sessions/${req.params.sessionIdOrShortCode}/participants:`, error);
+      
+      // Handle specific database errors
+      if (error.code && (error.code === '22P02' || error.code === '23503')) {
+        console.error("[JOIN_ERROR_DB] Database type or constraint violation:", error.detail || error.message);
+        return res.status(500).json({ message: "Database error: Could not correctly link participant to session due to data mismatch." });
+      }
+      
+      res.status(500).json({ message: "Internal server error while attempting to join session." });
     }
   });
 
