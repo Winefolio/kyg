@@ -58,7 +58,7 @@ export default function HostDashboard() {
   const [activeTab, setActiveTab] = useState<string>('overview');
 
   // Fetch session information
-  const { data: session, isLoading: sessionLoading, refetch: refetchSession } = useQuery<Session & { packageCode?: string }>({
+  const { data: session, isLoading: sessionLoading, refetch: refetchSession } = useQuery<Session & { packageCode?: string; short_code?: string | null }>({
     queryKey: [`/api/sessions/${sessionId}`],
     enabled: !!sessionId,
     refetchInterval: 5000, // Real-time updates
@@ -94,11 +94,11 @@ export default function HostDashboard() {
 
   // Generate QR and sharing functions
   const generateQRData = (): string => {
-    if (!sessionId) {
+    if (!session?.short_code) {
       return "";
     }
     const baseUrl = window.location.origin;
-    return `${baseUrl}/join?sessionId=${sessionId}`;
+    return `${baseUrl}/join?sessionCode=${session.short_code}`;
   };
 
   const copySessionLink = () => {
@@ -106,7 +106,7 @@ export default function HostDashboard() {
     if (!qrData) {
       toast({ 
         title: "Error", 
-        description: "Session ID not available to generate link.", 
+        description: "Session code not available to generate link.", 
         variant: "destructive" 
       });
       return;
@@ -124,7 +124,7 @@ export default function HostDashboard() {
     if (!qrData) {
       toast({ 
         title: "Error", 
-        description: "Session ID not available to generate QR code.", 
+        description: "Session code not available to generate QR code.", 
         variant: "destructive" 
       });
       return;
@@ -147,7 +147,7 @@ export default function HostDashboard() {
     if (!qrData) {
       toast({ 
         title: "Error", 
-        description: "Session ID not available to generate QR code.", 
+        description: "Session code not available to generate QR code.", 
         variant: "destructive" 
       });
       return;
@@ -259,6 +259,16 @@ export default function HostDashboard() {
           >
             {sessionStatus.charAt(0).toUpperCase() + sessionStatus.slice(1)}
           </Badge>
+          
+          {/* Display Short Session Code */}
+          {session?.short_code && (
+            <div className="mt-4">
+              <p className="text-purple-200 mb-2">Share this code with participants:</p>
+              <Badge className="text-2xl font-bold tracking-wider bg-white/20 text-white px-6 py-3 border border-white/30">
+                {session.short_code}
+              </Badge>
+            </div>
+          )}
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-6xl mx-auto">
@@ -309,7 +319,7 @@ export default function HostDashboard() {
                 <CardContent className="space-y-3">
                   <Button
                     onClick={copySessionLink}
-                    disabled={!sessionId}
+                    disabled={!session?.short_code}
                     variant="outline"
                     className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20 disabled:opacity-50"
                   >
@@ -318,7 +328,7 @@ export default function HostDashboard() {
                   </Button>
                   <Button
                     onClick={viewQR}
-                    disabled={!sessionId}
+                    disabled={!session?.short_code}
                     variant="outline"
                     className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20 disabled:opacity-50"
                   >
@@ -327,7 +337,7 @@ export default function HostDashboard() {
                   </Button>
                   <Button
                     onClick={downloadQR}
-                    disabled={!sessionId}
+                    disabled={!session?.short_code}
                     variant="outline"
                     className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20 disabled:opacity-50"
                   >
