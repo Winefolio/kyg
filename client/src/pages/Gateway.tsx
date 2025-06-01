@@ -118,7 +118,7 @@ export default function Gateway() {
         </AnimatePresence>
 
         {/* Main Content Area - Responsive */}
-        <div className="w-full flex-1 flex items-start justify-center">
+        <div className="w-full flex-1 flex items-center justify-center">
           <AnimatePresence mode="wait">
             {userMode === "selection" && (
               <motion.div
@@ -127,10 +127,10 @@ export default function Gateway() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -30, scale: 0.98 }}
                 transition={{
-                  duration: 0.6,
+                  duration: 0.5,
                   ease: [0.4, 0, 0.2, 1],
                 }}
-                className="w-full"
+                className="w-full flex flex-col items-center justify-center"
               >
                 <SelectionView 
                   setUserMode={setUserMode} 
@@ -146,11 +146,11 @@ export default function Gateway() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 30, scale: 0.98 }}
                 transition={{
-                  duration: 0.6,
+                  duration: 0.5,
                   ease: [0.4, 0, 0.2, 1],
                   delay: 0.1,
                 }}
-                className="w-full max-w-2xl flex flex-col items-center justify-center flex-grow"
+                className="w-full flex flex-col items-center justify-center"
               >
                 <JoinSessionView
                   sessionId={sessionId}
@@ -169,11 +169,11 @@ export default function Gateway() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 30, scale: 0.98 }}
                 transition={{
-                  duration: 0.6,
+                  duration: 0.5,
                   ease: [0.4, 0, 0.2, 1],
                   delay: 0.1,
                 }}
-                className="w-full max-w-2xl flex flex-col items-center justify-center flex-grow"
+                className="w-full flex flex-col items-center justify-center"
               >
                 <HostSessionView
                   packageCode={packageCode}

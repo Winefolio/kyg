@@ -97,7 +97,7 @@ export function SelectionView({
       </div>
 
       {/* Selection Cards */}
-      <div className="space-y-6 md:space-y-8 w-full max-w-2xl mx-auto px-4 pt-12 md:pt-16">
+      <div className="space-y-6 md:space-y-8 w-full max-w-2xl mx-auto px-4 pt-16 md:pt-24">
         {/* Join Session Card */}
         <motion.div
           className="group bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl hover:bg-white/15 transition-all duration-500 cursor-pointer"
