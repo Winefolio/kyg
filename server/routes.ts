@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import { 
   insertSessionSchema,
   insertParticipantSchema,
-  insertResponseSchema
+  insertResponseSchema,
+  type InsertSession
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -72,11 +73,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create the session
-      const session = await storage.createSession({
+      const sessionInputData: InsertSession = {
         packageId: (pkg as any).id,
         completedAt: null,
         activeParticipants: 0
-      });
+      };
+
+      if (createHost) {
+        sessionInputData.status = 'active'; // Set session to active if a host is being created
+      }
+
+      const session = await storage.createSession(sessionInputData);
 
       // If createHost is true, also create the host participant
       let hostParticipant = null;

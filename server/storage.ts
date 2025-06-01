@@ -290,10 +290,15 @@ export class DatabaseStorage implements IStorage {
       .values({
         packageId: session.packageId,
         short_code: uniqueShortCode,
+        status: session.status || 'waiting', // Use provided status or default to 'waiting'
         completedAt: session.completedAt,
         activeParticipants: session.activeParticipants || 0
       })
       .returning();
+    
+    if (!result || result.length === 0) {
+      throw new Error("Failed to create session or return result.");
+    }
     return result[0];
   }
 
