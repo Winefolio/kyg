@@ -124,11 +124,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Session not found" });
       }
 
+      // Check if session is active and has a host
+      if (session.status !== 'active') {
+        return res.status(400).json({ message: "Session is not active. Please check with the host." });
+      }
+
+      // Verify there's an active host for this session
+      const participants = await storage.getParticipantsBySessionId(sessionId);
+      const hasActiveHost = participants.some(p => p.isHost);
+      
+      if (!hasActiveHost) {
+        return res.status(400).json({ message: "Session does not have an active host. Please contact the session organizer." });
+      }
+
+      // Create the participant
       const participant = await storage.createParticipant(validatedData);
       
-      // Update participant count
-      const participants = await storage.getParticipantsBySessionId(sessionId);
-      await storage.updateSessionParticipantCount(sessionId, participants.length);
+      // Update participant count (refresh the list after adding new participant)
+      const updatedParticipants = await storage.getParticipantsBySessionId(sessionId);
+      await storage.updateSessionParticipantCount(sessionId, updatedParticipants.length);
 
       res.json(participant);
     } catch (error) {

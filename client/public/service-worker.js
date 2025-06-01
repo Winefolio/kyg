@@ -1,7 +1,7 @@
 // client/public/service-worker.js
 
 // IMPORTANT: Increment this version string every time you deploy a new build!
-const CACHE_VERSION = "v1.3.0"; // Updated version for smart caching
+const CACHE_VERSION = "v1.4.0"; // Chrome compatibility update
 const CACHE_PREFIX = "knowyourgrape-shell-";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
@@ -35,6 +35,13 @@ self.addEventListener("install", (event) => {
       }),
   );
   self.skipWaiting();
+});
+
+// Handle messages from main thread
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Activate event: Clean up ALL old caches and reset storage
