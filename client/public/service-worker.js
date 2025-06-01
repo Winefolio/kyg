@@ -38,11 +38,11 @@ self.addEventListener("install", (event) => {
 });
 
 // Handle messages from main thread
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
+// self.addEventListener('message', (event) => {
+//   if (event.data && event.data.type === 'SKIP_WAITING') {
+//     self.skipWaiting();
+//   }
+// });
 
 // Activate event: Clean up old caches only - DO NOT touch IndexedDB
 self.addEventListener("activate", (event) => {
