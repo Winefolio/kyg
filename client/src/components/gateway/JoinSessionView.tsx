@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { QrCode } from "lucide-react";
+import { SessionIdInput } from "@/components/SessionIdInput";
 import { hapticPatterns } from "@/lib/animations";
 
 interface JoinSessionViewProps {
@@ -54,17 +54,12 @@ export function JoinSessionView({
             </div>
 
             <div className="px-4">
-              <Input
+              <SessionIdInput
                 value={sessionId}
-                onChange={(e) => setSessionId(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && sessionId.trim().length >= 4) {
-                    handleJoinSession();
-                  }
-                }}
-                placeholder="Enter session ID..."
+                onChange={setSessionId}
+                onComplete={handleJoinSession}
                 maxLength={20}
-                className="w-full h-14 px-6 text-lg bg-white/10 backdrop-blur-xl border-white/20 text-white placeholder:text-white/50 rounded-2xl focus:border-white/40 focus:ring-0 transition-all duration-300"
+                className="flex-wrap"
               />
             </div>
 

@@ -182,7 +182,7 @@ export function SessionIdInput({
 
       {/* Character slots */}
       <div 
-        className="flex justify-center gap-1 sm:gap-2 cursor-pointer px-2 flex-wrap"
+        className="flex justify-center gap-1 sm:gap-2 cursor-pointer px-2 overflow-x-auto"
         onClick={handleClick}
       >
         {renderCharacterSlots()}
