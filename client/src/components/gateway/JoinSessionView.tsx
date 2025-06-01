@@ -30,7 +30,7 @@ export function JoinSessionView({
         ease: [0.4, 0, 0.2, 1],
         delay: 0.1,
       }}
-      className="w-full max-w-xl mx-auto px-4 pt-12 md:pt-16"
+      className="w-full max-w-xl mx-auto px-4"
     >
       <div className="space-y-8 md:space-y-12">
         {/* Page Header */}
@@ -66,18 +66,11 @@ export function JoinSessionView({
             </div>
 
             <div className="px-4">
-              <input
-                type="text"
+              <SessionIdInput
                 value={sessionId}
-                onChange={(e) => setSessionId(e.target.value.toUpperCase())}
-                onKeyPress={(e) => e.key === 'Enter' && handleJoinSession()}
-                placeholder="Enter session ID or package code"
-                className="w-full px-6 py-4 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl text-white placeholder-white/60 text-lg font-medium focus:outline-none focus:border-white/60 focus:bg-white/25 transition-all duration-300"
+                onChange={setSessionId}
+                onComplete={handleJoinSession}
                 maxLength={20}
-                autoCapitalize="characters"
-                autoCorrect="off"
-                autoComplete="off"
-                spellCheck="false"
               />
             </div>
 
