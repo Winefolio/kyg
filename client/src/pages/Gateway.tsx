@@ -246,7 +246,7 @@ export default function Gateway() {
                 <div className="space-y-6 md:space-y-8">
                   <div className="text-center">
                     <p className="text-white/80 text-base md:text-lg mb-2">Enter the session ID provided by your host</p>
-                    <p className="text-white/60 text-sm">Usually 8-12 characters long</p>
+                    <p className="text-white/60 text-sm">Type your unique session identifier</p>
                   </div>
 
                   <SessionIdInput

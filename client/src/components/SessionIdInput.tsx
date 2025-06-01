@@ -23,17 +23,17 @@ export function SessionIdInput({
   const { triggerHaptic } = useHaptics();
 
   const handleComplete = useCallback((sessionId: string) => {
-    if (!hasCompleted && sessionId.length >= 8 && onComplete) {
+    if (!hasCompleted && sessionId.length >= 6 && onComplete) {
       setHasCompleted(true);
       triggerHaptic('success');
       setTimeout(() => {
         onComplete(sessionId);
-      }, 300);
+      }, 500);
     }
   }, [hasCompleted, onComplete, triggerHaptic]);
 
   useEffect(() => {
-    if (value.length >= 8) {
+    if (value.length >= 6) {
       handleComplete(value);
     } else {
       setHasCompleted(false);
@@ -53,14 +53,14 @@ export function SessionIdInput({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && value.trim().length >= 8) {
+    if (e.key === 'Enter' && value.trim().length >= 4) {
       handleComplete(value.trim());
     }
   };
 
   const renderCharacterSlots = () => {
     const slots = [];
-    const minSlots = 8; // Start with 8 slots, expand as needed
+    const minSlots = 6; // Start with 6 slots minimum
     const actualSlots = Math.max(minSlots, value.length + (value.length < maxLength ? 1 : 0));
     
     for (let i = 0; i < actualSlots && i < maxLength; i++) {
@@ -72,36 +72,36 @@ export function SessionIdInput({
         <motion.div
           key={i}
           className={`
-            relative w-8 h-10 sm:w-10 sm:h-12 rounded-lg border-2 flex items-center justify-center text-sm sm:text-base font-bold
+            relative w-10 h-12 sm:w-12 sm:h-14 rounded-xl border-2 flex items-center justify-center text-base sm:text-lg font-bold
             transition-all duration-300 backdrop-blur-xl cursor-pointer touch-manipulation
             ${isCurrent 
-              ? 'border-blue-400/80 bg-blue-400/20 scale-105' 
+              ? 'border-blue-400/80 bg-blue-400/20 scale-105 shadow-lg shadow-blue-400/25' 
               : isEmpty 
                 ? 'border-white/30 bg-white/10 hover:border-white/40 active:border-white/50' 
-                : 'border-white/50 bg-white/15'
+                : 'border-white/60 bg-white/20 shadow-md'
             }
-            ${hasCompleted && i < value.length ? 'border-green-400/60 bg-green-400/10' : ''}
+            ${hasCompleted && i < value.length ? 'border-green-400/70 bg-green-400/15 shadow-green-400/20' : ''}
           `}
           animate={isCurrent ? { 
             scale: [1, 1.05, 1], 
-            borderColor: ['rgba(59, 130, 246, 0.8)', 'rgba(59, 130, 246, 1)', 'rgba(59, 130, 246, 0.8)']
+            borderColor: ['rgba(59, 130, 246, 0.8)', 'rgba(96, 165, 250, 0.9)', 'rgba(59, 130, 246, 0.8)']
           } : {}}
-          transition={{ duration: 0.8, repeat: isCurrent ? Infinity : 0 }}
+          transition={{ duration: 1.2, repeat: isCurrent ? Infinity : 0 }}
           whileHover={{ scale: 1.02 }}
           layout
         >
           <span className={`
             ${isEmpty ? 'text-white/40' : 'text-white'}
-            transition-all duration-200 font-mono
+            transition-all duration-200 font-mono uppercase
           `}>
             {char}
           </span>
           
           {isCurrent && (
             <motion.div
-              className="absolute inset-0 rounded-lg border-2 border-blue-400/40"
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 1, repeat: Infinity }}
+              className="absolute inset-0 rounded-xl border-2 border-blue-400/50"
+              animate={{ opacity: [0.4, 0.8, 0.4] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
             />
           )}
         </motion.div>
@@ -111,23 +111,44 @@ export function SessionIdInput({
   };
 
   const renderProgressDots = () => {
-    const progress = Math.min(value.length / 8, 1);
-    const dotCount = 8;
+    const minLength = 6;
     const dots = [];
     
-    for (let i = 0; i < dotCount; i++) {
+    for (let i = 0; i < minLength; i++) {
       const isActive = i < value.length;
+      const isComplete = value.length >= minLength;
+      
       dots.push(
         <motion.div
           key={i}
-          className={`w-2 h-2 rounded-full transition-all duration-300 ${
-            isActive ? 'bg-blue-400/80' : 'bg-white/30'
+          className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+            isComplete 
+              ? 'bg-green-400/80' 
+              : isActive 
+                ? 'bg-blue-400/80' 
+                : 'bg-white/30'
           }`}
-          animate={isActive ? { scale: [1, 1.2, 1] } : {}}
-          transition={{ duration: 0.3, delay: i * 0.05 }}
+          animate={isActive ? { scale: [1, 1.3, 1] } : {}}
+          transition={{ duration: 0.4, delay: i * 0.08 }}
         />
       );
     }
+    
+    // Add additional dots for longer inputs
+    if (value.length > minLength) {
+      for (let i = minLength; i < Math.min(value.length, maxLength); i++) {
+        dots.push(
+          <motion.div
+            key={i}
+            className="w-2 h-2 rounded-full bg-blue-400/60"
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          />
+        );
+      }
+    }
+    
     return dots;
   };
 
