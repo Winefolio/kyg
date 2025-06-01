@@ -267,25 +267,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSessionById(id: string): Promise<(Session & { packageCode?: string }) | undefined> {
-    // First try to find by session ID (UUID)
-    let result = await db
-      .select({
-        id: sessions.id,
-        packageId: sessions.packageId,
-        status: sessions.status,
-        startedAt: sessions.startedAt,
-        completedAt: sessions.completedAt,
-        activeParticipants: sessions.activeParticipants,
-        updatedAt: sessions.updatedAt,
-        packageCode: packages.code
-      })
-      .from(sessions)
-      .leftJoin(packages, eq(sessions.packageId, packages.id))
-      .where(eq(sessions.id, id))
-      .limit(1);
+    let result: any[] = [];
     
-    // If not found and the ID looks like a package code (not UUID), try finding active session by package code
-    if (result.length === 0 && !id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+    // Check if the ID looks like a UUID first
+    const isUUID = id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    
+    if (isUUID) {
+      // Try to find by session ID (UUID)
+      result = await db
+        .select({
+          id: sessions.id,
+          packageId: sessions.packageId,
+          status: sessions.status,
+          startedAt: sessions.startedAt,
+          completedAt: sessions.completedAt,
+          activeParticipants: sessions.activeParticipants,
+          updatedAt: sessions.updatedAt,
+          packageCode: packages.code
+        })
+        .from(sessions)
+        .leftJoin(packages, eq(sessions.packageId, packages.id))
+        .where(eq(sessions.id, id))
+        .limit(1);
+    } else {
+      // If not UUID, treat as package code and find most recent active session
       result = await db
         .select({
           id: sessions.id,

@@ -9,7 +9,7 @@ export function useHaptics() {
     }
     
     // Visual feedback fallback
-    console.log(`Haptic feedback: ${type}`);
+    // Haptic feedback triggered
   };
 
   return { triggerHaptic };

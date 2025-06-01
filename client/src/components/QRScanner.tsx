@@ -66,12 +66,12 @@ export function QRScanner({ onScan, onError, className }: QRScannerProps) {
       
       if (videoRef.current) {
         const result = await codeReader.decodeFromVideoDevice(
-          undefined, // Use default video device
+          null, // Use default video device
           videoRef.current,
           (result, error) => {
             if (result) {
               const text = result.getText();
-              console.log('QR Code detected:', text);
+              // QR Code detected successfully
               triggerHaptic('success');
               onScan(text);
               stopScanning();

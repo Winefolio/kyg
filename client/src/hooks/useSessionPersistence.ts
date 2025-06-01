@@ -149,7 +149,7 @@ export function useSessionPersistence() {
         } catch (error: any) {
           // If participant not found (404), remove the stale offline response
           if (error.status === 404 || error.message?.includes('Participant not found')) {
-            console.log('Removing stale offline response for non-existent participant:', item.participantId);
+            // Removing stale offline response
             if (db) {
               await db.delete('offlineResponses', item.id);
             }

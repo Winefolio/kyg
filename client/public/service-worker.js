@@ -95,23 +95,42 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // For other assets (CSS, JS, images), use network-first with cache fallback
+  // For other assets (CSS, JS, images), use network-first strategy
+  // Don't cache JS modules that could have MIME type issues
+  if (requestUrl.pathname.endsWith('.js') && requestUrl.searchParams.has('t')) {
+    // This is likely a Vite HMR JS module, always fetch fresh
+    event.respondWith(fetch(event.request));
+    return;
+  }
+  
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // If we get a valid response, cache it for future use
-        if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseClone);
-            });
+        // Only cache successful responses with correct content types
+        if (response.status === 200 && response.headers.get('content-type')) {
+          const contentType = response.headers.get('content-type');
+          // Only cache if we have a proper content type and it's not an HTML error page
+          if (!contentType.includes('text/html') && 
+              (contentType.includes('text/css') || 
+               contentType.includes('image/') || 
+               contentType.includes('font/') ||
+               (contentType.includes('javascript') && !requestUrl.pathname.includes('index-')))) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                cache.put(event.request, responseClone);
+              });
+          }
         }
         return response;
       })
       .catch(() => {
-        // If network fails, try to serve from cache
-        return caches.match(event.request);
+        // If network fails, try to serve from cache only for non-JS assets
+        if (!requestUrl.pathname.endsWith('.js')) {
+          return caches.match(event.request);
+        }
+        // For JS assets, let them fail rather than serve wrong content
+        throw new Error('JS asset unavailable');
       })
   );
 });
