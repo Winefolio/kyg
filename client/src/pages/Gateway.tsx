@@ -11,7 +11,7 @@ import {
   WifiOff,
   Wifi,
   ArrowLeft,
-} from "lucide-react";
+} from "@/lib/icons";
 import { QRScanner } from "@/components/QRScanner";
 import { SelectionView } from "@/components/gateway/SelectionView";
 import { JoinSessionView } from "@/components/gateway/JoinSessionView";

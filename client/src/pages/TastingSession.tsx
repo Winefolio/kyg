@@ -11,7 +11,7 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import { useHaptics } from "@/hooks/useHaptics";
 import { apiRequest } from "@/lib/queryClient";
-import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause } from "lucide-react";
+import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause } from "@/lib/icons";
 import type { Slide, Participant, Session } from "@shared/schema";
 
 export default function TastingSession() {

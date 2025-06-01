@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
   Users, Wine, BarChart3, Settings, QrCode, Copy, Download, 
   Play, Pause, RotateCcw, Eye, Clock, TrendingUp, CheckCircle 
-} from "lucide-react";
+} from "@/lib/icons";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Session, Participant, Slide, Response } from "@shared/schema";
