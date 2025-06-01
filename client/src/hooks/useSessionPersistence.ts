@@ -13,14 +13,30 @@ interface OfflineResponse {
   synced: boolean;
 }
 
-// Initialize IndexedDB
+interface SessionData {
+  sessionId: string;
+  participantId: string;
+  joinedAt: number;
+  isActive: boolean;
+}
+
+// Initialize IndexedDB - Only when user joins a session
 const initDB = async (): Promise<IDBPDatabase | null> => {
   try {
-    return await openDB('KnowYourGrapeDB', 1, {
-      upgrade(db) {
-        const store = db.createObjectStore('offlineResponses', { keyPath: 'id' });
-        store.createIndex('by-synced', 'synced');
-        store.createIndex('by-timestamp', 'timestamp');
+    return await openDB('KnowYourGrapeDB', 2, {
+      upgrade(db, oldVersion) {
+        // Clear old data on upgrade
+        if (oldVersion < 2) {
+          const storeNames = Array.from(db.objectStoreNames);
+          storeNames.forEach(name => db.deleteObjectStore(name));
+        }
+        
+        const responseStore = db.createObjectStore('offlineResponses', { keyPath: 'id' });
+        responseStore.createIndex('by-synced', 'synced');
+        responseStore.createIndex('by-timestamp', 'timestamp');
+        
+        const sessionStore = db.createObjectStore('sessionData', { keyPath: 'sessionId' });
+        sessionStore.createIndex('by-active', 'isActive');
       },
     });
   } catch (error) {
@@ -29,36 +45,139 @@ const initDB = async (): Promise<IDBPDatabase | null> => {
   }
 };
 
+// Check if session is still active
+const checkSessionActive = async (sessionId: string): Promise<boolean> => {
+  try {
+    const response = await apiRequest('GET', `/api/sessions/${sessionId}`);
+    return response && typeof response.status === 'string' && response.status === 'active';
+  } catch {
+    return false;
+  }
+};
+
 export function useSessionPersistence() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
   const [offlineQueue, setOfflineQueue] = useState<OfflineResponse[]>([]);
   const [db, setDb] = useState<IDBPDatabase | null>(null);
+  const [activeSession, setActiveSession] = useState<SessionData | null>(null);
 
-  // Initialize IndexedDB on mount
-  useEffect(() => {
-    const setupDB = async () => {
-      const database = await initDB();
-      setDb(database);
+  // Initialize IndexedDB ONLY when needed, not on mount
+  const initializeForSession = async (sessionId: string, participantId: string) => {
+    if (db) return db; // Already initialized
+    
+    const database = await initDB();
+    setDb(database);
+    
+    if (database) {
+      // Store session data
+      const sessionData: SessionData = {
+        sessionId,
+        participantId,
+        joinedAt: Date.now(),
+        isActive: true
+      };
       
-      // Load any existing unsynced responses from IndexedDB
-      if (database) {
-        try {
-          const tx = database.transaction('offlineResponses', 'readonly');
-          const store = tx.objectStore('offlineResponses');
-          const all = await store.getAll();
-          const unsynced = all.filter(item => !item.synced);
-          setOfflineQueue(unsynced);
-        } catch (error) {
-          console.warn('Failed to load unsynced responses:', error);
+      try {
+        await database.put('sessionData', sessionData);
+        setActiveSession(sessionData);
+        
+        // Check for any existing unsynced responses for this session only
+        const tx = database.transaction('offlineResponses', 'readonly');
+        const store = tx.objectStore('offlineResponses');
+        const all = await store.getAll();
+        const unsynced = all.filter(item => 
+          !item.synced && item.participantId === participantId
+        );
+        setOfflineQueue(unsynced);
+      } catch (error) {
+        console.warn('Failed to store session data:', error);
+      }
+    }
+    
+    return database;
+  };
+
+  // Clear session data when session ends
+  const endSession = async () => {
+    if (db && activeSession) {
+      try {
+        // Mark session as inactive
+        await db.put('sessionData', { ...activeSession, isActive: false });
+        
+        // Clear any remaining unsynced data for this session
+        const tx = db.transaction('offlineResponses', 'readwrite');
+        const store = tx.objectStore('offlineResponses');
+        const all = await store.getAll();
+        
+        for (const item of all) {
+          if (item.participantId === activeSession.participantId) {
+            await store.delete(item.id);
+          }
         }
+        
+        setActiveSession(null);
+        setOfflineQueue([]);
+      } catch (error) {
+        console.warn('Failed to end session:', error);
+      }
+    }
+  };
+
+  // Check for existing active sessions on startup
+  useEffect(() => {
+    const checkExistingSessions = async () => {
+      // Only check if there's no active session yet
+      if (activeSession) return;
+      
+      const database = await initDB();
+      if (!database) return;
+      
+      try {
+        const tx = database.transaction('sessionData', 'readonly');
+        const store = tx.objectStore('sessionData');
+        const sessions = await store.getAll();
+        
+        for (const session of sessions) {
+          if (session.isActive) {
+            // Check if session is still active on server
+            const isStillActive = await checkSessionActive(session.sessionId);
+            
+            if (isStillActive) {
+              // Restore active session
+              setActiveSession(session);
+              setDb(database);
+              
+              // Load unsynced responses for this session
+              const responseTx = database.transaction('offlineResponses', 'readonly');
+              const responseStore = responseTx.objectStore('offlineResponses');
+              const all = await responseStore.getAll();
+              const unsynced = all.filter(item => 
+                !item.synced && item.participantId === session.participantId
+              );
+              setOfflineQueue(unsynced);
+              return; // Found active session, no need to check others
+            } else {
+              // Session is no longer active, clean it up
+              await database.put('sessionData', { ...session, isActive: false });
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to check existing sessions:', error);
       }
     };
     
-    setupDB();
+    checkExistingSessions();
   }, []);
 
-  // Save response with offline support using IndexedDB
+  // Save response with offline support - ONLY if session is active
   const saveResponse = async (participantId: string, slideId: string, answerJson: any) => {
+    // Only save if we have an active session
+    if (!activeSession || activeSession.participantId !== participantId) {
+      console.warn('Cannot save response: no active session');
+      return;
+    }
+
     const response: OfflineResponse = {
       id: crypto.randomUUID(),
       participantId,
@@ -72,6 +191,7 @@ export function useSessionPersistence() {
     if (db) {
       try {
         await db.add('offlineResponses', response);
+        setOfflineQueue(prev => [...prev, response]);
       } catch (error) {
         console.warn('Failed to save to IndexedDB:', error);
         // Fallback to memory queue if IndexedDB fails
@@ -87,14 +207,14 @@ export function useSessionPersistence() {
         await apiRequest('POST', '/api/responses', {
           participantId,
           slideId,
-          answerJson,
-          synced: true
+          answerJson
         });
         
         // Remove from IndexedDB after successful sync
         if (db) {
           await db.delete('offlineResponses', response.id);
         }
+        setOfflineQueue(prev => prev.filter(item => item.id !== response.id));
         setSyncStatus('synced');
       } catch (error) {
         setSyncStatus('pending');
@@ -180,5 +300,12 @@ export function useSessionPersistence() {
     };
   }, [db, offlineQueue]);
 
-  return { saveResponse, syncStatus, offlineQueue };
+  return { 
+    saveResponse, 
+    syncStatus, 
+    offlineQueue, 
+    initializeForSession, 
+    endSession, 
+    activeSession 
+  };
 }

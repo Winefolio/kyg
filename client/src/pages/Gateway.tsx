@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useHaptics } from "@/hooks/useHaptics";
+import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import { apiRequest } from "@/lib/queryClient";
 import {
   Wine,
@@ -16,6 +17,7 @@ import { QRScanner } from "@/components/QRScanner";
 import { SelectionView } from "@/components/gateway/SelectionView";
 import { JoinSessionView } from "@/components/gateway/JoinSessionView";
 import { HostSessionView } from "@/components/gateway/HostSessionView";
+import { SessionRestoreModal } from "@/components/SessionRestoreModal";
 
 type UserMode = "selection" | "join" | "host";
 
@@ -26,7 +28,16 @@ export default function Gateway() {
   const [packageCode, setPackageCode] = useState("");
   const [hostDisplayName, setHostDisplayName] = useState("");
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
   const { triggerHaptic } = useHaptics();
+  const { activeSession, endSession } = useSessionPersistence();
+
+  // Check for active session on mount
+  useEffect(() => {
+    if (activeSession && activeSession.isActive) {
+      setShowRestoreModal(true);
+    }
+  }, [activeSession]);
 
   // Mutation for creating a new session (host flow)
   const createSessionMutation = useMutation({
@@ -87,6 +98,20 @@ export default function Gateway() {
     setSessionId("");
     setPackageCode("");
     setHostDisplayName("");
+  };
+
+  const handleRestoreSession = () => {
+    if (activeSession) {
+      setShowRestoreModal(false);
+      triggerHaptic("success");
+      setLocation(`/session/${activeSession.sessionId}/${activeSession.participantId}`);
+    }
+  };
+
+  const handleStartFresh = async () => {
+    setShowRestoreModal(false);
+    await endSession();
+    triggerHaptic("navigation");
   };
 
   return (

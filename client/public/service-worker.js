@@ -72,99 +72,38 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Fetch event: How to respond to network requests.
+// Fetch event: Network-first approach with minimal caching
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Only handle http/https requests.
+  // Only handle http/https requests
   if (!request.url.startsWith("http")) {
     return;
   }
 
-  // For API calls, always go to the network first.
-  // If network fails, return a generic error (or nothing, depending on desired offline UX for API).
+  // For API calls, always go to network - no caching
   if (url.pathname.startsWith("/api/")) {
-    event.respondWith(
-      fetch(request).catch(() => {
-        return new Response(
-          JSON.stringify({ error: "Network error: API unavailable offline." }),
-          {
-            status: 503, // Service Unavailable
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-      }),
-    );
+    event.respondWith(fetch(request));
     return;
   }
 
-  // For navigation requests (e.g., loading the main page or a route):
-  // Try network first to get the freshest index.html.
-  // If network fails, serve the cached index.html from the app shell.
-  // This ensures that if the user has an updated SW, they get the new app shell.
+  // For navigation requests: Always fetch fresh content
   if (request.mode === "navigate") {
+    event.respondWith(fetch(request));
+    return;
+  }
+
+  // For static assets: Only cache essential files that we pre-cached
+  if (ESSENTIAL_FILES.includes(url.pathname)) {
     event.respondWith(
-      fetch(request)
-        .then((networkResponse) => {
-          // If fetched successfully, clone and cache it for the app shell
-          // This is important if index.html itself is not fingerprinted
-          if (
-            networkResponse &&
-            networkResponse.status === 200 &&
-            (url.pathname === "/" || url.pathname.endsWith("/index.html"))
-          ) {
-            const responseToCache = networkResponse.clone();
-            caches
-              .open(CACHE_NAME)
-              .then((cache) => cache.put(request, responseToCache));
-          }
-          return networkResponse;
-        })
-        .catch(() => {
-          // If network fails, serve the main index.html from cache.
-          return caches.match("/index.html") || caches.match("/");
-        }),
+      caches.match(request).then((cachedResponse) => {
+        return cachedResponse || fetch(request);
+      })
     );
     return;
   }
 
-  // For other static assets (JS, CSS, images, fonts):
-  // Cache-First strategy: Serve from cache if available, otherwise fetch from network and cache.
-  // This is good for fingerprinted assets (like index-XYZ.js) because if the URL changes,
-  // it's a cache miss, and the new version is fetched and cached.
-  event.respondWith(
-    caches
-      .match(request)
-      .then((cachedResponse) => {
-        if (cachedResponse) {
-          return cachedResponse; // Serve from cache.
-        }
-
-        // Not in cache, fetch from network.
-        return fetch(request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            // Cache the new asset if it's from the same origin and not an opaque response (e.g. no-cors).
-            if (
-              url.origin === self.location.origin &&
-              networkResponse.type !== "opaque"
-            ) {
-              const responseToCache = networkResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(request, responseToCache);
-              });
-            }
-          }
-          return networkResponse;
-        });
-      })
-      .catch((error) => {
-        console.warn(
-          `[Service Worker] Fetch failed for ${request.url}; error:`,
-          error,
-        );
-        // Optionally, return a placeholder for images or a generic offline response.
-        // For JS/CSS, if it's not cached and network fails, the app might break, which is expected.
-      }),
-  );
+  // For all other assets: Always fetch fresh, no caching
+  event.respondWith(fetch(request));
 });
