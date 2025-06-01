@@ -100,54 +100,64 @@ export default function Gateway() {
         </motion.div>
       </div>
 
-      <div className="min-h-screen flex flex-col px-4 py-6 md:py-8 relative z-10">
-        <AnimatePresence mode="wait">
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-6 md:py-8 relative z-10">
+        {/* Enhanced Animated Logo - Only visible in selection mode */}
+        <AnimatePresence>
           {userMode === 'selection' && (
             <motion.div
-              key="selection"
-              initial={{ opacity: 0, y: 20 }}
+              className="text-center mb-16 md:mb-24"
+              initial={{ opacity: 0, y: -50 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="flex flex-col items-center justify-center flex-grow w-full max-w-lg mx-auto"
+              exit={{ opacity: 0, y: -30 }}
+              transition={{ duration: 0.8 }}
             >
-              {/* Enhanced Animated Logo */}
               <motion.div
-                className="text-center mb-12 md:mb-16"
-                initial={{ opacity: 0, y: -30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1 }}
+                className="inline-flex items-center justify-center w-32 h-32 md:w-44 md:h-44 mb-8 md:mb-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl"
+                animate={{ 
+                  rotate: [0, 3, -3, 0], 
+                  scale: [1, 1.02, 1],
+                  boxShadow: [
+                    "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                    "0 30px 60px -12px rgba(139, 92, 246, 0.3)",
+                    "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+                  ]
+                }}
+                transition={{ duration: 6, repeat: Infinity }}
               >
-                <motion.div
-                  className="inline-flex items-center justify-center w-32 h-32 md:w-40 md:h-40 mb-8 md:mb-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl"
-                  animate={{ 
-                    rotate: [0, 3, -3, 0], 
-                    scale: [1, 1.02, 1]
-                  }}
-                  transition={{ duration: 6, repeat: Infinity }}
-                >
-                  <Wine className="text-white" size={56} />
-                </motion.div>
-                <motion.h1 
-                  className="text-5xl md:text-6xl font-bold text-white mb-4 md:mb-5 tracking-tight"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                >
-                  KnowYourGrape
-                </motion.h1>
-                <motion.p 
-                  className="text-xl md:text-2xl text-white/80 font-light tracking-wide"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  Premium Wine Tasting Experience
-                </motion.p>
+                <Wine className="text-white" size={56} />
               </motion.div>
+              <motion.h1 
+                className="text-5xl md:text-6xl font-bold text-white mb-4 md:mb-5 tracking-tight"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+              >
+                KnowYourGrape
+              </motion.h1>
+              <motion.p 
+                className="text-xl md:text-2xl text-white/80 font-light tracking-wide"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+              >
+                Premium Wine Tasting Experience
+              </motion.p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-              {/* Selection Cards */}
-              <div className="w-full space-y-6 md:space-y-8">
+        {/* Main Content Area */}
+        <div className={`w-full ${userMode === 'selection' ? 'max-w-lg' : 'max-w-xl'}`}>
+          <AnimatePresence mode="wait">
+            {userMode === 'selection' && (
+              <motion.div
+                key="selection"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.6 }}
+                className="space-y-6 md:space-y-8"
+              >
                 {/* Join Session Card */}
                 <motion.div
                   className="group bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl hover:bg-white/15 transition-all duration-500 cursor-pointer"
@@ -201,158 +211,158 @@ export default function Gateway() {
                     Create a new tasting experience and invite participants to join.
                   </p>
                 </motion.div>
-              </div>
-            </motion.div>
-          )}
+              </motion.div>
+            )}
 
-          {userMode === 'join' && (
-            <motion.div
-              key="join"
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              transition={{ duration: 0.3 }}
-              className="flex flex-col items-center justify-center flex-grow w-full max-w-xl mx-auto"
-            >
-              <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/20 shadow-2xl w-full">
-                {/* Header with Back Button */}
-                <div className="flex items-center mb-10 md:mb-12">
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      triggerHaptic('navigation');
-                      setUserMode('selection');
-                      setSessionId('');
-                    }}
-                    className="text-white/60 hover:text-white p-2 mr-4 rounded-xl hover:bg-white/10 transition-all duration-300"
-                  >
-                    ← Back
-                  </Button>
-                  <div className="text-center flex-1">
-                    <h2 className="text-3xl md:text-4xl font-bold text-white mb-2">Join Session</h2>
-                    <p className="text-white/70 text-base md:text-lg">Enter your session identifier</p>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="space-y-8 md:space-y-10">
-                  <div className="text-center">
-                    <p className="text-white/80 text-lg md:text-xl mb-3">Enter session ID or package code</p>
-                    <p className="text-white/60 text-sm md:text-base">Example: WINE01 or ABC123</p>
-                  </div>
-
-                  <div className="px-2">
-                    <SessionIdInput
-                      value={sessionId}
-                      onChange={setSessionId}
-                      onComplete={handleJoinSession}
-                      maxLength={20}
-                    />
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-4">
+            {userMode === 'join' && (
+              <motion.div
+                key="join"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.6 }}
+                className="min-h-[80vh] flex flex-col justify-center"
+              >
+                <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl">
+                  {/* Header with Back Button */}
+                  <div className="flex items-center mb-8 md:mb-10">
                     <Button
-                      onClick={handleJoinSession}
-                      disabled={!sessionId.trim() || sessionId.length < 4}
-                      className="flex-1 py-5 md:py-6 px-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-lg md:text-xl"
+                      variant="ghost"
+                      onClick={() => {
+                        triggerHaptic('navigation');
+                        setUserMode('selection');
+                        setSessionId('');
+                      }}
+                      className="text-white/60 hover:text-white p-2 mr-4 rounded-xl hover:bg-white/10 transition-all duration-300"
                     >
-                      Join Session
+                      ← Back
                     </Button>
+                    <div className="text-center flex-1">
+                      <h2 className="text-3xl md:text-4xl font-bold text-white mb-2">Join Session</h2>
+                      <p className="text-white/70 text-base md:text-lg">Enter your session identifier</p>
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="space-y-8 md:space-y-10">
+                    <div className="text-center">
+                      <p className="text-white/80 text-lg md:text-xl mb-3">Enter session ID or package code</p>
+                      <p className="text-white/60 text-sm md:text-base">Example: WINE01 or ABC123</p>
+                    </div>
+
+                    <div className="px-2">
+                      <SessionIdInput
+                        value={sessionId}
+                        onChange={setSessionId}
+                        onComplete={handleJoinSession}
+                        maxLength={20}
+                      />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <Button
+                        onClick={handleJoinSession}
+                        disabled={!sessionId.trim() || sessionId.length < 4}
+                        className="flex-1 py-5 md:py-6 px-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-lg md:text-xl"
+                      >
+                        Join Session
+                      </Button>
+                      <Button
+                        onClick={() => setShowQRScanner(true)}
+                        variant="outline"
+                        className="py-5 md:py-6 px-6 bg-white/20 backdrop-blur-xl border-white/20 text-white hover:bg-white/30 rounded-2xl flex items-center justify-center min-w-[140px] transition-all duration-300"
+                      >
+                        <QrCode size={20} />
+                        <span className="ml-2">Scan QR</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {userMode === 'host' && (
+              <motion.div
+                key="host"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.6 }}
+                className="min-h-[80vh] flex flex-col justify-center"
+              >
+                <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl">
+                  {/* Header with Back Button */}
+                  <div className="flex items-center mb-8 md:mb-10">
                     <Button
-                      onClick={() => setShowQRScanner(true)}
-                      variant="outline"
-                      className="py-5 md:py-6 px-6 bg-white/20 backdrop-blur-xl border-white/20 text-white hover:bg-white/30 rounded-2xl flex items-center justify-center min-w-[140px] transition-all duration-300"
+                      variant="ghost"
+                      onClick={() => {
+                        triggerHaptic('navigation');
+                        setUserMode('selection');
+                        setPackageCode('');
+                      }}
+                      className="text-white/60 hover:text-white p-2 mr-4 rounded-xl hover:bg-white/10 transition-all duration-300"
                     >
-                      <QrCode size={20} />
-                      <span className="ml-2">Scan QR</span>
+                      ← Back
                     </Button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {userMode === 'host' && (
-            <motion.div
-              key="host"
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              transition={{ duration: 0.3 }}
-              className="flex flex-col items-center justify-center flex-grow w-full max-w-xl mx-auto"
-            >
-              <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/20 shadow-2xl w-full">
-                {/* Header with Back Button */}
-                <div className="flex items-center mb-10 md:mb-12">
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      triggerHaptic('navigation');
-                      setUserMode('selection');
-                      setPackageCode('');
-                    }}
-                    className="text-white/60 hover:text-white p-2 mr-4 rounded-xl hover:bg-white/10 transition-all duration-300"
-                  >
-                    ← Back
-                  </Button>
-                  <div className="text-center flex-1">
-                    <h2 className="text-3xl md:text-4xl font-bold text-white mb-2">Host Session</h2>
-                    <p className="text-white/70 text-base md:text-lg">Start with your package code</p>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="space-y-8 md:space-y-10">
-                  <div className="text-center">
-                    <p className="text-white/80 text-lg md:text-xl mb-3">Enter your 6-character package code</p>
-                    <p className="text-white/60 text-sm md:text-base">Find this on your wine tasting card</p>
+                    <div className="text-center flex-1">
+                      <h2 className="text-3xl md:text-4xl font-bold text-white mb-2">Host Session</h2>
+                      <p className="text-white/70 text-base md:text-lg">Start with your package code</p>
+                    </div>
                   </div>
 
-                  <div className="px-2">
-                    <CodeInput
-                      value={packageCode}
-                      onChange={setPackageCode}
-                      maxLength={6}
-                      placeholder="WINE01"
-                      onComplete={handleHostSession}
-                      className="mb-2"
-                    />
-                  </div>
+                  {/* Content */}
+                  <div className="space-y-8 md:space-y-10">
+                    <div className="text-center">
+                      <p className="text-white/80 text-lg md:text-xl mb-3">Enter your 6-character package code</p>
+                      <p className="text-white/60 text-sm md:text-base">Find this on your wine tasting card</p>
+                    </div>
 
-                  {packageCode.length === 6 && !createSessionMutation.isPending && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-center"
-                    >
-                      <div className="inline-flex items-center px-4 py-2 rounded-full bg-green-500/20 border border-green-400/30">
-                        <div className="w-2 h-2 bg-green-400 rounded-full mr-3 animate-pulse"></div>
-                        <p className="text-green-400 text-sm md:text-base font-medium">
-                          Ready to create session
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
+                    <div className="px-2">
+                      <CodeInput
+                        value={packageCode}
+                        onChange={setPackageCode}
+                        maxLength={6}
+                        placeholder="WINE01"
+                        onComplete={handleHostSession}
+                        className="mb-2"
+                      />
+                    </div>
 
-                  <Button
-                    onClick={handleHostSession}
-                    disabled={packageCode.length !== 6 || createSessionMutation.isPending}
-                    className="w-full py-5 md:py-6 px-6 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-lg md:text-xl"
-                  >
-                    {createSessionMutation.isPending ? (
-                      <div className="flex items-center justify-center">
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-3"></div>
-                        Creating...
-                      </div>
-                    ) : (
-                      'Create Session'
+                    {packageCode.length === 6 && !createSessionMutation.isPending && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-center"
+                      >
+                        <div className="inline-flex items-center px-4 py-2 rounded-full bg-green-500/20 border border-green-400/30">
+                          <div className="w-2 h-2 bg-green-400 rounded-full mr-3 animate-pulse"></div>
+                          <p className="text-green-400 text-sm md:text-base font-medium">
+                            Ready to create session
+                          </p>
+                        </div>
+                      </motion.div>
                     )}
-                  </Button>
+
+                    <Button
+                      onClick={handleHostSession}
+                      disabled={packageCode.length !== 6 || createSessionMutation.isPending}
+                      className="w-full py-5 md:py-6 px-6 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-lg md:text-xl"
+                    >
+                      {createSessionMutation.isPending ? (
+                        <div className="flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-3"></div>
+                          Creating...
+                        </div>
+                      ) : (
+                        'Create Session'
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* QR Scanner Modal */}
         <AnimatePresence>
@@ -381,15 +391,59 @@ export default function Gateway() {
                     ✕
                   </Button>
                 </div>
-                <QRScanner
-                  onScan={handleQRScan}
-                  onError={() => setShowQRScanner(false)}
-                  className="rounded-2xl overflow-hidden"
-                />
+                <div className="relative">
+                  <QRScanner
+                    onScan={handleQRScan}
+                    onError={() => setShowQRScanner(false)}
+                    className="w-full rounded-2xl overflow-hidden aspect-square"
+                  />
+                  <div className="absolute inset-0 border-2 border-white/30 rounded-2xl pointer-events-none"></div>
+                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 border-2 border-white rounded-xl pointer-events-none"></div>
+                </div>
+                <p className="text-center text-white/70 text-sm mt-4">
+                  Align the QR code within the frame
+                </p>
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Network Status Indicator */}
+        <motion.div
+          className="absolute bottom-6 left-6 flex items-center space-x-2 text-white/60 text-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+        >
+          {navigator.onLine ? (
+            <>
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <Wifi size={16} />
+              <span>Online</span>
+            </>
+          ) : (
+            <>
+              <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+              <WifiOff size={16} />
+              <span>Offline</span>
+            </>
+          )}
+        </motion.div>
+
+        {/* Sommelier Access Link */}
+        <motion.div
+          className="absolute bottom-6 right-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2 }}
+        >
+          <a
+            href="/sommelier"
+            className="text-white/30 hover:text-white/70 text-xs transition-colors duration-300"
+          >
+            Sommelier
+          </a>
+        </motion.div>
       </div>
 
       <LoadingOverlay 
