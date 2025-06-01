@@ -1,13 +1,14 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { CodeInput } from "@/components/CodeInput";
+import { hapticPatterns } from "@/lib/animations";
 
 interface HostSessionViewProps {
   packageCode: string;
   setPackageCode: (code: string) => void;
   handleHostSession: () => void;
   isCreatingSession: boolean;
-  triggerHaptic: (type: string) => void;
+  triggerHaptic: (type: keyof typeof hapticPatterns) => void;
 }
 
 export function HostSessionView({

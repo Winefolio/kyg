@@ -2,9 +2,11 @@ import { motion } from "framer-motion";
 import { Wine, Users, UserPlus, ArrowRight, Sparkles } from "lucide-react";
 import { animations } from "@/lib/animations";
 
+import { hapticPatterns } from "@/lib/animations";
+
 interface SelectionViewProps {
   setUserMode: (mode: "selection" | "join" | "host") => void;
-  triggerHaptic: (type: "selection" | "success" | "error" | "warning" | "navigation" | "milestone") => void;
+  triggerHaptic: (type: keyof typeof hapticPatterns) => void;
 }
 
 export function SelectionView({ setUserMode, triggerHaptic }: SelectionViewProps) {

@@ -2,13 +2,14 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { QrCode } from "lucide-react";
 import { SessionIdInput } from "@/components/SessionIdInput";
+import { hapticPatterns } from "@/lib/animations";
 
 interface JoinSessionViewProps {
   sessionId: string;
   setSessionId: (id: string) => void;
   handleJoinSession: () => void;
   setShowQRScanner: (show: boolean) => void;
-  triggerHaptic: (type: string) => void;
+  triggerHaptic: (type: keyof typeof hapticPatterns) => void;
 }
 
 export function JoinSessionView({
