@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useHaptics } from "@/hooks/useHaptics";
 
@@ -20,14 +20,27 @@ export function CodeInput({
   onComplete 
 }: CodeInputProps) {
   const [focused, setFocused] = useState(false);
+  const [hasCompleted, setHasCompleted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { triggerHaptic } = useHaptics();
 
-  useEffect(() => {
-    if (value.length === maxLength && onComplete) {
-      onComplete(value);
+  const handleComplete = useCallback((code: string) => {
+    if (!hasCompleted && code.length === maxLength && onComplete) {
+      setHasCompleted(true);
+      triggerHaptic('success');
+      setTimeout(() => {
+        onComplete(code);
+      }, 200);
     }
-  }, [value, maxLength, onComplete]);
+  }, [hasCompleted, maxLength, onComplete, triggerHaptic]);
+
+  useEffect(() => {
+    if (value.length === maxLength) {
+      handleComplete(value);
+    } else {
+      setHasCompleted(false);
+    }
+  }, [value, handleComplete]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value.toUpperCase().slice(0, maxLength);
@@ -53,14 +66,15 @@ export function CodeInput({
         <motion.div
           key={i}
           className={`
-            relative w-12 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-bold
-            transition-all duration-300 backdrop-blur-xl
+            relative w-14 h-16 rounded-xl border-2 flex items-center justify-center text-2xl font-bold
+            transition-all duration-300 backdrop-blur-xl cursor-pointer
             ${isCurrent 
               ? 'border-white/60 bg-white/20 scale-105' 
               : isEmpty 
-                ? 'border-white/30 bg-white/10' 
+                ? 'border-white/30 bg-white/10 hover:border-white/40' 
                 : 'border-white/50 bg-white/15'
             }
+            ${hasCompleted && i < value.length ? 'border-green-400/60 bg-green-400/10' : ''}
           `}
           animate={isCurrent ? { 
             scale: [1, 1.05, 1], 
