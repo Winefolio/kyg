@@ -189,38 +189,43 @@ export default function Gateway() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
               onClick={() => setShowQRScanner(false)}
             >
               <motion.div
                 initial={{ scale: 0.9, opacity: 0, y: 50 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.9, opacity: 0, y: 50 }}
-                className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 border border-white/20 max-w-md w-full max-h-[90vh]"
+                className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 border border-white/20 max-w-sm w-full"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-white">Scan QR Code</h3>
+                  <h3 className="text-2xl font-bold text-white">Scan QR Code</h3>
                   <Button
                     variant="ghost"
                     onClick={() => setShowQRScanner(false)}
-                    className="text-white/60 hover:text-white p-2 rounded-xl"
+                    className="text-white/60 hover:text-white p-2 rounded-xl hover:bg-white/10"
                   >
-                    ✕
+                    <ArrowLeft size={20} />
                   </Button>
                 </div>
-                <div className="relative">
+                
+                <div className="relative mb-6">
                   <QRScanner
                     onScan={handleQRScan}
                     onError={() => setShowQRScanner(false)}
-                    className="w-full rounded-2xl overflow-hidden aspect-square"
+                    className="w-full rounded-2xl overflow-hidden"
                   />
-                  <div className="absolute inset-0 border-2 border-white/30 rounded-2xl pointer-events-none"></div>
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 border-2 border-white rounded-xl pointer-events-none"></div>
                 </div>
-                <p className="text-center text-white/70 text-sm mt-4">
-                  Align the QR code within the frame
-                </p>
+                
+                <div className="text-center space-y-3">
+                  <p className="text-white/80 text-base font-medium">
+                    Point camera at QR code
+                  </p>
+                  <p className="text-white/60 text-sm">
+                    Make sure the code is clearly visible
+                  </p>
+                </div>
               </motion.div>
             </motion.div>
           )}

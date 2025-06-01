@@ -65,19 +65,28 @@ export function QRScanner({ onScan, onError, className }: QRScannerProps) {
       const codeReader = new BrowserQRCodeReader();
       
       if (videoRef.current) {
-        const result = await codeReader.decodeFromVideoDevice(
-          null, // Use default video device
-          videoRef.current,
-          (result, error) => {
+        // Set up continuous scanning
+        const scanLoop = async () => {
+          try {
+            const result = await codeReader.decodeOnceFromVideoDevice(undefined, videoRef.current!);
             if (result) {
               const text = result.getText();
-              // QR Code detected successfully
               triggerHaptic('success');
-              onScan(text);
+              onScan(text.trim().toUpperCase());
               stopScanning();
+              return;
             }
+          } catch (scanError) {
+            // Continue scanning - no QR code found yet
           }
-        );
+          
+          // Continue scanning if still active
+          if (isScanning && videoRef.current) {
+            setTimeout(scanLoop, 100);
+          }
+        };
+        
+        scanLoop();
       }
     } catch (err) {
       console.error('QR detection error:', err);
@@ -123,11 +132,24 @@ export function QRScanner({ onScan, onError, className }: QRScannerProps) {
 
           <Button
             onClick={startScanning}
-            className="w-full py-4 px-6 bg-gradient-button rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300"
+            disabled={hasPermission === false}
+            className="w-full py-4 px-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none"
           >
             <Camera className="mr-2" size={16} />
-            Access Camera & Scan QR
+            {hasPermission === false ? 'Camera Access Denied' : 'Start QR Scanner'}
           </Button>
+          
+          {hasPermission === false && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 p-4 bg-amber-500/20 border border-amber-400/30 rounded-xl"
+            >
+              <p className="text-amber-200 text-sm text-center">
+                Please enable camera permissions in your browser settings and refresh the page.
+              </p>
+            </motion.div>
+          )}
         </div>
       </motion.div>
     );
@@ -148,19 +170,25 @@ export function QRScanner({ onScan, onError, className }: QRScannerProps) {
       
       {/* QR Scanner overlay */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <div className="relative w-64 h-64">
+        <div className="relative w-48 h-48 sm:w-56 sm:h-56">
           {/* Scanner corners */}
-          <div className="absolute top-0 left-0 w-8 h-8 border-l-4 border-t-4 border-white"></div>
-          <div className="absolute top-0 right-0 w-8 h-8 border-r-4 border-t-4 border-white"></div>
-          <div className="absolute bottom-0 left-0 w-8 h-8 border-l-4 border-b-4 border-white"></div>
-          <div className="absolute bottom-0 right-0 w-8 h-8 border-r-4 border-b-4 border-white"></div>
+          <div className="absolute top-0 left-0 w-8 h-8 border-l-4 border-t-4 border-white drop-shadow-lg"></div>
+          <div className="absolute top-0 right-0 w-8 h-8 border-r-4 border-t-4 border-white drop-shadow-lg"></div>
+          <div className="absolute bottom-0 left-0 w-8 h-8 border-l-4 border-b-4 border-white drop-shadow-lg"></div>
+          <div className="absolute bottom-0 right-0 w-8 h-8 border-r-4 border-b-4 border-white drop-shadow-lg"></div>
           
           {/* Scanning line animation */}
           <motion.div
-            className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-green-400 to-transparent"
-            animate={{ y: [0, 256, 0] }}
-            transition={{ duration: 2, repeat: Infinity }}
+            className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent drop-shadow-lg"
+            animate={{ y: [0, 192, 0] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
           />
+          
+          {/* Corner accents */}
+          <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-blue-400 opacity-80"></div>
+          <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-blue-400 opacity-80"></div>
+          <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-blue-400 opacity-80"></div>
+          <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-blue-400 opacity-80"></div>
         </div>
       </div>
 
