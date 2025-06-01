@@ -55,7 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create session (with optional host participant)
   app.post("/api/sessions", async (req, res) => {
     try {
-      const { packageId, packageCode, name, hostName, createHost } = req.body;
+      const { packageId, packageCode, name, hostName, hostDisplayName, hostEmail, createHost } = req.body;
       
       let pkg;
       if (packageId) {
@@ -83,8 +83,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (createHost) {
         const hostParticipantData = insertParticipantSchema.parse({
           sessionId: session.id,
-          displayName: hostName || 'Host',
-          email: '', // Default empty email for host
+          displayName: hostDisplayName || hostName || 'Host',
+          email: hostEmail || '',
           isHost: true,
           progress: 0
         });

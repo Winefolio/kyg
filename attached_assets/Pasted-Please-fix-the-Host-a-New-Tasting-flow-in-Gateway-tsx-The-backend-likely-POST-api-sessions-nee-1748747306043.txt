@@ -1,0 +1,67 @@
+Please fix the 'Host a New Tasting' flow in Gateway.tsx. The backend (likely POST /api/sessions) needs to be updated to accept a host's details (default to 'Host' name for now) and automatically create a host participant record when a new session is created, returning both sessionId and hostParticipantId. Also, remove the QR code scanning option from the 'Host a New Tasting' UI path in Gateway.tsx."
+
+Prompt 17.1: Fix Host Session Creation & Remove Host QR Scan
+Context & Why:
+The "Host a New Tasting" flow initiated from client/src/pages/Gateway.tsx has two issues:
+
+Incomplete Host Setup: The createSessionMutation triggers session creation on the backend, but it doesn't ensure the host themselves is created as a participant within that new session with isHost: true. The backend POST /api/sessions also needs to be adapted to facilitate this and return the necessary hostParticipantId along with the sessionId for correct navigation.
+Unnecessary QR Scanner for Host: The "Host a New Tasting" UI path in Gateway.tsx currently shows a button to scan a QR code. Hosts typically initiate sessions with package codes; they don't scan QRs to start hosting. This option should be removed from the host flow.
+Objective (What):
+
+Refactor the backend logic for POST /api/sessions (and its corresponding storage.createSession method) to automatically create a host participant when a new session is initiated and return both sessionId and hostParticipantId.
+Update createSessionMutation in Gateway.tsx to align with this and correctly navigate the host.
+Remove the QR code scanning button/functionality from the "Host a New Tasting" UI path in Gateway.tsx.
+Implementation Details (How):
+
+Part 1: Backend - Automatic Host Participant Creation
+
+Modify POST /api/sessions in server/routes.ts (around lines 55-84):
+This endpoint is called by createSessionMutation in Gateway.tsx.
+When a new session is successfully created for a packageCode:
+Immediately after const session = await storage.createSession(...), add logic to create a participant for this session.
+Use storage.createParticipant(...) with sessionId: session.id, displayName: req.body.hostDisplayName || 'Host' (allow hostDisplayName from client, default to 'Host'), email: req.body.hostEmail || '' (optional), and isHost: true.
+The API should then return an object containing both the session data and the hostParticipantId.
+TypeScript
+
+// Example logic within POST /api/sessions
+// ... after session is created ...
+const hostParticipant = await storage.createParticipant({
+  sessionId: session.id,
+  displayName: req.body.hostDisplayName || 'Host', // Client can send this
+  email: req.body.hostEmail || '',       // Client can send this
+  isHost: true
+});
+
+if (!hostParticipant) {
+  // Handle error: failed to create host participant
+  throw new Error("Failed to create host participant for the new session.");
+}
+
+res.json({ session, hostParticipantId: hostParticipant.id });
+Update createSessionMutation in client/src/pages/Gateway.tsx (around lines 20-39):
+The mutationFn currently sends { packageCode, hostName: 'Host', createHost: true }. Modify it to send packageCode and potentially hostDisplayName and hostEmail if you add input fields for these on the Gateway for the host. For now, the backend can default hostDisplayName.
+The onSuccess callback expects sessionData.session.id and sessionData.hostParticipantId. This will now match the modified backend response.
+TypeScript
+
+// onSuccess in createSessionMutation
+onSuccess: (data) => { // data will be { session: Session, hostParticipantId: string }
+  triggerHaptic('success');
+  setLocation(`/host/<span class="math-inline">\{data\.session\.id\}/</span>{data.hostParticipantId}`);
+},
+Part 2: Frontend - Remove QR Scan from Host Flow in Gateway.tsx
+
+Modify userMode === 'host' section (around lines 243-299):
+Remove the <Button> component that triggers setShowQRScanner(true) (currently around lines 285-291).
+The handleQRScan function's else if (userMode === 'host') block will no longer be triggered from this UI path.
+Acceptance Criteria:
+
+Backend:
+When POST /api/sessions is called to create a new session, it also automatically creates a corresponding participant record with isHost: true and the provided/default host display name.
+The API response for successful session creation includes both the session details and the participantId of the newly created host.
+Frontend (Gateway.tsx):
+The "Host a New Tasting" UI path no longer shows an option to scan a QR code.
+When a host enters a valid packageCode and initiates session creation:
+The createSessionMutation sends the necessary data to the backend.
+Upon success, it correctly receives the sessionId and hostParticipantId.
+The host is correctly navigated to /host/:sessionId/:hostParticipantId.
+The host is successfully listed as a participant (and marked as host) if they navigate to the "Participants" tab on their HostDashboard.tsx.

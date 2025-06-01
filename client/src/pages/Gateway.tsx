@@ -66,11 +66,8 @@ export default function Gateway() {
       setSessionId(scannedData);
       setShowQRScanner(false);
       handleJoinSession();
-    } else if (userMode === 'host') {
-      setPackageCode(scannedData);
-      setShowQRScanner(false);
-      handleHostSession();
     }
+    // Note: QR scanning removed from host flow - hosts only use package codes
   };
 
   return (
@@ -334,23 +331,13 @@ export default function Gateway() {
                       </motion.div>
                     )}
 
-                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                      <Button
-                        onClick={handleHostSession}
-                        disabled={packageCode.length !== 6 || createSessionMutation.isPending}
-                        className="flex-1 py-4 md:py-5 px-6 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-base md:text-lg"
-                      >
-                        {createSessionMutation.isPending ? 'Creating...' : 'Create Session'}
-                      </Button>
-                      <Button
-                        onClick={() => setShowQRScanner(true)}
-                        variant="outline"
-                        className="py-4 md:py-5 px-6 bg-white/20 backdrop-blur-xl border-white/20 text-white hover:bg-white/30 rounded-2xl flex items-center justify-center min-w-[60px]"
-                      >
-                        <QrCode size={20} />
-                        <span className="ml-2 sm:hidden">Scan QR</span>
-                      </Button>
-                    </div>
+                    <Button
+                      onClick={handleHostSession}
+                      disabled={packageCode.length !== 6 || createSessionMutation.isPending}
+                      className="w-full py-4 md:py-5 px-6 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-base md:text-lg"
+                    >
+                      {createSessionMutation.isPending ? 'Creating...' : 'Create Session'}
+                    </Button>
                   </div>
                 </div>
               </motion.div>
