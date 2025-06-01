@@ -1,70 +1,74 @@
 // client/public/service-worker.js
 
 // IMPORTANT: Increment this version string every time you deploy a new build!
-const CACHE_VERSION = "v1.2.0"; // Example: Change to 'v1.2.1' for your next deploy
+const CACHE_VERSION = "v1.3.0"; // Updated version for smart caching
 const CACHE_PREFIX = "knowyourgrape-shell-";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
-// App shell files - these are critical for the app to load.
-const APP_SHELL_FILES = [
-  "/",
-  "/index.html", // This will be cached.
+// Only cache essential files - no aggressive caching
+const ESSENTIAL_FILES = [
   "/manifest.json",
   "/icons/icon-192x192.png",
   "/icons/icon-512x512.png",
-  "/icons/icon.svg", // Assuming this is also part of your app shell
-  // If you have a specific offline page, add it here: '/offline.html'
 ];
 
-// Install event: Cache the app shell.
+// Install event: Only cache essential files, not the full app shell
 self.addEventListener("install", (event) => {
   console.log(
-    `[Service Worker] Attempting to install version: ${CACHE_VERSION}`,
+    `[Service Worker] Installing version: ${CACHE_VERSION}`,
   );
   event.waitUntil(
     caches
       .open(CACHE_NAME)
       .then((cache) => {
         console.log(
-          `[Service Worker] Caching app shell for ${CACHE_NAME}:`,
-          APP_SHELL_FILES,
+          `[Service Worker] Caching essential files for ${CACHE_NAME}:`,
+          ESSENTIAL_FILES,
         );
-        return cache.addAll(APP_SHELL_FILES);
+        return cache.addAll(ESSENTIAL_FILES);
       })
       .catch((error) => {
         console.error(
-          `[Service Worker] Failed to cache app shell for ${CACHE_NAME}:`,
+          `[Service Worker] Failed to cache essential files for ${CACHE_NAME}:`,
           error,
         );
       }),
   );
-  self.skipWaiting(); // Force the new service worker to activate immediately.
+  self.skipWaiting();
 });
 
-// Activate event: Clean up old caches.
+// Activate event: Clean up ALL old caches and reset storage
 self.addEventListener("activate", (event) => {
   console.log(`[Service Worker] Activating version: ${CACHE_VERSION}`);
   event.waitUntil(
-    caches
-      .keys()
-      .then((cacheNames) => {
+    Promise.all([
+      // Delete ALL old caches
+      caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
-            // Delete all caches that start with our prefix but are not the current version.
-            if (
-              cacheName.startsWith(CACHE_PREFIX) &&
-              cacheName !== CACHE_NAME
-            ) {
+            if (cacheName.startsWith(CACHE_PREFIX) && cacheName !== CACHE_NAME) {
               console.log("[Service Worker] Deleting old cache:", cacheName);
               return caches.delete(cacheName);
             }
           }),
         );
-      })
-      .then(() => {
-        console.log("[Service Worker] Claiming clients.");
-        return self.clients.claim(); // Take control of uncontrolled pages.
       }),
+      // Clear IndexedDB for fresh start on new deployments
+      new Promise((resolve) => {
+        const deleteReq = indexedDB.deleteDatabase('KnowYourGrapeDB');
+        deleteReq.onsuccess = () => {
+          console.log("[Service Worker] Cleared IndexedDB for fresh start");
+          resolve();
+        };
+        deleteReq.onerror = () => {
+          console.log("[Service Worker] Could not clear IndexedDB");
+          resolve();
+        };
+      })
+    ]).then(() => {
+      console.log("[Service Worker] Claiming clients.");
+      return self.clients.claim();
+    }),
   );
 });
 
