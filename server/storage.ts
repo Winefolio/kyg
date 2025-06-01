@@ -300,7 +300,7 @@ export class DatabaseStorage implements IStorage {
       await this.createSlide({
         packageId: bordeauxPackage.id,
         position: slideInfo.position,
-        type: slideInfo.type,
+        type: slideInfo.type as "question" | "media" | "interlude" | "video_message" | "audio_message",
         payloadJson: slideInfo.payloadJson,
       });
     }
