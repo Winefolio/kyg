@@ -50,7 +50,7 @@ export function SelectionView({ setUserMode, triggerHaptic }: SelectionViewProps
       </div>
 
       {/* Logo Section */}
-      <div className="text-center mb-16 md:mb-20 mt-4 md:mt-8">
+      <div className="text-center mb-8 md:mb-16 mt-2 md:mt-6">
         <motion.div
           initial={{ opacity: 0, y: -30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -60,7 +60,7 @@ export function SelectionView({ setUserMode, triggerHaptic }: SelectionViewProps
           }}
         >
           <motion.div
-            className="inline-flex items-center justify-center w-32 h-32 md:w-44 md:h-44 mb-8 md:mb-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl"
+            className="inline-flex items-center justify-center w-24 h-24 md:w-32 md:h-32 mb-6 md:mb-8 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl"
             animate={{
               rotate: [0, 3, -3, 0],
               scale: [1, 1.02, 1],
@@ -72,10 +72,10 @@ export function SelectionView({ setUserMode, triggerHaptic }: SelectionViewProps
             }}
             transition={{ duration: 6, repeat: Infinity }}
           >
-            <Wine className="text-white" size={56} />
+            <Wine className="text-white" size={40} />
           </motion.div>
           <motion.h1
-            className="text-5xl md:text-6xl font-bold text-white mb-4 md:mb-5 tracking-tight"
+            className="text-4xl md:text-5xl font-bold text-white mb-3 md:mb-4 tracking-tight"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
@@ -94,7 +94,7 @@ export function SelectionView({ setUserMode, triggerHaptic }: SelectionViewProps
       </div>
 
       {/* Selection Cards */}
-      <div className="space-y-6 md:space-y-8 w-full max-w-2xl mx-auto px-4 pt-8 md:pt-12">
+      <div className="space-y-6 md:space-y-8 w-full max-w-2xl mx-auto px-4 pt-12 md:pt-16">
         {/* Join Session Card */}
         <motion.div
           className="group bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl hover:bg-white/15 transition-all duration-500 cursor-pointer"
