@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import { CheckCircle, Star, Trophy, Wine, Home, Repeat } from "lucide-react";
 import type { Participant, Response, Session } from "@shared/schema";
 
@@ -14,8 +15,17 @@ export default function TastingCompletion() {
   const { sessionId, participantId } = useParams();
   const [, setLocation] = useLocation();
   const { user, addTastingSession } = useUserProfile();
+  const { endSession } = useSessionPersistence();
   const [rating, setRating] = useState(0);
   const [sessionSaved, setSessionSaved] = useState(false);
+
+  // Clean up session storage when component mounts (session completed)
+  useEffect(() => {
+    const cleanupSession = async () => {
+      await endSession();
+    };
+    cleanupSession();
+  }, [endSession]);
 
   // Get URL parameters
   const urlParams = new URLSearchParams(window.location.search);

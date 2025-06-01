@@ -305,6 +305,14 @@ export default function Gateway() {
         isVisible={createSessionMutation.isPending}
         message="Creating session..."
       />
+
+      {/* Session Restore Modal */}
+      <SessionRestoreModal
+        isOpen={showRestoreModal}
+        sessionData={activeSession}
+        onRestore={handleRestoreSession}
+        onStartFresh={handleStartFresh}
+      />
     </div>
   );
 }

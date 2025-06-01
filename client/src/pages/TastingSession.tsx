@@ -21,9 +21,16 @@ export default function TastingSession() {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [completedSlides, setCompletedSlides] = useState<number[]>([]);
-  const { saveResponse, syncStatus } = useSessionPersistence();
+  const { saveResponse, syncStatus, initializeForSession, endSession } = useSessionPersistence();
   const { triggerHaptic } = useHaptics();
   const queryClient = useQueryClient();
+
+  // Initialize session storage when component mounts
+  useEffect(() => {
+    if (sessionId && participantId) {
+      initializeForSession(sessionId, participantId);
+    }
+  }, [sessionId, participantId, initializeForSession]);
 
   // Get session details including status
   const { data: currentSession, isLoading: sessionDetailsLoading } = useQuery<Session & { packageCode?: string }>({
