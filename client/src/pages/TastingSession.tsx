@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import { useHaptics } from "@/hooks/useHaptics";
 import { apiRequest } from "@/lib/queryClient";
-import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause } from "@/lib/icons";
+import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause } from "lucide-react";
 import type { Slide, Participant, Session } from "@shared/schema";
 
 export default function TastingSession() {

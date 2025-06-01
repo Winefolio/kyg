@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { CheckCircle, Star, Trophy, Wine, Home, Repeat } from "@/lib/icons";
+import { CheckCircle, Star, Trophy, Wine, Home, Repeat } from "lucide-react";
 import type { Participant, Response, Session } from "@shared/schema";
 
 export default function TastingCompletion() {

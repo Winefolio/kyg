@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Wine, Users, UserPlus, ArrowRight, Sparkles } from "@/lib/icons";
+import { Wine, Users, UserPlus, ArrowRight, Sparkles } from "lucide-react";
 import { animations } from "@/lib/animations";
 
 import { hapticPatterns } from "@/lib/animations";
