@@ -11,6 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Wine, Camera, Users, UserPlus, QrCode, WifiOff, Wifi, ArrowRight, Sparkles } from "lucide-react";
 import { QRScanner } from "@/components/QRScanner";
 import { CodeInput } from "@/components/CodeInput";
+import { SessionIdInput } from "@/components/SessionIdInput";
 
 type UserMode = 'selection' | 'join' | 'host';
 
@@ -242,71 +243,34 @@ export default function Gateway() {
                   </div>
                 </div>
 
-                <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl">
-                  <div className="text-center mb-6 md:mb-8">
-                    <p className="text-white/80 text-base md:text-lg">Enter the session ID provided by your host</p>
+                <div className="space-y-6 md:space-y-8">
+                  <div className="text-center">
+                    <p className="text-white/80 text-base md:text-lg mb-2">Enter the session ID provided by your host</p>
+                    <p className="text-white/60 text-sm">Usually 8-12 characters long</p>
                   </div>
 
-                  <div className="space-y-6 md:space-y-8">
-                    <div className="relative">
-                      <Input
-                        type="text"
-                        value={sessionId}
-                        onChange={(e) => {
-                          const newValue = e.target.value.trim();
-                          triggerHaptic('selection');
-                          setSessionId(newValue);
-                          
-                          // Auto-submit when reasonable length (8+ chars for session ID)
-                          if (newValue.length >= 8) {
-                            setTimeout(() => {
-                              if (newValue.length >= 8) {
-                                handleJoinSession();
-                              }
-                            }, 500);
-                          }
-                        }}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && sessionId.trim()) {
-                            handleJoinSession();
-                          }
-                        }}
-                        placeholder="Session ID"
-                        className="w-full py-4 md:py-5 px-4 md:px-6 text-base md:text-lg bg-white/10 backdrop-blur-xl border-2 border-white/20 rounded-2xl text-white placeholder-white/50 focus:border-blue-400 focus:ring-4 focus:ring-blue-400/20 text-center font-mono tracking-wider"
-                        autoCapitalize="none"
-                        autoCorrect="off"
-                        autoComplete="off"
-                      />
-                      {sessionId.length >= 8 && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2"
-                        >
-                          <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                            <span className="text-white text-xs">✓</span>
-                          </div>
-                        </motion.div>
-                      )}
-                    </div>
+                  <SessionIdInput
+                    value={sessionId}
+                    onChange={setSessionId}
+                    onComplete={handleJoinSession}
+                  />
 
-                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                      <Button
-                        onClick={handleJoinSession}
-                        disabled={!sessionId.trim()}
-                        className="flex-1 py-4 md:py-5 px-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-base md:text-lg"
-                      >
-                        Join Session
-                      </Button>
-                      <Button
-                        onClick={() => setShowQRScanner(true)}
-                        variant="outline"
-                        className="py-4 md:py-5 px-6 bg-white/20 backdrop-blur-xl border-white/20 text-white hover:bg-white/30 rounded-2xl flex items-center justify-center min-w-[60px]"
-                      >
-                        <QrCode size={20} />
-                        <span className="ml-2 sm:hidden">Scan QR</span>
-                      </Button>
-                    </div>
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                    <Button
+                      onClick={handleJoinSession}
+                      disabled={!sessionId.trim() || sessionId.length < 4}
+                      className="flex-1 py-4 md:py-5 px-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-base md:text-lg"
+                    >
+                      Join Session
+                    </Button>
+                    <Button
+                      onClick={() => setShowQRScanner(true)}
+                      variant="outline"
+                      className="py-4 md:py-5 px-6 bg-white/20 backdrop-blur-xl border-white/20 text-white hover:bg-white/30 rounded-2xl flex items-center justify-center min-w-[60px]"
+                    >
+                      <QrCode size={20} />
+                      <span className="ml-2 sm:hidden">Scan QR</span>
+                    </Button>
                   </div>
                 </div>
               </motion.div>
