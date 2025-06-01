@@ -44,35 +44,20 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// Activate event: Clean up ALL old caches and reset storage
+// Activate event: Clean up old caches only - DO NOT touch IndexedDB
 self.addEventListener("activate", (event) => {
   console.log(`[Service Worker] Activating version: ${CACHE_VERSION}`);
   event.waitUntil(
-    Promise.all([
-      // Delete ALL old caches
-      caches.keys().then((cacheNames) => {
-        return Promise.all(
-          cacheNames.map((cacheName) => {
-            if (cacheName.startsWith(CACHE_PREFIX) && cacheName !== CACHE_NAME) {
-              console.log("[Service Worker] Deleting old cache:", cacheName);
-              return caches.delete(cacheName);
-            }
-          }),
-        );
-      }),
-      // Clear IndexedDB for fresh start on new deployments
-      new Promise((resolve) => {
-        const deleteReq = indexedDB.deleteDatabase('KnowYourGrapeDB');
-        deleteReq.onsuccess = () => {
-          console.log("[Service Worker] Cleared IndexedDB for fresh start");
-          resolve();
-        };
-        deleteReq.onerror = () => {
-          console.log("[Service Worker] Could not clear IndexedDB");
-          resolve();
-        };
-      })
-    ]).then(() => {
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName.startsWith(CACHE_PREFIX) && cacheName !== CACHE_NAME) {
+            console.log("[Service Worker] Deleting old cache:", cacheName);
+            return caches.delete(cacheName);
+          }
+        }),
+      );
+    }).then(() => {
       console.log("[Service Worker] Claiming clients.");
       return self.clients.claim();
     }),
