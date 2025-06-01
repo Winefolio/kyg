@@ -271,7 +271,19 @@ export class DatabaseStorage implements IStorage {
       },
       {
         position: 8,
-        type: "question",
+        type: "video_message" as const,
+        payloadJson: {
+          title: "Sommelier's Tasting Notes",
+          description: "Expert insights on this Bordeaux wine",
+          video_url: "https://placeholder-video-url.com/bordeaux-tasting.mp4",
+          poster_url: "https://placeholder-video-url.com/bordeaux-poster.jpg",
+          autoplay: false,
+          show_controls: true,
+        },
+      },
+      {
+        position: 9,
+        type: "question" as const,
         payloadJson: {
           title: "Overall wine rating",
           description: "Your overall impression of this wine",

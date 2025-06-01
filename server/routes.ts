@@ -174,9 +174,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error(`[JOIN_ERROR] Critical error in /api/sessions/${req.params.sessionIdOrShortCode}/participants:`, error);
       
       // Handle specific database errors
-      if (error.code && (error.code === '22P02' || error.code === '23503')) {
-        console.error("[JOIN_ERROR_DB] Database type or constraint violation:", error.detail || error.message);
-        return res.status(500).json({ message: "Database error: Could not correctly link participant to session due to data mismatch." });
+      if (error && typeof error === 'object' && 'code' in error) {
+        const dbError = error as any;
+        if (dbError.code === '22P02' || dbError.code === '23503') {
+          console.error("[JOIN_ERROR_DB] Database type or constraint violation:", dbError.detail || dbError.message);
+          return res.status(500).json({ message: "Database error: Could not correctly link participant to session due to data mismatch." });
+        }
       }
       
       res.status(500).json({ message: "Internal server error while attempting to join session." });

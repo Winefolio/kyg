@@ -14,12 +14,15 @@ export const packages = pgTable("packages", {
   codeIdx: index("idx_packages_code").on(table.code)
 }));
 
+// Define all allowed slide types
+const slideTypes = ['question', 'media', 'interlude', 'video_message', 'audio_message'] as const;
+
 // Slides table - ALL content lives here
 export const slides = pgTable("slides", {
   id: uuid("id").primaryKey().defaultRandom(),
   packageId: uuid("package_id").references(() => packages.id, { onDelete: "cascade" }),
   position: integer("position").notNull(),
-  type: varchar("type", { length: 50 }).notNull(), // 'question', 'media', 'interlude'
+  type: varchar("type", { length: 50 }).$type<typeof slideTypes[number]>().notNull(),
   payloadJson: jsonb("payload_json").notNull(),
   createdAt: timestamp("created_at").defaultNow()
 }, (table) => ({
@@ -70,6 +73,41 @@ export const responses = pgTable("responses", {
   uniqueParticipantSlide: unique().on(table.participantId, table.slideId)
 }));
 
+// Payload schemas for different slide types
+export const videoMessagePayloadSchema = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  video_url: z.string().url({ message: "Invalid video URL" }),
+  poster_url: z.string().url({ message: "Invalid poster URL" }).optional(),
+  autoplay: z.boolean().default(false).optional(),
+  show_controls: z.boolean().default(true).optional()
+});
+export type VideoMessagePayload = z.infer<typeof videoMessagePayloadSchema>;
+
+export const audioMessagePayloadSchema = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  audio_url: z.string().url({ message: "Invalid audio URL" }),
+  autoplay: z.boolean().default(false).optional(),
+  show_controls: z.boolean().default(true).optional()
+});
+export type AudioMessagePayload = z.infer<typeof audioMessagePayloadSchema>;
+
+export const interludePayloadSchema = z.object({
+  title: z.string(),
+  description: z.string().optional(),
+  wine_name: z.string().optional(),
+  wine_image: z.string().url().optional()
+});
+export type InterludePayload = z.infer<typeof interludePayloadSchema>;
+
+export const mediaPayloadSchema = z.object({
+  image_url: z.string().url(),
+  alt_text: z.string().optional(),
+  title: z.string().optional()
+});
+export type MediaPayload = z.infer<typeof mediaPayloadSchema>;
+
 // Insert schemas
 export const insertPackageSchema = createInsertSchema(packages, {
   description: z.string().nullable().optional()
@@ -80,7 +118,9 @@ export const insertPackageSchema = createInsertSchema(packages, {
 });
 
 export const insertSlideSchema = createInsertSchema(slides, {
-  packageId: z.string().nullable().optional()
+  packageId: z.string().nullable().optional(),
+  type: z.enum(slideTypes),
+  payloadJson: z.any() // Accept any JSON payload, validation happens in application logic
 }).omit({
   id: true,
   createdAt: true
