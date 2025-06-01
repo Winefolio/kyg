@@ -91,6 +91,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         hostParticipant = await storage.createParticipant(hostParticipantData);
         
+        if (!hostParticipant) {
+          return res.status(500).json({ message: "Failed to create host participant for the new session" });
+        }
+        
         // Update session participant count
         await storage.updateSessionParticipantCount(session.id, 1);
       }
