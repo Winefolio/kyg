@@ -94,7 +94,7 @@ export function SelectionView({ setUserMode, triggerHaptic }: SelectionViewProps
       </div>
 
       {/* Selection Cards */}
-      <div className="space-y-6 md:space-y-8 w-full max-w-2xl mx-auto px-4">
+      <div className="space-y-6 md:space-y-8 w-full max-w-2xl mx-auto px-4 pt-8 md:pt-12">
         {/* Join Session Card */}
         <motion.div
           className="group bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl hover:bg-white/15 transition-all duration-500 cursor-pointer"
