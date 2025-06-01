@@ -6,6 +6,7 @@ interface SessionIdInputProps {
   value: string;
   onChange: (value: string) => void;
   onComplete?: (sessionId: string) => void;
+  maxLength?: number;
   className?: string;
 }
 
@@ -13,6 +14,7 @@ export function SessionIdInput({
   value, 
   onChange, 
   onComplete,
+  maxLength = 12,
   className = ""
 }: SessionIdInputProps) {
   const [focused, setFocused] = useState(false);
@@ -39,7 +41,7 @@ export function SessionIdInput({
   }, [value, handleComplete]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value.trim();
+    const newValue = e.target.value.slice(0, maxLength);
     if (newValue !== value) {
       triggerHaptic('selection');
       onChange(newValue);
@@ -56,61 +58,77 @@ export function SessionIdInput({
     }
   };
 
-  const renderProgressBar = () => {
-    const progress = Math.min((value.length / 8) * 100, 100);
+  const renderCharacterSlots = () => {
+    const slots = [];
+    const minSlots = 8; // Start with 8 slots, expand as needed
+    const actualSlots = Math.max(minSlots, value.length + (value.length < maxLength ? 1 : 0));
     
-    return (
-      <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden backdrop-blur-xl">
-        <motion.div
-          className={`h-full rounded-full transition-all duration-500 ${
-            progress >= 100 ? 'bg-gradient-to-r from-green-400 to-emerald-500' 
-                            : 'bg-gradient-to-r from-blue-400 to-purple-500'
-          }`}
-          initial={{ width: 0 }}
-          animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.3 }}
-        />
-      </div>
-    );
-  };
+    for (let i = 0; i < actualSlots && i < maxLength; i++) {
+      const char = value[i] || '';
+      const isEmpty = !char;
+      const isCurrent = i === value.length && focused;
 
-  const renderCharacterDisplay = () => {
-    const displayValue = value || '';
-    const maskedChars = displayValue.slice(0, -4).replace(/./g, '•');
-    const visibleChars = displayValue.slice(-4);
-    
-    return (
-      <div className="text-center space-y-2">
+      slots.push(
         <motion.div
-          className={`text-2xl md:text-3xl font-mono tracking-wider transition-all duration-300 ${
-            focused ? 'text-white' : 'text-white/80'
-          }`}
-          animate={hasCompleted ? { scale: [1, 1.05, 1] } : {}}
-          transition={{ duration: 0.6 }}
+          key={i}
+          className={`
+            relative w-8 h-10 sm:w-10 sm:h-12 rounded-lg border-2 flex items-center justify-center text-sm sm:text-base font-bold
+            transition-all duration-300 backdrop-blur-xl cursor-pointer touch-manipulation
+            ${isCurrent 
+              ? 'border-blue-400/80 bg-blue-400/20 scale-105' 
+              : isEmpty 
+                ? 'border-white/30 bg-white/10 hover:border-white/40 active:border-white/50' 
+                : 'border-white/50 bg-white/15'
+            }
+            ${hasCompleted && i < value.length ? 'border-green-400/60 bg-green-400/10' : ''}
+          `}
+          animate={isCurrent ? { 
+            scale: [1, 1.05, 1], 
+            borderColor: ['rgba(59, 130, 246, 0.8)', 'rgba(59, 130, 246, 1)', 'rgba(59, 130, 246, 0.8)']
+          } : {}}
+          transition={{ duration: 0.8, repeat: isCurrent ? Infinity : 0 }}
+          whileHover={{ scale: 1.02 }}
+          layout
         >
-          {maskedChars}{visibleChars}
-          {focused && (
-            <motion.span
-              className="text-white/60"
-              animate={{ opacity: [0, 1, 0] }}
+          <span className={`
+            ${isEmpty ? 'text-white/40' : 'text-white'}
+            transition-all duration-200 font-mono
+          `}>
+            {char}
+          </span>
+          
+          {isCurrent && (
+            <motion.div
+              className="absolute inset-0 rounded-lg border-2 border-blue-400/40"
+              animate={{ opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 1, repeat: Infinity }}
-            >
-              |
-            </motion.span>
+            />
           )}
         </motion.div>
-        
-        {value.length > 0 && (
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-white/60 text-sm"
-          >
-            {value.length}/8+ characters
-          </motion.p>
-        )}
-      </div>
-    );
+      );
+    }
+    return slots;
+  };
+
+  const renderProgressDots = () => {
+    const progress = Math.min(value.length / 8, 1);
+    const dotCount = 8;
+    const dots = [];
+    
+    for (let i = 0; i < dotCount; i++) {
+      const isActive = i < value.length;
+      dots.push(
+        <motion.div
+          key={i}
+          className={`w-2 h-2 rounded-full transition-all duration-300 ${
+            isActive ? 'bg-blue-400/80' : 'bg-white/30'
+          }`}
+          animate={isActive ? { scale: [1, 1.2, 1] } : {}}
+          transition={{ duration: 0.3, delay: i * 0.05 }}
+        />
+      );
+    }
+    return dots;
   };
 
   return (
@@ -125,74 +143,36 @@ export function SessionIdInput({
         onBlur={() => setFocused(false)}
         onKeyPress={handleKeyPress}
         className="sr-only"
-        placeholder="Session ID"
+        maxLength={maxLength}
         autoCapitalize="none"
         autoCorrect="off"
         autoComplete="off"
         spellCheck="false"
       />
 
-      {/* Interactive display area */}
-      <motion.div
-        className={`
-          relative bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 border-2 
-          transition-all duration-300 cursor-text min-h-[120px] flex flex-col justify-center
-          ${focused 
-            ? 'border-blue-400/60 bg-white/15 shadow-xl shadow-blue-500/20' 
-            : 'border-white/20 hover:border-white/30'
-          }
-          ${hasCompleted ? 'border-green-400/60 bg-green-400/5' : ''}
-        `}
+      {/* Character slots */}
+      <div 
+        className="flex justify-center gap-1 sm:gap-2 cursor-pointer px-2 flex-wrap"
         onClick={handleClick}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
       >
-        {/* Character display */}
-        {renderCharacterDisplay()}
+        {renderCharacterSlots()}
+      </div>
 
-        {/* Completion indicator */}
-        {hasCompleted && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="absolute top-4 right-4"
-          >
-            <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
-              <span className="text-white text-sm font-bold">✓</span>
-            </div>
-          </motion.div>
-        )}
+      {/* Progress dots */}
+      <div className="flex justify-center gap-2 mt-4">
+        {renderProgressDots()}
+      </div>
 
-        {/* Placeholder when empty */}
-        {value.length === 0 && !focused && (
-          <motion.div
-            initial={{ opacity: 1 }}
-            animate={{ opacity: focused ? 0 : 1 }}
-            className="text-center"
-          >
-            <p className="text-white/40 text-lg font-medium">Tap to enter Session ID</p>
-            <p className="text-white/30 text-sm mt-1">e.g., abc123def456</p>
-          </motion.div>
-        )}
-      </motion.div>
-
-      {/* Progress bar */}
-      {value.length > 0 && (
+      {/* Completion message */}
+      {hasCompleted && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-2"
+          className="text-center"
         >
-          {renderProgressBar()}
-          {hasCompleted && (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center text-green-400 text-sm font-medium"
-            >
-              Ready to join! 🎉
-            </motion.p>
-          )}
+          <p className="text-green-400 text-sm md:text-base font-medium">
+            Ready to join session!
+          </p>
         </motion.div>
       )}
     </div>
