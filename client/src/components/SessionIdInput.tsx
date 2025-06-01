@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useHaptics } from "@/hooks/useHaptics";
+import { slotVariants, containerVariants, itemVariants } from "@/lib/micro-animations";
 
 interface SessionIdInputProps {
   value: string;
@@ -73,23 +74,26 @@ export function SessionIdInput({
           key={i}
           className={`
             relative w-12 h-14 rounded-xl border-2 flex items-center justify-center text-lg font-bold
-            transition-all duration-300 backdrop-blur-xl cursor-pointer touch-manipulation
-            ${isCurrent 
-              ? 'border-blue-400/80 bg-blue-400/20 scale-105 shadow-lg shadow-blue-400/25' 
-              : isEmpty 
-                ? 'border-white/30 bg-white/10 hover:border-white/40 active:border-white/50' 
-                : 'border-white/60 bg-white/20 shadow-md'
+            backdrop-blur-xl cursor-pointer touch-manipulation
+            ${isEmpty 
+              ? 'border-white/30 bg-white/10' 
+              : 'border-white/60 bg-white/20 shadow-md'
             }
-            ${hasCompleted && i < value.length ? 'border-green-400/70 bg-green-400/15 shadow-green-400/20' : ''}
           `}
-          animate={isCurrent ? { 
-            scale: [1, 1.05, 1], 
-            borderColor: ['rgba(59, 130, 246, 0.8)', 'rgba(96, 165, 250, 0.9)', 'rgba(59, 130, 246, 0.8)']
-          } : {}}
-          transition={{ duration: 1.2, repeat: isCurrent ? Infinity : 0 }}
+          variants={slotVariants}
+          animate={
+            hasCompleted && i < value.length ? 'complete' :
+            isCurrent ? 'active' :
+            !isEmpty ? 'filled' : 'empty'
+          }
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           layout
+          transition={{
+            type: "spring",
+            stiffness: 400,
+            damping: 30
+          }}
         >
           <span className={`
             ${isEmpty ? 'text-white/40' : 'text-white'}
@@ -98,13 +102,17 @@ export function SessionIdInput({
             {char}
           </span>
           
-          {isCurrent && (
-            <motion.div
-              className="absolute inset-0 rounded-xl border-2 border-blue-400/50"
-              animate={{ opacity: [0.4, 0.8, 0.4] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            />
-          )}
+          <AnimatePresence>
+            {isCurrent && (
+              <motion.div
+                className="absolute inset-0 rounded-xl border-2 border-blue-400/50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [0.4, 0.8, 0.4] }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+            )}
+          </AnimatePresence>
         </motion.div>
       );
     }
