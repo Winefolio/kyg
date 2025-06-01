@@ -1,9 +1,14 @@
-import express, { type Express } from "express";
+import express, {
+  type Express,
+  type Request,
+  type Response,
+  type NextFunction,
+} from "express";
 import fs from "fs";
 import path from "path";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
-import viteConfig from "../vite.config";
+import viteConfig from "../vite.config"; // Assuming vite.config.ts is at the project root
 import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
@@ -28,12 +33,13 @@ export async function setupVite(app: Express, server: Server) {
 
   const vite = await createViteServer({
     ...viteConfig,
-    configFile: false,
+    configFile: false, // configFile is already loaded via import viteConfig from "../vite.config";
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
         viteLogger.error(msg, options);
-        process.exit(1);
+        // Consider if process.exit(1) is too aggressive for all dev errors
+        // process.exit(1);
       },
     },
     server: serverOptions,
@@ -46,14 +52,14 @@ export async function setupVite(app: Express, server: Server) {
 
     try {
       const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "..",
-        "client",
+        import.meta.dirname, // Current directory (server/)
+        "..", // Up to project root
+        "client", // Into client/
         "index.html",
       );
 
-      // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
+      // Cache-busting for /src/main.tsx in dev mode
       template = template.replace(
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid()}"`,
@@ -67,20 +73,63 @@ export async function setupVite(app: Express, server: Server) {
   });
 }
 
-// In server/vite.ts
 export function serveStatic(app: Express) {
+  // Correctly points to <project_root>/dist/public/
   const distPath = path.resolve(import.meta.dirname, "..", "dist/public");
 
   if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
+    const errorMsg = `Production build directory not found at: ${distPath}. Make sure to run 'npm run build' first.`;
+    console.error(`[Express ERROR] ${errorMsg}`);
+    // In a production scenario, you might want the server to fail hard if assets are missing.
+    // Or, serve a minimal maintenance page, but throwing ensures the problem is noticed.
+    throw new Error(errorMsg);
   }
+  log(`Serving static files from: ${distPath}`, "Express");
 
-  app.use(express.static(distPath));
+  // Serve static assets from dist/public
+  // Explicitly set Content-Type for JS/CSS to be absolutely sure.
+  app.use(
+    express.static(distPath, {
+      index: false, // We'll handle SPA fallback manually
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".js")) {
+          res.setHeader("Content-Type", "application/javascript");
+        } else if (filePath.endsWith(".css")) {
+          res.setHeader("Content-Type", "text/css");
+        }
+      },
+    }),
+  );
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  // SPA Fallback: Serve index.html for valid client-side routes
+  // This should come after API routes and static asset serving.
+  app.get("*", (req: Request, res: Response, next: NextFunction) => {
+    // If the request is for an API endpoint, pass it to the next handler (likely your API router)
+    if (req.path.startsWith("/api/")) {
+      return next();
+    }
+
+    // If the request looks like it's for a static file (e.g., contains a common file extension)
+    // but wasn't found by express.static, it should 404.
+    // This prevents serving index.html for missing images, scripts, etc.
+    // Common asset extensions:
+    const assetExtensions =
+      /\.(js|css|json|webmanifest|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|otf|map)$/i;
+    if (assetExtensions.test(req.path)) {
+      // Let it fall through to Express's default 404 handler or any subsequent error handlers
+      return next();
+    }
+
+    // For all other GET requests (assumed to be client-side routes), serve the main HTML file.
+    const indexPath = path.resolve(distPath, "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      // This case should ideally not happen if your build is correct and index.html is in distPath
+      log(`[Express ERROR] Main index.html not found at: ${indexPath}`);
+      res
+        .status(500)
+        .send("Application critical error: Main HTML file not found.");
+    }
   });
 }
