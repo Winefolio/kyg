@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { ModernButton } from "@/components/ui/modern-button";
+import { ModernCard } from "@/components/ui/modern-card";
 import { ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
 import { modernCardVariants, staggeredReveal, springTransition } from "@/lib/modern-animations";
 import { useHaptics } from "@/hooks/useHaptics";
@@ -153,8 +154,7 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
 
       {question.allow_notes && (
         <div>
-          <Button
-            type="button"
+          <ModernButton
             variant="ghost"
             onClick={toggleNotes}
             className="w-full flex items-center justify-between p-2 text-white/80 hover:text-white hover:bg-white/5 text-xs sm:text-sm"
@@ -167,7 +167,7 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
               )}
             </div>
             {notesExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </Button>
+          </ModernButton>
           
           <AnimatePresence>
             {notesExpanded && (
