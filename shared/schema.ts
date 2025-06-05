@@ -74,6 +74,20 @@ export const responses = pgTable("responses", {
   uniqueParticipantSlide: unique().on(table.participantId, table.slideId)
 }));
 
+// Glossary terms table
+export const glossaryTerms = pgTable("glossary_terms", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  term: text("term").notNull().unique(),
+  variations: text("variations").array(), // For alternate spellings
+  definition: text("definition").notNull(),
+  category: varchar("category", { length: 50 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  termIdx: index("idx_glossary_terms_term").on(table.term),
+  categoryIdx: index("idx_glossary_terms_category").on(table.category)
+}));
+
 // Payload schemas for different slide types
 export const videoMessagePayloadSchema = z.object({
   title: z.string().optional(),
@@ -160,6 +174,15 @@ export const insertResponseSchema = createInsertSchema(responses, {
   answeredAt: true
 });
 
+export const insertGlossaryTermSchema = createInsertSchema(glossaryTerms, {
+  variations: z.array(z.string()).nullable().optional(),
+  category: z.string().nullable().optional()
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
 // Types
 export type Package = typeof packages.$inferSelect;
 export type InsertPackage = z.infer<typeof insertPackageSchema>;
@@ -171,3 +194,5 @@ export type Participant = typeof participants.$inferSelect;
 export type InsertParticipant = z.infer<typeof insertParticipantSchema>;
 export type Response = typeof responses.$inferSelect;
 export type InsertResponse = z.infer<typeof insertResponseSchema>;
+export type GlossaryTerm = typeof glossaryTerms.$inferSelect;
+export type InsertGlossaryTerm = z.infer<typeof insertGlossaryTermSchema>;

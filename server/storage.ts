@@ -9,11 +9,14 @@ import {
   type InsertParticipant,
   type Response,
   type InsertResponse,
+  type GlossaryTerm,
+  type InsertGlossaryTerm,
   packages,
   slides,
   sessions,
   participants,
   responses,
+  glossaryTerms,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, desc } from "drizzle-orm";
@@ -99,6 +102,10 @@ export interface IStorage {
 
   // Analytics
   getAggregatedSessionAnalytics(sessionId: string): Promise<any>;
+
+  // Glossary
+  getGlossaryTerms(): Promise<GlossaryTerm[]>;
+  createGlossaryTerm(term: InsertGlossaryTerm): Promise<GlossaryTerm>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -818,6 +825,15 @@ export class DatabaseStorage implements IStorage {
       totalQuestions,
       slidesAnalytics,
     };
+  }
+
+  async getGlossaryTerms(): Promise<GlossaryTerm[]> {
+    return await db.select().from(glossaryTerms).orderBy(glossaryTerms.term);
+  }
+
+  async createGlossaryTerm(term: InsertGlossaryTerm): Promise<GlossaryTerm> {
+    const result = await db.insert(glossaryTerms).values(term).returning();
+    return result[0];
   }
 }
 
