@@ -625,18 +625,22 @@ export default function TastingSession() {
                       </linearGradient>
                     </defs>
                     
-                    {/* Wine Fill Animation - masked to only show inside glass bowl */}
-                    <motion.circle
-                      cx="50"
-                      cy="37.3"
-                      r="20.44"
+                    {/* Wine Fill Animation - realistic liquid rising effect */}
+                    <motion.rect
+                      x="29.56"
+                      y="57.74"
+                      width="40.88"
+                      height="0"
                       fill="url(#wine-gradient)"
                       mask="url(#wine-glass-mask)"
+                      rx="0"
                       initial={{ 
-                        clipPath: "circle(0% at 50% 100%)"
+                        height: 0,
+                        y: 57.74
                       }}
                       animate={{ 
-                        clipPath: "circle(20.44px at 50% 37.3%)"
+                        height: 36,
+                        y: 21.74
                       }}
                       transition={{ duration: 1.5, ease: [0.4, 0, 0.2, 1] }}
                       opacity="0.95"
@@ -646,15 +650,16 @@ export default function TastingSession() {
                     <path d="M75.44,35.78l-.09-.48c-.14-1.73-.44-3.41-.91-5.02l-4.01-18.23H29.57l-4.01,18.23c-.46,1.61-.77,3.29-.91,5.02l-.09,.48h.05c-.03,.51-.05,1.02-.05,1.53,0,13.2,10.06,24.06,22.94,25.31v20.61h-12.4v5h29.81v-5h-12.4v-20.61c12.87-1.26,22.94-12.11,22.94-25.31,0-.51-.02-1.02-.05-1.53h.05Zm-25.44,21.96c-11.27,0-20.44-9.17-20.44-20.44,0-.36,.01-.77,.04-1.23v-.11s.01-.03,.01-.03l.02-.25c.11-1.37,.35-2.73,.73-4.03l.04-.15,.03-.15,3.14-14.3h32.83l3.14,14.3,.03,.15,.04,.15c.38,1.31,.62,2.66,.73,4.03l.02,.25v.02s.01,.11,.01,.11c.03,.47,.04,.87,.04,1.23,0,11.27-9.17,20.44-20.44,20.44Z"/>
                     
                     {/* Wine Shimmer Effect - also masked to glass bowl */}
-                    <motion.circle
-                      cx="50"
-                      cy="37.3"
-                      r="20.44"
+                    <motion.rect
+                      x="25"
+                      y="21.74"
+                      width="50"
+                      height="36"
                       fill="url(#shimmer-gradient)"
                       mask="url(#wine-glass-mask)"
-                      initial={{ opacity: 0, transform: "translateX(-40px)" }}
-                      animate={{ opacity: [0, 0.3, 0], transform: "translateX(40px)" }}
-                      transition={{ duration: 1.5, delay: 0.3, ease: "easeInOut" }}
+                      initial={{ opacity: 0, x: "15" }}
+                      animate={{ opacity: [0, 0.4, 0], x: "35" }}
+                      transition={{ duration: 1.5, delay: 0.5, ease: "easeInOut" }}
                     />
                   </svg>
                   
