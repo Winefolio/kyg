@@ -506,11 +506,23 @@ export default function TastingSession() {
               const isAccessible = index <= currentSlideIndex || isCompleted;
               
               return (
-                <div
+                <motion.div
                   key={slide.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05, duration: 0.3 }}
+                  whileHover={isAccessible ? { 
+                    scale: 1.02, 
+                    x: 5,
+                    transition: { duration: 0.2 }
+                  } : {}}
+                  whileTap={isAccessible ? { 
+                    scale: 0.98,
+                    transition: { duration: 0.1 }
+                  } : {}}
                   className={`p-3 rounded-lg border transition-all cursor-pointer ${
                     isCurrent 
-                      ? 'bg-white/20 border-white/30 text-white' 
+                      ? 'bg-white/20 border-white/30 text-white shadow-lg' 
                       : isCompleted
                         ? 'bg-green-500/20 border-green-400/30 text-green-200 hover:bg-green-500/30'
                         : isAccessible
@@ -541,9 +553,15 @@ export default function TastingSession() {
                         </p>
                       </div>
                     </div>
-                    {isCurrent && <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />}
+                    {isCurrent && (
+                      <motion.div 
+                        className="w-2 h-2 bg-purple-400 rounded-full"
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                      />
+                    )}
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>
@@ -729,26 +747,64 @@ export default function TastingSession() {
       </div>
 
       {/* Fixed Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-primary/95 backdrop-blur-xl border-t border-white/10 p-4">
+      <motion.div 
+        initial={{ y: 100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.5, type: "spring", stiffness: 300, damping: 30 }}
+        className="fixed bottom-0 left-0 right-0 bg-gradient-primary/95 backdrop-blur-xl border-t border-white/10 p-4"
+      >
         <div className="max-w-md mx-auto flex space-x-3">
-          <Button
-            onClick={handlePrevious}
-            disabled={currentSlideIndex === 0}
-            variant="outline"
-            className="flex-1 py-3 px-4 bg-white/20 border-white/20 text-white hover:bg-white/30 disabled:opacity-50 text-sm"
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="flex-1"
           >
-            <ArrowLeft className="mr-1" size={14} />
-            Previous
-          </Button>
-          <Button
-            onClick={handleNext}
-            className="flex-1 py-3 px-4 bg-gradient-button text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 text-sm"
+            <Button
+              onClick={handlePrevious}
+              disabled={currentSlideIndex === 0}
+              variant="outline"
+              className="w-full py-3 px-4 bg-white/20 border-white/20 text-white hover:bg-white/30 disabled:opacity-50 text-sm transition-all duration-300 hover:shadow-lg"
+            >
+              <motion.div
+                animate={{ x: currentSlideIndex === 0 ? 0 : [-2, 0] }}
+                transition={{ duration: 0.3 }}
+                className="flex items-center"
+              >
+                <ArrowLeft className="mr-1" size={14} />
+                Previous
+              </motion.div>
+            </Button>
+          </motion.div>
+          
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="flex-1"
           >
-            {currentSlideIndex === slides.length - 1 ? 'Finish' : 'Next'}
-            <ArrowRight className="ml-1" size={14} />
-          </Button>
+            <Button
+              onClick={handleNext}
+              className="w-full py-3 px-4 bg-gradient-button text-white font-semibold shadow-xl hover:shadow-2xl transition-all duration-300 text-sm relative overflow-hidden"
+            >
+              <motion.div
+                animate={{ x: [0, 2, 0] }}
+                transition={{ duration: 0.3 }}
+                className="flex items-center justify-center"
+              >
+                {currentSlideIndex === slides.length - 1 ? 'Finish' : 'Next'}
+                <ArrowRight className="ml-1" size={14} />
+              </motion.div>
+              
+              {/* Subtle shimmer effect */}
+              <motion.div
+                initial={{ x: "-100%" }}
+                animate={{ x: "100%" }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform skew-x-12"
+              />
+            </Button>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

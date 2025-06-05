@@ -77,33 +77,77 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
       </div>
 
       <div className="space-y-2 mb-4">
-        {question.options.map((option) => (
-          <motion.div
-            key={option.id}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-          >
-            <Label
-              htmlFor={option.id}
-              className="flex items-center p-3 bg-white/5 rounded-xl cursor-pointer hover:bg-white/10 transition-all duration-300 group"
+        {question.options.map((option, index) => {
+          const isSelected = value.selected.includes(option.id);
+          return (
+            <motion.div
+              key={option.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.1, duration: 0.4 }}
+              whileHover={{ 
+                scale: 1.02, 
+                x: 5,
+                transition: { duration: 0.2 }
+              }}
+              whileTap={{ 
+                scale: 0.98,
+                transition: { duration: 0.1 }
+              }}
             >
-              <Checkbox
-                id={option.id}
-                checked={value.selected.includes(option.id)}
-                onCheckedChange={(checked) => handleOptionChange(option.id, checked as boolean)}
-                className="mr-3 border-white/40 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
-              />
-              <div className="flex-1">
-                <div className="text-white text-sm sm:text-base font-medium group-hover:text-purple-200 transition-colors duration-300">
-                  {option.text}
+              <Label
+                htmlFor={option.id}
+                className={`
+                  flex items-center p-3 rounded-xl cursor-pointer transition-all duration-300 group
+                  transform-gpu
+                  ${isSelected 
+                    ? 'bg-purple-500/20 border border-purple-400/50 shadow-lg shadow-purple-500/20' 
+                    : 'bg-white/5 hover:bg-white/10 border border-transparent hover:border-white/20'
+                  }
+                `}
+              >
+                <motion.div
+                  animate={isSelected ? { scale: 1.1 } : { scale: 1 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                >
+                  <Checkbox
+                    id={option.id}
+                    checked={isSelected}
+                    onCheckedChange={(checked) => handleOptionChange(option.id, checked as boolean)}
+                    className="mr-3 border-white/40 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
+                  />
+                </motion.div>
+                <div className="flex-1">
+                  <motion.div 
+                    className={`text-sm sm:text-base font-medium transition-colors duration-300 ${
+                      isSelected ? 'text-purple-100' : 'text-white group-hover:text-purple-200'
+                    }`}
+                    animate={isSelected ? { x: 2 } : { x: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {option.text}
+                  </motion.div>
+                  {option.description && (
+                    <motion.div 
+                      className="text-white/60 text-xs sm:text-sm mt-1 leading-relaxed"
+                      animate={isSelected ? { opacity: 0.9 } : { opacity: 0.6 }}
+                    >
+                      {option.description}
+                    </motion.div>
+                  )}
                 </div>
-                {option.description && (
-                  <div className="text-white/60 text-xs sm:text-sm mt-1 leading-relaxed">{option.description}</div>
+                {isSelected && (
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    className="w-2 h-2 bg-purple-400 rounded-full ml-2"
+                  />
                 )}
-              </div>
-            </Label>
-          </motion.div>
-        ))}
+              </Label>
+            </motion.div>
+          );
+        })}
       </div>
 
       {question.allow_notes && (

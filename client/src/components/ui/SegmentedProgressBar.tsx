@@ -45,6 +45,7 @@ export function SegmentedProgressBar({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
+            whileHover={{ scale: 1.02 }}
           >
             {/* Section Name */}
             <div className="flex items-center justify-between">
