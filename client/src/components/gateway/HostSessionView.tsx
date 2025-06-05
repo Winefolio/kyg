@@ -9,6 +9,8 @@ interface HostSessionViewProps {
   setPackageCode: (code: string) => void;
   hostDisplayName: string;
   setHostDisplayName: (name: string) => void;
+  hostEmail: string;
+  setHostEmail: (email: string) => void;
   handleHostSession: () => void;
   isCreatingSession: boolean;
   triggerHaptic: (type: keyof typeof hapticPatterns) => void;

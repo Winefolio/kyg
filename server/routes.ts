@@ -84,7 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const hostParticipantData = insertParticipantSchema.parse({
           sessionId: session.id,
           displayName: hostDisplayName || hostName || 'Host',
-          email: hostEmail || '',
+          email: hostEmail,
           isHost: true,
           progress: 0
         });

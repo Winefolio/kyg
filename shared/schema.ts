@@ -45,7 +45,7 @@ export const sessions = pgTable("sessions", {
 export const participants = pgTable("participants", {
   id: uuid("id").primaryKey().defaultRandom(),
   sessionId: uuid("session_id").references(() => sessions.id, { onDelete: "cascade" }),
-  email: varchar("email", { length: 255 }),
+  email: varchar("email", { length: 255 }).notNull(),
   displayName: varchar("display_name", { length: 100 }).notNull(),
   isHost: boolean("is_host").default(false),
   progressPtr: integer("progress_ptr").default(0),
@@ -100,7 +100,7 @@ export const insertSessionSchema = createInsertSchema(sessions, {
 
 export const insertParticipantSchema = createInsertSchema(participants, {
   sessionId: z.string().nullable().optional(),
-  email: z.string().nullable().optional(),
+  email: z.string().email("Please enter a valid email address"),
   isHost: z.boolean().nullable().optional(),
   progressPtr: z.number().nullable().optional()
 }).omit({
