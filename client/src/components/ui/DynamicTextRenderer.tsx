@@ -52,6 +52,7 @@ export function DynamicTextRenderer({ text, className }: DynamicTextRendererProp
     const matches = text.match(regex) || [];
 
     const result: React.ReactNode[] = [];
+    const processedTerms = new Set<string>(); // Track terms already highlighted in this text block
     let matchIndex = 0;
 
     parts.forEach((part, index) => {
@@ -70,11 +71,21 @@ export function DynamicTextRenderer({ text, className }: DynamicTextRendererProp
           );
 
           if (termData) {
-            result.push(
-              <TerminologyTooltip key={`${matchIndex}-${matchedTerm}`} term={termData.data}>
-                {matchedTerm}
-              </TerminologyTooltip>
-            );
+            // Create a unique key for this term (normalize to base term)
+            const termKey = termData.data.term.toLowerCase().replace(/\s+/g, '_');
+            
+            // Only highlight if this term hasn't been processed yet in this text block
+            if (!processedTerms.has(termKey)) {
+              processedTerms.add(termKey);
+              result.push(
+                <TerminologyTooltip key={`${termKey}-${matchIndex}`} term={termData.data}>
+                  {matchedTerm}
+                </TerminologyTooltip>
+              );
+            } else {
+              // Term already highlighted once, render as plain text
+              result.push(matchedTerm);
+            }
           } else {
             result.push(matchedTerm);
           }
