@@ -23,6 +23,7 @@ export const slides = pgTable("slides", {
   packageId: uuid("package_id").references(() => packages.id, { onDelete: "cascade" }),
   position: integer("position").notNull(),
   type: varchar("type", { length: 50 }).$type<typeof slideTypes[number]>().notNull(),
+  section_type: varchar("section_type", { length: 20 }),
   payloadJson: jsonb("payload_json").notNull(),
   createdAt: timestamp("created_at").defaultNow()
 }, (table) => ({
@@ -120,6 +121,7 @@ export const insertPackageSchema = createInsertSchema(packages, {
 export const insertSlideSchema = createInsertSchema(slides, {
   packageId: z.string().nullable().optional(),
   type: z.enum(slideTypes),
+  section_type: z.enum(['intro', 'deep_dive', 'ending']).optional().nullable(),
   payloadJson: z.any() // Accept any JSON payload, validation happens in application logic
 }).omit({
   id: true,

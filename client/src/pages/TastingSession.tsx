@@ -1,17 +1,18 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { SegmentedProgressBar } from "@/components/ui/SegmentedProgressBar";
 import { MultipleChoiceQuestion } from "@/components/questions/MultipleChoiceQuestion";
 import { ScaleQuestion } from "@/components/questions/ScaleQuestion";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import { useHaptics } from "@/hooks/useHaptics";
 import { apiRequest } from "@/lib/queryClient";
-import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause } from "lucide-react";
+import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause, Award } from "lucide-react";
 import type { Slide, Participant, Session } from "@shared/schema";
 
 export default function TastingSession() {
@@ -21,6 +22,8 @@ export default function TastingSession() {
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [completedSlides, setCompletedSlides] = useState<number[]>([]);
+  const [isTransitioningSection, setIsTransitioningSection] = useState(false);
+  const [transitionSectionName, setTransitionSectionName] = useState("");
   const { saveResponse, syncStatus, initializeForSession, endSession } = useSessionPersistence();
   const { triggerHaptic } = useHaptics();
   const queryClient = useQueryClient();
@@ -73,7 +76,80 @@ export default function TastingSession() {
 
   const slides = slidesData?.slides || [];
   const currentSlide = slides[currentSlideIndex];
-  const progress = slides.length > 0 ? ((currentSlideIndex + 1) / slides.length) * 100 : 0;
+  
+  // Calculate section-based progress
+  const calculateSectionProgress = () => {
+    if (slides.length === 0) return { sections: [], currentWineName: "", progressInfo: "" };
+    
+    // Group slides by section_type
+    const introSlides = slides.filter(slide => slide.section_type === 'intro');
+    const deepDiveSlides = slides.filter(slide => slide.section_type === 'deep_dive');
+    const endingSlides = slides.filter(slide => slide.section_type === 'ending');
+    
+    // Determine current section
+    const currentSectionType = currentSlide?.section_type || null;
+    
+    // Calculate progress for each section
+    const calculateSectionProgressValue = (sectionSlides: typeof slides, sectionType: string) => {
+      if (sectionSlides.length === 0) return 0;
+      
+      const completedInSection = sectionSlides.filter(slide => {
+        const slideIndex = slides.findIndex(s => s.id === slide.id);
+        return completedSlides.includes(slideIndex);
+      }).length;
+      
+      // If we're in this section, add partial progress for current slide
+      if (currentSectionType === sectionType) {
+        const currentSlideInSection = sectionSlides.find(slide => slide.id === currentSlide?.id);
+        if (currentSlideInSection) {
+          return ((completedInSection + 0.5) / sectionSlides.length) * 100;
+        }
+      }
+      
+      return (completedInSection / sectionSlides.length) * 100;
+    };
+    
+    const sections = [
+      {
+        name: "Intro",
+        progress: calculateSectionProgressValue(introSlides, 'intro'),
+        isActive: currentSectionType === 'intro',
+        isCompleted: introSlides.length > 0 && introSlides.every(slide => {
+          const slideIndex = slides.findIndex(s => s.id === slide.id);
+          return completedSlides.includes(slideIndex);
+        })
+      },
+      {
+        name: "Deep Dive",
+        progress: calculateSectionProgressValue(deepDiveSlides, 'deep_dive'),
+        isActive: currentSectionType === 'deep_dive',
+        isCompleted: deepDiveSlides.length > 0 && deepDiveSlides.every(slide => {
+          const slideIndex = slides.findIndex(s => s.id === slide.id);
+          return completedSlides.includes(slideIndex);
+        })
+      },
+      {
+        name: "Ending",
+        progress: calculateSectionProgressValue(endingSlides, 'ending'),
+        isActive: currentSectionType === 'ending',
+        isCompleted: endingSlides.length > 0 && endingSlides.every(slide => {
+          const slideIndex = slides.findIndex(s => s.id === slide.id);
+          return completedSlides.includes(slideIndex);
+        })
+      }
+    ];
+    
+    // Extract wine name from current slide or package
+    const currentWineName = currentSlide?.type === 'interlude' 
+      ? (currentSlide.payloadJson as any)?.wine_name || "Wine Tasting"
+      : packageData?.name || "Wine Tasting";
+    
+    const progressInfo = `Slide ${currentSlideIndex + 1} of ${slides.length}`;
+    
+    return { sections, currentWineName, progressInfo };
+  };
+  
+  const { sections, currentWineName, progressInfo } = calculateSectionProgress();
 
   const handleAnswerChange = (slideId: string, answer: any) => {
     setAnswers(prev => ({ ...prev, [slideId]: answer }));
@@ -88,8 +164,33 @@ export default function TastingSession() {
     }
     
     if (currentSlideIndex < slides.length - 1) {
-      triggerHaptic('navigation');
-      setCurrentSlideIndex(prev => prev + 1);
+      const currentSectionType = currentSlide?.section_type;
+      const nextSlide = slides[currentSlideIndex + 1];
+      const nextSectionType = nextSlide?.section_type;
+      
+      // Check for section transition
+      if (currentSectionType && nextSectionType && currentSectionType !== nextSectionType) {
+        triggerHaptic('milestone');
+        
+        // Set transition state
+        const sectionNames = {
+          'intro': 'Introduction',
+          'deep_dive': 'Deep Dive',
+          'ending': 'Final Thoughts'
+        };
+        
+        setTransitionSectionName(sectionNames[nextSectionType as keyof typeof sectionNames] || 'Next Section');
+        setIsTransitioningSection(true);
+        
+        // Auto-advance after transition animation
+        setTimeout(() => {
+          setIsTransitioningSection(false);
+          setCurrentSlideIndex(prev => prev + 1);
+        }, 1500);
+      } else {
+        triggerHaptic('navigation');
+        setCurrentSlideIndex(prev => prev + 1);
+      }
     } else {
       // Session completed
       triggerHaptic('success');

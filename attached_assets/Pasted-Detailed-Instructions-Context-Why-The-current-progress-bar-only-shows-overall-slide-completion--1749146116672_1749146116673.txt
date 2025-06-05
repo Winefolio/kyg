@@ -1,0 +1,95 @@
+Detailed Instructions:
+Context & Why:
+The current progress bar only shows overall slide completion. The KnowYourGrape team wants a more granular view that aligns with the actual structure of a wine tasting, which typically has distinct phases for each wine. Clear visual cues and transitions between these phases ("Intro", "Deep Dive", "Ending") will significantly improve user navigation and understanding of the tasting flow, contributing to the desired "beautiful UI."
+
+What Needs to Be Done:
+
+Schema Modification: Add a section_type column to the slides table to categorize slides.
+UI Design & Implementation: Create a new segmented progress bar component.
+Transition Design & Implementation: Implement noticeable transitions between sections.
+Logic Update: Update progress calculation logic in TastingSession.tsx to manage progress through sections and wines.
+How to Implement (Code Changes & Guidance):
+
+Database Schema Update (shared/schema.ts and Supabase):
+
+File: shared/schema.ts
+Action (Drizzle Schema): Modify the slides table definition to include a new section_type column. This column will store values like 'intro', 'deep_dive', 'ending', or be NULL if a slide doesn't belong to a specific section.
+TypeScript
+
+// In shared/schema.ts, within the slides table definition:
+export const slides = pgTable("slides", {
+  // ... existing columns ...
+  position: integer("position").notNull(),
+  type: varchar("type", { length: 50 }).$type<typeof slideTypes[number]>().notNull(),
+  section_type: varchar("section_type", { length: 20 }), // NEW COLUMN (nullable)
+  payloadJson: jsonb("payload_json").notNull(),
+  // ... existing columns ...
+});
+
+// Also update the insertSlideSchema if you want type safety for this new field during inserts
+export const insertSlideSchema = createInsertSchema(slides, {
+  // ... other overrides ...
+  section_type: z.enum(['intro', 'deep_dive', 'ending']).optional().nullable(), // Make it optional & nullable
+  payloadJson: z.any() 
+}).omit({ /* ... */ });
+
+// Update Slide type if not automatically inferred with the new field
+export type Slide = typeof slides.$inferSelect; // Should include section_type?
+Action (SQL for Supabase - to be run by you in Supabase SQL editor):
+SQL
+
+ALTER TABLE public.slides
+ADD COLUMN section_type VARCHAR(20) NULL;
+
+COMMENT ON COLUMN public.slides.section_type IS 'Categorizes the slide into tasting sections like intro, deep_dive, ending.';
+Data Population: Existing slides will have NULL for section_type. New packages/slides created via the (future) Sommelier Dashboard should allow setting this. For initializeWineTastingData in server/storage.ts, you can now add section_type to your sample slides.
+Segmented Progress Bar UI (client/src/pages/TastingSession.tsx and new component):
+
+File: Create a new component, e.g., client/src/components/ui/SegmentedProgressBar.tsx.
+Props for SegmentedProgressBar.tsx:
+sections: Array<{ name: string; progress: number; isActive: boolean; isCompleted: boolean }>
+currentWineName?: string
+currentOverallProgressInfo?: string (e.g., "Wine 1 of 4: Slide 2 of 5")
+Visual Design:
+Display the currentWineName if applicable.
+For each section in props.sections:
+Show section.name (e.g., "Intro").
+Use a <Progress /> bar from client/src/components/ui/progress.tsx for section.progress.
+Visually distinguish isActive and isCompleted sections (e.g., different colors, border, filled state).
+Display currentOverallProgressInfo.
+Integration in TastingSession.tsx:
+Replace the current <Progress value={progress} ... /> in the sticky header with an instance of your new <SegmentedProgressBar />.
+The progress state variable (currently ((currentSlideIndex + 1) / slides.length) * 100) will need to be replaced/augmented with logic to calculate section-specific progress.
+Section Transition UX (client/src/pages/TastingSession.tsx):
+
+Trigger: When the user navigates from the last slide of one section (e.g., "Intro") to the first slide of the next section (e.g., "Deep Dive").
+Actions:
+Haptic Feedback: Call triggerHaptic('milestone') (or another distinct pattern from client/src/lib/animations.ts).
+Visual Transition (Option A - Animated Title Card):
+Introduce a temporary state in TastingSession.tsx, e.g., isTransitioningSection: boolean and transitionSectionName: string.
+When a section transition occurs, set isTransitioningSection to true and display a short, full-screen or prominent modal/overlay (using Framer Motion from motion and components from client/src/components/ui/dialog.tsx or a custom overlay).
+This overlay could display: "Moving to: [Deep Dive]" with a relevant icon (e.g., from lucide-react) and a subtle background animation.
+After a short delay (e.g., 1.5-2 seconds), set isTransitioningSection to false and render the actual first slide of the new section.
+Visual Transition (Option B - Enhanced Progress Bar Animation):
+The SegmentedProgressBar could have more pronounced animations. When a section completes, its bar fills with a satisfying animation. The newly active section could pulse or highlight more prominently.
+Combined Approach: Use both a haptic cue and an enhanced progress bar animation. A full title card might be too disruptive between every section within a single wine, but could be used when transitioning between wines. For now, focus on clear visual cues in the progress bar and header for within-wine section changes.
+Header Update: The h2 in the sticky header of TastingSession.tsx (currently showing wine name or "Question X") should be updated to reflect the current section, e.g., "2018 Château Margaux - Deep Dive".
+Progress Calculation Logic (client/src/pages/TastingSession.tsx):
+
+Data Dependency: This step heavily relies on Task 9 (Multi-Wine Architecture) and the section_type data from Step 1.
+You'll need functions to:
+Identify all slides belonging to the current wine.
+Within the current wine, identify slides for "Intro," "Deep Dive," "Ending" based on section_type or predefined positions.
+Calculate currentSlideIndexWithinWine, totalSlidesInCurrentWine.
+Calculate currentSlideIndexWithinSection, totalSlidesInCurrentSection.
+Determine currentSectionName.
+Update the progress state and the props passed to the <SegmentedProgressBar /> based on these new calculations.
+The currentSlideIndex (overall) will still be the primary driver from handleNext/handlePrevious.
+Replit AI Guidance:
+Schema First: Guide the AI to first propose the modification to shared/schema.ts for the slides table (section_type column) and the corresponding insertSlideSchema. Remind it that the SQL ALTER TABLE command will be executed by you in Supabase.
+Component-Based Design: Encourage the creation of a new, reusable <SegmentedProgressBar /> component.
+Iterative Implementation:
+Implement the SegmentedProgressBar component with static/mock data for sections to get the UI right.
+Focus on the logic within TastingSession.tsx to determine the current section and wine, and calculate progress for these segments. This logic will be placeholder until Task 9 is fully done but can be designed assuming that data structure.
+Implement simple visual cues for section transitions first (e.g., header text change, progress bar segment highlighting). More complex animated transition cards can be a refinement.
+Modern UI/UX: Emphasize smooth animations (using Framer Motion where appropriate, as seen in other components like CollapsibleNotes), clear visual hierarchy, and a polished feel for the progress display and transitions.
