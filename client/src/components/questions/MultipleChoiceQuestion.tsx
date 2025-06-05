@@ -56,19 +56,19 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gradient-card backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl"
+      className="bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-2xl"
     >
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <span className="px-3 py-1 bg-purple-600/30 rounded-full text-purple-200 text-sm font-medium">
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="px-2 py-1 bg-purple-600/30 rounded-full text-purple-200 text-xs sm:text-sm font-medium">
             {question.category}
           </span>
         </div>
-        <h3 className="text-xl font-semibold text-white mb-3">{question.title}</h3>
-        <p className="text-white/70">{question.description}</p>
+        <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">{question.title}</h3>
+        <p className="text-white/70 text-sm sm:text-base leading-relaxed">{question.description}</p>
       </div>
 
-      <div className="space-y-3 mb-6">
+      <div className="space-y-2 mb-4">
         {question.options.map((option) => (
           <motion.div
             key={option.id}
@@ -77,20 +77,20 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
           >
             <Label
               htmlFor={option.id}
-              className="flex items-center p-4 bg-white/5 rounded-xl cursor-pointer hover:bg-white/10 transition-all duration-300 group"
+              className="flex items-center p-3 bg-white/5 rounded-xl cursor-pointer hover:bg-white/10 transition-all duration-300 group"
             >
               <Checkbox
                 id={option.id}
                 checked={value.selected.includes(option.id)}
                 onCheckedChange={(checked) => handleOptionChange(option.id, checked as boolean)}
-                className="mr-4 border-white/40 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
+                className="mr-3 border-white/40 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
               />
               <div className="flex-1">
-                <div className="text-white font-medium group-hover:text-purple-200 transition-colors duration-300">
+                <div className="text-white text-sm sm:text-base font-medium group-hover:text-purple-200 transition-colors duration-300">
                   {option.text}
                 </div>
                 {option.description && (
-                  <div className="text-white/60 text-sm">{option.description}</div>
+                  <div className="text-white/60 text-xs sm:text-sm mt-1 leading-relaxed">{option.description}</div>
                 )}
               </div>
             </Label>
@@ -100,15 +100,15 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
 
       {question.allow_notes && (
         <div>
-          <Label className="block text-white/80 text-sm font-medium mb-2">
+          <Label className="block text-white/80 text-xs sm:text-sm font-medium mb-2">
             Additional Notes (Optional)
           </Label>
           <Textarea
             placeholder="Describe any other aromas you notice..."
             value={value.notes || ""}
             onChange={(e) => handleNotesChange(e.target.value)}
-            className="bg-white/10 border-white/20 text-white placeholder-white/40 focus:border-purple-400 focus:ring-purple-400/20 resize-none"
-            rows={3}
+            className="bg-white/10 border-white/20 text-white placeholder-white/40 focus:border-purple-400 focus:ring-purple-400/20 resize-none text-sm"
+            rows={2}
           />
         </div>
       )}

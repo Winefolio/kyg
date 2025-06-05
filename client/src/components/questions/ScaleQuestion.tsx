@@ -42,19 +42,19 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gradient-card backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl"
+      className="bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-2xl"
     >
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <span className="px-3 py-1 bg-blue-600/30 rounded-full text-blue-200 text-sm font-medium">
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="px-2 py-1 bg-blue-600/30 rounded-full text-blue-200 text-xs sm:text-sm font-medium">
             {question.category}
           </span>
         </div>
-        <h3 className="text-xl font-semibold text-white mb-3">{question.title}</h3>
-        <p className="text-white/70">{question.description}</p>
+        <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">{question.title}</h3>
+        <p className="text-white/70 text-sm sm:text-base leading-relaxed">{question.description}</p>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="relative">
           <Slider
             value={[value]}
@@ -66,10 +66,10 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
             step={1}
             className="slider"
           />
-          <div className="flex justify-between text-white/60 text-sm mt-2">
+          <div className="flex justify-between text-white/60 text-xs sm:text-sm mt-2">
             <span>{question.scale_labels[0]}</span>
             <motion.span 
-              className="text-xl font-semibold text-white"
+              className="text-lg sm:text-xl font-semibold text-white"
               animate={isDragging ? { scale: 1.1 } : { scale: 1 }}
             >
               {value}
@@ -85,7 +85,7 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
             return (
               <motion.div
                 key={i}
-                className={`w-2 h-8 rounded-full transition-all duration-300 ${
+                className={`w-2 h-6 sm:h-8 rounded-full transition-all duration-300 ${
                   isActive ? 'bg-purple-500' : 'bg-white/20'
                 }`}
                 animate={isActive && isDragging ? { scale: 1.2 } : { scale: 1 }}

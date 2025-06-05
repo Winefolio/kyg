@@ -152,25 +152,25 @@ export default function TastingSession() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-6"
+          className="text-center space-y-3 sm:space-y-4"
         >
           {/* Wine Image */}
           {payload.wine_image && (
-            <div className="mb-8">
+            <div className="mb-4">
               <img
                 src={payload.wine_image}
                 alt={payload.wine_name || "Wine"}
-                className="w-48 h-72 mx-auto rounded-2xl shadow-2xl object-cover"
+                className="w-36 h-52 sm:w-44 sm:h-64 mx-auto rounded-2xl shadow-2xl object-cover max-h-52 sm:max-h-64"
               />
             </div>
           )}
 
-          <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
-            <h2 className="text-3xl font-bold text-white mb-4">{payload.title}</h2>
+          <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-2xl">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-2 sm:mb-3">{payload.title}</h2>
             {payload.wine_name && (
-              <h3 className="text-xl text-purple-200 mb-4">{payload.wine_name}</h3>
+              <h3 className="text-lg sm:text-xl text-purple-200 mb-2 sm:mb-3">{payload.wine_name}</h3>
             )}
-            <p className="text-white/70 text-lg">{payload.description}</p>
+            <p className="text-white/70 text-sm sm:text-base leading-relaxed">{payload.description}</p>
           </div>
         </motion.div>
       );
@@ -189,11 +189,11 @@ export default function TastingSession() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-4 bg-gradient-card backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-xl"
+          className="space-y-3 bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-xl"
         >
-          {payload.title && <h2 className="text-2xl md:text-3xl font-bold text-white text-center mb-3">{payload.title}</h2>}
-          {payload.description && <p className="text-white/70 text-center mb-4">{payload.description}</p>}
-          <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg mx-auto max-w-2xl">
+          {payload.title && <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white text-center mb-2">{payload.title}</h2>}
+          {payload.description && <p className="text-white/70 text-center text-sm sm:text-base mb-3">{payload.description}</p>}
+          <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg mx-auto max-w-full">
             <video
               src={payload.video_url}
               controls={payload.show_controls !== undefined ? payload.show_controls : true}
@@ -216,10 +216,10 @@ export default function TastingSession() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-4 bg-gradient-card backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-xl"
+          className="space-y-3 bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-xl"
         >
-          {payload.title && <h2 className="text-2xl md:text-3xl font-bold text-white text-center mb-3">{payload.title}</h2>}
-          {payload.description && <p className="text-white/70 text-center mb-4">{payload.description}</p>}
+          {payload.title && <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white text-center mb-2">{payload.title}</h2>}
+          {payload.description && <p className="text-white/70 text-center text-sm sm:text-base mb-3">{payload.description}</p>}
           <div className="flex justify-center">
             <audio
               src={payload.audio_url}
@@ -238,13 +238,13 @@ export default function TastingSession() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center bg-gradient-card backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-xl"
+          className="text-center bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-xl"
         >
-          {payload.title && <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">{payload.title}</h2>}
+          {payload.title && <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white mb-3">{payload.title}</h2>}
           <img 
             src={payload.image_url} 
             alt={payload.alt_text || 'Media content'} 
-            className="w-full max-w-md mx-auto rounded-lg shadow-lg"
+            className="w-full max-w-md mx-auto rounded-lg shadow-lg max-h-60 sm:max-h-72 object-contain"
           />
         </motion.div>
       );
@@ -460,7 +460,7 @@ export default function TastingSession() {
       )}
 
       {/* Question Content */}
-      <div className="p-6 pb-32">
+      <div className="p-4 pb-28">
         <div className="max-w-md mx-auto">
           {currentSlide && renderSlideContent(currentSlide)}
         </div>
