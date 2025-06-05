@@ -1,18 +1,18 @@
 import React, { useMemo } from 'react';
 import { useGlossary } from '@/contexts/GlossaryContext';
-import { TerminologyTooltip } from './TerminologyTooltip';
 import type { GlossaryTerm } from '@shared/schema';
 
 interface DynamicTextRendererProps {
   text: string;
   className?: string;
+  enableHighlighting?: boolean;
 }
 
-export function DynamicTextRenderer({ text, className }: DynamicTextRendererProps) {
+export function DynamicTextRenderer({ text, className, enableHighlighting = true }: DynamicTextRendererProps) {
   const { terms, isLoading } = useGlossary();
 
   const renderedContent = useMemo(() => {
-    if (isLoading || !text || terms.length === 0) {
+    if (isLoading || !text || terms.length === 0 || !enableHighlighting) {
       return <span className={className}>{text}</span>;
     }
 
@@ -78,9 +78,12 @@ export function DynamicTextRenderer({ text, className }: DynamicTextRendererProp
             if (!processedTerms.has(termKey)) {
               processedTerms.add(termKey);
               result.push(
-                <TerminologyTooltip key={`${termKey}-${matchIndex}`} term={termData.data}>
+                <span 
+                  key={`${termKey}-${matchIndex}`} 
+                  className="underline decoration-dotted decoration-purple-400/60 decoration-1"
+                >
                   {matchedTerm}
-                </TerminologyTooltip>
+                </span>
               );
             } else {
               // Term already highlighted once, render as plain text
@@ -95,7 +98,37 @@ export function DynamicTextRenderer({ text, className }: DynamicTextRendererProp
     });
 
     return <span className={className}>{result}</span>;
-  }, [text, terms, isLoading, className]);
+  }, [text, terms, isLoading, className, enableHighlighting]);
 
   return <>{renderedContent}</>;
+}
+
+// Helper function to extract relevant glossary terms from text
+export function extractRelevantTerms(text: string, allTerms: GlossaryTerm[]): GlossaryTerm[] {
+  if (!text || allTerms.length === 0) return [];
+
+  const relevantTerms: GlossaryTerm[] = [];
+  const processedTerms = new Set<string>();
+
+  allTerms.forEach(termData => {
+    const mainTerm = termData.term.toLowerCase();
+    const variations = termData.variations?.map(v => v.toLowerCase()) || [];
+    const allVariations = [mainTerm, ...variations];
+
+    // Check if any variation appears in the text
+    const termKey = mainTerm.replace(/\s+/g, '_');
+    if (!processedTerms.has(termKey)) {
+      const isRelevant = allVariations.some(term => {
+        const regex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+        return regex.test(text);
+      });
+
+      if (isRelevant) {
+        relevantTerms.push(termData);
+        processedTerms.add(termKey);
+      }
+    }
+  });
+
+  return relevantTerms.sort((a, b) => a.term.localeCompare(b.term));
 }

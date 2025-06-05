@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ModernButton } from "@/components/ui/modern-button";
 import { ModernCard } from "@/components/ui/modern-card";
-import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
-import { ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
+import { DynamicTextRenderer, extractRelevantTerms } from "@/components/ui/DynamicTextRenderer";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, ChevronUp, MessageSquare, Info, BookOpen } from "lucide-react";
 import { modernCardVariants, staggeredReveal, springTransition } from "@/lib/modern-animations";
 import { useHaptics } from "@/hooks/useHaptics";
+import { useGlossary } from "@/contexts/GlossaryContext";
 
 interface Option {
   id: string;
@@ -34,7 +36,20 @@ interface MultipleChoiceQuestionProps {
 
 export function MultipleChoiceQuestion({ question, value, onChange }: MultipleChoiceQuestionProps) {
   const { triggerHaptic } = useHaptics();
+  const { terms } = useGlossary();
   const [notesExpanded, setNotesExpanded] = useState(false);
+  const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
+
+  // Extract all relevant glossary terms from the current slide content
+  const relevantTerms = useMemo(() => {
+    const allText = [
+      question.title,
+      question.description,
+      ...question.options.map(opt => `${opt.text} ${opt.description || ''}`)
+    ].join(' ');
+    
+    return extractRelevantTerms(allText, terms);
+  }, [question, terms]);
 
   const handleOptionChange = (optionId: string, checked: boolean) => {
     triggerHaptic('selection');
@@ -132,14 +147,14 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
                     animate={isSelected ? { x: 2 } : { x: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <DynamicTextRenderer text={option.text} />
+                    {option.text}
                   </motion.div>
                   {option.description && (
                     <motion.div 
                       className="text-white/60 text-xs sm:text-sm mt-1 leading-relaxed"
                       animate={isSelected ? { opacity: 0.9 } : { opacity: 0.6 }}
                     >
-                      <DynamicTextRenderer text={option.description} />
+                      {option.description}
                     </motion.div>
                   )}
                 </div>
@@ -195,6 +210,78 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
               </motion.div>
             )}
           </AnimatePresence>
+        </div>
+      )}
+
+      {/* Integrated Info Panel */}
+      {relevantTerms.length > 0 && (
+        <div className="mt-4 border-t border-white/10 pt-4">
+          <Collapsible open={isInfoPanelOpen} onOpenChange={setIsInfoPanelOpen}>
+            <CollapsibleTrigger asChild>
+              <ModernButton 
+                variant="ghost" 
+                onClick={() => {
+                  triggerHaptic('selection');
+                  setIsInfoPanelOpen(!isInfoPanelOpen);
+                }}
+                className="w-full flex items-center justify-center gap-2 text-purple-300 hover:text-white hover:bg-white/5 text-sm transition-all duration-200"
+              >
+                <Info size={16} />
+                <span>{isInfoPanelOpen ? 'Hide Terms' : `Show Terms (${relevantTerms.length})`}</span>
+                {isInfoPanelOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </ModernButton>
+            </CollapsibleTrigger>
+            <CollapsibleContent asChild>
+              <AnimatePresence>
+                {isInfoPanelOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-3 p-4 bg-black/20 rounded-xl border border-white/10 backdrop-blur-sm">
+                      <div className="flex items-center gap-2 mb-3">
+                        <BookOpen size={16} className="text-purple-400" />
+                        <h4 className="text-sm font-semibold text-purple-300">Wine Terms</h4>
+                      </div>
+                      <div className="space-y-3">
+                        {relevantTerms.map((term, index) => (
+                          <motion.div
+                            key={term.id}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.05, duration: 0.2 }}
+                            className="border-l-2 border-purple-400/40 pl-3"
+                          >
+                            <h5 className="text-sm font-medium text-purple-200 capitalize mb-1">
+                              {term.term}
+                            </h5>
+                            <p className="text-xs text-white/80 leading-relaxed">
+                              {term.definition}
+                            </p>
+                            {term.variations && term.variations.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {term.variations.map((variation, i) => (
+                                  <span
+                                    key={i}
+                                    className="px-2 py-0.5 bg-purple-500/20 text-purple-200 text-xs rounded-md border border-purple-400/20"
+                                  >
+                                    {variation}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       )}
     </motion.div>

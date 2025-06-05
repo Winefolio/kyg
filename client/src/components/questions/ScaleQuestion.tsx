@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ModernSlider } from "@/components/ui/modern-slider";
 import { Label } from "@/components/ui/label";
-import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
+import { ModernButton } from "@/components/ui/modern-button";
+import { DynamicTextRenderer, extractRelevantTerms } from "@/components/ui/DynamicTextRenderer";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, ChevronUp, Info, BookOpen, TrendingUp } from "lucide-react";
 import { modernCardVariants, springTransition } from "@/lib/modern-animations";
 import { useHaptics } from "@/hooks/useHaptics";
+import { useGlossary } from "@/contexts/GlossaryContext";
 
 interface ScaleQuestionProps {
   question: {
@@ -21,6 +25,40 @@ interface ScaleQuestionProps {
 
 export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps) {
   const { triggerHaptic } = useHaptics();
+  const { terms } = useGlossary();
+  const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
+
+  // Extract all relevant glossary terms from the current slide content
+  const relevantTerms = useMemo(() => {
+    const allText = [
+      question.title,
+      question.description,
+      ...question.scale_labels
+    ].join(' ');
+    
+    return extractRelevantTerms(allText, terms);
+  }, [question, terms]);
+
+  // Generate receptive feedback based on slider value
+  const feedbackText = useMemo(() => {
+    const range = question.scale_max - question.scale_min;
+    const position = (value - question.scale_min) / range;
+    
+    if (position < 0.3) {
+      return `You're experiencing the "${question.scale_labels[0]}" end of the spectrum. This suggests more subtle or restrained characteristics.`;
+    } else if (position > 0.7) {
+      return `You're experiencing the "${question.scale_labels[1]}" end of the spectrum. This indicates more pronounced and intense characteristics.`;
+    } else {
+      return `You're in the middle range, experiencing a balanced blend between "${question.scale_labels[0]}" and "${question.scale_labels[1]}".`;
+    }
+  }, [value, question]);
+
+  // Calculate which scale label should be highlighted
+  const highlightedLabelIndex = useMemo(() => {
+    const range = question.scale_max - question.scale_min;
+    const position = (value - question.scale_min) / range;
+    return position < 0.5 ? 0 : 1;
+  }, [value, question]);
 
   return (
     <motion.div
