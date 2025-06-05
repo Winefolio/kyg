@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ModernButton } from "@/components/ui/modern-button";
 import { ModernCard } from "@/components/ui/modern-card";
+import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
 import { ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
 import { modernCardVariants, staggeredReveal, springTransition } from "@/lib/modern-animations";
 import { useHaptics } from "@/hooks/useHaptics";
@@ -74,8 +75,12 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
             {question.category}
           </span>
         </div>
-        <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">{question.title}</h3>
-        <p className="text-white/70 text-sm sm:text-base leading-relaxed">{question.description}</p>
+        <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">
+          <DynamicTextRenderer text={question.title} />
+        </h3>
+        <p className="text-white/70 text-sm sm:text-base leading-relaxed">
+          <DynamicTextRenderer text={question.description} />
+        </p>
       </div>
 
       <div className="space-y-2 mb-4">

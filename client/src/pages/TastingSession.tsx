@@ -13,6 +13,7 @@ import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import { useHaptics } from "@/hooks/useHaptics";
 import { apiRequest } from "@/lib/queryClient";
 import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause, Award } from "lucide-react";
+import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
 import type { Slide, Participant, Session } from "@shared/schema";
 
 export default function TastingSession() {
@@ -273,11 +274,19 @@ export default function TastingSession() {
           )}
 
           <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-2xl flex-grow flex flex-col justify-center">
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 sm:mb-4">{payload.title}</h2>
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 sm:mb-4">
+              <DynamicTextRenderer text={payload.title} />
+            </h2>
             {payload.wine_name && (
-              <h3 className="text-lg sm:text-xl text-purple-200 mb-3 sm:mb-4">{payload.wine_name}</h3>
+              <h3 className="text-lg sm:text-xl text-purple-200 mb-3 sm:mb-4">
+                <DynamicTextRenderer text={payload.wine_name} />
+              </h3>
             )}
-            <p className="text-white/70 text-sm sm:text-base leading-relaxed">{payload.description}</p>
+            {payload.description && (
+              <p className="text-white/70 text-sm sm:text-base leading-relaxed">
+                <DynamicTextRenderer text={payload.description} />
+              </p>
+            )}
           </div>
         </motion.div>
       );
