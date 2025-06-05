@@ -59,15 +59,7 @@ export function ModernSlider({
   const dashPositions = Array.from({ length: dashCount }, (_, i) => (i / (dashCount - 1)) * 100);
 
   return (
-    <div className={cn("space-y-4", className)}>
-      {/* Labels */}
-      {labels && (
-        <div className="flex justify-between text-sm">
-          <span className={labelClassNames?.[0] || "text-white/70"}>{labels[0]}</span>
-          <span className={labelClassNames?.[1] || "text-white/70"}>{labels[1]}</span>
-        </div>
-      )}
-
+    <div className={cn("relative", className)}>
       {/* Slider Track */}
       <div className="relative">
         <motion.div
@@ -118,6 +110,19 @@ export function ModernSlider({
               transition={{ duration: 0.2 }}
             />
           </motion.div>
+
+          {/* Energy Hotspot Glow */}
+          <motion.div
+            className="absolute top-1/2 w-8 h-8 rounded-full pointer-events-none -translate-y-1/2 -translate-x-1/2"
+            style={{ 
+              background: 'radial-gradient(circle, rgba(233, 168, 255, 0.5) 0%, rgba(192, 132, 252, 0) 65%)' 
+            }}
+            animate={{ 
+              left: `${percentage}%`,
+              scale: 1 + (percentage / 100) * 0.5 // Glow gets bigger at higher values
+            }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+          />
 
           {/* Dash marks */}
           {dashPositions.map((position, index) => (
@@ -208,12 +213,6 @@ export function ModernSlider({
         </AnimatePresence>
       </div>
 
-      {/* Value range indicators */}
-      <div className="flex justify-between text-xs text-white/50">
-        <span>{min}</span>
-        <span className="font-medium text-white/80">{value}</span>
-        <span>{max}</span>
-      </div>
     </div>
   );
 }
