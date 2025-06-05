@@ -88,7 +88,7 @@ export function ModernSlider({
           {/* Progress fill with dynamic glow */}
           <motion.div
             className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
-            animate={{ width: `calc(${percentage}% + 12px)` }}
+            animate={{ width: `${percentage}%` }}
             transition={{ type: "spring", stiffness: 200, damping: 25 }}
           >
             {/* Dynamic intensity glow effect */}
@@ -116,8 +116,9 @@ export function ModernSlider({
             className="absolute w-8 h-8 rounded-full pointer-events-none"
             style={{ 
               background: 'radial-gradient(circle, rgba(233, 168, 255, 0.5) 0%, rgba(192, 132, 252, 0) 65%)',
-              left: `calc(${percentage}% - 16px)`, // 16px is half the glow width (32px/2)
-              top: `calc(50% - 16px)` // 16px is half the glow height to center on track
+              left: `${percentage}%`, // Use same percentage as fill bar and thumb
+              top: `calc(50% - 16px)`, // 16px is half the glow height to center on track
+              transform: 'translateX(-50%)' // Center the glow on the percentage point
             }}
             animate={{ 
               scale: 1 + (percentage / 100) * 0.5 // Glow gets bigger at higher values
@@ -150,8 +151,9 @@ export function ModernSlider({
         <motion.div
           className="absolute w-6 h-6 bg-white rounded-full shadow-lg cursor-grab"
           style={{ 
-            left: `calc(${percentage}% - 12px)`, // 12px is half the thumb width (24px/2)
-            top: `calc(50% - 12px)` // 12px is half the thumb height to center on track
+            left: `${percentage}%`, // Use same percentage as fill bar
+            top: `calc(50% - 12px)`, // 12px is half the thumb height to center on track
+            transform: 'translateX(-50%)' // Center the thumb on the percentage point
           }}
           drag="x"
           dragConstraints={trackRef}
