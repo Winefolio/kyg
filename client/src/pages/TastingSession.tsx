@@ -586,19 +586,100 @@ export default function TastingSession() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
               transition={{ type: "spring", duration: 0.5 }}
-              className="text-center space-y-4"
+              className="text-center space-y-6"
             >
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                className="w-16 h-16 mx-auto bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center"
-              >
-                <Award className="text-white" size={24} />
-              </motion.div>
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-2">Moving to:</h2>
-                <h3 className="text-xl text-purple-200">{transitionSectionName}</h3>
+              {/* Wine Glass Filling Animation */}
+              <div className="relative w-24 h-24 mx-auto">
+                {/* Glow Effect Background */}
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1.2, opacity: 0.3 }}
+                  transition={{ duration: 1.5, repeat: Infinity, repeatType: "reverse" }}
+                  className="absolute inset-0 bg-gradient-to-br from-red-500 via-purple-600 to-red-700 rounded-full blur-xl"
+                />
+                
+                {/* Wine Glass Container */}
+                <div className="relative w-full h-full overflow-hidden">
+                  {/* Wine Fill Animation */}
+                  <motion.div
+                    initial={{ height: "0%" }}
+                    animate={{ height: "85%" }}
+                    transition={{ duration: 1.5, ease: [0.4, 0, 0.2, 1] }}
+                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-red-800 via-red-600 to-red-500 opacity-90"
+                    style={{
+                      clipPath: "polygon(22% 20%, 78% 20%, 72% 85%, 28% 85%)"
+                    }}
+                  />
+                  
+                  {/* Wine Glass SVG */}
+                  <svg 
+                    width="96" 
+                    height="96" 
+                    viewBox="0 0 100 100" 
+                    className="relative z-10 text-white/90 drop-shadow-lg"
+                    fill="currentColor"
+                  >
+                    <path d="M75.44,35.78l-.09-.48c-.14-1.73-.44-3.41-.91-5.02l-4.01-18.23H29.57l-4.01,18.23c-.46,1.61-.77,3.29-.91,5.02l-.09,.48h.05c-.03,.51-.05,1.02-.05,1.53,0,13.2,10.06,24.06,22.94,25.31v20.61h-12.4v5h29.81v-5h-12.4v-20.61c12.87-1.26,22.94-12.11,22.94-25.31,0-.51-.02-1.02-.05-1.53h.05Zm-25.44,21.96c-11.27,0-20.44-9.17-20.44-20.44,0-.36,.01-.77,.04-1.23v-.11s.01-.03,.01-.03l.02-.25c.11-1.37,.35-2.73,.73-4.03l.04-.15,.03-.15,3.14-14.3h32.83l3.14,14.3,.03,.15,.04,.15c.38,1.31,.62,2.66,.73,4.03l.02,.25v.02s.01,.11,.01,.11c.03,.47,.04,.87,.04,1.23,0,11.27-9.17,20.44-20.44,20.44Z"/>
+                  </svg>
+                  
+                  {/* Wine Shimmer Effect */}
+                  <motion.div
+                    initial={{ x: "-100%", opacity: 0 }}
+                    animate={{ x: "100%", opacity: [0, 0.6, 0] }}
+                    transition={{ duration: 1.5, delay: 0.3, ease: "easeInOut" }}
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform skew-x-12"
+                    style={{
+                      clipPath: "polygon(22% 20%, 78% 20%, 72% 85%, 28% 85%)"
+                    }}
+                  />
+                </div>
+                
+                {/* Floating Wine Particles */}
+                <motion.div
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: -20, opacity: [0, 1, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                  className="absolute top-4 left-1/2 transform -translate-x-1/2"
+                >
+                  <div className="w-1 h-1 bg-red-400 rounded-full opacity-60" />
+                </motion.div>
+                
+                <motion.div
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: -25, opacity: [0, 1, 0] }}
+                  transition={{ duration: 2.2, repeat: Infinity, delay: 0.8 }}
+                  className="absolute top-6 left-1/3 transform -translate-x-1/2"
+                >
+                  <div className="w-0.5 h-0.5 bg-purple-300 rounded-full opacity-70" />
+                </motion.div>
+                
+                <motion.div
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: -18, opacity: [0, 1, 0] }}
+                  transition={{ duration: 1.8, repeat: Infinity, delay: 1.1 }}
+                  className="absolute top-5 right-1/3 transform translate-x-1/2"
+                >
+                  <div className="w-0.5 h-0.5 bg-red-300 rounded-full opacity-80" />
+                </motion.div>
               </div>
+              
+              {/* Text Content */}
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3, duration: 0.6 }}
+                className="space-y-2"
+              >
+                <h2 className="text-2xl font-bold text-white mb-2 tracking-wide">Moving to:</h2>
+                <motion.h3 
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.6, type: "spring", stiffness: 200 }}
+                  className="text-xl text-gradient bg-gradient-to-r from-purple-200 via-pink-200 to-red-200 bg-clip-text text-transparent font-semibold"
+                >
+                  {transitionSectionName}
+                </motion.h3>
+              </motion.div>
             </motion.div>
           </motion.div>
         )}
