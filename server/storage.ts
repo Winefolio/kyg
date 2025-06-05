@@ -122,6 +122,9 @@ export class DatabaseStorage implements IStorage {
 
     console.log("Initializing wine tasting data...");
 
+    // Initialize glossary terms first
+    await this.initializeGlossaryTerms();
+
     // Create the Bordeaux wine package
     const bordeauxPackage = await this.createPackage({
       code: "WINE01",
@@ -825,6 +828,82 @@ export class DatabaseStorage implements IStorage {
       totalQuestions,
       slidesAnalytics,
     };
+  }
+
+  private async initializeGlossaryTerms() {
+    console.log("Initializing wine glossary terms...");
+    
+    const wineTerms = [
+      {
+        term: "tannins",
+        variations: ["tannin", "tannic"],
+        definition: "Natural compounds found in grape skins, seeds, and stems that create a dry, astringent sensation in your mouth. They provide structure and aging potential to red wines.",
+        category: "Structure"
+      },
+      {
+        term: "body",
+        variations: ["full-bodied", "medium-bodied", "light-bodied"],
+        definition: "The weight and fullness of wine in your mouth, ranging from light (like skim milk) to full (like cream). Influenced by alcohol content, tannins, and flavor concentration.",
+        category: "Structure"
+      },
+      {
+        term: "acidity",
+        variations: ["acidic", "crisp", "bright"],
+        definition: "The tartness or sharpness in wine that makes your mouth water. Good acidity provides freshness and helps wine pair well with food.",
+        category: "Structure"
+      },
+      {
+        term: "finish",
+        variations: ["aftertaste", "length"],
+        definition: "The lingering flavors and sensations that remain in your mouth after swallowing wine. A long finish is often a sign of quality.",
+        category: "Tasting"
+      },
+      {
+        term: "terroir",
+        variations: [],
+        definition: "The complete natural environment where grapes are grown, including soil, climate, and topography. It's what gives wine its sense of place.",
+        category: "Viticulture"
+      },
+      {
+        term: "vintage",
+        variations: [],
+        definition: "The year the grapes were harvested. Weather conditions during that year significantly impact the wine's character.",
+        category: "Production"
+      },
+      {
+        term: "oak",
+        variations: ["oaked", "oaky"],
+        definition: "Wood used for aging wine, imparting flavors like vanilla, spice, and toast while allowing subtle oxidation that softens the wine.",
+        category: "Production"
+      },
+      {
+        term: "bouquet",
+        variations: ["nose", "aroma"],
+        definition: "The complex scents that develop in wine as it ages, distinct from the primary fruit aromas of young wines.",
+        category: "Aroma"
+      },
+      {
+        term: "estate",
+        variations: ["château", "domaine"],
+        definition: "A winery that controls its own vineyards and winemaking process from grape to bottle, ensuring quality consistency.",
+        category: "Production"
+      },
+      {
+        term: "minerality",
+        variations: ["mineral", "flinty"],
+        definition: "A taste characteristic often described as wet stones or chalk, typically attributed to the soil composition where grapes are grown.",
+        category: "Flavor"
+      }
+    ];
+
+    for (const termData of wineTerms) {
+      try {
+        await this.createGlossaryTerm(termData);
+      } catch (error) {
+        // Term might already exist, skip
+        console.log(`Glossary term "${termData.term}" already exists or failed to create`);
+      }
+    }
   }
 
   async getGlossaryTerms(): Promise<GlossaryTerm[]> {

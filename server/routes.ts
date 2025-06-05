@@ -377,6 +377,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get glossary terms
+  app.get("/api/glossary", async (_req, res) => {
+    try {
+      const terms = await storage.getGlossaryTerms();
+      res.json(terms);
+    } catch (error) {
+      console.error("Error fetching glossary:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Create package with custom code
   app.post("/api/packages", async (req, res) => {
     try {
