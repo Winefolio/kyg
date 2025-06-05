@@ -181,6 +181,7 @@ export class DatabaseStorage implements IStorage {
       {
         position: 3,
         type: "question",
+        section_type: "deep_dive",
         payloadJson: {
           title: "Rate the aroma intensity",
           description:
@@ -195,6 +196,7 @@ export class DatabaseStorage implements IStorage {
       {
         position: 4,
         type: "question",
+        section_type: "deep_dive",
         payloadJson: {
           title: "Describe the taste profile",
           description: "Take a sip and identify the flavors you experience.",
@@ -234,6 +236,7 @@ export class DatabaseStorage implements IStorage {
       {
         position: 5,
         type: "question",
+        section_type: "deep_dive",
         payloadJson: {
           title: "How would you describe the body?",
           description: "The weight and fullness of the wine in your mouth",
@@ -247,6 +250,7 @@ export class DatabaseStorage implements IStorage {
       {
         position: 6,
         type: "question",
+        section_type: "deep_dive",
         payloadJson: {
           title: "Tannin level assessment",
           description:
@@ -261,6 +265,7 @@ export class DatabaseStorage implements IStorage {
       {
         position: 7,
         type: "question",
+        section_type: "ending",
         payloadJson: {
           title: "How long is the finish?",
           description: "How long do the flavors linger after swallowing?",
@@ -274,6 +279,7 @@ export class DatabaseStorage implements IStorage {
       {
         position: 8,
         type: "video_message" as const,
+        section_type: "ending",
         payloadJson: {
           title: "Sommelier's Tasting Notes",
           description: "Expert insights on this Bordeaux wine",
