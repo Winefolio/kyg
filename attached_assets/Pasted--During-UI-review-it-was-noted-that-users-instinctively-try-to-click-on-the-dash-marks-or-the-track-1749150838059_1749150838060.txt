@@ -1,0 +1,42 @@
+ During UI review, it was noted that users instinctively try to click on the dash marks or the track of a slider to set its value, rather than being limited to dragging the thumb. The team agreed that both the slider thumb and the track (including any visual dash mark areas) should be clickable to set the value.
+What Needs to Be Done:
+Verify the existing Slider component (client/src/components/ui/slider.tsx, which uses Radix UI's Slider) supports track clicks by default.
+If the "dash marks" are separate visual elements (as seen in the ScaleQuestion.tsx with the row of motion.divs), implement click handlers on these elements to update the slider's value.
+Ensure a smooth user experience with clear visual feedback when the value changes via any click interaction.
+How to Implement (Code Changes & Guidance):
+Base Slider Component (client/src/components/ui/slider.tsx):
+Verification: Radix UI's Slider (SliderPrimitive.Root) generally allows clicking on the track to move the thumb to that position. Confirm this behavior is present and working as expected. No changes should be needed here if it works out-of-the-box.
+Scale Question Implementation (client/src/components/questions/ScaleQuestion.tsx):
+Current Structure: This component renders the <Slider /> and also a separate row of visual "scale indicators" (the motion.divs in a flex container).
+Action - Making Visual Indicators Clickable:
+For the row of visual scale indicators:
+TypeScript
+
+// Inside the map for scale indicators:
+// Array.from({ length: question.scale_max - question.scale_min + 1 }, (_, i) => {
+//   const indicatorValue = i + question.scale_min; // Value this indicator represents
+//   const isActive = indicatorValue <= value;
+//   return (
+//     <motion.div
+//       key={i}
+//       className={`w-2 h-6 sm:h-8 rounded-full cursor-pointer transition-all duration-300 ${
+//         isActive ? 'bg-purple-500' : 'bg-white/20 hover:bg-white/30'
+//       }`}
+//       onClick={() => { // ADD THIS
+//         triggerHaptic('selection');
+//         onChange(indicatorValue); // Call the main onChange handler
+//       }}
+//       animate={isActive && isDragging ? { scaleY: 1.2, scaleX: 1.1 } : { scaleY: 1, scaleX: 1 }}
+//     />
+//   );
+// })}
+Add an onClick handler to each motion.div representing a scale indicator.
+When an indicator is clicked, call onChange(indicatorValue) with the value that indicator represents.
+Ensure cursor-pointer is applied to these indicators.
+Visual Feedback: The existing animate prop on the motion.div for indicators, and the slider thumb moving, should provide sufficient feedback.
+Haptics: Ensure triggerHaptic('selection') is called when the value is changed via these new click targets as well (as shown in the example above). The handleValueChange for the slider itself already calls this.
+Replit AI Guidance:
+First, confirm that clicking directly on the track of the existing <Slider /> component in ScaleQuestion.tsx updates its value. If not, investigate the props passed to it or the SliderPrimitive.Root in ui/slider.tsx.
+Implement the onClick handlers for the visual scale indicator motion.div elements in ScaleQuestion.tsx as described, so they directly call the onChange prop with their corresponding value.
+Ensure consistent haptic feedback for all methods of changing the slider value.
+Test thoroughly to ensure clicks on the track, thumb, and individual dash mark indicators all correctly update the displayed value and the underlying state.

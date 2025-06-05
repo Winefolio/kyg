@@ -78,17 +78,36 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
           </div>
         </div>
         
-        {/* Scale indicators */}
+        {/* Scale indicators - clickable dash marks */}
         <div className="flex justify-between">
           {Array.from({ length: question.scale_max - question.scale_min + 1 }, (_, i) => {
-            const isActive = i + question.scale_min <= value;
+            const indicatorValue = i + question.scale_min;
+            const isActive = indicatorValue <= value;
+            const isCurrentValue = indicatorValue === value;
             return (
               <motion.div
                 key={i}
-                className={`w-2 h-6 sm:h-8 rounded-full transition-all duration-300 ${
-                  isActive ? 'bg-purple-500' : 'bg-white/20'
+                className={`w-2 h-6 sm:h-8 rounded-full cursor-pointer transition-all duration-300 ${
+                  isActive 
+                    ? isCurrentValue
+                      ? 'bg-purple-400 shadow-lg shadow-purple-500/50' 
+                      : 'bg-purple-500' 
+                    : 'bg-white/20 hover:bg-white/30 hover:scale-110'
                 }`}
-                animate={isActive && isDragging ? { scale: 1.2 } : { scale: 1 }}
+                onClick={() => {
+                  triggerHaptic('selection');
+                  onChange(indicatorValue);
+                }}
+                animate={
+                  isActive && isDragging 
+                    ? { scaleY: 1.2, scaleX: 1.1 } 
+                    : isCurrentValue 
+                      ? { scaleY: 1.1, scaleX: 1.1 }
+                      : { scaleY: 1, scaleX: 1 }
+                }
+                whileHover={{ scaleY: 1.1, scaleX: 1.1 }}
+                whileTap={{ scaleY: 0.9, scaleX: 0.9 }}
+                title={`Set value to ${indicatorValue}`}
               />
             );
           })}
