@@ -89,6 +89,19 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
           <span className="px-2 py-1 bg-purple-600/30 rounded-full text-purple-200 text-xs sm:text-sm font-medium">
             {question.category}
           </span>
+          {relevantTerms.length > 0 && (
+            <ModernButton
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                triggerHaptic('selection');
+                setIsInfoPanelOpen(!isInfoPanelOpen);
+              }}
+              className="text-purple-300 hover:text-white hover:bg-white/10 p-2 rounded-full transition-all duration-200"
+            >
+              <Info size={16} />
+            </ModernButton>
+          )}
         </div>
         <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">
           <DynamicTextRenderer text={question.title} />
@@ -215,74 +228,58 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
 
       {/* Integrated Info Panel */}
       {relevantTerms.length > 0 && (
-        <div className="mt-4 border-t border-white/10 pt-4">
-          <Collapsible open={isInfoPanelOpen} onOpenChange={setIsInfoPanelOpen}>
-            <CollapsibleTrigger asChild>
-              <ModernButton 
-                variant="ghost" 
-                onClick={() => {
-                  triggerHaptic('selection');
-                  setIsInfoPanelOpen(!isInfoPanelOpen);
-                }}
-                className="w-full flex items-center justify-center gap-2 text-purple-300 hover:text-white hover:bg-white/5 text-sm transition-all duration-200"
-              >
-                <Info size={16} />
-                <span>{isInfoPanelOpen ? 'Hide Terms' : `Show Terms (${relevantTerms.length})`}</span>
-                {isInfoPanelOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </ModernButton>
-            </CollapsibleTrigger>
-            <CollapsibleContent asChild>
-              <AnimatePresence>
-                {isInfoPanelOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                    className="overflow-hidden"
-                  >
-                    <div className="mt-3 p-4 bg-black/20 rounded-xl border border-white/10 backdrop-blur-sm">
-                      <div className="flex items-center gap-2 mb-3">
-                        <BookOpen size={16} className="text-purple-400" />
-                        <h4 className="text-sm font-semibold text-purple-300">Wine Terms</h4>
-                      </div>
-                      <div className="space-y-3">
-                        {relevantTerms.map((term, index) => (
-                          <motion.div
-                            key={term.id}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: index * 0.05, duration: 0.2 }}
-                            className="border-l-2 border-purple-400/40 pl-3"
-                          >
-                            <h5 className="text-sm font-medium text-purple-200 capitalize mb-1">
-                              {term.term}
-                            </h5>
-                            <p className="text-xs text-white/80 leading-relaxed">
-                              {term.definition}
-                            </p>
-                            {term.variations && term.variations.length > 0 && (
-                              <div className="mt-2 flex flex-wrap gap-1">
-                                {term.variations.map((variation, i) => (
-                                  <span
-                                    key={i}
-                                    className="px-2 py-0.5 bg-purple-500/20 text-purple-200 text-xs rounded-md border border-purple-400/20"
-                                  >
-                                    {variation}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </motion.div>
-                        ))}
-                      </div>
+        <Collapsible open={isInfoPanelOpen} onOpenChange={setIsInfoPanelOpen}>
+          <CollapsibleContent asChild>
+            <AnimatePresence>
+              {isInfoPanelOpen && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                  animate={{ opacity: 1, height: "auto", marginTop: 16 }}
+                  exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  className="overflow-hidden"
+                >
+                  <div className="p-4 bg-gradient-to-br from-purple-900/40 via-purple-800/30 to-purple-900/40 rounded-xl border border-purple-500/30 backdrop-blur-sm shadow-lg">
+                    <div className="flex items-center gap-2 mb-3">
+                      <BookOpen size={16} className="text-purple-300" />
+                      <h4 className="text-sm font-semibold text-purple-200">Wine Terms</h4>
                     </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
+                    <div className="space-y-3">
+                      {relevantTerms.map((term, index) => (
+                        <motion.div
+                          key={term.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05, duration: 0.2 }}
+                          className="border-l-2 border-purple-400/50 pl-3 py-1"
+                        >
+                          <h5 className="text-sm font-medium text-purple-100 capitalize mb-1">
+                            {term.term}
+                          </h5>
+                          <p className="text-xs text-white/90 leading-relaxed">
+                            {term.definition}
+                          </p>
+                          {term.variations && term.variations.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {term.variations.map((variation, i) => (
+                                <span
+                                  key={i}
+                                  className="px-2 py-0.5 bg-purple-500/30 text-purple-200 text-xs rounded-md border border-purple-400/30"
+                                >
+                                  {variation}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </CollapsibleContent>
+        </Collapsible>
       )}
     </motion.div>
   );

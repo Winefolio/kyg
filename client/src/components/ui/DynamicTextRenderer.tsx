@@ -80,7 +80,7 @@ export function DynamicTextRenderer({ text, className, enableHighlighting = true
               result.push(
                 <span 
                   key={`${termKey}-${matchIndex}`} 
-                  className="underline decoration-dotted decoration-purple-400/60 decoration-1"
+                  className="underline decoration-dotted decoration-purple-400/60 decoration-1 font-medium text-purple-300"
                 >
                   {matchedTerm}
                 </span>
