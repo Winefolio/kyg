@@ -600,18 +600,7 @@ export default function TastingSession() {
                 
                 {/* Wine Glass Container */}
                 <div className="relative w-full h-full overflow-hidden">
-                  {/* Wine Fill Animation */}
-                  <motion.div
-                    initial={{ height: "0%" }}
-                    animate={{ height: "85%" }}
-                    transition={{ duration: 1.5, ease: [0.4, 0, 0.2, 1] }}
-                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-red-800 via-red-600 to-red-500 opacity-90"
-                    style={{
-                      clipPath: "polygon(22% 20%, 78% 20%, 72% 85%, 28% 85%)"
-                    }}
-                  />
-                  
-                  {/* Wine Glass SVG */}
+                  {/* Wine Glass SVG with Mask Definition */}
                   <svg 
                     width="96" 
                     height="96" 
@@ -619,19 +608,66 @@ export default function TastingSession() {
                     className="relative z-10 text-white/90 drop-shadow-lg"
                     fill="currentColor"
                   >
+                    <defs>
+                      {/* Create a mask that defines the wine glass bowl area */}
+                      <mask id="wine-glass-mask">
+                        <rect width="100" height="100" fill="black" />
+                        {/* Wine glass bowl area in white - this is where wine can be visible */}
+                        <circle cx="50" cy="37.3" r="20.44" fill="white" />
+                      </mask>
+                      
+                      {/* Gradient for wine fill */}
+                      <linearGradient id="wine-gradient" x1="0%" y1="100%" x2="0%" y2="0%">
+                        <stop offset="0%" stopColor="#7f1d1d" />
+                        <stop offset="30%" stopColor="#991b1b" />
+                        <stop offset="70%" stopColor="#dc2626" />
+                        <stop offset="100%" stopColor="#ef4444" />
+                      </linearGradient>
+                    </defs>
+                    
+                    {/* Wine Fill Animation - masked to only show inside glass bowl */}
+                    <motion.circle
+                      cx="50"
+                      cy="37.3"
+                      r="20.44"
+                      fill="url(#wine-gradient)"
+                      mask="url(#wine-glass-mask)"
+                      initial={{ 
+                        clipPath: "circle(0% at 50% 100%)"
+                      }}
+                      animate={{ 
+                        clipPath: "circle(20.44px at 50% 37.3%)"
+                      }}
+                      transition={{ duration: 1.5, ease: [0.4, 0, 0.2, 1] }}
+                      opacity="0.95"
+                    />
+                    
+                    {/* Wine Glass Outline */}
                     <path d="M75.44,35.78l-.09-.48c-.14-1.73-.44-3.41-.91-5.02l-4.01-18.23H29.57l-4.01,18.23c-.46,1.61-.77,3.29-.91,5.02l-.09,.48h.05c-.03,.51-.05,1.02-.05,1.53,0,13.2,10.06,24.06,22.94,25.31v20.61h-12.4v5h29.81v-5h-12.4v-20.61c12.87-1.26,22.94-12.11,22.94-25.31,0-.51-.02-1.02-.05-1.53h.05Zm-25.44,21.96c-11.27,0-20.44-9.17-20.44-20.44,0-.36,.01-.77,.04-1.23v-.11s.01-.03,.01-.03l.02-.25c.11-1.37,.35-2.73,.73-4.03l.04-.15,.03-.15,3.14-14.3h32.83l3.14,14.3,.03,.15,.04,.15c.38,1.31,.62,2.66,.73,4.03l.02,.25v.02s.01,.11,.01,.11c.03,.47,.04,.87,.04,1.23,0,11.27-9.17,20.44-20.44,20.44Z"/>
+                    
+                    {/* Wine Shimmer Effect - also masked to glass bowl */}
+                    <motion.circle
+                      cx="50"
+                      cy="37.3"
+                      r="20.44"
+                      fill="url(#shimmer-gradient)"
+                      mask="url(#wine-glass-mask)"
+                      initial={{ opacity: 0, transform: "translateX(-40px)" }}
+                      animate={{ opacity: [0, 0.3, 0], transform: "translateX(40px)" }}
+                      transition={{ duration: 1.5, delay: 0.3, ease: "easeInOut" }}
+                    />
                   </svg>
                   
-                  {/* Wine Shimmer Effect */}
-                  <motion.div
-                    initial={{ x: "-100%", opacity: 0 }}
-                    animate={{ x: "100%", opacity: [0, 0.6, 0] }}
-                    transition={{ duration: 1.5, delay: 0.3, ease: "easeInOut" }}
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform skew-x-12"
-                    style={{
-                      clipPath: "polygon(22% 20%, 78% 20%, 72% 85%, 28% 85%)"
-                    }}
-                  />
+                  {/* Additional shimmer gradient definition */}
+                  <svg width="0" height="0" className="absolute">
+                    <defs>
+                      <linearGradient id="shimmer-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="transparent" />
+                        <stop offset="50%" stopColor="rgba(255,255,255,0.3)" />
+                        <stop offset="100%" stopColor="transparent" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
                 </div>
                 
                 {/* Floating Wine Particles */}
