@@ -86,7 +86,15 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
           min={question.scale_min}
           max={question.scale_max}
           step={1}
-          labels={question.scale_labels}
+          labels={question.scale_labels as [string, string]}
+          labelClassNames={[
+            highlightedLabelIndex === 0 
+              ? 'text-purple-300 font-semibold' 
+              : 'text-white/70',
+            highlightedLabelIndex === 1 
+              ? 'text-purple-300 font-semibold' 
+              : 'text-white/70'
+          ] as [string, string]}
           onChange={onChange}
         />
         
@@ -123,6 +131,102 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
           })}
         </div>
       </div>
+
+      {/* Integrated Info Panel */}
+      {(relevantTerms.length > 0 || feedbackText) && (
+        <div className="mt-4 border-t border-white/10 pt-4">
+          <Collapsible open={isInfoPanelOpen} onOpenChange={setIsInfoPanelOpen}>
+            <CollapsibleTrigger asChild>
+              <ModernButton 
+                variant="ghost" 
+                onClick={() => {
+                  triggerHaptic('selection');
+                  setIsInfoPanelOpen(!isInfoPanelOpen);
+                }}
+                className="w-full flex items-center justify-center gap-2 text-blue-300 hover:text-white hover:bg-white/5 text-sm transition-all duration-200"
+              >
+                <Info size={16} />
+                <span>
+                  {isInfoPanelOpen 
+                    ? 'Hide Info' 
+                    : `Show Info${relevantTerms.length > 0 ? ` & Terms (${relevantTerms.length})` : ''}`
+                  }
+                </span>
+                {isInfoPanelOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </ModernButton>
+            </CollapsibleTrigger>
+            <CollapsibleContent asChild>
+              <AnimatePresence>
+                {isInfoPanelOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-3 p-4 bg-black/20 rounded-xl border border-white/10 backdrop-blur-sm space-y-4">
+                      
+                      {/* Receptive Slider Feedback */}
+                      {feedbackText && (
+                        <div className="border border-blue-400/30 rounded-lg p-3 bg-blue-500/10">
+                          <div className="flex items-center gap-2 mb-2">
+                            <TrendingUp size={16} className="text-blue-400" />
+                            <h4 className="text-sm font-semibold text-blue-300">Your Rating</h4>
+                          </div>
+                          <p className="text-sm text-white/90 leading-relaxed">
+                            {feedbackText}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Glossary Terms */}
+                      {relevantTerms.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <BookOpen size={16} className="text-purple-400" />
+                            <h4 className="text-sm font-semibold text-purple-300">Wine Terms</h4>
+                          </div>
+                          <div className="space-y-3">
+                            {relevantTerms.map((term, index) => (
+                              <motion.div
+                                key={term.id}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: index * 0.05, duration: 0.2 }}
+                                className="border-l-2 border-purple-400/40 pl-3"
+                              >
+                                <h5 className="text-sm font-medium text-purple-200 capitalize mb-1">
+                                  {term.term}
+                                </h5>
+                                <p className="text-xs text-white/80 leading-relaxed">
+                                  {term.definition}
+                                </p>
+                                {term.variations && term.variations.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-1">
+                                    {term.variations.map((variation, i) => (
+                                      <span
+                                        key={i}
+                                        className="px-2 py-0.5 bg-purple-500/20 text-purple-200 text-xs rounded-md border border-purple-400/20"
+                                      >
+                                        {variation}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </motion.div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      )}
     </motion.div>
   );
 }

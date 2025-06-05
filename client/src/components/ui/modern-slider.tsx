@@ -9,6 +9,7 @@ interface ModernSliderProps {
   max: number;
   step?: number;
   labels?: [string, string];
+  labelClassNames?: [string, string];
   onChange: (value: number) => void;
   className?: string;
 }
@@ -19,6 +20,7 @@ export function ModernSlider({
   max, 
   step = 1, 
   labels,
+  labelClassNames,
   onChange, 
   className 
 }: ModernSliderProps) {
@@ -58,9 +60,9 @@ export function ModernSlider({
     <div className={cn("space-y-4", className)}>
       {/* Labels */}
       {labels && (
-        <div className="flex justify-between text-sm text-white/70">
-          <span>{labels[0]}</span>
-          <span>{labels[1]}</span>
+        <div className="flex justify-between text-sm">
+          <span className={labelClassNames?.[0] || "text-white/70"}>{labels[0]}</span>
+          <span className={labelClassNames?.[1] || "text-white/70"}>{labels[1]}</span>
         </div>
       )}
 
