@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
 import { useHaptics } from "@/hooks/useHaptics";
 
 interface Option {
@@ -29,6 +31,7 @@ interface MultipleChoiceQuestionProps {
 
 export function MultipleChoiceQuestion({ question, value, onChange }: MultipleChoiceQuestionProps) {
   const { triggerHaptic } = useHaptics();
+  const [notesExpanded, setNotesExpanded] = useState(false);
 
   const handleOptionChange = (optionId: string, checked: boolean) => {
     triggerHaptic('selection');
@@ -50,6 +53,11 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
 
   const handleNotesChange = (notes: string) => {
     onChange({ ...value, notes });
+  };
+
+  const toggleNotes = () => {
+    triggerHaptic('selection');
+    setNotesExpanded(!notesExpanded);
   };
 
   return (
@@ -100,16 +108,43 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
 
       {question.allow_notes && (
         <div>
-          <Label className="block text-white/80 text-xs sm:text-sm font-medium mb-2">
-            Additional Notes (Optional)
-          </Label>
-          <Textarea
-            placeholder="Describe any other aromas you notice..."
-            value={value.notes || ""}
-            onChange={(e) => handleNotesChange(e.target.value)}
-            className="bg-white/10 border-white/20 text-white placeholder-white/40 focus:border-purple-400 focus:ring-purple-400/20 resize-none text-sm"
-            rows={2}
-          />
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={toggleNotes}
+            className="w-full flex items-center justify-between p-2 text-white/80 hover:text-white hover:bg-white/5 text-xs sm:text-sm"
+          >
+            <div className="flex items-center space-x-2">
+              <MessageSquare size={14} />
+              <span>Add Notes</span>
+              {value.notes && value.notes.trim() && (
+                <span className="text-purple-300 text-xs">(Added)</span>
+              )}
+            </div>
+            {notesExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </Button>
+          
+          <AnimatePresence>
+            {notesExpanded && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-2">
+                  <Textarea
+                    placeholder="Describe any other aromas you notice..."
+                    value={value.notes || ""}
+                    onChange={(e) => handleNotesChange(e.target.value)}
+                    className="bg-white/10 border-white/20 text-white placeholder-white/40 focus:border-purple-400 focus:ring-purple-400/20 resize-none text-sm"
+                    rows={2}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
     </motion.div>

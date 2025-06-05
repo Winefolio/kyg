@@ -318,54 +318,54 @@ export default function TastingSession() {
     <div className="min-h-screen bg-gradient-primary">
       {/* Progress Header */}
       <div className="sticky top-0 z-50 bg-gradient-primary/90 backdrop-blur-xl border-b border-white/10">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-3">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center space-x-2">
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="p-2 hover:bg-white/10 text-white"
+                className="p-1.5 hover:bg-white/10 text-white"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
               >
-                <Menu size={20} />
+                <Menu size={18} />
               </Button>
               <div>
-                <h2 className="text-white font-semibold">
+                <h2 className="text-white font-semibold text-sm">
                   {currentSlide?.type === 'interlude' 
                     ? (currentSlide.payloadJson as any).wine_name || "Wine Tasting"
                     : `Question ${currentSlideIndex + 1}`
                   }
                 </h2>
-                <p className="text-white/60 text-sm">
+                <p className="text-white/60 text-xs">
                   {currentSlideIndex + 1} of {slides.length}
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
               {/* Sync Status */}
-              <div className="flex items-center space-x-1 text-white/60 text-sm">
+              <div className="flex items-center space-x-1 text-white/60 text-xs">
                 {syncStatus === 'synced' ? (
                   <>
-                    <BadgeCheck className="text-green-400" size={16} />
-                    <span>Synced</span>
+                    <BadgeCheck className="text-green-400" size={14} />
+                    <span className="hidden sm:inline">Synced</span>
                   </>
                 ) : (
                   <>
-                    <CloudOff className="text-yellow-400" size={16} />
-                    <span>Syncing...</span>
+                    <CloudOff className="text-yellow-400" size={14} />
+                    <span className="hidden sm:inline">Syncing...</span>
                   </>
                 )}
               </div>
               {/* Participants Count */}
-              <div className="flex items-center space-x-1 text-white/60 text-sm">
-                <Users size={16} />
+              <div className="flex items-center space-x-1 text-white/60 text-xs">
+                <Users size={14} />
                 <span>1</span>
               </div>
             </div>
           </div>
           
           {/* Progress Bar */}
-          <Progress value={progress} className="h-2 bg-white/20" />
+          <Progress value={progress} className="h-1.5 bg-white/20" />
         </div>
       </div>
 
@@ -460,30 +460,30 @@ export default function TastingSession() {
       )}
 
       {/* Question Content */}
-      <div className="p-4 pb-28">
+      <div className="p-3 pb-20">
         <div className="max-w-md mx-auto">
           {currentSlide && renderSlideContent(currentSlide)}
         </div>
       </div>
 
       {/* Fixed Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-primary/95 backdrop-blur-xl border-t border-white/10 p-6">
-        <div className="max-w-md mx-auto flex space-x-4">
+      <div className="fixed bottom-0 left-0 right-0 bg-gradient-primary/95 backdrop-blur-xl border-t border-white/10 p-4">
+        <div className="max-w-md mx-auto flex space-x-3">
           <Button
             onClick={handlePrevious}
             disabled={currentSlideIndex === 0}
             variant="outline"
-            className="flex-1 py-4 px-6 bg-white/20 border-white/20 text-white hover:bg-white/30 disabled:opacity-50"
+            className="flex-1 py-3 px-4 bg-white/20 border-white/20 text-white hover:bg-white/30 disabled:opacity-50 text-sm"
           >
-            <ArrowLeft className="mr-2" size={16} />
+            <ArrowLeft className="mr-1" size={14} />
             Previous
           </Button>
           <Button
             onClick={handleNext}
-            className="flex-1 py-4 px-6 bg-gradient-button text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300"
+            className="flex-1 py-3 px-4 bg-gradient-button text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] transition-all duration-300 text-sm"
           >
             {currentSlideIndex === slides.length - 1 ? 'Finish' : 'Next'}
-            <ArrowRight className="ml-2" size={16} />
+            <ArrowRight className="ml-1" size={14} />
           </Button>
         </div>
       </div>
