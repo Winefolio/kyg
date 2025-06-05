@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
+import { modernCardVariants, staggeredReveal, springTransition } from "@/lib/modern-animations";
 import { useHaptics } from "@/hooks/useHaptics";
 
 interface Option {
