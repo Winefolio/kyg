@@ -98,7 +98,7 @@ export default function HostDashboard() {
       return "";
     }
     const baseUrl = window.location.origin;
-    return `${baseUrl}/join?sessionCode=${session.short_code}`;
+    return `${baseUrl}/join?sessionId=${session.short_code}`;
   };
 
   const copySessionLink = () => {
