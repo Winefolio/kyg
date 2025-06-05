@@ -132,14 +132,14 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
                     animate={isSelected ? { x: 2 } : { x: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    {option.text}
+                    <DynamicTextRenderer text={option.text} />
                   </motion.div>
                   {option.description && (
                     <motion.div 
                       className="text-white/60 text-xs sm:text-sm mt-1 leading-relaxed"
                       animate={isSelected ? { opacity: 0.9 } : { opacity: 0.6 }}
                     >
-                      {option.description}
+                      <DynamicTextRenderer text={option.description} />
                     </motion.div>
                   )}
                 </div>

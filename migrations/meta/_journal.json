@@ -8,6 +8,13 @@
       "when": 1748713709379,
       "tag": "0000_careless_korvac",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1749155443185,
+      "tag": "0001_worried_kate_bishop",
+      "breakpoints": true
     }
   ]
 }

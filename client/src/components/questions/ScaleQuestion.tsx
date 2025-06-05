@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ModernSlider } from "@/components/ui/modern-slider";
 import { Label } from "@/components/ui/label";
+import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
 import { modernCardVariants, springTransition } from "@/lib/modern-animations";
 import { useHaptics } from "@/hooks/useHaptics";
 
@@ -33,8 +34,12 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
             {question.category}
           </span>
         </div>
-        <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">{question.title}</h3>
-        <p className="text-white/70 text-sm sm:text-base leading-relaxed">{question.description}</p>
+        <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">
+          <DynamicTextRenderer text={question.title} />
+        </h3>
+        <p className="text-white/70 text-sm sm:text-base leading-relaxed">
+          <DynamicTextRenderer text={question.description} />
+        </p>
       </div>
 
       <div className="space-y-4">
