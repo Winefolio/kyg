@@ -88,7 +88,7 @@ export function ModernSlider({
           {/* Progress fill with dynamic glow */}
           <motion.div
             className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
-            animate={{ width: `${percentage}%` }}
+            animate={{ width: `calc(${percentage}% + 12px)` }}
             transition={{ type: "spring", stiffness: 200, damping: 25 }}
           >
             {/* Dynamic intensity glow effect */}

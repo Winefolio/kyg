@@ -1,0 +1,285 @@
+Complete Stax PRD Generation & Development Workflow
+Recap: Your Strategy is Perfect
+What you're planning:
+
+Convert MVP UX files → Full PRDs
+AI analyzes all PRDs for consistency + extracts overall schema
+Break PRDs into development tickets systematically
+Set up documentation for optimal Claude Code/Cursor performance
+
+This is exactly right. Here's the systematic approach:
+Phase 1: Convert MVP Files to PRDs
+PRD Format Template
+markdown# [Page Name] PRD
+
+## Product Overview
+- **Purpose**: [What this page accomplishes for users]
+- **User Journey**: [How users arrive and what they do next]
+- **Success Metrics**: [Measurable outcomes]
+
+## Core Features
+### Feature 1: [Name]
+- **User Story**: As a [user type], I want [goal] so that [benefit]
+- **Acceptance Criteria**: [Specific, testable requirements]
+- **API Requirements**: [Data needs, endpoints]
+- **UI Components**: [Specific components needed]
+- **Business Logic**: [Calculations, rules, validation]
+
+## Technical Specifications
+### Frontend Requirements
+- **Components**: [List of React components]
+- **State Management**: [Data that needs to persist/update]
+- **API Integration**: [External services, real-time data]
+- **Performance**: [Load time, interaction standards]
+
+### Backend Requirements
+- **Endpoints**: [API routes needed]
+- **Database Schema**: [Data models]
+- **External APIs**: [FMP, Congressional data, etc.]
+
+## Dependencies
+- **Blocks**: [What must be built first]
+- **Blocked By**: [What this enables]
+- **Shared Components**: [Reusable across pages]
+
+## Development Tickets
+- [High-level ticket breakdown for this page]
+Prompt for Converting MVP Files to PRDs
+markdown# Convert MVP UX Specification to Product Requirements Document
+
+## Your Task
+Transform the attached MVP UX specification into a comprehensive PRD using the template below. Focus on:
+- Extracting specific user requirements from UX descriptions
+- Identifying technical implementation needs
+- Breaking down features into measurable acceptance criteria
+- Noting API integrations and data requirements
+
+## Analysis Framework
+1. **User Experience Analysis**: What specific user actions/emotions are described?
+2. **Technical Requirements Extraction**: What backend/frontend capabilities are needed?
+3. **Component Identification**: What reusable UI components are described?
+4. **Data Flow Mapping**: What real-time data, calculations, or API calls are required?
+5. **Success Metrics**: What measurable outcomes indicate this page works?
+
+## PRD Template to Follow
+[Insert the PRD template from above]
+
+## Success Criteria
+- Every UX detail has corresponding technical requirement
+- All user interactions have defined acceptance criteria  
+- API needs are explicitly stated with expected data formats
+- Components are broken down to implementable level
+- Dependencies between features are clearly identified
+
+Convert the MVP specification into a complete PRD that a development team could immediately start implementing.
+Phase 2: Schema & Consistency Analysis
+Prompt for Analyzing All PRDs
+markdown# Analyze Complete Stax PRD Suite for Consistency & Extract Schema
+
+## Your Task
+Analyze all 5 Stax PRDs to:
+1. **Identify Inconsistencies**: Conflicting requirements, duplicate features, missing connections
+2. **Extract Overall Schema**: Database models, API patterns, shared components
+3. **Map Dependencies**: Feature dependencies across pages
+4. **Generate Development Roadmap**: Logical build order based on dependencies
+
+## Analysis Areas
+
+### 1. Data Schema Extraction
+From all PRDs, identify:
+- **User Data Models**: Profile, preferences, achievements
+- **Financial Data Models**: Portfolios, stocks, Core 4 scores, goals
+- **Activity Data Models**: Decisions, transactions, learning progress
+- **Relationship Models**: How entities connect across pages
+
+### 2. Shared Component Library
+Identify components mentioned across multiple PRDs:
+- **Investment Components**: Stock cards, portfolio displays, Core 4 scores
+- **Gamification Components**: Achievement badges, progress bars, office evolution
+- **Navigation Components**: Tab systems, modals, action buttons
+- **Data Visualization**: Charts, performance indicators, trend displays
+
+### 3. API Integration Patterns
+Extract common patterns:
+- **Real-time Data**: What needs live updates vs cached data
+- **Calculation Requirements**: Core 4 scoring, portfolio math, goal progress
+- **External Services**: FMP API usage patterns, congressional data integration
+
+### 4. Cross-Page User Flows
+Map how users move between pages:
+- **Onboarding → Dashboard**: Portfolio creation flow
+- **Dashboard → Investment**: Discovery and purchase flow  
+- **Investment → Portfolio**: Adding to existing holdings
+- **Portfolio → Profile**: Achievement and progress tracking
+
+## Output Format
+```typescript
+// Database Schema
+interface UserSchema {
+  // Extracted from all PRDs
+}
+
+interface PortfolioSchema {
+  // Consolidated requirements
+}
+
+// Component Library
+interface SharedComponents {
+  // Cross-page component needs
+}
+
+// API Requirements  
+interface APIRequirements {
+  // All external service needs
+}
+
+// Development Roadmap
+interface BuildOrder {
+  // Dependency-based development sequence
+}
+Success Criteria
+
+Zero conflicting requirements across PRDs
+Complete data schema covering all features
+Shared component library with reuse opportunities identified
+Clear development roadmap with logical dependencies
+
+
+## Phase 3: Ticket Generation
+
+### Prompt for Breaking PRDs into Development Tickets
+```markdown
+# Generate Development Tickets from Stax PRDs
+
+## Your Task
+Convert each PRD into a complete set of development tickets using a logical dependency order. Each ticket should be:
+- **Implementable**: 1-3 days of work for a senior developer
+- **Testable**: Clear acceptance criteria
+- **Independent**: Minimal dependencies on other tickets
+
+## Ticket Template
+```markdown
+# Ticket: [Component/Feature Name]
+
+## Epic: [Page/Feature Group]
+## Priority: [P0/P1/P2] 
+## Effort: [S/M/L] (1-3 days)
+
+## Objective
+Build [specific component] that enables [user value]
+
+## User Story
+As a [user type], I want [functionality] so that [benefit]
+
+## Technical Requirements
+- **Framework**: Next.js/React/TypeScript
+- **Styling**: Tailwind + glassmorphic design system
+- **Data**: [API endpoints, state management]
+- **Performance**: [Load time, interaction standards]
+
+## Acceptance Criteria
+- [ ] [Specific, testable requirement]
+- [ ] [UI/UX requirement]
+- [ ] [Performance requirement]
+- [ ] [Error handling requirement]
+
+## Technical Notes
+- **API Integration**: [Specific endpoints from FMP/Congressional APIs]
+- **State Management**: [Context/props/global state needs]
+- **Shared Components**: [Reusable elements this creates/uses]
+
+## Dependencies
+- **Blocks**: [What must be completed first]
+- **Blocked By**: [What this enables]
+
+## Definition of Done
+- [ ] Component renders with real data
+- [ ] Mobile responsive (iPhone 13 tested)
+- [ ] Unit tests pass
+- [ ] Storybook example works
+- [ ] Performance budget met (<3s load, 60fps interactions)
+Ticket Categories
+Generate tickets in these categories:
+Foundation Tickets (Week 1)
+
+Project setup and configuration
+Design system and shared components
+API integration layer (FMP, Congressional data)
+Database schema and basic CRUD operations
+
+Feature Tickets (Weeks 2-5)
+
+Page-specific components
+User flows and interactions
+Real-time data integration
+Gamification systems
+
+Polish Tickets (Week 6)
+
+Performance optimization
+Mobile responsiveness
+Error handling and edge cases
+Testing and deployment
+
+Success Criteria
+
+Every PRD feature has corresponding tickets
+Tickets follow logical dependency order
+Each ticket is implementable in 1-3 days
+Total tickets cover complete MVP scope
+Tickets reference shared schema and components
+
+
+## Phase 4: Claude Code Documentation Setup
+
+### Final Documentation Structure
+/docs/
+├── prds/                           # Your converted PRDs
+│   ├── home-dashboard.md
+│   ├── portfolio-management.md
+│   ├── investment-discovery.md
+│   ├── user-profile.md
+│   └── onboarding-flow.md
+├── technical/
+│   ├── database-schema.md          # From schema analysis
+│   ├── api-integration.md          # FMP and Congressional APIs
+│   ├── shared-components.md        # Cross-page component library
+│   └── performance-standards.md    # 60fps, load time requirements
+├── development/
+│   ├── tickets/                    # All generated tickets
+│   │   ├── foundation/
+│   │   ├── features/
+│   │   └── polish/
+│   ├── ticket-template.md          # Standard format
+│   └── dependency-map.md           # Build order logic
+└── setup/
+├── tech-stack.md               # Next.js, APIs, deployment
+├── coding-standards.md         # TypeScript, testing, conventions
+└── claude-code-guide.md        # How to use docs with AI IDE
+
+## Complete Workflow Summary
+
+### Week 0: PRD Generation
+1. **Run PRD conversion prompt** on each of your 5 MVP files
+2. **Run consistency analysis** on all PRDs together  
+3. **Generate complete ticket backlog** from PRDs
+4. **Set up documentation structure** in your repo
+
+### Week 1+: Development with Claude Code
+**Claude Code System Prompt:**
+You are a senior fintech engineer building Stax. Follow /docs/prds/ for requirements and /docs/development/tickets/ for implementation details. Ask before making architecture decisions.
+
+**Daily Development:**
+```markdown
+# Today's Feature: [Pick from ticket backlog]
+
+## Ticket Reference
+/docs/development/tickets/features/[specific-ticket].md
+
+## Implementation Notes
+- Follow /docs/technical/shared-components.md for reusable elements
+- Use /docs/technical/api-integration.md for FMP data patterns
+- Match /docs/technical/performance-standards.md requirements
+
+## Done When
+[Copy acceptance criteria from ticket]
