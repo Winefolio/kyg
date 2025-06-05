@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ModernSlider } from "@/components/ui/modern-slider";
 import { Label } from "@/components/ui/label";
 import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
+import { BookOpen } from "lucide-react";
 import { modernCardVariants, springTransition } from "@/lib/modern-animations";
 import { useHaptics } from "@/hooks/useHaptics";
 
@@ -26,18 +27,23 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-2xl h-full flex flex-col justify-center"
+      className="bg-gradient-to-br from-blue-900/80 via-blue-800/70 to-purple-900/80 backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-blue-400/30 shadow-2xl shadow-blue-900/50 h-full flex flex-col justify-center"
     >
       <div className="mb-4">
         <div className="flex items-center justify-between mb-3">
-          <span className="px-2 py-1 bg-blue-600/30 rounded-full text-blue-200 text-xs sm:text-sm font-medium">
+          <span className="px-3 py-1.5 bg-gradient-to-r from-blue-600/40 to-blue-500/30 rounded-full text-blue-200 text-xs sm:text-sm font-medium border border-blue-400/20 backdrop-blur-sm">
             {question.category}
           </span>
+          <div className="flex items-center text-blue-300/60 text-xs">
+            <BookOpen className="w-3 h-3 mr-1" />
+            <span className="hidden sm:inline">Hover terms for definitions</span>
+            <span className="sm:hidden">Tap terms</span>
+          </div>
         </div>
-        <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">
+        <h3 className="text-lg sm:text-xl font-bold text-white mb-3 leading-tight">
           <DynamicTextRenderer text={question.title} />
         </h3>
-        <p className="text-white/70 text-sm sm:text-base leading-relaxed">
+        <p className="text-white/80 text-sm sm:text-base leading-relaxed">
           <DynamicTextRenderer text={question.description} />
         </p>
       </div>
