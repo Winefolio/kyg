@@ -9,8 +9,6 @@ interface HostSessionViewProps {
   setPackageCode: (code: string) => void;
   hostDisplayName: string;
   setHostDisplayName: (name: string) => void;
-  hostEmail: string;
-  setHostEmail: (email: string) => void;
   handleHostSession: () => void;
   isCreatingSession: boolean;
   triggerHaptic: (type: keyof typeof hapticPatterns) => void;
@@ -70,6 +68,8 @@ export function HostSessionView({
               This will be displayed to participants during the session
             </p>
           </div>
+
+
 
           {/* Package Code Section */}
           <div className="space-y-3">

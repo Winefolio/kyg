@@ -1,0 +1,46 @@
+oncise Introduction: This task focuses on making the email field a mandatory requirement for participants when they join a tasting session. This change is foundational for delivering personalized tasting reports and enabling future user-specific features, aligning with the project's goal of creating a more engaging and continuous user journey.
+Detailed Instructions:
+Context & Why: The KnowYourGrape team has identified email collection as a critical near-term goal for several reasons:
+Report Delivery: To send participants their tasting reports and summaries.
+Future Updates: To keep users informed about new features or package recommendations.
+User Profiling: To build a foundation for the long-term vision of a personalized "Duolingo for wine" experience, where user progress and preferences are tracked. This implies a need to identify and communicate with users.
+What Needs to Be Done:
+Update the participant joining form to require an email address.
+Implement client-side validation for the presence and format of the email.
+Ensure server-side validation also enforces this requirement.
+Consider database schema implications if email becomes universally non-nullable for participants.
+How to Implement (Code Changes & Guidance):
+Client-Side Validation (client/src/pages/SessionJoin.tsx):
+Locate the joinFormSchema Zod schema used with react-hook-form.
+Modify the email field definition within this schema:
+Current (example, based on typical optional field): email: z.string().email("Invalid email").optional().or(z.literal("")),
+Change To: email: z.string().min(1, { message: "Email is required" }).email("Invalid email address"),
+In the JSX form structure within SessionJoin.tsx, update the <FormLabel> for the email input to visually indicate it's a required field. For instance: <FormLabel className="text-white/80">Your Email <span className="text-red-400">*</span></FormLabel>
+The FormMessage component associated with the email FormField should automatically display the Zod error messages.
+Shared Schema (shared/schema.ts):
+Examine the participants table definition: email: varchar("email", { length: 255 }). Currently, it does not have notNull: true.
+Decision Point for Team: If email should always be mandatory for every participant record in the database:
+Change to: email: varchar("email", { length: 255 }).notNull(),
+Update the corresponding insertParticipantSchema: remove .optional().or(z.literal("")) from the email field to align with the notNull constraint.
+Action Required by User After Code Change: If the database schema is changed, a new migration will need to be generated and applied (e.g., using npm run db:push or drizzle-kit push).
+If email is mandatory for participants joining but might be optional for other scenarios (e.g., a host created without an email initially), keep the DB nullable and rely on stricter application-level validation for the join flow.
+Server-Side Validation (server/routes.ts):
+In the POST /api/sessions/:sessionIdOrShortCode/participants route handler:
+When insertParticipantSchema.omit({ sessionId: true }).parse(req.body) is called, if the Zod schema (from shared/schema.ts) was updated to make email non-optional, Zod will handle the validation and throw an error if email is missing/invalid. Ensure your existing catch (error) block handles z.ZodError appropriately by returning a 400 status.
+If the DB schema remains nullable for email but it's required for this specific endpoint, add an explicit check:
+TypeScript
+
+const participantInputData = insertParticipantSchema.omit({ sessionId: true }).parse(req.body);
+if (!participantInputData.email || participantInputData.email.trim() === "") {
+  return res.status(400).json({ message: "Email is required to join." });
+}
+// Proceed to create participant
+Testing Guidance:
+Attempt to submit the join form with an empty email field.
+Attempt to submit with an incorrectly formatted email.
+Successfully submit with a valid email.
+If backend changes were made, use a tool like Postman or curl to test the API endpoint directly with and without the email field to ensure server-side validation.
+Replit AI Guidance:
+Prioritize clear user feedback for validation errors.
+Ensure consistency between client, shared schema (Zod), and database schema regarding the mandatory nature of the email field.
+Follow existing patterns for form handling and error display.
