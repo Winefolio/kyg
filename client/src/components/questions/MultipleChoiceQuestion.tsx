@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ModernButton } from "@/components/ui/modern-button";
 import { ModernCard } from "@/components/ui/modern-card";
 import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
-import { ChevronDown, ChevronUp, MessageSquare, BookOpen } from "lucide-react";
+import { ChevronDown, ChevronUp, MessageSquare } from "lucide-react";
 import { modernCardVariants, staggeredReveal, springTransition } from "@/lib/modern-animations";
 import { useHaptics } from "@/hooks/useHaptics";
 
@@ -67,23 +67,18 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gradient-to-br from-purple-900/80 via-purple-800/70 to-purple-900/80 backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-purple-400/30 shadow-2xl shadow-purple-900/50 h-full flex flex-col justify-center"
+      className="bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-2xl h-full flex flex-col justify-center"
     >
       <div className="mb-4">
         <div className="flex items-center justify-between mb-3">
-          <span className="px-3 py-1.5 bg-gradient-to-r from-purple-600/40 to-purple-500/30 rounded-full text-purple-200 text-xs sm:text-sm font-medium border border-purple-400/20 backdrop-blur-sm">
+          <span className="px-2 py-1 bg-purple-600/30 rounded-full text-purple-200 text-xs sm:text-sm font-medium">
             {question.category}
           </span>
-          <div className="flex items-center text-purple-300/60 text-xs">
-            <BookOpen className="w-3 h-3 mr-1" />
-            <span className="hidden sm:inline">Hover terms for definitions</span>
-            <span className="sm:hidden">Tap terms</span>
-          </div>
         </div>
-        <h3 className="text-lg sm:text-xl font-bold text-white mb-3 leading-tight">
+        <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">
           <DynamicTextRenderer text={question.title} />
         </h3>
-        <p className="text-white/80 text-sm sm:text-base leading-relaxed">
+        <p className="text-white/70 text-sm sm:text-base leading-relaxed">
           <DynamicTextRenderer text={question.description} />
         </p>
       </div>
@@ -113,8 +108,8 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
                   flex items-center p-3 rounded-xl cursor-pointer transition-all duration-300 group
                   transform-gpu
                   ${isSelected 
-                    ? 'bg-gradient-to-r from-purple-500/30 to-purple-600/20 border border-purple-400/60 shadow-lg shadow-purple-500/30' 
-                    : 'bg-gradient-to-r from-white/8 to-purple-900/20 hover:from-purple-500/15 hover:to-purple-600/10 border border-purple-400/20 hover:border-purple-400/40'
+                    ? 'bg-purple-500/20 border border-purple-400/50 shadow-lg shadow-purple-500/20' 
+                    : 'bg-white/5 hover:bg-white/10 border border-transparent hover:border-white/20'
                   }
                 `}
               >
@@ -137,14 +132,14 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
                     animate={isSelected ? { x: 2 } : { x: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    {option.text}
+                    <DynamicTextRenderer text={option.text} />
                   </motion.div>
                   {option.description && (
                     <motion.div 
                       className="text-white/60 text-xs sm:text-sm mt-1 leading-relaxed"
                       animate={isSelected ? { opacity: 0.9 } : { opacity: 0.6 }}
                     >
-                      {option.description}
+                      <DynamicTextRenderer text={option.description} />
                     </motion.div>
                   )}
                 </div>
