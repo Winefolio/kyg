@@ -113,12 +113,12 @@ export function ModernSlider({
 
           {/* Energy Hotspot Glow */}
           <motion.div
-            className="absolute top-1/2 w-8 h-8 rounded-full pointer-events-none -translate-y-1/2 -translate-x-1/2"
+            className="absolute top-1/2 w-8 h-8 rounded-full pointer-events-none -translate-y-1/2"
             style={{ 
-              background: 'radial-gradient(circle, rgba(233, 168, 255, 0.5) 0%, rgba(192, 132, 252, 0) 65%)' 
+              background: 'radial-gradient(circle, rgba(233, 168, 255, 0.5) 0%, rgba(192, 132, 252, 0) 65%)',
+              left: `calc(${percentage}% - 16px)` // 16px is half the glow width (32px/2)
             }}
             animate={{ 
-              left: `${percentage}%`,
               scale: 1 + (percentage / 100) * 0.5 // Glow gets bigger at higher values
             }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
@@ -147,8 +147,10 @@ export function ModernSlider({
 
         {/* Thumb with dynamic glow */}
         <motion.div
-          className="absolute top-1/2 w-6 h-6 bg-white rounded-full shadow-lg cursor-grab -translate-y-1/2 -translate-x-1/2"
-          style={{ left: `${percentage}%` }}
+          className="absolute top-1/2 w-6 h-6 bg-white rounded-full shadow-lg cursor-grab -translate-y-1/2"
+          style={{ 
+            left: `calc(${percentage}% - 12px)` // 12px is half the thumb width (24px/2)
+          }}
           drag="x"
           dragConstraints={trackRef}
           dragElastic={0}
