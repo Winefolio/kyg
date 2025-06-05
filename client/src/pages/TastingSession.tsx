@@ -180,7 +180,78 @@ export default function TastingSession() {
       return renderQuestion(slide);
     }
 
-    return null;
+    // Handle video messages from sommeliers
+    if (slide.type === 'video_message') {
+      if (!payload.video_url) {
+        return <div className="text-white text-center p-4">Video URL missing for this slide.</div>;
+      }
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-4 bg-gradient-card backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-xl"
+        >
+          {payload.title && <h2 className="text-2xl md:text-3xl font-bold text-white text-center mb-3">{payload.title}</h2>}
+          {payload.description && <p className="text-white/70 text-center mb-4">{payload.description}</p>}
+          <div className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg mx-auto max-w-2xl">
+            <video
+              src={payload.video_url}
+              controls={payload.show_controls !== undefined ? payload.show_controls : true}
+              autoPlay={payload.autoplay || false}
+              poster={payload.poster_url}
+              className="w-full h-full object-contain"
+              playsInline
+            />
+          </div>
+        </motion.div>
+      );
+    }
+
+    // Handle audio messages from sommeliers
+    if (slide.type === 'audio_message') {
+      if (!payload.audio_url) {
+        return <div className="text-white text-center p-4">Audio URL missing for this slide.</div>;
+      }
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-4 bg-gradient-card backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-xl"
+        >
+          {payload.title && <h2 className="text-2xl md:text-3xl font-bold text-white text-center mb-3">{payload.title}</h2>}
+          {payload.description && <p className="text-white/70 text-center mb-4">{payload.description}</p>}
+          <div className="flex justify-center">
+            <audio
+              src={payload.audio_url}
+              controls={payload.show_controls !== undefined ? payload.show_controls : true}
+              autoPlay={payload.autoplay || false}
+              className="w-full max-w-md rounded-lg"
+            />
+          </div>
+        </motion.div>
+      );
+    }
+
+    // Handle media slides (images)
+    if (slide.type === 'media' && payload.image_url) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center bg-gradient-card backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-xl"
+        >
+          {payload.title && <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">{payload.title}</h2>}
+          <img 
+            src={payload.image_url} 
+            alt={payload.alt_text || 'Media content'} 
+            className="w-full max-w-md mx-auto rounded-lg shadow-lg"
+          />
+        </motion.div>
+      );
+    }
+
+    console.warn("Unsupported slide type or missing media URL for slide:", slide);
+    return <div className="text-white text-center p-4">Unsupported slide type: {slide.type} or missing media content.</div>;
   };
 
   if (isLoading || sessionDetailsLoading) {
