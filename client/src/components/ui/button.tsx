@@ -1,6 +1,8 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
+import { motion } from "framer-motion"
+import { modernButtonVariants, springTransition } from "@/lib/modern-animations"
 
 import { cn } from "@/lib/utils"
 import { useHaptics } from "@/hooks/useHaptics"
@@ -60,31 +62,46 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const handlePointerUp = () => setIsPressed(false)
     const handlePointerLeave = () => setIsPressed(false)
 
-    const Comp = asChild ? Slot : "button"
+    if (asChild) {
+      return (
+        <Slot
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          onClick={handleClick}
+          {...props}
+        />
+      );
+    }
+
     return (
-      <Comp
+      <motion.button
         className={cn(
           buttonVariants({ variant, size, className }),
-          "transform transition-all duration-200 ease-out",
-          "hover:scale-[1.02] active:scale-[0.98]",
-          "hover:shadow-lg active:shadow-md",
-          isPressed && "scale-[0.98] shadow-md"
+          "relative overflow-hidden transform-gpu"
         )}
         ref={ref}
         onClick={handleClick}
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerLeave}
+        variants={modernButtonVariants}
+        initial="initial"
+        whileHover="hover"
+        whileTap="tap"
+        animate={loading ? "loading" : "initial"}
+        transition={springTransition}
         style={{
           transformOrigin: "center"
         }}
-        {...props}
+        disabled={loading}
+        {...(props as any)}
       >
         {loading && (
-          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2 animate-spin" />
+          <motion.div 
+            className="w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          />
         )}
         {props.children}
-      </Comp>
+      </motion.button>
     )
   }
 )
