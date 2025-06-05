@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Slider } from "@/components/ui/slider";
+import { ModernSlider } from "@/components/ui/modern-slider";
 import { Label } from "@/components/ui/label";
-import { modernCardVariants, modernSliderThumbVariants, springTransition } from "@/lib/modern-animations";
+import { modernCardVariants, springTransition } from "@/lib/modern-animations";
 import { useHaptics } from "@/hooks/useHaptics";
 
 interface ScaleQuestionProps {
@@ -20,24 +20,6 @@ interface ScaleQuestionProps {
 
 export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps) {
   const { triggerHaptic } = useHaptics();
-  const [isDragging, setIsDragging] = useState(false);
-
-  const handleValueChange = (newValue: number[]) => {
-    const val = newValue[0];
-    if (val !== value) {
-      triggerHaptic('selection');
-      onChange(val);
-    }
-  };
-
-  const handlePointerDown = () => {
-    setIsDragging(true);
-    triggerHaptic('selection');
-  };
-
-  const handlePointerUp = () => {
-    setIsDragging(false);
-  };
 
   return (
     <motion.div
@@ -56,28 +38,14 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
       </div>
 
       <div className="space-y-4">
-        <div className="relative">
-          <Slider
-            value={[value]}
-            onValueChange={handleValueChange}
-            onPointerDown={handlePointerDown}
-            onPointerUp={handlePointerUp}
-            min={question.scale_min}
-            max={question.scale_max}
-            step={1}
-            className="slider"
-          />
-          <div className="flex justify-between text-white/60 text-xs sm:text-sm mt-2">
-            <span>{question.scale_labels[0]}</span>
-            <motion.span 
-              className="text-lg sm:text-xl font-semibold text-white"
-              animate={isDragging ? { scale: 1.1 } : { scale: 1 }}
-            >
-              {value}
-            </motion.span>
-            <span>{question.scale_labels[1]}</span>
-          </div>
-        </div>
+        <ModernSlider
+          value={value}
+          min={question.scale_min}
+          max={question.scale_max}
+          step={1}
+          labels={question.scale_labels}
+          onChange={onChange}
+        />
         
         {/* Scale indicators - clickable dash marks */}
         <div className="flex justify-between">
@@ -100,11 +68,9 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
                   onChange(indicatorValue);
                 }}
                 animate={
-                  isActive && isDragging 
-                    ? { scaleY: 1.2, scaleX: 1.1 } 
-                    : isCurrentValue 
-                      ? { scaleY: 1.1, scaleX: 1.1 }
-                      : { scaleY: 1, scaleX: 1 }
+                  isCurrentValue 
+                    ? { scaleY: 1.1, scaleX: 1.1 }
+                    : { scaleY: 1, scaleX: 1 }
                 }
                 whileHover={{ scaleY: 1.1, scaleX: 1.1 }}
                 whileTap={{ scaleY: 0.9, scaleX: 0.9 }}

@@ -33,7 +33,7 @@ const EnhancedInput = React.forwardRef<HTMLInputElement, EnhancedInputProps>(
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setHasValue(!!e.target.value);
       if (hapticFeedback && e.target.value) {
-        triggerHaptic('soft');
+        triggerHaptic('selection');
       }
       props.onChange?.(e);
     };
@@ -69,7 +69,7 @@ const EnhancedInput = React.forwardRef<HTMLInputElement, EnhancedInputProps>(
           style={{
             transformOrigin: "center"
           }}
-          {...props}
+          {...(props as any)}
         />
 
         {/* Focus ring effect */}

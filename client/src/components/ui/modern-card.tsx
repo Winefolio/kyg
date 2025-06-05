@@ -52,7 +52,7 @@ export function ModernCard({
       } : {}}
       onClick={onClick}
       style={{ transformOrigin: "center" }}
-      {...props}
+      {...(props as any)}
     >
       {/* Selection glow effect */}
       <AnimatePresence>
