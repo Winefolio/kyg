@@ -84,7 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const hostParticipantData = insertParticipantSchema.parse({
           sessionId: session.id,
           displayName: hostDisplayName || hostName || 'Host',
-          email: hostEmail || '',
+          email: hostEmail,
           isHost: true,
           progress: 0
         });
@@ -118,19 +118,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         sessionId
       });
-
-      // For non-host participants, email is required
-      if (!validatedData.isHost && (!validatedData.email || validatedData.email.trim() === "")) {
-        return res.status(400).json({ message: "Email is required to join a session" });
-      }
-
-      // Validate email format for non-host participants
-      if (!validatedData.isHost && validatedData.email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(validatedData.email)) {
-          return res.status(400).json({ message: "Please enter a valid email address" });
-        }
-      }
 
       const session = await storage.getSessionById(sessionId);
       if (!session) {
