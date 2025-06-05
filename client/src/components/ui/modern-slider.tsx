@@ -10,6 +10,7 @@ interface ModernSliderProps {
   step?: number;
   labels?: [string, string];
   labelClassNames?: [string, string];
+  progressPercent?: number;
   onChange: (value: number) => void;
   className?: string;
 }
@@ -21,6 +22,7 @@ export function ModernSlider({
   step = 1, 
   labels,
   labelClassNames,
+  progressPercent,
   onChange, 
   className 
 }: ModernSliderProps) {
@@ -91,15 +93,25 @@ export function ModernSlider({
             )}
           </AnimatePresence>
 
-          {/* Progress fill */}
+          {/* Progress fill with dynamic glow */}
           <motion.div
             className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
-            style={{ width: `${percentage}%` }}
-            initial={{ width: 0 }}
             animate={{ width: `${percentage}%` }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
+            transition={{ type: "spring", stiffness: 200, damping: 25 }}
           >
-            {/* Glow effect */}
+            {/* Dynamic intensity glow effect */}
+            <motion.div 
+              className="absolute inset-0 rounded-full blur-md"
+              style={{ 
+                background: 'radial-gradient(circle, rgba(233,168,255,0.7) 0%, rgba(192,132,252,0) 70%)' 
+              }}
+              animate={{ 
+                opacity: (progressPercent || percentage / 100), // Glow opacity increases with value
+                scale: 1 + ((progressPercent || percentage / 100) * 0.5) // Glow size increases with value
+              }}
+              transition={{ duration: 0.2 }}
+            />
+            {/* Base glow effect */}
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-purple-400/50 to-pink-400/50 rounded-full blur-sm"
               animate={{ opacity: isDragging ? 1 : 0.3 }}
@@ -128,7 +140,7 @@ export function ModernSlider({
           ))}
         </motion.div>
 
-        {/* Thumb */}
+        {/* Thumb with dynamic glow */}
         <motion.div
           className="absolute top-1/2 w-6 h-6 bg-white rounded-full shadow-lg cursor-grab -translate-y-1/2 -translate-x-1/2"
           style={{ left: `${percentage}%` }}
@@ -162,17 +174,17 @@ export function ModernSlider({
           }}
           animate={{
             boxShadow: isDragging 
-              ? "0 0 25px rgba(147, 51, 234, 0.6)" 
-              : "0 4px 12px rgba(0, 0, 0, 0.3)"
+              ? `0px 0px 15px 5px rgba(192, 132, 252, ${0.5 + ((progressPercent || percentage/100)*0.5)})` 
+              : `0px 0px 8px 2px rgba(192, 132, 252, ${0.2 + ((progressPercent || percentage/100)*0.3)})`
           }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
         >
-          {/* Thumb glow */}
+          {/* Dynamic intensity thumb glow */}
           <motion.div
             className="absolute inset-0 bg-purple-400/30 rounded-full blur-md"
             animate={{ 
-              scale: isDragging ? 2 : 1,
-              opacity: isDragging ? 1 : 0
+              scale: isDragging ? 2 : 1 + ((progressPercent || percentage/100) * 0.5),
+              opacity: isDragging ? 1 : 0.3 + ((progressPercent || percentage/100) * 0.4)
             }}
             transition={{ duration: 0.2 }}
           />

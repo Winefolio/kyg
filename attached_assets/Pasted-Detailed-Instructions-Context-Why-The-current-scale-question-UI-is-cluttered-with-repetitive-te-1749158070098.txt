@@ -1,0 +1,104 @@
+Detailed Instructions:
+
+Context & Why:
+The current scale question UI is cluttered with repetitive text and a static feedback box that fails to provide an engaging user experience. To align with the project's goal of a modern, sleek, and beautiful UI, we need to transform this component from a simple data input into an interactive, receptive element. The new design will provide immediate, non-verbal feedback that helps the user feel the intensity and meaning of their rating.
+
+What Needs to Be Done:
+
+Simplify the Layout: Remove all redundant text labels from the component.
+Remove Textbox Feedback: Completely delete the "Info Panel" and its text-based feedback logic from the ScaleQuestion.tsx component.
+Implement Dynamic Label Highlighting: Make the min/max labels (e.g., "Very Light", "Very Intense") fade and scale dynamically based on the slider thumb's proximity.
+Implement Thumb & Track Glow Effect: Make the slider thumb and the filled portion of the track glow with an intensity that corresponds to the selected value.
+How to Implement (Code Changes & Guidance):
+
+File to Modify: client/src/components/questions/ScaleQuestion.tsx
+
+Step 1: Drastically Simplify the JSX Layout:
+
+Remove the Collapsible "Info Panel" and all its contents entirely.
+Remove the visual scale indicators (the row of motion.div dash marks). The new ModernSlider component handles this more elegantly.
+Ensure there is only one set of labels for the slider's range, positioned clearly.
+Step 2: Implement Dynamic Label Highlighting:
+
+Action: We will animate the opacity and scale of the min/max labels. The label closer to the thumb will be more prominent.
+Logic (inside the ScaleQuestion component):
+TypeScript
+
+const progressPercent = (value - question.scale_min) / (question.scale_max - question.scale_min);
+
+// Opacity: Make labels fade but never disappear completely (min opacity of 0.5)
+const rightLabelOpacity = 0.5 + (progressPercent * 0.5);
+const leftLabelOpacity = 0.5 + ((1 - progressPercent) * 0.5);
+
+// Scale: Make the active label slightly larger
+const rightLabelScale = 1 + (progressPercent * 0.05);
+const leftLabelScale = 1 + ((1 - progressPercent) * 0.05);
+JSX: Wrap the labels in motion.span and apply the dynamic styles.
+TypeScript
+
+// In the JSX where labels are rendered
+<div className="flex justify-between text-sm font-medium">
+  <motion.span 
+    className="text-white"
+    animate={{ opacity: leftLabelOpacity, scale: leftLabelScale }}
+    transition={{ duration: 0.2 }}
+  >
+    {question.scale_labels[0]}
+  </motion.span>
+  <motion.span 
+    className="text-white"
+    animate={{ opacity: rightLabelOpacity, scale: rightLabelScale }}
+    transition={{ duration: 0.2 }}
+  >
+    {question.scale_labels[1]}
+  </motion.span>
+</div>
+Step 3: Enhance the Slider Component for Visual Feedback:
+
+File: client/src/components/ui/modern-slider.tsx (the custom slider created by the AI).
+Action: We will modify this component to accept and use the progressPercent to create a "glow" effect.
+Logic (inside ModernSlider):
+Calculate percentage as you already do.
+The glow effect can be a box-shadow on the thumb and the progress fill div.
+JSX (modern-slider.tsx):
+TypeScript
+
+// For the progress fill div
+<motion.div
+  className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
+  animate={{ width: `${percentage}%` }}
+  transition={{ type: "spring", stiffness: 200, damping: 25 }}
+>
+   {/* NEW: Add a glow that intensifies with progress */}
+   <motion.div 
+     className="absolute inset-0 rounded-full blur-md"
+     style={{ 
+       background: 'radial-gradient(circle, rgba(233,168,255,0.7) 0%, rgba(192,132,252,0) 70%)' 
+     }}
+     animate={{ 
+       opacity: percentage / 100, // Glow opacity increases with value
+       scale: 1 + (percentage / 100) * 0.5 // Glow size increases with value
+     }}
+   />
+</motion.div>
+
+// For the thumb div
+<motion.div
+  className="absolute ... w-6 h-6 bg-white rounded-full ..."
+  // ... drag props ...
+  animate={{
+     // Animate the shadow based on dragging state and value
+     boxShadow: isDragging 
+       ? `0px 0px 15px 5px rgba(192, 132, 252, ${0.5 + (percentage/100)*0.5})` 
+       : `0px 0px 8px 2px rgba(192, 132, 252, ${0.2 + (percentage/100)*0.3})`
+  }}
+>
+  {/* ... thumb contents ... */}
+</motion.div>
+Replit AI Guidance:
+
+Clean Slate: Your first step is to completely remove the text-based feedback box and the "Info Panel" (Collapsible component) from client/src/components/questions/ScaleQuestion.tsx.
+Simplify Labels: Ensure only one set of min/max labels is present in the UI.
+Implement Dynamic Label Styles: Modify the label <span>s in ScaleQuestion.tsx to be motion.spans. Use the provided logic to calculate opacity and scale based on the slider's value and apply these styles via the animate prop for a live, responsive effect.
+Enhance ModernSlider.tsx: Implement the dynamic glow effect on the progress fill and the thumb itself, tying the opacity, scale, and box-shadow of the glow to the slider's percentage value.
+Goal: The final component should communicate the selected value through clean, ambient visual cues, not extra text. It should feel elegant, responsive, and modern.
