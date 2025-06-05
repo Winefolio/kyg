@@ -64,7 +64,7 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-2xl"
+      className="bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-2xl h-full flex flex-col justify-center"
     >
       <div className="mb-4">
         <div className="flex items-center justify-between mb-3">

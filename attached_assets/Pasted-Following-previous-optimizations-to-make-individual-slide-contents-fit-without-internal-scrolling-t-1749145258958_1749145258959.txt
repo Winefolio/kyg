@@ -1,0 +1,72 @@
+Following previous optimizations to make individual slide contents fit without internal scrolling, the current layout in TastingSession.tsx often results in the slide content block appearing at the top of the available space, leaving a large empty area below. This creates a visual imbalance. The goal is to achieve better visual hierarchy and a more polished, modern feel by centering the content and ensuring it utilizes screen real estate more effectively.
+
+What Needs to Be Done:
+
+The primary content div within TastingSession.tsx that wraps the output of renderSlideContent needs to be styled to fill more of the available vertical space (between the fixed header and fixed footer).
+Flexbox or Grid utilities should then be used on this container to vertically center the slide content block (div with max-w-md mx-auto).
+The slide content block itself might need a min-height or be encouraged to take up more height if its natural content is short, while still respecting the "no internal scroll" rule for its own children.
+How to Implement (Code Changes & Guidance):
+
+Target File: client/src/pages/TastingSession.tsx
+
+Locate Main Content Wrapper:
+Find the div that immediately wraps the slide content. Based on previous logs, this is likely:
+
+TypeScript
+
+{/* Question Content */}
+<div className="p-4 pb-28"> {/* This is the main content area for the slide */}
+  <div className="max-w-md mx-auto"> {/* This is where the slide component is rendered */}
+    {currentSlide && renderSlideContent(currentSlide)}
+  </div>
+</div>
+Modify the Main Content Wrapper for Vertical Centering & Sizing:
+
+Step 1: Make the wrapper a flex container that grows. The div with className="p-4 pb-28" needs to become a flex container that attempts to fill the available vertical space between the sticky header and the fixed bottom navigation.
+The parent of this div is the main div of the TastingSession component: <div className="min-h-screen bg-gradient-primary">. The header is sticky, and the footer is fixed. This implies the content area between them is the scrollable part (if the overall page content is taller than the screen, which it might not be if a single slide is always meant to fit).
+Consider making the TastingSession main div a flex column:
+TypeScript
+
+// In TastingSession.tsx, the root div
+<div className="min-h-screen bg-gradient-primary flex flex-col">
+  {/* Sticky Header ... */}
+  {/* Main Content Area (to be modified) ... */}
+  {/* Fixed Bottom Navigation ... */}
+</div>
+Then, the main content div should grow:
+TypeScript
+
+{/* Question Content */}
+<div className="flex-grow flex flex-col items-center justify-center p-4 pb-28"> {/* MODIFIED: added flex-grow, flex, flex-col, items-center, justify-center */}
+  {/* The max-w-md mx-auto div will now be centered within this flex container */}
+  <div className="w-full max-w-md mx-auto"> {/* Added w-full for safety, max-w-md constrains it */}
+    {currentSlide && renderSlideContent(currentSlide)}
+  </div>
+</div>
+Explanation of changes:
+flex-grow: Allows this div to take up available space in the flex column.
+flex flex-col items-center justify-center: This will vertically and horizontally center its direct child (the div with max-w-md).
+The inner div now has w-full to ensure it can be centered properly by its flex parent, while max-w-md still limits its width.
+Step 2: Ensuring Slide Components Proportionally Use Space (Optional Refinement):
+If individual slide components (like a short interlude) still look too small even when centered, you might consider giving the div className="w-full max-w-md mx-auto" a min-height (e.g., min-h-[60vh] or a specific pixel value like min-h-[400px] sm:min-h-[500px]) to encourage it to occupy more space. If you do this, ensure the content within this div (the actual slide rendered by renderSlideContent) is also centered or arranged nicely (e.g., using flexbox on this inner div as well if needed).
+For example, the motion.div returned by renderSlideContent for each slide type could also be made a flex container to center its own contents if it's given a min-height.
+TypeScript
+
+// Example for the interlude slide's motion.div in TastingSession.tsx
+// <motion.div className="text-center space-y-3 sm:space-y-4 bg-gradient-card ... p-4 sm:p-6 ... flex flex-col justify-center min-h-[50vh]">
+//  ... content ...
+// </motion.div>
+This makes the card itself taller and centers its content. This would need to be applied judiciously to each slide type's root element.
+Testing:
+
+Load various slide types (especially shorter ones like interludes and potentially some scale questions).
+Check on different mobile viewport heights. The content should be more vertically centered.
+Ensure the fixed header and footer are not overlapped and are still functional.
+Ensure that taller slides (e.g., MCQs with many options, after the collapsible notes are implemented) still fit without forcing the slide itself to scroll, and that they don't push the bottom navigation off-screen. The overall page might scroll if the sum of header + centered_slide_with_min_height + footer exceeds viewport, but the slide itself should remain a non-scrolling block.
+Replit AI Guidance:
+
+Focus on client/src/pages/TastingSession.tsx for the primary layout adjustments.
+Use Tailwind CSS flexbox utilities (flex, flex-col, flex-grow, items-center, justify-center) to achieve vertical centering of the main slide content block.
+Encourage the AI to consider adding a min-height (e.g., min-h-[50vh] or min-h-[60vh]) to the div className="w-full max-w-md mx-auto" that wraps the slide content. This will ensure that even shorter slides occupy a more substantial and visually balanced portion of the screen. If this min-height is added, the content within this div (i.e., the output of renderSlideContent) should also be vertically centered within it (e.g., by making that motion.div a flex container with justify-center).
+Remind it to test thoroughly on mobile viewports.
+Maintain the existing visual aesthetic while making these structural changes. The goal is balance and proportion.
