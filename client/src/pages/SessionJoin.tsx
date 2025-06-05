@@ -20,7 +20,7 @@ import type { Package, Participant, Session } from "@shared/schema";
 
 const joinFormSchema = z.object({
   displayName: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  email: z.string().min(1, "Email is required").email("Invalid email"),
   isHost: z.boolean().default(false)
 });
 
@@ -213,7 +213,7 @@ export default function SessionJoin() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white/80">Email (Optional)</FormLabel>
+                    <FormLabel className="text-white/80">Email</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
