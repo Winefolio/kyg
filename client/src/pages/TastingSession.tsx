@@ -48,6 +48,12 @@ export default function TastingSession() {
     enabled: !!participantId
   });
 
+  // Get package data
+  const { data: packageData } = useQuery({
+    queryKey: [`/api/packages/${currentSession?.packageCode}`],
+    enabled: !!currentSession?.packageCode
+  });
+
   // Get session slides - use dynamic package code from session
   const { data: slidesData, isLoading } = useQuery<{ slides: Slide[]; totalCount: number }>({
     queryKey: [`/api/packages/${currentSession?.packageCode}/slides`, participantId],
@@ -142,7 +148,7 @@ export default function TastingSession() {
     // Extract wine name from current slide or package
     const currentWineName = currentSlide?.type === 'interlude' 
       ? (currentSlide.payloadJson as any)?.wine_name || "Wine Tasting"
-      : packageData?.name || "Wine Tasting";
+      : currentSession?.packageCode || "Wine Tasting";
     
     const progressInfo = `Slide ${currentSlideIndex + 1} of ${slides.length}`;
     
@@ -467,8 +473,12 @@ export default function TastingSession() {
             </div>
           </div>
           
-          {/* Progress Bar */}
-          <Progress value={progress} className="h-1.5 bg-white/20" />
+          {/* Segmented Progress Bar */}
+          <SegmentedProgressBar 
+            sections={sections}
+            currentWineName={currentWineName}
+            currentOverallProgressInfo={progressInfo}
+          />
         </div>
       </div>
 
@@ -561,6 +571,38 @@ export default function TastingSession() {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+
+      {/* Section Transition Overlay */}
+      <AnimatePresence>
+        {isTransitioningSection && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-gradient-primary/95 backdrop-blur-xl z-50 flex items-center justify-center"
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              className="text-center space-y-4"
+            >
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-16 h-16 mx-auto bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center"
+              >
+                <Award className="text-white" size={24} />
+              </motion.div>
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-2">Moving to:</h2>
+                <h3 className="text-xl text-purple-200">{transitionSectionName}</h3>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Question Content */}
       <div className="flex-grow flex flex-col items-center justify-center p-3 pb-20">

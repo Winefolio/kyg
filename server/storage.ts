@@ -128,6 +128,7 @@ export class DatabaseStorage implements IStorage {
       {
         position: 1,
         type: "interlude",
+        section_type: "intro",
         payloadJson: {
           title: "Welcome to Your Wine Tasting",
           description: "Let's begin our journey through Bordeaux",
@@ -139,6 +140,7 @@ export class DatabaseStorage implements IStorage {
       {
         position: 2,
         type: "question",
+        section_type: "intro",
         payloadJson: {
           title: "What aromas do you detect?",
           description:
