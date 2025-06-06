@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WineModal } from "@/components/WineModal";
+import { SlideEditor } from "@/components/SlideEditor";
 import { 
   Plus, 
   Edit3, 
@@ -138,6 +139,8 @@ export default function SommelierDashboard() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedSessionForQR, setSelectedSessionForQR] = useState<Session | null>(null);
   const [expandedPackages, setExpandedPackages] = useState<Set<string>>(new Set());
+  const [slideEditorOpen, setSlideEditorOpen] = useState(false);
+  const [selectedWineForSlides, setSelectedWineForSlides] = useState<PackageWine | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -311,6 +314,11 @@ export default function SommelierDashboard() {
     setWineModalMode(mode);
     setSelectedWine(wine || null);
     setWineModalOpen(true);
+  };
+
+  const openSlideEditor = (wine: PackageWine) => {
+    setSelectedWineForSlides(wine);
+    setSlideEditorOpen(true);
   };
 
   return (
@@ -1210,10 +1218,20 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
                         {!isReadOnly && (
                           <div className="flex items-center space-x-2 ml-4">
                             <Button
+                              onClick={() => openSlideEditor(wine)}
+                              variant="ghost"
+                              size="sm"
+                              className="text-blue-400 hover:bg-blue-500/10"
+                              title="Edit Slides"
+                            >
+                              <Settings className="w-4 h-4" />
+                            </Button>
+                            <Button
                               onClick={() => openWineModal('edit', wine)}
                               variant="ghost"
                               size="sm"
                               className="text-white hover:bg-white/10"
+                              title="Edit Wine"
                             >
                               <Edit3 className="w-4 h-4" />
                             </Button>
@@ -1222,6 +1240,7 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
                               variant="ghost"
                               size="sm"
                               className="text-red-400 hover:bg-red-500/10"
+                              title="Delete Wine"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
@@ -1249,6 +1268,18 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
               } else if (wineModalMode === 'edit' && selectedWine) {
                 updateWineMutation.mutate({ id: selectedWine.id, data });
               }
+            }}
+          />
+        )}
+
+        {/* Slide Editor */}
+        {slideEditorOpen && selectedWineForSlides && (
+          <SlideEditor
+            packageWineId={selectedWineForSlides.id}
+            wineName={selectedWineForSlides.wineName}
+            onClose={() => {
+              setSlideEditorOpen(false);
+              setSelectedWineForSlides(null);
             }}
           />
         )}
