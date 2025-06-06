@@ -167,12 +167,15 @@ export function ModernSlider({
             if (!trackRef.current) return;
             
             const rect = trackRef.current.getBoundingClientRect();
-            const dragPercentage = ((info.point.x - rect.left) / rect.width) * 100;
-            const newValue = Math.round((dragPercentage / 100) * (max - min) + min);
-            const clampedValue = Math.max(min, Math.min(max, newValue));
+            // Calculate relative position from the current thumb position
+            const currentThumbX = rect.left + (percentage / 100) * rect.width;
+            const newThumbX = currentThumbX + info.delta.x;
+            const dragPercentage = ((newThumbX - rect.left) / rect.width) * 100;
+            const clampedPercentage = Math.max(0, Math.min(100, dragPercentage));
+            const newValue = Math.round((clampedPercentage / 100) * (max - min) + min);
             
-            if (clampedValue !== value) {
-              onChange(clampedValue);
+            if (newValue !== value) {
+              onChange(newValue);
             }
           }}
           whileHover={{ 
