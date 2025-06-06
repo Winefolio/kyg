@@ -281,6 +281,252 @@ export default function VideoEditorPackageEditorNew() {
     });
   };
 
+  // Render slide content based on type
+  const renderSlideContent = (slide: any, isPreview: boolean = false) => {
+    if (!slide) return null;
+
+    if (slide.type === 'wine_transition') {
+      return renderWineTransition(slide, isPreview);
+    }
+
+    const payload = slide.payloadJson || slide.payload_json || {};
+
+    switch (slide.type) {
+      case 'question':
+        return renderQuestionSlide(slide, payload, isPreview);
+      case 'interlude':
+        return renderInterludeSlide(slide, payload, isPreview);
+      case 'video_message':
+        return renderVideoSlide(slide, payload, isPreview);
+      case 'audio_message':
+        return renderAudioSlide(slide, payload, isPreview);
+      case 'media':
+        return renderMediaSlide(slide, payload, isPreview);
+      default:
+        return (
+          <div className="text-white text-center">
+            <p>Unsupported slide type: {slide.type}</p>
+          </div>
+        );
+    }
+  };
+
+  // Render question slide with proper question types
+  const renderQuestionSlide = (slide: any, payload: any, isPreview: boolean = false) => {
+    if (payload.question_type === 'multiple_choice') {
+      return (
+        <div className="w-full max-w-4xl mx-auto">
+          <MultipleChoiceQuestion
+            question={{
+              title: payload.title || payload.question || 'Question',
+              description: payload.description || '',
+              category: payload.category || 'General',
+              options: payload.options || [],
+              allow_multiple: payload.allow_multiple || payload.allowMultiple || false,
+              allow_notes: payload.allow_notes || payload.allowNotes || false
+            }}
+            value={null}
+            onChange={() => {}}
+          />
+        </div>
+      );
+    }
+
+    if (payload.question_type === 'scale') {
+      return (
+        <div className="w-full max-w-4xl mx-auto">
+          <ScaleQuestion
+            question={{
+              title: payload.title || 'Scale Question',
+              description: payload.description || '',
+              category: payload.category || 'Scale',
+              scale_min: payload.scale_min || 1,
+              scale_max: payload.scale_max || 10,
+              scale_labels: payload.scale_labels || ['Low', 'High']
+            }}
+            value={payload.scale_min || 1}
+            onChange={() => {}}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-full max-w-4xl mx-auto bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
+        <h3 className="text-xl font-bold text-white mb-4">{payload.title || 'Question'}</h3>
+        <p className="text-white/70 mb-4">{payload.description || ''}</p>
+        <Badge variant="outline" className="text-white">
+          {payload.question_type || 'Unknown Question Type'}
+        </Badge>
+      </div>
+    );
+  };
+
+  // Render interlude slide
+  const renderInterludeSlide = (slide: any, payload: any, isPreview: boolean = false) => {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-4xl mx-auto bg-gradient-to-br from-purple-900/90 to-indigo-900/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl text-center text-white relative overflow-hidden"
+      >
+        {payload.backgroundImage && (
+          <img 
+            src={payload.backgroundImage} 
+            alt="Background" 
+            className="absolute inset-0 w-full h-full object-cover opacity-30"
+          />
+        )}
+        <div className="relative z-10">
+          <h2 className="text-3xl font-bold mb-4">{payload.title || 'Take a Moment'}</h2>
+          <p className="text-xl text-white/90 mb-6">{payload.description || 'Reflect on this experience'}</p>
+          {payload.duration && (
+            <p className="text-purple-200">Duration: {payload.duration} seconds</p>
+          )}
+        </div>
+      </motion.div>
+    );
+  };
+
+  // Render video slide
+  const renderVideoSlide = (slide: any, payload: any, isPreview: boolean = false) => {
+    return (
+      <div className="w-full max-w-4xl mx-auto bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
+        <div className="text-center mb-6">
+          <h3 className="text-xl font-bold text-white mb-2">{payload.title || 'Video Message'}</h3>
+          <p className="text-white/70">{payload.description || ''}</p>
+        </div>
+        <div className="bg-black/50 rounded-2xl p-8 text-center">
+          <Video className="w-16 h-16 mx-auto mb-4 text-white/60" />
+          <p className="text-white/60">Video Player</p>
+          {payload.videoUrl && (
+            <p className="text-xs text-white/40 mt-2">URL: {payload.videoUrl}</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Render audio slide
+  const renderAudioSlide = (slide: any, payload: any, isPreview: boolean = false) => {
+    return (
+      <div className="w-full max-w-4xl mx-auto bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
+        <div className="text-center mb-6">
+          <h3 className="text-xl font-bold text-white mb-2">{payload.title || 'Audio Message'}</h3>
+          <p className="text-white/70">{payload.description || ''}</p>
+        </div>
+        <div className="bg-black/50 rounded-2xl p-8 text-center">
+          <Volume2 className="w-16 h-16 mx-auto mb-4 text-white/60" />
+          <p className="text-white/60">Audio Player</p>
+          {payload.audioUrl && (
+            <p className="text-xs text-white/40 mt-2">URL: {payload.audioUrl}</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Render media slide
+  const renderMediaSlide = (slide: any, payload: any, isPreview: boolean = false) => {
+    return (
+      <div className="w-full max-w-4xl mx-auto bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
+        <div className="text-center mb-6">
+          <h3 className="text-xl font-bold text-white mb-2">{payload.title || 'Media Gallery'}</h3>
+          <p className="text-white/70">{payload.description || ''}</p>
+        </div>
+        <div className="bg-black/50 rounded-2xl p-8 text-center">
+          <ImageIcon className="w-16 h-16 mx-auto mb-4 text-white/60" />
+          <p className="text-white/60">Media Gallery</p>
+          {payload.mediaItems && (
+            <p className="text-xs text-white/40 mt-2">{payload.mediaItems.length} items</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Render slide editor
+  const renderSlideEditor = () => {
+    if (!selectedSlide) return null;
+
+    const payload = selectedSlide.payloadJson || {};
+
+    return (
+      <div className="p-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Slide Preview */}
+          <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <Eye className="w-4 h-4" />
+              Live Preview
+            </h3>
+            <div className="bg-black rounded-xl p-4 min-h-[300px] flex items-center justify-center">
+              {renderSlideContent(selectedSlide, false)}
+            </div>
+          </div>
+
+          {/* Slide Properties */}
+          <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+            <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Slide Properties
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <Label className="text-white">Slide Type</Label>
+                <Badge variant="outline" className="text-white ml-2">
+                  {selectedSlide.type}
+                </Badge>
+              </div>
+              
+              {payload.title && (
+                <div>
+                  <Label className="text-white">Title</Label>
+                  <Input 
+                    value={payload.title || ''}
+                    className="bg-gray-700 border-gray-600 text-white mt-1"
+                    readOnly
+                  />
+                </div>
+              )}
+              
+              {payload.description && (
+                <div>
+                  <Label className="text-white">Description</Label>
+                  <Textarea 
+                    value={payload.description || ''}
+                    className="bg-gray-700 border-gray-600 text-white mt-1"
+                    readOnly
+                  />
+                </div>
+              )}
+
+              {payload.category && (
+                <div>
+                  <Label className="text-white">Category</Label>
+                  <Input 
+                    value={payload.category || ''}
+                    className="bg-gray-700 border-gray-600 text-white mt-1"
+                    readOnly
+                  />
+                </div>
+              )}
+
+              {payload.question_type && (
+                <div>
+                  <Label className="text-white">Question Type</Label>
+                  <Badge variant="outline" className="text-white ml-2">
+                    {payload.question_type}
+                  </Badge>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Render wine transition slide
   const renderWineTransition = (slide: any, isPreview: boolean = false) => {
     const payload = slide.payloadJson;
