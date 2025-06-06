@@ -51,7 +51,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { MultipleChoiceQuestion, ScaleQuestion } from '@/components/ui/question-types';
+import { MultipleChoiceQuestion } from '@/components/questions/MultipleChoiceQuestion';
+import { ScaleQuestion } from '@/components/questions/ScaleQuestion';
 
 interface Slide {
   id: string;
@@ -592,11 +593,8 @@ export default function VideoEditorPackageEditorNew() {
                 <X className="w-8 h-8" />
               </button>
               
-              <div className="relative w-full h-full flex items-center justify-center">
-                {getAllSlidesWithTransitions()[previewSlideIndex]?.type === 'wine_transition' ? 
-                  renderWineTransition(getAllSlidesWithTransitions()[previewSlideIndex], true) : 
-                  <div className="text-white">Regular slide content would go here</div>
-                }
+              <div className="relative w-full h-full flex items-center justify-center p-6">
+                {renderSlideContent(getAllSlidesWithTransitions()[previewSlideIndex], true)}
               </div>
               
               <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-4">
@@ -624,16 +622,8 @@ export default function VideoEditorPackageEditorNew() {
               </div>
             </motion.div>
           ) : selectedSlide ? (
-            <div className="flex-1 p-6 overflow-y-auto">
-              <div className="bg-gradient-card backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
-                <h3 className="text-xl font-bold text-white mb-2">{selectedSlide.title}</h3>
-                <p className="text-white/70">{selectedSlide.description}</p>
-                <div className="mt-4">
-                  <Badge variant="outline" className="text-white">
-                    {selectedSlide.type}
-                  </Badge>
-                </div>
-              </div>
+            <div className="flex-1 overflow-y-auto">
+              {renderSlideEditor()}
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center">

@@ -33,7 +33,7 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
     const allText = [
       question.title,
       question.description,
-      ...question.scale_labels
+      ...(Array.isArray(question.scale_labels) ? question.scale_labels : [])
     ].join(' ');
     
     return extractRelevantTerms(allText, terms);
@@ -123,22 +123,24 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
         />
         
         {/* Single Set of Dynamic Visual Label Feedback */}
-        <div className="flex justify-between text-sm font-medium">
-          <motion.span 
-            className="text-white"
-            animate={{ opacity: leftLabelOpacity, scale: leftLabelScale }}
-            transition={{ duration: 0.2 }}
-          >
-            {question.scale_labels[0]}
-          </motion.span>
-          <motion.span 
-            className="text-white"
-            animate={{ opacity: rightLabelOpacity, scale: rightLabelScale }}
-            transition={{ duration: 0.2 }}
-          >
-            {question.scale_labels[1]}
-          </motion.span>
-        </div>
+        {Array.isArray(question.scale_labels) && question.scale_labels.length >= 2 && (
+          <div className="flex justify-between text-sm font-medium">
+            <motion.span 
+              className="text-white"
+              animate={{ opacity: leftLabelOpacity, scale: leftLabelScale }}
+              transition={{ duration: 0.2 }}
+            >
+              {question.scale_labels[0]}
+            </motion.span>
+            <motion.span 
+              className="text-white"
+              animate={{ opacity: rightLabelOpacity, scale: rightLabelScale }}
+              transition={{ duration: 0.2 }}
+            >
+              {question.scale_labels[1]}
+            </motion.span>
+          </div>
+        )}
       </div>
 
 
