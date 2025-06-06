@@ -65,6 +65,20 @@ export function SlidePreview({ slide, mode }: SlidePreviewProps) {
                   </div>
                 ))}
               </RadioGroup>
+              
+              {/* Interactive Continue Button */}
+              <div className="flex justify-center mt-6">
+                <Button 
+                  disabled={!currentAnswer}
+                  className={`px-6 py-2 rounded-full transition-all ${
+                    currentAnswer 
+                      ? 'bg-white text-purple-900 hover:bg-white/90' 
+                      : 'bg-white/20 text-white/50 cursor-not-allowed'
+                  }`}
+                >
+                  Continue
+                </Button>
+              </div>
             </div>
           )}
 
@@ -87,6 +101,15 @@ export function SlidePreview({ slide, mode }: SlidePreviewProps) {
                 step={1}
                 className="w-full"
               />
+              
+              {/* Interactive Continue Button for Scale */}
+              <div className="flex justify-center mt-6">
+                <Button 
+                  className="px-6 py-2 rounded-full bg-white text-purple-900 hover:bg-white/90 transition-all"
+                >
+                  Continue
+                </Button>
+              </div>
             </div>
           )}
 

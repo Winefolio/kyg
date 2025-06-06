@@ -831,14 +831,15 @@ export default function SommelierDashboard() {
                 </div>
               ) : (
                 <>
-                  {/* Overview Stats */}
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6 text-center">
-                      <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                      <div className="text-2xl font-bold text-white">
+                  {/* Overview Stats - Bento Box Mobile Layout */}
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+                    {/* Large card - spans 2 columns on mobile */}
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center col-span-2 lg:col-span-1">
+                      <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-blue-400 mx-auto mb-2" />
+                      <div className="text-xl md:text-2xl font-bold text-white">
                         {packages?.length || 0}
                       </div>
-                      <div className="text-white/70 text-sm">
+                      <div className="text-white/70 text-xs md:text-sm">
                         Total Packages
                       </div>
                       <div className="text-green-400 text-xs mt-1">
@@ -846,32 +847,32 @@ export default function SommelierDashboard() {
                       </div>
                     </Card>
 
-                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6 text-center">
-                      <Users className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                      <div className="text-2xl font-bold text-white">
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
+                      <Users className="w-6 h-6 md:w-8 md:h-8 text-purple-400 mx-auto mb-2" />
+                      <div className="text-xl md:text-2xl font-bold text-white">
                         {sessions?.length || 0}
                       </div>
-                      <div className="text-white/70 text-sm">
-                        Total Sessions
+                      <div className="text-white/70 text-xs md:text-sm">
+                        Sessions
                       </div>
                       <div className="text-green-400 text-xs mt-1">
                         {sessions?.filter(s => s.status === 'active').length || 0} active
                       </div>
                     </Card>
 
-                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6 text-center">
-                      <Activity className="w-8 h-8 text-pink-400 mx-auto mb-2" />
-                      <div className="text-2xl font-bold text-white">
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
+                      <Activity className="w-6 h-6 md:w-8 md:h-8 text-pink-400 mx-auto mb-2" />
+                      <div className="text-xl md:text-2xl font-bold text-white">
                         {sessions?.reduce((total, s) => total + s.participantCount, 0) || 0}
                       </div>
-                      <div className="text-white/70 text-sm">
-                        Total Participants
+                      <div className="text-white/70 text-xs md:text-sm">
+                        Participants
                       </div>
                     </Card>
 
-                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6 text-center">
-                      <BarChart3 className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
-                      <div className="text-2xl font-bold text-white">
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
+                      <BarChart3 className="w-6 h-6 md:w-8 md:h-8 text-yellow-400 mx-auto mb-2" />
+                      <div className="text-xl md:text-2xl font-bold text-white">
                         {sessions && sessions.length > 0
                           ? Math.round(
                               (sessions.reduce((total, s) => total + s.participantCount, 0) /
@@ -880,51 +881,51 @@ export default function SommelierDashboard() {
                             ) / 10
                           : 0}
                       </div>
-                      <div className="text-white/70 text-sm">
-                        Avg Participants
+                      <div className="text-white/70 text-xs md:text-sm">
+                        Avg Rate
                       </div>
                     </Card>
 
-                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6 text-center">
-                      <Wine className="w-8 h-8 text-red-400 mx-auto mb-2" />
-                      <div className="text-2xl font-bold text-white">
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
+                      <Wine className="w-6 h-6 md:w-8 md:h-8 text-red-400 mx-auto mb-2" />
+                      <div className="text-xl md:text-2xl font-bold text-white">
                         {packages?.reduce((total, p) => total + (p.wines?.length || 0), 0) || 0}
                       </div>
-                      <div className="text-white/70 text-sm">
+                      <div className="text-white/70 text-xs md:text-sm">
                         Total Wines
                       </div>
                     </Card>
                   </div>
 
-                  {/* Package Performance */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6">
-                      <h3 className="text-white font-semibold text-lg mb-4">
+                  {/* Package Performance - Mobile Optimized */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6">
+                      <h3 className="text-white font-semibold text-base md:text-lg mb-3 md:mb-4">
                         Package Performance
                       </h3>
-                      <div className="space-y-4">
-                        {packages?.slice(0, 5).map((pkg, index) => (
+                      <div className="space-y-2 md:space-y-3">
+                        {packages?.slice(0, 3).map((pkg, index) => (
                           <motion.div
                             key={pkg.id}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: index * 0.1 }}
-                            className="bg-white/5 rounded-lg p-4 border border-white/10"
+                            className="bg-white/5 rounded-lg p-3 border border-white/10"
                           >
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center space-x-3">
-                                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-purple-400 to-pink-400"></div>
-                                <h4 className="text-white font-medium">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 flex-shrink-0"></div>
+                                <h4 className="text-white font-medium text-sm truncate">
                                   {pkg.name}
                                 </h4>
                                 <Badge
                                   variant="outline"
-                                  className="text-xs border-white/20 text-white/70"
+                                  className="text-xs border-white/20 text-white/70 flex-shrink-0"
                                 >
-                                  {pkg.wines?.length || 0} wines
+                                  {pkg.wines?.length || 0}
                                 </Badge>
                               </div>
-                              <div className="text-white/60 text-sm">
+                              <div className="text-white/60 text-xs md:text-sm flex-shrink-0 ml-2">
                                 {sessions?.filter(s => s.packageCode === pkg.code).length || 0} sessions
                               </div>
                             </div>
@@ -933,12 +934,12 @@ export default function SommelierDashboard() {
                       </div>
                     </Card>
 
-                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6">
-                      <h3 className="text-white font-semibold text-lg mb-4">
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6">
+                      <h3 className="text-white font-semibold text-base md:text-lg mb-3 md:mb-4">
                         Recent Activity
                       </h3>
-                      <div className="space-y-3">
-                        {sessions?.slice(0, 5).map((session, index) => (
+                      <div className="space-y-2 md:space-y-3">
+                        {sessions?.slice(0, 3).map((session, index) => (
                           <motion.div
                             key={session.id}
                             initial={{ opacity: 0, x: 20 }}
@@ -947,8 +948,8 @@ export default function SommelierDashboard() {
                             className="bg-white/5 rounded-lg p-3 border border-white/10"
                           >
                             <div className="flex items-center justify-between">
-                              <div>
-                                <div className="text-white font-medium text-sm">
+                              <div className="min-w-0 flex-1">
+                                <div className="text-white font-medium text-sm truncate">
                                   Session {session.code}
                                 </div>
                                 <div className="text-white/60 text-xs">
@@ -956,7 +957,7 @@ export default function SommelierDashboard() {
                                 </div>
                               </div>
                               <Badge 
-                                className={`text-xs ${
+                                className={`text-xs flex-shrink-0 ml-2 ${
                                   session.status === 'active' 
                                     ? 'bg-green-500/20 text-green-400' 
                                     : 'bg-gray-500/20 text-gray-400'
