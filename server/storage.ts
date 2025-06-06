@@ -994,7 +994,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllSessions(): Promise<Session[]> {
-    return await db.select().from(sessions).orderBy(sessions.createdAt);
+    return await db.select().from(sessions).orderBy(sessions.id);
   }
 }
 

@@ -31,7 +31,18 @@ import {
   MessageSquare,
   Star,
   Clock,
-  Download
+  Download,
+  QrCode,
+  Link,
+  Send,
+  Mail,
+  ExternalLink,
+  ChevronDown,
+  ChevronRight,
+  Move,
+  GripVertical,
+  TrendingUp,
+  Activity
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -57,6 +68,13 @@ interface PackageWine {
   slides: Slide[];
 }
 
+interface WineForm {
+  wineName: string;
+  wineDescription: string;
+  wineImageUrl: string;
+  position: number;
+}
+
 interface Slide {
   id: string;
   packageWineId: string;
@@ -79,6 +97,7 @@ interface Session {
 
 type TabType = 'packages' | 'sessions' | 'analytics';
 type PackageModalMode = 'create' | 'edit' | 'view';
+type WineModalMode = 'create' | 'edit' | 'view';
 
 export default function SommelierDashboard() {
   const [, setLocation] = useLocation();
@@ -86,7 +105,12 @@ export default function SommelierDashboard() {
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [packageModalOpen, setPackageModalOpen] = useState(false);
   const [packageModalMode, setPackageModalMode] = useState<PackageModalMode>('view');
-  const [editingSlide, setEditingSlide] = useState<Slide | null>(null);
+  const [wineModalOpen, setWineModalOpen] = useState(false);
+  const [wineModalMode, setWineModalMode] = useState<WineModalMode>('create');
+  const [selectedWine, setSelectedWine] = useState<PackageWine | null>(null);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedSessionForQR, setSelectedSessionForQR] = useState<Session | null>(null);
+  const [expandedPackages, setExpandedPackages] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -159,9 +183,100 @@ export default function SommelierDashboard() {
     setPackageModalOpen(true);
   };
 
+  // Wine management mutations
+  const createWineMutation = useMutation({
+    mutationFn: async (data: WineForm & { packageId: string }) => {
+      const response = await fetch('/api/package-wines', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) throw new Error('Failed to create wine');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
+      setWineModalOpen(false);
+      toast({ title: "Wine added successfully" });
+    }
+  });
+
+  const updateWineMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string, data: WineForm }) => {
+      const response = await fetch(`/api/package-wines/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) throw new Error('Failed to update wine');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
+      setWineModalOpen(false);
+      toast({ title: "Wine updated successfully" });
+    }
+  });
+
+  const deleteWineMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/package-wines/${id}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error('Failed to delete wine');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
+      toast({ title: "Wine deleted successfully" });
+    }
+  });
+
+  // Create session mutation
+  const createSessionMutation = useMutation({
+    mutationFn: async (packageCode: string) => {
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packageCode })
+      });
+      if (!response.ok) throw new Error('Failed to create session');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      toast({ title: "Session created successfully" });
+      // Show QR code modal with new session
+      setSelectedSessionForQR(data.session);
+      setShowQRModal(true);
+    }
+  });
+
   const copyPackageCode = (code: string) => {
     navigator.clipboard.writeText(code);
     toast({ title: "Package code copied to clipboard" });
+  };
+
+  const copySessionLink = (sessionCode: string) => {
+    const link = `${window.location.origin}/session/${sessionCode}`;
+    navigator.clipboard.writeText(link);
+    toast({ title: "Session link copied to clipboard" });
+  };
+
+  const togglePackageExpansion = (packageId: string) => {
+    const newExpanded = new Set(expandedPackages);
+    if (newExpanded.has(packageId)) {
+      newExpanded.delete(packageId);
+    } else {
+      newExpanded.add(packageId);
+    }
+    setExpandedPackages(newExpanded);
+  };
+
+  const openWineModal = (mode: WineModalMode, wine?: PackageWine) => {
+    setWineModalMode(mode);
+    setSelectedWine(wine || null);
+    setWineModalOpen(true);
   };
 
   return (
@@ -258,76 +373,202 @@ export default function SommelierDashboard() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.1 }}
                       >
-                        <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6 hover:border-white/30 transition-all duration-300">
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-2">
-                                <h3 className="text-white font-semibold text-lg">{pkg.name}</h3>
-                                <Badge 
-                                  variant={pkg.isActive ? "default" : "secondary"}
-                                  className={pkg.isActive ? "bg-green-500/20 text-green-200" : "bg-gray-500/20 text-gray-200"}
-                                >
-                                  {pkg.isActive ? 'Active' : 'Inactive'}
-                                </Badge>
-                              </div>
-                              
-                              <div className="flex items-center space-x-2 mb-3">
-                                <code className="bg-white/10 text-purple-200 px-2 py-1 rounded text-sm font-mono">
-                                  {pkg.code}
-                                </code>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => copyPackageCode(pkg.code)}
-                                  className="p-1 h-auto text-white/60 hover:text-white hover:bg-white/10"
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </Button>
-                              </div>
-                              
-                              <p className="text-white/70 text-sm mb-4 line-clamp-2">{pkg.description}</p>
-                              
-                              <div className="flex items-center space-x-4 text-sm text-white/60">
-                                <div className="flex items-center space-x-1">
-                                  <Wine className="w-4 h-4" />
-                                  <span>{pkg.wines?.length || 0} wines</span>
+                        <Card className="bg-gradient-card backdrop-blur-xl border-white/20 hover:border-white/30 transition-all duration-300">
+                          {/* Package Header */}
+                          <div className="p-6 border-b border-white/10">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-3 mb-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => togglePackageExpansion(pkg.id)}
+                                    className="p-1 h-auto text-white/60 hover:text-white hover:bg-white/10"
+                                  >
+                                    {expandedPackages.has(pkg.id) ? 
+                                      <ChevronDown className="w-4 h-4" /> : 
+                                      <ChevronRight className="w-4 h-4" />
+                                    }
+                                  </Button>
+                                  <h3 className="text-white font-semibold text-lg">{pkg.name}</h3>
+                                  <Badge 
+                                    variant={pkg.isActive ? "default" : "secondary"}
+                                    className={pkg.isActive ? "bg-green-500/20 text-green-200" : "bg-gray-500/20 text-gray-200"}
+                                  >
+                                    {pkg.isActive ? 'Active' : 'Inactive'}
+                                  </Badge>
                                 </div>
-                                <div className="flex items-center space-x-1">
-                                  <Clock className="w-4 h-4" />
-                                  <span>{new Date(pkg.createdAt).toLocaleDateString()}</span>
+                                
+                                <div className="flex items-center space-x-2 mb-3">
+                                  <code className="bg-white/10 text-purple-200 px-2 py-1 rounded text-sm font-mono">
+                                    {pkg.code}
+                                  </code>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => copyPackageCode(pkg.code)}
+                                    className="p-1 h-auto text-white/60 hover:text-white hover:bg-white/10"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                                
+                                <p className="text-white/70 text-sm mb-4">{pkg.description}</p>
+                                
+                                <div className="flex items-center space-x-4 text-sm text-white/60">
+                                  <div className="flex items-center space-x-1">
+                                    <Wine className="w-4 h-4" />
+                                    <span>{pkg.wines?.length || 0} wines</span>
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <Clock className="w-4 h-4" />
+                                    <span>{new Date(pkg.createdAt).toLocaleDateString()}</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
+                            
+                            <div className="flex space-x-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => createSessionMutation.mutate(pkg.code)}
+                                className="text-white hover:bg-white/10"
+                                disabled={createSessionMutation.isPending}
+                              >
+                                <QrCode className="w-4 h-4 mr-2" />
+                                Create Session
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openPackageModal('view', pkg)}
+                                className="text-white hover:bg-white/10"
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openPackageModal('edit', pkg)}
+                                className="text-white hover:bg-white/10"
+                              >
+                                <Edit3 className="w-4 h-4 mr-2" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deletePackageMutation.mutate(pkg.id)}
+                                className="text-red-300 hover:bg-red-500/20"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
-                          
-                          <div className="flex space-x-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openPackageModal('view', pkg)}
-                              className="flex-1 text-white hover:bg-white/10"
-                            >
-                              <Eye className="w-4 h-4 mr-2" />
-                              View
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openPackageModal('edit', pkg)}
-                              className="flex-1 text-white hover:bg-white/10"
-                            >
-                              <Edit3 className="w-4 h-4 mr-2" />
-                              Edit
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => deletePackageMutation.mutate(pkg.id)}
-                              className="text-red-300 hover:bg-red-500/20"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+
+                          {/* Expandable Wine Management Section */}
+                          <AnimatePresence>
+                            {expandedPackages.has(pkg.id) && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="p-6 space-y-4">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-white font-medium">Wines in Package</h4>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedPackage(pkg);
+                                        openWineModal('create');
+                                      }}
+                                      className="bg-white/10 text-white hover:bg-white/20"
+                                    >
+                                      <Plus className="w-4 h-4 mr-2" />
+                                      Add Wine
+                                    </Button>
+                                  </div>
+
+                                  {pkg.wines && pkg.wines.length > 0 ? (
+                                    <div className="space-y-3">
+                                      {pkg.wines.map((wine, wineIndex) => (
+                                        <motion.div
+                                          key={wine.id}
+                                          initial={{ opacity: 0, x: -20 }}
+                                          animate={{ opacity: 1, x: 0 }}
+                                          transition={{ delay: wineIndex * 0.1 }}
+                                          className="bg-white/5 rounded-lg p-4 border border-white/10"
+                                        >
+                                          <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                              <div className="flex items-center space-x-2 mb-2">
+                                                <GripVertical className="w-4 h-4 text-white/40" />
+                                                <h5 className="text-white font-medium">{wine.wineName}</h5>
+                                                <Badge variant="outline" className="text-xs border-white/20 text-white/70">
+                                                  Position {wine.position}
+                                                </Badge>
+                                              </div>
+                                              {wine.wineDescription && (
+                                                <p className="text-white/60 text-sm mb-2">{wine.wineDescription}</p>
+                                              )}
+                                              <div className="flex items-center space-x-4 text-xs text-white/50">
+                                                <span>{wine.slides?.length || 0} slides</span>
+                                                {wine.wineImageUrl && (
+                                                  <span className="flex items-center space-x-1">
+                                                    <ImageIcon className="w-3 h-3" />
+                                                    <span>Image attached</span>
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                            
+                                            <div className="flex space-x-1">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => openWineModal('edit', wine)}
+                                                className="text-white/60 hover:text-white hover:bg-white/10"
+                                              >
+                                                <Edit3 className="w-3 h-3" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => deleteWineMutation.mutate(wine.id)}
+                                                className="text-red-300/60 hover:text-red-300 hover:bg-red-500/10"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        </motion.div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="text-center py-8 text-white/50">
+                                      <Wine className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                      <p className="text-sm">No wines added yet</p>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setSelectedPackage(pkg);
+                                          openWineModal('create');
+                                        }}
+                                        className="mt-2 text-white/70 hover:text-white hover:bg-white/10"
+                                      >
+                                        Add your first wine
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
                         </Card>
                       </motion.div>
                     ))}
@@ -456,6 +697,32 @@ export default function SommelierDashboard() {
           }}
         />
       )}
+
+      {/* Wine Modal */}
+      {wineModalOpen && selectedPackage && (
+        <WineModal
+          mode={wineModalMode}
+          wine={selectedWine}
+          packageId={selectedPackage.id}
+          onClose={() => setWineModalOpen(false)}
+          onSave={(data) => {
+            if (wineModalMode === 'create') {
+              createWineMutation.mutate({ ...data, packageId: selectedPackage.id });
+            } else if (wineModalMode === 'edit' && selectedWine) {
+              updateWineMutation.mutate({ id: selectedWine.id, data });
+            }
+          }}
+        />
+      )}
+
+      {/* QR Code Modal */}
+      {showQRModal && selectedSessionForQR && (
+        <QRCodeModal
+          session={selectedSessionForQR}
+          onClose={() => setShowQRModal(false)}
+          onCopyLink={(sessionCode) => copySessionLink(sessionCode)}
+        />
+      )}
     </div>
   );
 }
@@ -466,6 +733,214 @@ interface PackageModalProps {
   package: Package | null;
   onClose: () => void;
   onSave: (data: any) => void;
+}
+
+// Wine Modal Component
+interface WineModalProps {
+  mode: WineModalMode;
+  wine: PackageWine | null;
+  packageId: string;
+  onClose: () => void;
+  onSave: (data: WineForm) => void;
+}
+
+function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalProps) {
+  const [formData, setFormData] = useState<WineForm>({
+    wineName: wine?.wineName || '',
+    wineDescription: wine?.wineDescription || '',
+    wineImageUrl: wine?.wineImageUrl || '',
+    position: wine?.position || 1
+  });
+
+  const handleSave = () => {
+    onSave(formData);
+  };
+
+  const isReadOnly = mode === 'view';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-white font-semibold text-xl">
+            {mode === 'create' ? 'Add Wine' : mode === 'edit' ? 'Edit Wine' : 'Wine Details'}
+          </h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="text-white hover:bg-white/10"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <Label className="text-white">Wine Name</Label>
+            <Input
+              value={formData.wineName}
+              onChange={(e) => setFormData(prev => ({ ...prev, wineName: e.target.value }))}
+              className="bg-white/10 border-white/20 text-white"
+              placeholder="Enter wine name"
+              disabled={isReadOnly}
+            />
+          </div>
+
+          <div>
+            <Label className="text-white">Description</Label>
+            <Textarea
+              value={formData.wineDescription}
+              onChange={(e) => setFormData(prev => ({ ...prev, wineDescription: e.target.value }))}
+              className="bg-white/10 border-white/20 text-white"
+              placeholder="Describe this wine"
+              disabled={isReadOnly}
+            />
+          </div>
+
+          <div>
+            <Label className="text-white">Wine Image URL</Label>
+            <Input
+              value={formData.wineImageUrl}
+              onChange={(e) => setFormData(prev => ({ ...prev, wineImageUrl: e.target.value }))}
+              className="bg-white/10 border-white/20 text-white"
+              placeholder="https://example.com/wine-image.jpg"
+              disabled={isReadOnly}
+            />
+          </div>
+
+          <div>
+            <Label className="text-white">Position in Package</Label>
+            <Input
+              type="number"
+              min="1"
+              value={formData.position}
+              onChange={(e) => setFormData(prev => ({ ...prev, position: parseInt(e.target.value) || 1 }))}
+              className="bg-white/10 border-white/20 text-white"
+              disabled={isReadOnly}
+            />
+          </div>
+
+          {!isReadOnly && (
+            <div className="flex space-x-3 pt-4">
+              <Button
+                onClick={handleSave}
+                className="flex-1 bg-white text-purple-900 hover:bg-white/90"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {mode === 'create' ? 'Add Wine' : 'Save Changes'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={onClose}
+                className="flex-1 text-white hover:bg-white/10"
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// QR Code Modal Component
+interface QRCodeModalProps {
+  session: Session;
+  onClose: () => void;
+  onCopyLink: (sessionCode: string) => void;
+}
+
+function QRCodeModal({ session, onClose, onCopyLink }: QRCodeModalProps) {
+  const sessionUrl = `${window.location.origin}/session/${session.code}`;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-8 w-full max-w-md"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-white font-semibold text-xl">Session Created</h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="text-white hover:bg-white/10"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+
+        <div className="text-center space-y-6">
+          {/* QR Code Placeholder */}
+          <div className="bg-white p-4 rounded-2xl mx-auto w-48 h-48 flex items-center justify-center">
+            <div className="text-center">
+              <QrCode className="w-12 h-12 text-gray-600 mx-auto mb-2" />
+              <p className="text-gray-600 text-sm">QR Code for</p>
+              <p className="font-mono text-sm">{session.code}</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <Label className="text-white/70 text-sm">Session Code</Label>
+              <div className="bg-white/10 rounded-lg p-3 border border-white/20">
+                <code className="text-white font-mono text-lg">{session.code}</code>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-white/70 text-sm">Direct Link</Label>
+              <div className="bg-white/10 rounded-lg p-3 border border-white/20">
+                <p className="text-white/80 text-sm break-all">{sessionUrl}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex space-x-3">
+            <Button
+              onClick={() => onCopyLink(session.code)}
+              className="flex-1 bg-white text-purple-900 hover:bg-white/90"
+            >
+              <Link className="w-4 h-4 mr-2" />
+              Copy Link
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="flex-1 border-white/20 text-white hover:bg-white/10"
+            >
+              <Send className="w-4 h-4 mr-2" />
+              Share
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
 }
 
 function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps) {
