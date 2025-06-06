@@ -499,7 +499,7 @@ export default function VideoEditorPackageEditorNew() {
                   onDragEnd={handleDragEnd}
                 >
                   <div className="space-y-3">
-                    {winesData?.map((wine: Wine) => {
+                    {selectedPackage?.wines?.map((wine: Wine) => {
                       const wineSlides = slidesByWine[wine.id] || [];
                       return (
                         <div 
