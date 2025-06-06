@@ -285,7 +285,7 @@ export function SlidePreview({ slide, mode }: SlidePreviewProps) {
           <p className="text-white/70 text-sm">{payload.description}</p>
         )}
         <Badge variant="secondary" className="mt-4">
-          {slide.type.replace('_', ' ')}
+          {String(slide.type).replace('_', ' ')}
         </Badge>
       </Card>
     </div>

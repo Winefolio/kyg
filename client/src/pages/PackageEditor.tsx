@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import type { Package, PackageWine, Slide } from "@shared/schema";
 import { WineModal } from '@/components/WineModal';
+import { SlidePreview } from '@/components/SlidePreview';
 
 type EditorData = Package & { wines: PackageWine[]; slides: Slide[] };
 
@@ -299,7 +300,7 @@ export default function PackageEditor() {
         </div>
       </div>
 
-      <div className="flex h-[calc(100vh-73px)]">
+      <div className="flex h-[calc(100vh-57px)]">
         {/* Sidebar */}
         <AnimatePresence>
           {sidebarOpen && (
@@ -416,18 +417,19 @@ export default function PackageEditor() {
 
                                 {/* Add Slide Templates */}
                                 <div className="pt-2 border-t border-white/10">
-                                  <p className="text-xs text-white/60 mb-2">Add Slide:</p>
-                                  <div className="grid grid-cols-2 gap-2">
+                                  <p className="text-xs text-white/60 mb-3">Add Slide:</p>
+                                  <div className="grid grid-cols-1 gap-2">
                                     {SLIDE_TEMPLATES.map(template => (
                                       <Button
-                                        key={template.type}
+                                        key={`${template.type}-${template.name}`}
                                         size="sm"
                                         variant="outline"
-                                        className="text-xs h-8"
+                                        className="text-xs h-9 justify-start"
                                         onClick={() => handleAddSlide(wine.id, template)}
+                                        title={template.description}
                                       >
-                                        <template.icon className="mr-1 h-3 w-3" />
-                                        {template.name}
+                                        <template.icon className="mr-2 h-3 w-3 flex-shrink-0" />
+                                        <span className="truncate">{template.name}</span>
                                       </Button>
                                     ))}
                                   </div>
@@ -677,6 +679,33 @@ export default function PackageEditor() {
                         Save Changes
                       </Button>
                     </div>
+                  </div>
+                </div>
+
+                {/* Live Preview Section */}
+                <div className="mt-8 border-t border-white/10 pt-8">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-white">Live Preview</h3>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant={previewMode === 'desktop' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setPreviewMode('desktop')}
+                      >
+                        <Monitor className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant={previewMode === 'mobile' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setPreviewMode('mobile')}
+                      >
+                        <Smartphone className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-black/20 rounded-lg p-4 border border-white/10">
+                    <SlidePreview slide={activeSlide} mode={previewMode} />
                   </div>
                 </div>
               </motion.div>
