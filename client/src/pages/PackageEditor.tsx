@@ -252,8 +252,8 @@ export default function PackageEditor() {
   return (
     <div className="min-h-screen bg-gradient-primary text-white">
       {/* Header */}
-      <div className="sticky top-0 z-50 border-b border-white/10 bg-black/20 backdrop-blur-xl">
-        <div className="flex items-center justify-between p-4">
+      <div className="sticky top-0 z-40 border-b border-white/10 bg-black/20 backdrop-blur-xl">
+        <div className="flex items-center justify-between px-4 py-2">
           <div className="flex items-center space-x-4">
             <Button
               variant="ghost"
@@ -270,8 +270,8 @@ export default function PackageEditor() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-xl font-bold">{editorData.name}</h1>
-              <p className="text-white/60 text-sm">Package Code: {editorData.code}</p>
+              <h1 className="text-lg font-bold">{editorData.name}</h1>
+              <p className="text-white/60 text-xs">Code: {editorData.code}</p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -308,7 +308,7 @@ export default function PackageEditor() {
               animate={{ x: 0 }}
               exit={{ x: -320 }}
               transition={{ type: "spring", damping: 20 }}
-              className="fixed lg:relative inset-y-0 left-0 z-40 w-80 bg-black/20 backdrop-blur-xl border-r border-white/10 overflow-y-auto"
+              className="fixed lg:relative inset-y-0 left-0 z-50 w-80 bg-black/20 backdrop-blur-xl border-r border-white/10 overflow-y-auto"
             >
               <div className="p-4">
                 <div className="flex items-center justify-between mb-6">
