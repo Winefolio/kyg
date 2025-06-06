@@ -1370,10 +1370,77 @@ export default function VideoEditorPackageEditorNew() {
                       />
                     )}
                     <div className="absolute inset-0 bg-black/30" />
-                    <div className="relative z-10 text-center text-white p-4">
+                    
+                    {/* Animation overlay based on type */}
+                    {payload.animationType === 'celebration' && (
+                      <div className="absolute inset-0 overflow-hidden">
+                        {[...Array(20)].map((_, i) => (
+                          <motion.div
+                            key={i}
+                            initial={{ y: '100%', x: Math.random() * 100 + '%', opacity: 0 }}
+                            animate={{ 
+                              y: '-20%', 
+                              opacity: [0, 1, 1, 0],
+                              rotate: Math.random() * 360 
+                            }}
+                            transition={{ 
+                              duration: 3, 
+                              delay: Math.random() * 2,
+                              repeat: Infinity,
+                              repeatDelay: Math.random() * 3
+                            }}
+                            className="absolute w-2 h-2 bg-yellow-400 rounded-full"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    
+                    {payload.animationType === 'particle_flow' && (
+                      <div className="absolute inset-0">
+                        {[...Array(15)].map((_, i) => (
+                          <motion.div
+                            key={i}
+                            initial={{ x: '-10%', opacity: 0 }}
+                            animate={{ 
+                              x: '110%', 
+                              opacity: [0, 0.6, 0],
+                            }}
+                            transition={{ 
+                              duration: 4, 
+                              delay: i * 0.3,
+                              repeat: Infinity,
+                              ease: "linear"
+                            }}
+                            className="absolute top-1/2 w-1 h-20 bg-white/20 rounded-full"
+                            style={{ transform: `translateY(${Math.random() * 200 - 100}px) rotate(45deg)` }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    
+                    <motion.div 
+                      className="relative z-10 text-center text-white p-4"
+                      initial={{ 
+                        opacity: payload.animationType === 'zoom_in' ? 0 : 1,
+                        scale: payload.animationType === 'zoom_in' ? 0.8 : 1,
+                        x: payload.animationType === 'slide_transition' ? -50 : 0
+                      }}
+                      animate={{ 
+                        opacity: 1,
+                        scale: 1,
+                        x: 0
+                      }}
+                      transition={{ 
+                        duration: payload.animationType === 'gentle_fade' ? 2 : 1,
+                        ease: "easeOut"
+                      }}
+                    >
                       <h2 className="text-2xl font-bold mb-4">{selectedSlide.title || 'Title'}</h2>
                       <p className="text-lg opacity-80">{selectedSlide.description || 'Description'}</p>
-                    </div>
+                      <div className="mt-4 text-sm opacity-60">
+                        Animation: {payload.animationType?.replace('_', ' ').toUpperCase() || 'GENTLE FADE'}
+                      </div>
+                    </motion.div>
                   </div>
                 </motion.div>
               </div>
