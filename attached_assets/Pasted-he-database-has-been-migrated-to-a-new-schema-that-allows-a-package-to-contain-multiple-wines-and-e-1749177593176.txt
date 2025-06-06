@@ -1,0 +1,65 @@
+he database has been migrated to a new schema that allows a package to contain multiple wines, and each wine to contain multiple slides. This is the foundational change for building a realistic tasting experience. We must now update our application's data layer (Drizzle schema and storage methods) to reflect this new reality, making it possible to create, manage, and fetch data in a multi-wine context.
+
+What Needs to Be Done:
+
+Define the new packageWines table in the Drizzle schema.
+Update the slides table schema to be linked via packageWineId.
+Rewrite the initializeWineTastingData function to seed a proper multi-wine package.
+Create new data access methods for fetching wines and their corresponding slides.
+How to Implement (Code Changes & Guidance):
+
+Update Drizzle Schema (shared/schema.ts):
+
+Action: Define the packageWines table schema and update the slides table. This code should mirror the SQL structure you've already applied.
+Implementation:
+TypeScript
+
+// Add this new table schema definition
+export const packageWines = pgTable("package_wines", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  packageId: uuid("package_id").notNull().references(() => packages.id, { onDelete: "cascade" }),
+  position: integer("position").notNull(),
+  wineName: text("wine_name").notNull(),
+  wineDescription: text("wine_description"),
+  wineImageUrl: text("wine_image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniquePosition: unique().on(table.packageId, table.position)
+}));
+
+// Modify the existing slides table schema
+export const slides = pgTable("slides", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  // Add the new foreign key. This is now the primary link for slides.
+  packageWineId: uuid("package_wine_id").notNull().references(() => packageWines.id, { onDelete: "cascade" }),
+  position: integer("position").notNull(),
+  type: varchar("type", { length: 50 }).$type<typeof slideTypes[number]>().notNull(),
+  section_type: varchar("section_type", { length: 20 }),
+  payloadJson: jsonb("payload_json").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+   // The old packageId is now obsolete for slide lookups. Remove it.
+  // packageId: uuid("package_id").references(() => packages.id, { onDelete: "cascade" }),
+}, (table) => ({
+    packageWinePositionIdx: index("idx_slides_package_wine_position").on(table.packageWineId, table.position)
+}));
+Rewrite Data Seeding Logic (server/storage.ts):
+
+Action: The initializeWineTastingData method must be completely overhauled to create a proper multi-wine package based on the logic from our master SQL script.
+Implementation Guidance:
+Delete the current content of initializeWineTastingData.
+First, createPackage for "Bordeaux Discovery Collection".
+Then, use the returned packageId to createPackageWine twice (you'll need a new createPackageWine method). Create "2018 Château Margaux" and "2019 Château Latour".
+For each of the returned packageWine objects, loop through and createSlide for the 5 replicated slides, linking them with the correct packageWineId. You can define the slide data in a constant array to avoid repetition. Ensure the payloadJson for scale questions includes the feedback_tiers we designed.
+Refactor Storage Methods (server/storage.ts):
+
+Action: Create new methods for the new architecture and deprecate old ones.
+New Methods:
+async createPackageWine(wine: InsertPackageWine): Promise<PackageWine>: An insert method for the new table.
+async getPackageWines(packageId: string): Promise<PackageWine[]>: Fetches all wines for a package, ordered by position.
+async getSlidesByPackageWineId(packageWineId: string): Promise<Slide[]>: Fetches all slides for a specific wine, ordered by position.
+Deprecate/Remove: The old getSlidesByPackageId method is now incorrect and should be removed to prevent confusion.
+Replit AI Guidance:
+Start by modifying shared/schema.ts to introduce the packageWines table and update the slides table as specified. Remove the old foreign key from slides to packages.
+Implement the three new methods in server/storage.ts: createPackageWine, getPackageWines, and getSlidesByPackageWineId.
+Rewrite initializeWineTastingData from scratch to follow the multi-wine seeding logic: create one package, then create two package_wines belonging to it, and then create the set of questions for each of those wines, ensuring they are linked correctly via packageWineId.
+Delete the old getSlidesByPackageId method.
