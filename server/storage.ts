@@ -295,6 +295,7 @@ export class DatabaseStorage implements IStorage {
           scale_min: 1,
           scale_max: 10,
           scale_labels: ["Very Light", "Very Intense"],
+          backgroundImage: "https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?w=600&h=400&fit=crop",
         },
       },
       {
@@ -306,6 +307,7 @@ export class DatabaseStorage implements IStorage {
           description: "Take a sip and identify the flavors you experience.",
           question_type: "multiple_choice",
           category: "Taste",
+          backgroundImage: "https://images.unsplash.com/photo-1574982817-a0138501b8e7?w=600&h=400&fit=crop",
           options: [
             {
               id: "1",

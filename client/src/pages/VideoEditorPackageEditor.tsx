@@ -485,17 +485,17 @@ export default function VideoEditorPackageEditor() {
                       return (
                         <div 
                           key={wine.id}
-                          className={`border rounded-lg p-3 transition-colors ${
+                          className={`border rounded-lg p-2 mb-3 transition-colors ${
                             selectedWine?.id === wine.id 
                               ? 'border-purple-500 bg-purple-500/10' 
                               : 'border-gray-600 bg-gray-800/50'
                           }`}
                         >
                           <div 
-                            className="flex items-center gap-3 mb-2 cursor-pointer"
+                            className="flex items-center gap-2 mb-2 cursor-pointer"
                             onClick={() => setSelectedWine(wine)}
                           >
-                            <div className="w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                            <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
                               {wine.position}
                             </div>
                             <div className="flex-1">
