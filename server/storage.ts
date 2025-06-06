@@ -974,6 +974,28 @@ export class DatabaseStorage implements IStorage {
     const result = await db.insert(glossaryTerms).values(term).returning();
     return result[0];
   }
+
+  // Package management methods for sommelier dashboard
+  async getAllPackages(): Promise<Package[]> {
+    return await db.select().from(packages).orderBy(packages.createdAt);
+  }
+
+  async updatePackage(id: string, data: Partial<InsertPackage>): Promise<Package> {
+    const [updatedPackage] = await db
+      .update(packages)
+      .set(data)
+      .where(eq(packages.id, id))
+      .returning();
+    return updatedPackage;
+  }
+
+  async deletePackage(id: string): Promise<void> {
+    await db.delete(packages).where(eq(packages.id, id));
+  }
+
+  async getAllSessions(): Promise<Session[]> {
+    return await db.select().from(sessions).orderBy(sessions.createdAt);
+  }
 }
 
 export const storage = new DatabaseStorage();
