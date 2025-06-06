@@ -5,6 +5,8 @@ import {
   insertSessionSchema,
   insertParticipantSchema,
   insertResponseSchema,
+  insertSlideSchema,
+  insertPackageWineSchema,
   type InsertSession
 } from "@shared/schema";
 import { z } from "zod";
@@ -594,6 +596,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating slide:", error);
       res.status(500).json({ message: "Failed to create slide" });
+    }
+  });
+
+  // Direct slide management endpoints for slide editor
+  app.get("/api/slides/:packageWineId", async (req, res) => {
+    try {
+      const { packageWineId } = req.params;
+      const slides = await storage.getSlidesByPackageWineId(packageWineId);
+      res.json(slides);
+    } catch (error) {
+      console.error("Error fetching slides:", error);
+      res.status(500).json({ error: "Failed to fetch slides" });
+    }
+  });
+
+  app.post("/api/slides", async (req, res) => {
+    try {
+      const validatedData = insertSlideSchema.parse(req.body);
+      const slide = await storage.createSlide(validatedData);
+      res.json({ slide });
+    } catch (error) {
+      console.error("Error creating slide:", error);
+      res.status(500).json({ error: "Failed to create slide" });
+    }
+  });
+
+  app.patch("/api/slides/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const slide = await storage.updateSlide(id, req.body);
+      res.json({ slide });
+    } catch (error) {
+      console.error("Error updating slide:", error);
+      res.status(500).json({ error: "Failed to update slide" });
+    }
+  });
+
+  app.delete("/api/slides/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteSlide(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting slide:", error);
+      res.status(500).json({ error: "Failed to delete slide" });
+    }
+  });
+
+  // Modern wine management endpoints
+  app.post("/api/wines", async (req, res) => {
+    try {
+      const validatedData = insertPackageWineSchema.parse(req.body);
+      const wine = await storage.createPackageWineFromDashboard(validatedData);
+      res.json({ wine });
+    } catch (error) {
+      console.error("Error creating wine:", error);
+      res.status(500).json({ error: "Failed to create wine" });
+    }
+  });
+
+  app.patch("/api/wines/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const wine = await storage.updatePackageWine(id, req.body);
+      res.json({ wine });
+    } catch (error) {
+      console.error("Error updating wine:", error);
+      res.status(500).json({ error: "Failed to update wine" });
+    }
+  });
+
+  app.delete("/api/wines/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deletePackageWine(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting wine:", error);
+      res.status(500).json({ error: "Failed to delete wine" });
     }
   });
 

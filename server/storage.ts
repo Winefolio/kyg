@@ -137,7 +137,7 @@ export class DatabaseStorage implements IStorage {
 
   private async initializeWineTastingData() {
     // Check if data already exists
-    const existingPackage = await this.getPackageByCode("PABLO1");
+    const existingPackage = await this.getPackageByCode("WINE01");
     if (existingPackage) {
       return; // Data already exists
     }
