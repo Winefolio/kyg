@@ -19,6 +19,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { 
   ArrowLeft, 
+  BarChart3,
   Save, 
   Eye, 
   Plus,
@@ -28,6 +29,7 @@ import {
   Edit3,
   Trash2,
   Volume2,
+  Wine,
   Video,
   MessageSquare,
   HelpCircle,
@@ -287,6 +289,76 @@ export default function VideoEditorPackageEditorNew() {
       ...prev,
       [wineId]: !prev[wineId]
     }));
+  };
+
+  // Render wine transition slide
+  const renderWineTransition = (slide: any, isPreview: boolean = false) => {
+    const payload = slide.payloadJson;
+    
+    return (
+      <motion.div
+        initial={{ opacity: 0, x: isPreview ? 50 : 0 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -50 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="w-full max-w-4xl mx-auto bg-gradient-to-br from-amber-900/90 to-orange-900/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl relative overflow-hidden"
+      >
+        {payload.backgroundImage && (
+          <img 
+            src={payload.backgroundImage} 
+            alt="Wine Background" 
+            className="absolute inset-0 w-full h-full object-cover opacity-30"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-br from-black/40 to-transparent" />
+        
+        <div className="relative z-10 text-center text-white">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.6 }}
+            className="mb-8"
+          >
+            <div className="w-24 h-24 mx-auto mb-6 bg-white/10 rounded-full flex items-center justify-center">
+              <Video className="w-12 h-12 text-amber-300" />
+            </div>
+            <h2 className="text-4xl font-bold mb-4">{slide.title}</h2>
+            <p className="text-xl opacity-90 max-w-2xl mx-auto">{slide.description}</p>
+          </motion.div>
+          
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.6, duration: 0.6 }}
+            className="text-amber-200"
+          >
+            <p className="text-lg">Take a moment to cleanse your palate</p>
+            <p className="text-sm opacity-75 mt-2">Prepare for the next wine experience</p>
+          </motion.div>
+          
+          {/* Floating particles animation */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {[...Array(8)].map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{ y: '100%', x: Math.random() * 100 + '%', opacity: 0 }}
+                animate={{ 
+                  y: '-20%', 
+                  opacity: [0, 0.6, 0],
+                }}
+                transition={{ 
+                  duration: 4, 
+                  delay: i * 0.5,
+                  repeat: Infinity,
+                  repeatDelay: 2
+                }}
+                className="absolute w-1 h-8 bg-amber-300/40 rounded-full"
+              />
+            ))}
+          </div>
+        </div>
+      </motion.div>
+    );
   };
 
   // Update slides when data changes
@@ -764,6 +836,11 @@ export default function VideoEditorPackageEditorNew() {
       );
     }
 
+    // Wine transition slide
+    if (slide.type === 'wine_transition') {
+      return renderWineTransition(slide, isPreview);
+    }
+
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -791,7 +868,6 @@ export default function VideoEditorPackageEditorNew() {
         )}
       </motion.div>
     );
-  };
 
   // Create a modular slide editor component
   const renderSlideEditor = (slide: Slide) => {
@@ -1634,6 +1710,71 @@ export default function VideoEditorPackageEditorNew() {
               {selectedSlide.type}
             </Badge>
           </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSlidePreview = () => {
+    if (previewMode && selectedPackage) {
+      const allSlidesWithTransitions = getAllSlidesWithTransitions();
+      const currentSlide = allSlidesWithTransitions[previewSlideIndex];
+      
+      if (!currentSlide) return null;
+
+      return (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black z-50 flex items-center justify-center"
+        >
+          <button
+            onClick={() => setPreviewMode(false)}
+            className="absolute top-6 right-6 z-10 text-white/80 hover:text-white"
+          >
+            <X className="w-8 h-8" />
+          </button>
+          
+          <div className="relative w-full h-full flex items-center justify-center">
+            {currentSlide.type === 'wine_transition' ? 
+              renderWineTransition(currentSlide, true) : 
+              renderSlideContent(currentSlide, true)
+            }
+          </div>
+          
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-4">
+            <Button
+              onClick={() => setPreviewSlideIndex(Math.max(0, previewSlideIndex - 1))}
+              disabled={previewSlideIndex === 0}
+              className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+            >
+              <ChevronLeft className="w-4 h-4 mr-2" />
+              Previous
+            </Button>
+            
+            <div className="text-white px-4 py-2 bg-black/30 rounded-lg">
+              {previewSlideIndex + 1} / {allSlidesWithTransitions.length}
+            </div>
+            
+            <Button
+              onClick={() => setPreviewSlideIndex(Math.min(allSlidesWithTransitions.length - 1, previewSlideIndex + 1))}
+              disabled={previewSlideIndex === allSlidesWithTransitions.length - 1}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              Next
+              <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </motion.div>
+      );
+    }
+
+    return selectedSlide ? renderSlideEditor() : (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center text-white/60">
+          <Edit3 className="w-16 h-16 mx-auto mb-4" />
+          <h3 className="text-xl font-bold mb-2">Select a Slide to Edit</h3>
+          <p>Choose a slide from the timeline to start editing</p>
         </div>
       </div>
     );
