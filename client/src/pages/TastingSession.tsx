@@ -232,9 +232,26 @@ export default function TastingSession() {
     // Calculate final progress and session data
     const finalProgress = Math.round(((completedSlides.length + 1) / slides.length) * 100);
     
-    // Save session to user profile if user is authenticated
-    // For now, redirect to a completion summary
-    setLocation(`/completion/${sessionId}/${participantId}?progress=${finalProgress}`);
+    // Save session completion to local storage for profile display
+    const sessionSummary = {
+      sessionId,
+      participantId,
+      packageCode: currentSession?.packageCode,
+      packageName: currentSession?.packageCode, // Will be enhanced with actual package data
+      completedAt: new Date().toISOString(),
+      progress: finalProgress,
+      answers: answers,
+      totalSlides: slides.length,
+      completedSlides: completedSlides.length + 1
+    };
+    
+    // Store in localStorage for profile page
+    const existingSessions = JSON.parse(localStorage.getItem('completedSessions') || '[]');
+    existingSessions.push(sessionSummary);
+    localStorage.setItem('completedSessions', JSON.stringify(existingSessions));
+    
+    // Redirect to profile page instead of broken completion page
+    setLocation('/profile');
   };
 
   const renderQuestion = (slide: Slide) => {

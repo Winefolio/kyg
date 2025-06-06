@@ -471,5 +471,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Package management endpoints for sommelier dashboard
+  app.get("/api/packages", async (req, res) => {
+    try {
+      const packages = await storage.getAllPackages();
+      res.json(packages);
+    } catch (error) {
+      console.error("Error fetching packages:", error);
+      res.status(500).json({ message: "Failed to fetch packages" });
+    }
+  });
+
+  app.post("/api/packages", async (req, res) => {
+    try {
+      const packageData = req.body;
+      const newPackage = await storage.createPackage(packageData);
+      res.json(newPackage);
+    } catch (error) {
+      console.error("Error creating package:", error);
+      res.status(500).json({ message: "Failed to create package" });
+    }
+  });
+
+  app.patch("/api/packages/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+      const updatedPackage = await storage.updatePackage(id, updateData);
+      res.json(updatedPackage);
+    } catch (error) {
+      console.error("Error updating package:", error);
+      res.status(500).json({ message: "Failed to update package" });
+    }
+  });
+
+  app.delete("/api/packages/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deletePackage(id);
+      res.json({ message: "Package deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting package:", error);
+      res.status(500).json({ message: "Failed to delete package" });
+    }
+  });
+
+  app.get("/api/sessions", async (req, res) => {
+    try {
+      const sessions = await storage.getAllSessions();
+      res.json(sessions);
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+      res.status(500).json({ message: "Failed to fetch sessions" });
+    }
+  });
+
   return httpServer;
 }

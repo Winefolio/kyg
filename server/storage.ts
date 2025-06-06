@@ -110,6 +110,12 @@ export interface IStorage {
   // Analytics
   getAggregatedSessionAnalytics(sessionId: string): Promise<any>;
 
+  // Package management for sommelier dashboard
+  getAllPackages(): Promise<Package[]>;
+  updatePackage(id: string, data: Partial<InsertPackage>): Promise<Package>;
+  deletePackage(id: string): Promise<void>;
+  getAllSessions(): Promise<Session[]>;
+
   // Glossary
   getGlossaryTerms(): Promise<GlossaryTerm[]>;
   createGlossaryTerm(term: InsertGlossaryTerm): Promise<GlossaryTerm>;

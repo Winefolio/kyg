@@ -45,16 +45,56 @@ export default function Profile() {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'stats'>('overview');
 
-  // Get user profile data
-  const { data: profile, isLoading } = useQuery<UserProfile>({
-    queryKey: ['/api/profile'],
-    enabled: true
-  });
+  // Get user profile data from localStorage and API
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [recentSession, setRecentSession] = useState<TastingSession | null>(null);
 
-  const { data: recentSession } = useQuery<TastingSession>({
-    queryKey: ['/api/profile/recent-session'],
-    enabled: true
-  });
+  useEffect(() => {
+    // Load completed sessions from localStorage
+    const completedSessions = JSON.parse(localStorage.getItem('completedSessions') || '[]');
+    
+    const profileData: UserProfile = {
+      id: "user-123",
+      email: "wine.lover@example.com", 
+      displayName: "Wine Enthusiast",
+      tastingSessions: completedSessions.map((session: any) => ({
+        id: session.sessionId,
+        packageName: session.packageName || session.packageCode,
+        packageCode: session.packageCode,
+        completedAt: session.completedAt,
+        progress: session.progress,
+        totalSlides: session.totalSlides,
+        completedSlides: session.completedSlides,
+        wineName: session.packageCode, // Will be enhanced with actual wine data
+        answers: session.answers
+      })),
+      totalSessions: completedSessions.length,
+      completedSessions: completedSessions.filter((s: any) => s.progress === 100).length
+    };
+
+    // Check for recent session (completed in last 30 minutes)
+    const recentSessionData = completedSessions.find((session: any) => {
+      const completedTime = new Date(session.completedAt).getTime();
+      const now = new Date().getTime();
+      return (now - completedTime) < 30 * 60 * 1000; // 30 minutes
+    });
+
+    setProfile(profileData);
+    setRecentSession(recentSessionData ? {
+      id: recentSessionData.sessionId,
+      packageName: recentSessionData.packageName || recentSessionData.packageCode,
+      packageCode: recentSessionData.packageCode,
+      completedAt: recentSessionData.completedAt,
+      progress: recentSessionData.progress,
+      totalSlides: recentSessionData.totalSlides,
+      completedSlides: recentSessionData.completedSlides,
+      wineName: recentSessionData.packageCode,
+      answers: recentSessionData.answers
+    } : null);
+    
+    setIsLoading(false);
+  }, []);
 
   if (isLoading) {
     return (
