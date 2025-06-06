@@ -305,36 +305,42 @@ export default function VideoEditorPackageEditorNew() {
   return (
     <div className="h-screen bg-gray-900 flex flex-col">
       {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <div className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex-shrink-0">
+        <div className="flex items-center justify-between w-full max-w-none">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setLocation('/sommelier')}
-              className="text-gray-400 hover:text-white"
+              className="text-gray-400 hover:text-white flex-shrink-0"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Sommelier Dashboard
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Back
             </Button>
-            <div>
-              <h1 className="text-xl font-bold text-white">{packageData?.name}</h1>
-              <p className="text-gray-400">Package Code: {packageData?.code}</p>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg font-bold text-white truncate">{packageData?.name}</h1>
+              <p className="text-gray-400 text-xs">Code: {packageData?.code}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+            {selectedWine && (
+              <div className="text-xs text-gray-300 bg-gray-700 px-2 py-1 rounded">
+                Editing: {selectedWine.wineName}
+              </div>
+            )}
             <Button 
               variant="outline" 
               size="sm"
               onClick={() => setIsPlaying(!isPlaying)}
+              className="text-xs px-2"
             >
-              <Eye className="w-4 h-4 mr-2" />
-              {isPlaying ? 'Stop Preview' : 'Preview'}
+              <Eye className="w-3 h-3 mr-1" />
+              Preview
             </Button>
             <Button 
               variant="default" 
               size="sm" 
-              className="bg-purple-600 hover:bg-purple-700"
+              className="bg-purple-600 hover:bg-purple-700 text-xs px-2"
               onClick={() => {
                 toast({
                   title: "Changes Saved",
@@ -342,7 +348,7 @@ export default function VideoEditorPackageEditorNew() {
                 });
               }}
             >
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="w-3 h-3 mr-1" />
               Save
             </Button>
           </div>
@@ -367,6 +373,36 @@ export default function VideoEditorPackageEditorNew() {
 
           {sidebarOpen && (
             <div className="flex-1 overflow-y-auto">
+              {/* Wine Selection */}
+              <div className="p-3 border-b border-gray-700">
+                <h3 className="text-white font-semibold mb-3 text-sm">Select Wine</h3>
+                <div className="space-y-2">
+                  {packageData?.wines?.map((wine: Wine) => (
+                    <Button
+                      key={wine.id}
+                      variant={selectedWine?.id === wine.id ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedWine(wine)}
+                      className={`w-full flex items-center gap-2 p-2 h-10 justify-start text-xs ${
+                        selectedWine?.id === wine.id 
+                          ? 'bg-purple-600 hover:bg-purple-700 text-white border-purple-500' 
+                          : 'border-gray-600 text-gray-300 hover:bg-gray-700'
+                      }`}
+                    >
+                      <div className="w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                        {wine.position}
+                      </div>
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="font-medium truncate">{wine.wineName}</div>
+                        <div className="text-xs opacity-70">
+                          {slidesByWine[wine.id]?.length || 0} slides
+                        </div>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
               {/* Add Slide Templates */}
               <div className="p-3 border-b border-gray-700">
                 <h3 className="text-white font-semibold mb-3 text-sm">Add Slides</h3>
