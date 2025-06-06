@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
@@ -13,71 +12,21 @@ import {
 import {
   arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import {
-  useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   ArrowLeft, 
   Plus, 
   Save, 
   Eye, 
-  Settings,
-  GripVertical,
-  Wine,
-  Edit3,
-  Trash2,
-  ChevronDown,
-  ChevronRight
+  Layers
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
-
-interface Package {
-  id: string;
-  code: string;
-  name: string;
-  description: string;
-  isActive: boolean;
-}
-
-interface PackageWine {
-  id: string;
-  packageId: string;
-  position: number;
-  wineName: string;
-  wineDescription: string;
-  wineImageUrl: string;
-  wineType: string;
-  vintage: number;
-  region: string;
-  producer: string;
-  grapeVarietals: string[];
-  alcoholContent: string;
-  expectedCharacteristics: Record<string, any>;
-}
-
-interface Slide {
-  id: string;
-  packageWineId: string;
-  position: number;
-  type: 'interlude' | 'question' | 'video_message' | 'audio_message' | 'media';
-  sectionType: 'intro' | 'deep_dive' | 'ending';
-  title: string;
-  description: string;
-  payloadJson: any;
-}
+import { SortableWineSection } from '@/components/editor/SlideListPanel';
+import { SlidePreviewPanel } from '@/components/editor/SlidePreviewPanel';
+import { SlideConfigPanel } from '@/components/editor/SlideConfigPanel';
 
 interface PackageEditorData {
   id: string;
@@ -85,267 +34,11 @@ interface PackageEditorData {
   name: string;
   description: string;
   isActive: boolean;
-  wines: PackageWine[];
-  slides: Slide[];
+  wines: any[];
+  slides: any[];
 }
 
-function SortableSlideItem({ slide, wine, isSelected, onClick }: {
-  slide: Slide;
-  wine: PackageWine;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: slide.id });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  const getSlideIcon = (type: string) => {
-    switch (type) {
-      case 'question': return '❓';
-      case 'interlude': return '🎭';
-      case 'video_message': return '🎥';
-      case 'audio_message': return '🎵';
-      case 'media': return '📷';
-      default: return '📝';
-    }
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "group relative p-3 border rounded-lg cursor-pointer transition-all",
-        isSelected ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20" : "border-gray-200 dark:border-gray-700 hover:border-gray-300",
-        isDragging && "opacity-50 z-50"
-      )}
-      onClick={onClick}
-    >
-      <div className="flex items-center space-x-3">
-        <div
-          {...attributes}
-          {...listeners}
-          className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"
-        >
-          <GripVertical className="w-4 h-4" />
-        </div>
-        
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center space-x-2 mb-1">
-            <span className="text-lg">{getSlideIcon(slide.type)}</span>
-            <Badge variant="outline" className="text-xs">
-              {slide.type.replace('_', ' ')}
-            </Badge>
-            <Badge variant="secondary" className="text-xs">
-              {slide.sectionType}
-            </Badge>
-          </div>
-          <p className="font-medium text-sm truncate">{slide.title}</p>
-          <p className="text-xs text-gray-500 truncate">{slide.description}</p>
-          <p className="text-xs text-purple-600 mt-1">Wine: {wine.wineName}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function WineSection({ wine, slides, selectedSlide, onSlideSelect, isExpanded, onToggle }: {
-  wine: PackageWine;
-  slides: Slide[];
-  selectedSlide: Slide | null;
-  onSlideSelect: (slide: Slide) => void;
-  isExpanded: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div className="border rounded-lg p-4 bg-white dark:bg-gray-800">
-      <div 
-        className="flex items-center justify-between cursor-pointer"
-        onClick={onToggle}
-      >
-        <div className="flex items-center space-x-3">
-          <Wine className="w-5 h-5 text-purple-600" />
-          <div>
-            <h3 className="font-medium">{wine.wineName}</h3>
-            <p className="text-sm text-gray-500">{slides.length} slides</p>
-          </div>
-        </div>
-        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-      </div>
-
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="mt-4 space-y-2 overflow-hidden"
-          >
-            <SortableContext items={slides.map(s => s.id)} strategy={verticalListSortingStrategy}>
-              {slides.map((slide) => (
-                <SortableSlideItem
-                  key={slide.id}
-                  slide={slide}
-                  wine={wine}
-                  isSelected={selectedSlide?.id === slide.id}
-                  onClick={() => onSlideSelect(slide)}
-                />
-              ))}
-            </SortableContext>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function SlideConfigPanel({ slide, wine, onUpdate }: {
-  slide: Slide | null;
-  wine: PackageWine | null;
-  onUpdate: (slideId: string, updates: Partial<Slide>) => void;
-}) {
-  const [localSlide, setLocalSlide] = useState(slide);
-
-  useEffect(() => {
-    setLocalSlide(slide);
-  }, [slide]);
-
-  if (!slide || !wine) {
-    return (
-      <div className="h-full flex items-center justify-center text-gray-500">
-        <div className="text-center">
-          <Settings className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p>Select a slide to configure</p>
-        </div>
-      </div>
-    );
-  }
-
-  const handleSave = () => {
-    if (localSlide) {
-      onUpdate(slide.id, localSlide);
-    }
-  };
-
-  return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-2">Configure Slide</h3>
-        <div className="flex items-center space-x-2 mb-4">
-          <Badge>{slide.type.replace('_', ' ')}</Badge>
-          <Badge variant="secondary">{slide.sectionType}</Badge>
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        <div>
-          <Label htmlFor="slide-title">Title</Label>
-          <Input
-            id="slide-title"
-            value={localSlide?.title || ''}
-            onChange={(e) => setLocalSlide(prev => prev ? { ...prev, title: e.target.value } : null)}
-            className="mt-1"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="slide-description">Description</Label>
-          <Textarea
-            id="slide-description"
-            value={localSlide?.description || ''}
-            onChange={(e) => setLocalSlide(prev => prev ? { ...prev, description: e.target.value } : null)}
-            className="mt-1"
-            rows={3}
-          />
-        </div>
-
-        {slide.type === 'question' && (
-          <div className="space-y-4">
-            <h4 className="font-medium">Question Settings</h4>
-            
-            <div>
-              <Label htmlFor="question-text">Question</Label>
-              <Input
-                id="question-text"
-                value={localSlide?.payloadJson?.question || ''}
-                onChange={(e) => setLocalSlide(prev => prev ? {
-                  ...prev,
-                  payloadJson: { ...prev.payloadJson, question: e.target.value }
-                } : null)}
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="question-type">Question Type</Label>
-              <select
-                id="question-type"
-                value={localSlide?.payloadJson?.questionType || 'multiple_choice'}
-                onChange={(e) => setLocalSlide(prev => prev ? {
-                  ...prev,
-                  payloadJson: { ...prev.payloadJson, questionType: e.target.value }
-                } : null)}
-                className="mt-1 w-full p-2 border rounded-md"
-              >
-                <option value="multiple_choice">Multiple Choice</option>
-                <option value="scale">Scale</option>
-                <option value="text">Text Input</option>
-              </select>
-            </div>
-          </div>
-        )}
-
-        {slide.type === 'interlude' && (
-          <div className="space-y-4">
-            <h4 className="font-medium">Interlude Settings</h4>
-            
-            <div>
-              <Label htmlFor="duration">Duration (seconds)</Label>
-              <Input
-                id="duration"
-                type="number"
-                value={localSlide?.payloadJson?.duration || 30}
-                onChange={(e) => setLocalSlide(prev => prev ? {
-                  ...prev,
-                  payloadJson: { ...prev.payloadJson, duration: parseInt(e.target.value) }
-                } : null)}
-                className="mt-1"
-              />
-            </div>
-          </div>
-        )}
-
-        <Separator />
-
-        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-          <h4 className="font-medium mb-2">Associated Wine</h4>
-          <div className="flex items-center space-x-3">
-            <Wine className="w-5 h-5 text-purple-600" />
-            <div>
-              <p className="font-medium">{wine.wineName}</p>
-              <p className="text-sm text-gray-500">{wine.producer}, {wine.vintage}</p>
-            </div>
-          </div>
-        </div>
-
-        <Button onClick={handleSave} className="w-full">
-          <Save className="w-4 h-4 mr-2" />
-          Save Changes
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 export default function PackageEditor() {
   const { code } = useParams<{ code: string }>();

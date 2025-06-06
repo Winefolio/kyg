@@ -1,0 +1,406 @@
+Prompt for Replit AI
+The Big Picture: Activating the Professional Package Editor
+We have successfully created the backend APIs and the basic page structure for our new SlideEditor. Now, it's time to bring it to life. Our goal is to implement the core interactive features outlined in our roadmap, turning the static page into a dynamic, Kahoot-style editor.
+Our Plan for This Session:
+Create Reusable Editor Components: We will break down the editor's UI into three main components for each panel: SlideListPanel, SlidePreviewPanel, and SlideConfigPanel. This promotes clean code and modularity.
+Implement the Slide List: The left panel will display all slides, visually grouped by wine. We will make these items selectable.
+Implement Drag-and-Drop: We will use dnd-kit to allow the sommelier to intuitively reorder slides, both within a single wine and by moving them between different wines.
+Implement the Live Preview: The center panel will display a live, non-interactive preview of the currently selected slide, reusing our existing question components.
+Implement the Configuration Panel: The right panel will be context-aware. It will show a form to edit the properties of the selected slide. We will start by building the form for the "Interlude" slide type.
+Integrate and Save: We will assemble these components in the main SlideEditor page, wire up all the state management, and implement the "Save Changes" functionality to persist the new slide order to the backend.
+Let's begin.
+Phase 1: Creating the Editor Component Structure
+First, create the placeholder files for our new, modular editor components.
+<execute_bash>
+mkdir -p client/src/components/editor
+touch client/src/components/editor/SlideListPanel.tsx
+touch client/src/components/editor/SlidePreviewPanel.tsx
+touch client/src/components/editor/SlideConfigPanel.tsx
+touch client/src/components/editor/InterludeConfigForm.tsx
+</execute_bash>
+Phase 2: Implementing the Interactive Slide List
+This is the left panel. It needs to display slides grouped by wine and be fully sortable via drag-and-drop.
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Card, CardContent } from '@/components/ui/card';
+import { GripVertical, Clapperboard, HelpCircle, MessageSquare } from 'lucide-react';
+import type { Slide, PackageWine } from '@shared/schema';
+
+// A single sortable slide item
+function SortableSlideItem({ slide, isActive, onClick }: { slide: Slide; isActive: boolean; onClick: () => void; }) {
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: slide.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+    };
+
+    const slideTypeIcons: { [key: string]: React.ReactNode } = {
+        interlude: <Clapperboard className="h-4 w-4" />,
+        question: <HelpCircle className="h-4 w-4" />,
+        video_message: <Clapperboard className="h-4 w-4" />,
+        audio_message: <MessageSquare className="h-4 w-4" />,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} onClick={onClick}>
+            <Card className={`mb-2 cursor-pointer transition-all duration-200 ${isActive ? 'border-purple-500 bg-purple-500/10' : 'border-gray-700 bg-gray-800/50 hover:bg-gray-700/50'}`}>
+                <CardContent className="p-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="text-gray-400" {...attributes} {...listeners}>
+                            <GripVertical className="h-5 w-5" />
+                        </div>
+                        <div className="text-gray-400">{slideTypeIcons[slide.type] || <HelpCircle className="h-4 w-4" />}</div>
+                        <span className="text-sm font-medium truncate">
+                            {(slide.payloadJson as any).title || slide.type}
+                        </span>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
+// A container for a wine's slides
+export function SortableWineSection({ wine, slides, activeSlideId, onSlideClick }: { wine: PackageWine; slides: Slide[]; activeSlideId: string | null, onSlideClick: (id: string) => void }) {
+    return (
+        <div className="mb-6">
+            <h3 className="text-lg font-bold text-purple-300 mb-2 border-b border-gray-700 pb-1">{wine.wineName}</h3>
+            {slides.map(slide => (
+                <SortableSlideItem
+                    key={slide.id}
+                    slide={slide}
+                    isActive={slide.id === activeSlideId}
+                    onClick={() => onSlideClick(slide.id)}
+                />
+            ))}
+        </div>
+    );
+}
+Use code with caution.
+Typescript:client/src/components/editor/SlideListPanel.tsx
+Phase 3: Implementing the Live Preview Panel
+This center panel will render the appropriate component for the active slide.
+import { AnimatePresence, motion } from 'framer-motion';
+import { MultipleChoiceQuestion } from '@/components/questions/MultipleChoiceQuestion';
+import { ScaleQuestion } from '@/components/questions/ScaleQuestion';
+import type { Slide } from '@shared/schema';
+
+function InterludePreview({ payload }: { payload: any }) {
+    return (
+        <div className="text-center p-4">
+            {payload.wine_image_url && <img src={payload.wine_image_url} alt={payload.wine_name} className="w-48 mx-auto rounded-lg mb-4" />}
+            <h3 className="text-2xl font-bold text-white mb-2">{payload.title}</h3>
+            <p className="text-lg text-white/80">{payload.wine_name}</p>
+            <p className="text-white/60 mt-4">{payload.description}</p>
+        </div>
+    );
+}
+
+
+export function SlidePreviewPanel({ activeSlide }: { activeSlide: Slide | undefined }) {
+    return (
+        <div className="aspect-[9/16] w-full max-w-sm bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 rounded-3xl p-4 shadow-2xl flex flex-col justify-center items-center overflow-hidden">
+            <AnimatePresence mode="wait">
+                <motion.div
+                    key={activeSlide?.id || 'empty'}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.3, ease: 'easeInOut' }}
+                    className="w-full"
+                >
+                    {!activeSlide && (
+                        <div className="text-center text-white/50">
+                            <p>Select a slide to preview and edit</p>
+                        </div>
+                    )}
+                    {activeSlide?.type === 'interlude' && <InterludePreview payload={activeSlide.payloadJson} />}
+                    {activeSlide?.type === 'question' && (activeSlide.payloadJson as any).options && (
+                        <MultipleChoiceQuestion
+                            question={activeSlide.payloadJson as any}
+                            value={{ selected: [], notes: '' }}
+                            onChange={() => {}}
+                        />
+                    )}
+                     {activeSlide?.type === 'question' && (activeSlide.payloadJson as any).scale_min !== undefined && (
+                        <ScaleQuestion
+                            question={activeSlide.payloadJson as any}
+                            value={(activeSlide.payloadJson as any).scale_min}
+                            onChange={() => {}}
+                        />
+                    )}
+                </motion.div>
+            </AnimatePresence>
+        </div>
+    );
+}
+Use code with caution.
+Typescript:client/src/components/editor/SlidePreviewPanel.tsx
+Phase 4: Implementing the Configuration Panel
+This right panel will show the editing form. We'll start with the "Interlude" form.
+import { useForm, Controller } from 'react-hook-form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import type { Slide } from '@shared/schema';
+
+export function InterludeConfigForm({ slide, onSave }: { slide: Slide; onSave: (updatedPayload: any) => void }) {
+    const { control, handleSubmit } = useForm({
+        defaultValues: slide.payloadJson as any,
+    });
+
+    return (
+        <form onSubmit={handleSubmit(onSave)} className="space-y-4">
+            <div>
+                <Label htmlFor="title">Title</Label>
+                <Controller
+                    name="title"
+                    control={control}
+                    render={({ field }) => <Input id="title" {...field} className="bg-gray-700 border-gray-600" />}
+                />
+            </div>
+             <div>
+                <Label htmlFor="wine_name">Wine Name</Label>
+                <Controller
+                    name="wine_name"
+                    control={control}
+                    render={({ field }) => <Input id="wine_name" {...field} className="bg-gray-700 border-gray-600" />}
+                />
+            </div>
+            <div>
+                <Label htmlFor="description">Description</Label>
+                <Controller
+                    name="description"
+                    control={control}
+                    render={({ field }) => <Textarea id="description" {...field} className="bg-gray-700 border-gray-600" />}
+                />
+            </div>
+             <div>
+                <Label htmlFor="wine_image_url">Wine Image URL</Label>
+                <Controller
+                    name="wine_image_url"
+                    control={control}
+                    render={({ field }) => <Input id="wine_image_url" {...field} className="bg-gray-700 border-gray-600" />}
+                />
+            </div>
+            <Button type="submit" className="w-full">Update Slide</Button>
+        </form>
+    );
+}
+Use code with caution.
+Typescript:client/src/components/editor/InterludeConfigForm.tsx
+Now, the main configuration panel component.
+import { AnimatePresence, motion } from "framer-motion";
+import { InterludeConfigForm } from "./InterludeConfigForm";
+import type { Slide } from "@shared/schema";
+
+export function SlideConfigPanel({ activeSlide, onSlideUpdate }: { activeSlide: Slide | undefined, onSlideUpdate: (slideId: string, updatedPayload: any) => void }) {
+    return (
+         <div className="h-full bg-gray-800/50 p-4 overflow-y-auto">
+            <h2 className="font-bold mb-4 text-lg">Configuration</h2>
+            <AnimatePresence mode="wait">
+                 <motion.div
+                    key={activeSlide?.id || 'empty'}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.3 }}
+                >
+                    {!activeSlide && (
+                        <div className="text-center text-gray-400 mt-10">
+                            <p>Select a slide to configure its properties.</p>
+                        </div>
+                    )}
+                    {activeSlide?.type === 'interlude' && (
+                        <InterludeConfigForm slide={activeSlide} onSave={(payload) => onSlideUpdate(activeSlide.id, payload)} />
+                    )}
+                    {/* TODO: Add forms for other slide types here */}
+                     {activeSlide?.type === 'question' && (
+                        <div className="text-center text-gray-400 mt-10">
+                            <p>Question configuration coming soon!</p>
+                        </div>
+                    )}
+                </motion.div>
+            </AnimatePresence>
+        </div>
+    );
+}
+Use code with caution.
+Typescript:client/src/components/editor/SlideConfigPanel.tsx
+Phase 5: Final Integration into SlideEditor.tsx
+Let's assemble all the pieces, add the drag-and-drop logic, and wire up the save functionality.
+import { useState, useEffect } from "react";
+import { useParams, Link } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+
+import { apiRequest } from "@/lib/queryClient";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { Home, GripVertical, Save } from "lucide-react";
+
+import { SortableWineSection } from '@/components/editor/SlideListPanel';
+import { SlidePreviewPanel } from '@/components/editor/SlidePreviewPanel';
+import { SlideConfigPanel } from '@/components/editor/SlideConfigPanel';
+
+import type { Package, PackageWine, Slide } from "@shared/schema";
+
+type EditorData = Package & { wines: PackageWine[]; slides: Slide[] };
+
+export default function SlideEditor() {
+    const { packageCode } = useParams();
+    const queryClient = useQueryClient();
+    const { toast } = useToast();
+
+    const { data, isLoading, error } = useQuery<EditorData>({
+        queryKey: [`/api/packages/${packageCode}/editor`],
+        enabled: !!packageCode,
+    });
+    
+    // Local state for slides and wines to enable instant UI updates for drag-and-drop
+    const [wines, setWines] = useState<PackageWine[]>([]);
+    const [slides, setSlides] = useState<Slide[]>([]);
+    const [activeSlideId, setActiveSlideId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (data) {
+            setWines(data.wines);
+            setSlides(data.slides);
+            if (data.slides.length > 0 && !activeSlideId) {
+                setActiveSlideId(data.slides[0].id);
+            }
+        }
+    }, [data, activeSlideId]);
+
+    const sensors = useSensors(useSensor(PointerSensor));
+
+    const updateOrderMutation = useMutation({
+        mutationFn: (slideUpdates: { slideId: string; packageWineId: string; position: number }[]) => 
+            apiRequest('PUT', '/api/slides/order', { slideUpdates }),
+        onSuccess: () => {
+            toast({ title: "Success", description: "Slide order saved successfully." });
+            queryClient.invalidateQueries({ queryKey: [`/api/packages/${packageCode}/editor`] });
+        },
+        onError: (e) => {
+            toast({ variant: "destructive", title: "Error", description: `Failed to save order: ${(e as Error).message}` });
+        },
+    });
+
+    const handleSaveChanges = () => {
+        // Create the payload for the API by re-calculating positions
+        const slideUpdates: { slideId: string; packageWineId: string; position: number }[] = [];
+        wines.forEach(wine => {
+            slides.filter(s => s.packageWineId === wine.id)
+                .forEach((slide, index) => {
+                    slideUpdates.push({
+                        slideId: slide.id,
+                        packageWineId: slide.packageWineId,
+                        position: index + 1,
+                    });
+                });
+        });
+        updateOrderMutation.mutate(slideUpdates);
+    };
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        setSlides((prevSlides) => {
+            const oldIndex = prevSlides.findIndex(s => s.id === active.id);
+            const newIndex = prevSlides.findIndex(s => s.id === over.id);
+            
+            let newSlides = arrayMove(prevSlides, oldIndex, newIndex);
+
+            // Check if the slide moved to a different wine section
+            const activeSlide = newSlides.find(s => s.id === active.id)!;
+            const overSlide = prevSlides.find(s => s.id === over.id)!;
+
+            if (activeSlide.packageWineId !== overSlide.packageWineId) {
+                 newSlides = newSlides.map(s => 
+                    s.id === active.id ? { ...s, packageWineId: overSlide.packageWineId } : s
+                );
+            }
+
+            return newSlides;
+        });
+    };
+    
+     const handleSlideUpdate = (slideId: string, updatedPayload: any) => {
+        setSlides(currentSlides => currentSlides.map(s => 
+            s.id === slideId ? { ...s, payloadJson: updatedPayload } : s
+        ));
+        // Note: This only updates local state. A dedicated mutation would be needed to save this to the DB.
+        toast({ title: "Updated in Editor", description: "Slide content updated locally. Save all changes to persist." });
+    };
+
+    const activeSlide = slides.find(s => s.id === activeSlideId);
+
+    if (isLoading) return <LoadingOverlay isVisible={true} message="Loading Editor..." />;
+    if (error || !data) return <div className="text-white">Error loading data.</div>;
+
+    const slideIds = slides.map(s => s.id);
+
+    return (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <div className="h-screen w-screen bg-gray-900 text-white flex flex-col overflow-hidden">
+                <header className="flex-shrink-0 bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Link href="/sommelier">
+                            <Button variant="ghost" size="sm" className="text-gray-300 hover:bg-gray-700 hover:text-white">
+                                <Home className="mr-2 h-4 w-4" /> Dashboard
+                            </Button>
+                        </Link>
+                        <h1 className="text-lg font-semibold">{data.name}</h1>
+                    </div>
+                    <div>
+                        <Button size="sm" onClick={handleSaveChanges} disabled={updateOrderMutation.isPending}>
+                            <Save className="mr-2 h-4 w-4" />
+                            {updateOrderMutation.isPending ? "Saving..." : "Save Changes"}
+                        </Button>
+                    </div>
+                </header>
+                
+                <ResizablePanelGroup direction="horizontal" className="flex-grow">
+                    <ResizablePanel defaultSize={25} minSize={15} maxSize={35}>
+                         <div className="h-full bg-gray-800/50 p-4 overflow-y-auto">
+                            <SortableContext items={slideIds} strategy={verticalListSortingStrategy}>
+                                {wines.map(wine => (
+                                    <SortableWineSection
+                                        key={wine.id}
+                                        wine={wine}
+                                        slides={slides.filter(s => s.packageWineId === wine.id)}
+                                        activeSlideId={activeSlideId}
+                                        onSlideClick={setActiveSlideId}
+                                    />
+                                ))}
+                            </SortableContext>
+                        </div>
+                    </ResizablePanel>
+
+                    <ResizableHandle withHandle><GripVertical /></ResizableHandle>
+
+                    <ResizablePanel defaultSize={45} minSize={30}>
+                        <div className="h-full bg-gray-900 flex items-center justify-center p-8">
+                            <SlidePreviewPanel activeSlide={activeSlide} />
+                        </div>
+                    </ResizablePanel>
+
+                    <ResizableHandle withHandle><GripVertical /></ResizableHandle>
+                    
+                    <ResizablePanel defaultSize={30} minSize={20} maxSize={40}>
+                        <SlideConfigPanel activeSlide={activeSlide} onSlideUpdate={handleSlideUpdate} />
+                    </ResizablePanel>
+                </ResizablePanelGroup>
+            </div>
+        </DndContext>
+    );
+}
+Use code with caution.
+Typescript:client/src/pages/SlideEditor.tsx
+With these changes, we will have a highly functional, professional-grade slide editor that allows for reordering and basic content editing. The foundation is now set to easily add more configuration forms and features as outlined in the rest of your roadmap.
