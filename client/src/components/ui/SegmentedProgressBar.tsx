@@ -13,12 +13,14 @@ interface SegmentedProgressBarProps {
   sections: Section[];
   currentWineName?: string;
   currentOverallProgressInfo?: string;
+  onSectionClick?: (sectionName: string) => void;
 }
 
 export function SegmentedProgressBar({ 
   sections, 
   currentWineName, 
-  currentOverallProgressInfo 
+  currentOverallProgressInfo,
+  onSectionClick
 }: SegmentedProgressBarProps) {
   return (
     <div className="space-y-2">
@@ -41,11 +43,13 @@ export function SegmentedProgressBar({
         {sections.map((section, index) => (
           <motion.div
             key={section.name}
-            className="space-y-1"
+            className="space-y-1 cursor-pointer"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
             whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => onSectionClick?.(section.name)}
           >
             {/* Section Name */}
             <div className="flex items-center justify-between">

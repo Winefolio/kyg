@@ -263,23 +263,26 @@ export default function TastingSession() {
           className="text-center space-y-4 sm:space-y-6 flex flex-col justify-center h-full"
         >
           {/* Wine Image */}
-          {payload.wine_image && (
+          {(payload.wine_image || payload.wineImageUrl) && (
             <div className="flex-shrink-0">
               <img
-                src={payload.wine_image}
-                alt={payload.wine_name || "Wine"}
+                src={payload.wine_image || payload.wineImageUrl}
+                alt={payload.wine_name || payload.wineName || "Wine"}
                 className="w-40 h-56 sm:w-48 sm:h-64 mx-auto rounded-2xl shadow-2xl object-cover"
               />
             </div>
           )}
 
           <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-2xl flex-grow flex flex-col justify-center">
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 sm:mb-4">
-              <DynamicTextRenderer text={payload.title} />
-            </h2>
-            {payload.wine_name && (
+            {/* Only show title if it's different from wine name to avoid duplication */}
+            {payload.title && payload.title !== payload.wine_name && (
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 sm:mb-4">
+                <DynamicTextRenderer text={payload.title} />
+              </h2>
+            )}
+            {(payload.wine_name || payload.wineName) && (
               <h3 className="text-lg sm:text-xl text-purple-200 mb-3 sm:mb-4">
-                <DynamicTextRenderer text={payload.wine_name} />
+                <DynamicTextRenderer text={payload.wine_name || payload.wineName} />
               </h3>
             )}
             {payload.description && (

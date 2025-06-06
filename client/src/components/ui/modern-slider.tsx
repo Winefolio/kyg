@@ -167,14 +167,13 @@ export function ModernSlider({
             if (!trackRef.current) return;
             
             const rect = trackRef.current.getBoundingClientRect();
-            // Calculate relative position from the current thumb position
-            const currentThumbX = rect.left + (percentage / 100) * rect.width;
-            const newThumbX = currentThumbX + info.delta.x;
-            const dragPercentage = ((newThumbX - rect.left) / rect.width) * 100;
-            const clampedPercentage = Math.max(0, Math.min(100, dragPercentage));
-            const newValue = Math.round((clampedPercentage / 100) * (max - min) + min);
+            // Use offset instead of absolute position for better precision
+            const currentOffset = (percentage / 100) * rect.width;
+            const newOffset = Math.max(0, Math.min(rect.width, currentOffset + info.delta.x));
+            const newPercentage = (newOffset / rect.width) * 100;
+            const newValue = Math.round((newPercentage / 100) * (max - min) + min);
             
-            if (newValue !== value) {
+            if (newValue !== value && newValue >= min && newValue <= max) {
               onChange(newValue);
             }
           }}
