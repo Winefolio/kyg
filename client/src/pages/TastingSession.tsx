@@ -26,6 +26,7 @@ export default function TastingSession() {
   const [isTransitioningSection, setIsTransitioningSection] = useState(false);
   const [transitionSectionName, setTransitionSectionName] = useState("");
   const [isNavigating, setIsNavigating] = useState(false);
+  const [expandedWines, setExpandedWines] = useState<Record<string, boolean>>({});
   const { saveResponse, syncStatus, initializeForSession, endSession } = useSessionPersistence();
   const { triggerHaptic } = useHaptics();
   const queryClient = useQueryClient();
@@ -152,12 +153,12 @@ export default function TastingSession() {
   
   // Calculate wine-specific progress with clickable wine sections
   const calculateSectionProgress = () => {
-    if (slides.length === 0 || !packageData?.wines) return { sections: [], currentWineName: "", progressInfo: "", wineProgress: [] };
+    if (slides.length === 0 || !packageData?.wines) return { sections: [], currentWineName: "", progressInfo: "" };
     
     const wines = packageData.wines.sort((a: any, b: any) => a.position - b.position);
     
     // Create sections for each wine (clickable wine headers)
-    const sections = wines.map((wine: any, index: number) => {
+    const sections = wines.slice(0, 3).map((wine: any, index: number) => {
       const wineSlides = slides.filter(slide => slide.packageWineId === wine.id);
       const completedWineSlides = wineSlides.filter(slide => {
         const slideIndex = slides.findIndex(s => s.id === slide.id);
@@ -184,7 +185,7 @@ export default function TastingSession() {
     const currentWineName = currentWine?.wineName || currentWine?.wine_name || "Wine Tasting";
     const progressInfo = `Slide ${currentSlideIndex + 1} of ${slides.length}`;
     
-    return { sections, currentWineName, progressInfo, wineProgress: [] };
+    return { sections, currentWineName, progressInfo };
   };
   
   const { sections, currentWineName, progressInfo } = calculateSectionProgress();
@@ -635,12 +636,12 @@ export default function TastingSession() {
             </Button>
           </div>
 
-          {/* Wine-organized dropdown sections */}
+          {/* Wine-organized sections */}
           <div className="space-y-4">
             {packageData?.wines?.sort((a: any, b: any) => a.position - b.position).map((wine: any, wineIndex: number) => {
               const wineSlides = slides.filter(slide => slide.packageWineId === wine.id);
               const hasCurrentSlide = wineSlides.some(slide => slide.id === currentSlide?.id);
-              const [isWineExpanded, setIsWineExpanded] = useState(hasCurrentSlide);
+              const isExpanded = expandedWines[wine.id] ?? hasCurrentSlide;
               
               const completedWineSlides = wineSlides.filter(slide => {
                 const slideIndex = slides.findIndex(s => s.id === slide.id);
@@ -651,9 +652,9 @@ export default function TastingSession() {
               
               return (
                 <div key={wine.id} className="space-y-2">
-                  {/* Wine Header - Clickable to expand/collapse */}
+                  {/* Wine Header */}
                   <button
-                    onClick={() => setIsWineExpanded(!isWineExpanded)}
+                    onClick={() => setExpandedWines(prev => ({ ...prev, [wine.id]: !isExpanded }))}
                     className={`w-full p-3 rounded-lg border transition-all text-left ${
                       hasCurrentSlide
                         ? 'bg-purple-500/20 border-purple-400/40 text-white'
@@ -670,39 +671,34 @@ export default function TastingSession() {
                             {wine.wineName || wine.wine_name || `Wine ${wineIndex + 1}`}
                           </p>
                           <div className="flex items-center space-x-2 text-xs opacity-75">
-                            <span>{completedWineSlides.length}/{wineSlides.length} completed</span>
+                            <span>{completedWineSlides.length}/{wineSlides.length} slides</span>
                             <span>•</span>
-                            <span>{wineProgress}%</span>
+                            <span>{wineProgress}% complete</span>
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
                         {wineProgress === 100 && <CheckCircle className="w-4 h-4 text-green-400" />}
-                        <motion.div
-                          animate={{ rotate: isWineExpanded ? 180 : 0 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          <ChevronDown className="w-4 h-4" />
-                        </motion.div>
+                        <ArrowRight className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                       </div>
                     </div>
                   </button>
                   
-                  {/* Wine Progress Bar */}
+                  {/* Progress Bar */}
                   <div className="px-3">
                     <div className="h-1 bg-white/10 rounded-full overflow-hidden">
                       <motion.div
                         className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full"
                         initial={{ width: 0 }}
                         animate={{ width: `${wineProgress}%` }}
-                        transition={{ duration: 0.5, delay: 0.1 }}
+                        transition={{ duration: 0.5 }}
                       />
                     </div>
                   </div>
                   
-                  {/* Expandable Slides List */}
+                  {/* Slides List */}
                   <AnimatePresence>
-                    {isWineExpanded && (
+                    {isExpanded && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
@@ -743,7 +739,7 @@ export default function TastingSession() {
                                   <div className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${
                                     isCompleted ? 'bg-green-500 text-white' : 'bg-white/20 text-white'
                                   }`}>
-                                    {isCompleted ? <CheckCircle size={10} /> : slideIndex + 1}
+                                    {isCompleted ? '✓' : slideIndex + 1}
                                   </div>
                                   <span className="truncate">
                                     {slide.type === 'interlude' ? 'Introduction' : 
