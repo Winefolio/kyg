@@ -149,76 +149,94 @@ export default function TastingSession() {
   const slides = processedSlides();
   const currentSlide = slides[currentSlideIndex];
   
-  // Calculate section-based progress
+  // Calculate wine-specific progress with distinct sections
   const calculateSectionProgress = () => {
-    if (slides.length === 0) return { sections: [], currentWineName: "", progressInfo: "" };
+    if (slides.length === 0) return { sections: [], currentWineName: "", progressInfo: "", wineProgress: [] };
     
-    // Group slides by section_type
-    const introSlides = slides.filter(slide => slide.section_type === 'intro');
-    const deepDiveSlides = slides.filter(slide => slide.section_type === 'deep_dive');
-    const endingSlides = slides.filter(slide => slide.section_type === 'ending');
+    // Group slides by wine and create wine-specific sections
+    const wineProgressData: any[] = [];
+    const wines = packageData?.wines || [];
     
-    // Determine current section
-    const currentSectionType = currentSlide?.section_type || null;
-    
-    // Calculate progress for each section
-    const calculateSectionProgressValue = (sectionSlides: typeof slides, sectionType: string) => {
-      if (sectionSlides.length === 0) return 0;
+    wines.forEach((wine: any, wineIndex: number) => {
+      const wineSlides = slides.filter(slide => slide.packageWineId === wine.id);
       
-      const completedInSection = sectionSlides.filter(slide => {
-        const slideIndex = slides.findIndex(s => s.id === slide.id);
-        return completedSlides.includes(slideIndex);
-      }).length;
+      // Categorize wine slides into sections
+      const introSlides = wineSlides.filter(slide => 
+        slide.type === 'interlude' || slide.position <= 2
+      );
+      const deepDiveSlides = wineSlides.filter(slide => 
+        slide.type === 'question' && slide.position > 2 && slide.position < 9
+      );
+      const endingSlides = wineSlides.filter(slide => 
+        slide.position >= 9 || (slide.payloadJson as any)?.category === 'Overall'
+      );
       
-      // If we're in this section, add partial progress for current slide
-      if (currentSectionType === sectionType) {
-        const currentSlideInSection = sectionSlides.find(slide => slide.id === currentSlide?.id);
-        if (currentSlideInSection) {
+      const calculateWineSectionProgress = (sectionSlides: any[], sectionName: string) => {
+        if (sectionSlides.length === 0) return 0;
+        
+        const completedInSection = sectionSlides.filter(slide => {
+          const slideIndex = slides.findIndex(s => s.id === slide.id);
+          return completedSlides.includes(slideIndex);
+        }).length;
+        
+        const isCurrentSection = sectionSlides.some(slide => slide.id === currentSlide?.id);
+        if (isCurrentSection) {
           return ((completedInSection + 0.5) / sectionSlides.length) * 100;
         }
-      }
+        
+        return (completedInSection / sectionSlides.length) * 100;
+      };
       
-      return (completedInSection / sectionSlides.length) * 100;
-    };
+      wineProgressData.push({
+        wineName: wine.wineName || wine.wine_name,
+        wineNumber: wineIndex + 1,
+        isCurrentWine: wineSlides.some(slide => slide.id === currentSlide?.id),
+        sections: [
+          {
+            name: "Intro",
+            progress: calculateWineSectionProgress(introSlides, 'intro'),
+            isActive: introSlides.some(slide => slide.id === currentSlide?.id),
+            isCompleted: introSlides.length > 0 && introSlides.every(slide => {
+              const slideIndex = slides.findIndex(s => s.id === slide.id);
+              return completedSlides.includes(slideIndex);
+            })
+          },
+          {
+            name: "Deep Dive", 
+            progress: calculateWineSectionProgress(deepDiveSlides, 'deep_dive'),
+            isActive: deepDiveSlides.some(slide => slide.id === currentSlide?.id),
+            isCompleted: deepDiveSlides.length > 0 && deepDiveSlides.every(slide => {
+              const slideIndex = slides.findIndex(s => s.id === slide.id);
+              return completedSlides.includes(slideIndex);
+            })
+          },
+          {
+            name: "Ending",
+            progress: calculateWineSectionProgress(endingSlides, 'ending'),
+            isActive: endingSlides.some(slide => slide.id === currentSlide?.id),
+            isCompleted: endingSlides.length > 0 && endingSlides.every(slide => {
+              const slideIndex = slides.findIndex(s => s.id === slide.id);
+              return completedSlides.includes(slideIndex);
+            })
+          }
+        ]
+      });
+    });
     
+    // Legacy sections for overall progress
     const sections = [
       {
-        name: "Intro",
-        progress: calculateSectionProgressValue(introSlides, 'intro'),
-        isActive: currentSectionType === 'intro',
-        isCompleted: introSlides.length > 0 && introSlides.every(slide => {
-          const slideIndex = slides.findIndex(s => s.id === slide.id);
-          return completedSlides.includes(slideIndex);
-        })
-      },
-      {
-        name: "Deep Dive",
-        progress: calculateSectionProgressValue(deepDiveSlides, 'deep_dive'),
-        isActive: currentSectionType === 'deep_dive',
-        isCompleted: deepDiveSlides.length > 0 && deepDiveSlides.every(slide => {
-          const slideIndex = slides.findIndex(s => s.id === slide.id);
-          return completedSlides.includes(slideIndex);
-        })
-      },
-      {
-        name: "Ending",
-        progress: calculateSectionProgressValue(endingSlides, 'ending'),
-        isActive: currentSectionType === 'ending',
-        isCompleted: endingSlides.length > 0 && endingSlides.every(slide => {
-          const slideIndex = slides.findIndex(s => s.id === slide.id);
-          return completedSlides.includes(slideIndex);
-        })
+        name: "Wine Exploration",
+        progress: Math.round((completedSlides.length / slides.length) * 100),
+        isActive: true,
+        isCompleted: completedSlides.length === slides.length
       }
     ];
     
-    // Extract wine name from current slide or package
-    const currentWineName = currentSlide?.type === 'interlude' 
-      ? (currentSlide.payloadJson as any)?.wine_name || "Wine Tasting"
-      : currentSession?.packageCode || "Wine Tasting";
-    
+    const currentWineName = wineProgressData.find(w => w.isCurrentWine)?.wineName || "Wine Tasting";
     const progressInfo = `Slide ${currentSlideIndex + 1} of ${slides.length}`;
     
-    return { sections, currentWineName, progressInfo };
+    return { sections, currentWineName, progressInfo, wineProgress: wineProgressData };
   };
   
   const { sections, currentWineName, progressInfo } = calculateSectionProgress();

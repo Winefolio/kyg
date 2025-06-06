@@ -213,7 +213,7 @@ export default function SessionJoin() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white/80">Email</FormLabel>
+                    <FormLabel className="text-white/80">Email (Required)</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
