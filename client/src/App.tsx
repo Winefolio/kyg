@@ -11,6 +11,7 @@ import TastingCompletion from "@/pages/TastingCompletion";
 import HostDashboard from "@/pages/HostDashboard";
 import SommelierDashboard from "@/pages/SommelierDashboard";
 import PackageEditor from "@/pages/PackageEditor";
+import VideoEditorPackageEditor from "@/pages/VideoEditorPackageEditor";
 import Profile from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
 
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/" component={Gateway} />
       <Route path="/sommelier" component={SommelierDashboard} />
       <Route path="/editor/:code" component={PackageEditor} />
+      <Route path="/video-editor/:code" component={VideoEditorPackageEditor} />
       <Route path="/profile" component={Profile} />
       <Route path="/join" component={SessionJoin} />
       <Route path="/session/:packageCode" component={SessionJoin} />

@@ -1281,11 +1281,14 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
                         {!isReadOnly && (
                           <div className="flex items-center space-x-2 ml-4">
                             <Button
-                              onClick={() => setLocation(`/editor/${packages?.find(p => p.id === wine.packageId)?.code || ''}`)}
+                              onClick={() => {
+                                const pkg = packages?.find(p => p.id === wine.packageId);
+                                if (pkg) setLocation(`/video-editor/${pkg.code}`);
+                              }}
                               variant="ghost"
                               size="sm"
                               className="text-purple-400 hover:bg-purple-500/10"
-                              title="Edit Package"
+                              title="Video Editor Style"
                             >
                               <Edit3 className="w-4 h-4" />
                             </Button>
@@ -1335,6 +1338,14 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
           />
         )}
 
+        {/* QR Code Modal */}
+        {showQRModal && selectedSessionForQR && (
+          <QRCodeModal
+            session={selectedSessionForQR}
+            isOpen={showQRModal}
+            onClose={() => setShowQRModal(false)}
+          />
+        )}
 
       </motion.div>
     </motion.div>
