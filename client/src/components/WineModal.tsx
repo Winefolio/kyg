@@ -38,12 +38,12 @@ interface SlideOrderItem {
 }
 
 interface SlideTemplate {
-  id: string;
+  id?: string;
   name: string;
   type: string;
   sectionType: string;
   payloadTemplate: any;
-  isPublic: boolean;
+  isPublic?: boolean;
 }
 
 interface WineModalProps {
@@ -139,10 +139,7 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      ...wineForm,
-      packageId
-    });
+    onSave(wineForm);
     onClose();
   };
 

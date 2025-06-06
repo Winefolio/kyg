@@ -526,7 +526,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Wine management endpoints for sommelier dashboard
+  // Wine management endpoints for packages
+  app.get("/api/packages/:packageId/wines", async (req, res) => {
+    try {
+      const { packageId } = req.params;
+      const wines = await storage.getPackageWines(packageId);
+      res.json(wines);
+    } catch (error) {
+      console.error("Error fetching wines:", error);
+      res.status(500).json({ message: "Failed to fetch wines" });
+    }
+  });
+
+  app.post("/api/packages/:packageId/wines", async (req, res) => {
+    try {
+      const { packageId } = req.params;
+      const wineData = { ...req.body, packageId };
+      const newWine = await storage.createPackageWineFromDashboard(wineData);
+      res.json(newWine);
+    } catch (error) {
+      console.error("Error creating wine:", error);
+      res.status(500).json({ message: "Failed to create wine" });
+    }
+  });
+
+  app.patch("/api/packages/:packageId/wines/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+      const updatedWine = await storage.updatePackageWine(id, updateData);
+      res.json(updatedWine);
+    } catch (error) {
+      console.error("Error updating wine:", error);
+      res.status(500).json({ message: "Failed to update wine" });
+    }
+  });
+
+  app.delete("/api/packages/:packageId/wines/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deletePackageWine(id);
+      res.json({ message: "Wine deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting wine:", error);
+      res.status(500).json({ message: "Failed to delete wine" });
+    }
+  });
+
+  // Slides management endpoints
+  app.get("/api/packages/:packageId/wines/:wineId/slides", async (req, res) => {
+    try {
+      const { wineId } = req.params;
+      const slides = await storage.getSlidesByPackageWineId(wineId);
+      res.json(slides);
+    } catch (error) {
+      console.error("Error fetching slides:", error);
+      res.status(500).json({ message: "Failed to fetch slides" });
+    }
+  });
+
+  app.post("/api/packages/:packageId/wines/:wineId/slides", async (req, res) => {
+    try {
+      const { wineId } = req.params;
+      const slideData = { ...req.body, packageWineId: wineId };
+      const newSlide = await storage.createSlide(slideData);
+      res.json(newSlide);
+    } catch (error) {
+      console.error("Error creating slide:", error);
+      res.status(500).json({ message: "Failed to create slide" });
+    }
+  });
+
+  // Legacy wine management endpoints for backward compatibility
   app.post("/api/package-wines", async (req, res) => {
     try {
       const wineData = req.body;
