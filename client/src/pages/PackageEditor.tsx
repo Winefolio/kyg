@@ -301,6 +301,19 @@ export default function PackageEditor() {
       </div>
 
       <div className="flex h-[calc(100vh-57px)]">
+        {/* Mobile Overlay */}
+        <AnimatePresence>
+          {sidebarOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSidebarOpen(false)}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+            />
+          )}
+        </AnimatePresence>
+
         {/* Sidebar */}
         <AnimatePresence>
           {sidebarOpen && (
@@ -309,19 +322,29 @@ export default function PackageEditor() {
               animate={{ x: 0 }}
               exit={{ x: -320 }}
               transition={{ type: "spring", damping: 20 }}
-              className="fixed lg:relative inset-y-0 left-0 z-50 w-full sm:w-80 lg:w-96 bg-black/95 backdrop-blur-xl border-r border-white/10 overflow-y-auto"
+              className="fixed lg:relative inset-y-0 left-0 z-50 w-80 lg:w-96 bg-gradient-to-br from-purple-900/90 to-black/90 backdrop-blur-xl border-r border-white/10 overflow-y-auto"
             >
               <div className="p-4">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-semibold">Content Structure</h2>
-                  <Button
-                    size="sm"
-                    onClick={() => setIsWineModalOpen(true)}
-                    className="bg-purple-600 hover:bg-purple-700"
-                  >
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Wine
-                  </Button>
+                  <h2 className="text-lg font-semibold text-white">Content Structure</h2>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      size="sm"
+                      onClick={() => setIsWineModalOpen(true)}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Add Wine
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setSidebarOpen(false)}
+                      className="lg:hidden text-white/60 hover:text-white hover:bg-white/10"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -402,7 +425,7 @@ export default function PackageEditor() {
                                           <Eye className="h-4 w-4" />
                                         )}
                                         <div>
-                                          <p className="text-sm font-medium">
+                                          <p className="text-sm font-medium text-white">
                                             {(slide.payloadJson as any)?.title || 'Untitled Slide'}
                                           </p>
                                           <p className="text-xs text-white/60">
