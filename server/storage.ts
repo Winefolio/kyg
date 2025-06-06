@@ -1047,7 +1047,20 @@ export class DatabaseStorage implements IStorage {
 
   // Package management methods for sommelier dashboard
   async getAllPackages(): Promise<Package[]> {
-    return await db.select().from(packages).orderBy(packages.createdAt);
+    const packagesData = await db.select().from(packages).orderBy(packages.createdAt);
+    
+    // For each package, fetch its wines
+    const packagesWithWines = await Promise.all(
+      packagesData.map(async (pkg) => {
+        const wines = await this.getPackageWines(pkg.id);
+        return {
+          ...pkg,
+          wines
+        };
+      })
+    );
+    
+    return packagesWithWines;
   }
 
   async updatePackage(id: string, data: Partial<InsertPackage>): Promise<Package> {
