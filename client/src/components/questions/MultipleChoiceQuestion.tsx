@@ -145,10 +145,10 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
             </div>
           )}
         </div>
-        <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">
+        <h3 className="text-base sm:text-lg font-semibold text-white mb-1.5">
           <DynamicTextRenderer text={question.title} />
         </h3>
-        <p className="text-white/70 text-sm sm:text-base leading-relaxed">
+        <p className="text-white/70 text-xs sm:text-sm leading-relaxed">
           <DynamicTextRenderer text={question.description} />
         </p>
       </div>
