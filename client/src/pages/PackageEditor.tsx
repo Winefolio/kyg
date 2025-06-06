@@ -488,7 +488,7 @@ export default function PackageEditor() {
     );
   }
 
-  const selectedWine = selectedSlide ? packageData.wines.find(w => w.id === selectedSlide.packageWineId) : null;
+  const selectedWine = selectedSlide ? packageData.wines.find(w => w.id === selectedSlide.packageWineId) || null : null;
 
   return (
     <div className="h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex flex-col">
