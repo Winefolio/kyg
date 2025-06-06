@@ -1120,6 +1120,59 @@ export class DatabaseStorage implements IStorage {
   async deleteSlide(id: string): Promise<void> {
     await db.delete(slides).where(eq(slides.id, id));
   }
+
+  // NEW: Get all packages with their associated wines for the dashboard
+  async getAllPackagesWithWines(): Promise<(Package & { wines: PackageWine[] })[]> {
+    const allPackages = await db.select().from(packages).orderBy(packages.createdAt);
+    if (allPackages.length === 0) return [];
+
+    const packageIds = allPackages.map(p => p.id);
+    const allPackageWines = await db.select().from(packageWines)
+      .where(inArray(packageWines.packageId, packageIds))
+      .orderBy(packageWines.position);
+
+    return allPackages.map(pkg => ({
+      ...pkg,
+      wines: allPackageWines.filter(wine => wine.packageId === pkg.id),
+    }));
+  }
+
+  // NEW: Get a single package with all its wines and all their slides for the editor
+  async getPackageWithWinesAndSlides(packageCode: string) {
+    const pkg = await this.getPackageByCode(packageCode);
+    if (!pkg) {
+      return null;
+    }
+
+    const wines = await this.getPackageWines(pkg.id);
+    if (wines.length === 0) {
+      return { ...pkg, wines: [], slides: [] };
+    }
+
+    const wineIds = wines.map(w => w.id);
+    const allSlidesForPackage = await db.select()
+      .from(slides)
+      .where(inArray(slides.packageWineId, wineIds))
+      .orderBy(slides.position);
+
+    return {
+      ...pkg,
+      wines,
+      slides: allSlidesForPackage,
+    };
+  }
+
+  // NEW: Update the order and wine assignment of multiple slides in a single transaction
+  async updateSlidesOrder(slideUpdates: { slideId: string; packageWineId: string; position: number }[]) {
+    if (slideUpdates.length === 0) return;
+    return db.transaction(async (tx) => {
+      await Promise.all(slideUpdates.map(update =>
+        tx.update(slides)
+          .set({ packageWineId: update.packageWineId, position: update.position })
+          .where(eq(slides.id, update.slideId))
+      ));
+    });
+  }
 }
 
 export const storage = new DatabaseStorage();

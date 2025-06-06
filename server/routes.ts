@@ -644,6 +644,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // NEW: Endpoint for the slide editor to get all package data
+  app.get("/api/packages/:code/editor", async (req, res) => {
+    try {
+      const { code } = req.params;
+      const data = await storage.getPackageWithWinesAndSlides(code);
+      if (!data) {
+        return res.status(404).json({ message: "Package not found" });
+      }
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching package editor data:", error);
+      res.status(500).json({ error: "Failed to fetch package data" });
+    }
+  });
+
+  // NEW: Endpoint to update slide order
+  app.put("/api/slides/order", async (req, res) => {
+    try {
+      const { slideUpdates } = req.body;
+      if (!Array.isArray(slideUpdates)) {
+        return res.status(400).json({ message: "Invalid payload: slideUpdates must be an array." });
+      }
+      await storage.updateSlidesOrder(slideUpdates);
+      res.status(200).json({ message: "Slide order updated successfully." });
+    } catch (error) {
+      console.error("Failed to update slide order:", error);
+      res.status(500).json({ message: "Failed to update slide order." });
+    }
+  });
+
+  // UPDATED: Use new function to include wines  
+  app.get("/api/packages-with-wines", async (req, res) => {
+    try {
+      const packages = await storage.getAllPackagesWithWines();
+      res.json(packages);
+    } catch (error) {
+      console.error("Error fetching packages with wines:", error);
+      res.status(500).json({ error: "Failed to fetch packages" });
+    }
+  });
+
   // Modern wine management endpoints
   app.post("/api/wines", async (req, res) => {
     try {

@@ -10,6 +10,7 @@ import TastingSession from "@/pages/TastingSession";
 import TastingCompletion from "@/pages/TastingCompletion";
 import HostDashboard from "@/pages/HostDashboard";
 import SommelierDashboard from "@/pages/SommelierDashboard";
+import PackageEditor from "@/pages/PackageEditor";
 import Profile from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
 
