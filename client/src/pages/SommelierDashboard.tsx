@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WineModal } from "@/components/WineModal";
 import { 
   Plus, 
@@ -980,9 +981,67 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
     description: pkg?.description || '',
     isActive: pkg?.isActive ?? true
   });
+  const [activeTab, setActiveTab] = useState<'details' | 'wines'>('details');
+  const [packageWines, setPackageWines] = useState<PackageWine[]>([]);
+  const [wineModalOpen, setWineModalOpen] = useState(false);
+  const [wineModalMode, setWineModalMode] = useState<'create' | 'edit' | 'view'>('create');
+  const [selectedWine, setSelectedWine] = useState<PackageWine | null>(null);
+
+  const queryClient = useQueryClient();
+
+  // Fetch wines for this package if it exists
+  const { data: wines } = useQuery({
+    queryKey: ['/api/packages', pkg?.id, 'wines'],
+    enabled: !!pkg?.id && activeTab === 'wines'
+  });
+
+  useEffect(() => {
+    if (wines) {
+      setPackageWines(wines);
+    }
+  }, [wines]);
+
+  const createWineMutation = useMutation({
+    mutationFn: (wineData: any) => fetch(`/api/packages/${pkg?.id}/wines`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(wineData)
+    }).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/packages', pkg?.id, 'wines'] });
+      setWineModalOpen(false);
+    }
+  });
+
+  const updateWineMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string, data: any }) => fetch(`/api/packages/${pkg?.id}/wines/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/packages', pkg?.id, 'wines'] });
+      setWineModalOpen(false);
+    }
+  });
+
+  const deleteWineMutation = useMutation({
+    mutationFn: (wineId: string) => fetch(`/api/packages/${pkg?.id}/wines/${wineId}`, {
+      method: 'DELETE'
+    }).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/packages', pkg?.id, 'wines'] });
+    }
+  });
 
   const handleSave = () => {
     onSave(formData);
+  };
+
+  const openWineModal = (mode: 'create' | 'edit' | 'view', wine?: PackageWine) => {
+    setWineModalMode(mode);
+    setSelectedWine(wine || null);
+    setWineModalOpen(true);
   };
 
   const isReadOnly = mode === 'view';
@@ -1016,32 +1075,44 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
           </Button>
         </div>
 
-        <div className="space-y-6">
-          <div>
-            <Label className="text-white">Package Name</Label>
-            <Input
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              className="bg-white/10 border-white/20 text-white"
-              placeholder="Enter package name"
-              disabled={isReadOnly}
-            />
-          </div>
+        <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)}>
+          <TabsList className="grid w-full grid-cols-2 bg-white/10 rounded-lg">
+            <TabsTrigger value="details" className="text-white">
+              <Settings className="w-4 h-4 mr-2" />
+              Package Details
+            </TabsTrigger>
+            <TabsTrigger value="wines" className="text-white" disabled={!pkg?.id}>
+              <Wine className="w-4 h-4 mr-2" />
+              Wines ({packageWines.length})
+            </TabsTrigger>
+          </TabsList>
 
-          <div>
-            <Label className="text-white">Package Code</Label>
-            <Input
-              value={formData.code}
-              onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
-              className="bg-white/10 border-white/20 text-white font-mono"
-              placeholder="WINE01"
-              disabled={isReadOnly}
-            />
-          </div>
+          <TabsContent value="details" className="space-y-6 mt-6">
+            <div>
+              <Label className="text-white">Package Name</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                className="bg-white/10 border-white/20 text-white"
+                placeholder="Enter package name"
+                disabled={isReadOnly}
+              />
+            </div>
 
-          <div>
-            <Label className="text-white">Description</Label>
-            <Textarea
+            <div>
+              <Label className="text-white">Package Code</Label>
+              <Input
+                value={formData.code}
+                onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                className="bg-white/10 border-white/20 text-white font-mono"
+                placeholder="WINE01"
+                disabled={isReadOnly}
+              />
+            </div>
+
+            <div>
+              <Label className="text-white">Description</Label>
+              <Textarea
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               className="bg-white/10 border-white/20 text-white"
@@ -1077,7 +1148,99 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
               </Button>
             </div>
           )}
-        </div>
+          </TabsContent>
+
+          <TabsContent value="wines" className="space-y-6 mt-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-medium">Package Wines</h3>
+              {!isReadOnly && (
+                <Button
+                  onClick={() => openWineModal('create')}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Wine
+                </Button>
+              )}
+            </div>
+
+            {packageWines.length === 0 ? (
+              <div className="text-center py-8">
+                <Wine className="w-12 h-12 mx-auto text-white/40 mb-4" />
+                <p className="text-white/60">No wines added yet</p>
+                {!isReadOnly && (
+                  <Button
+                    onClick={() => openWineModal('create')}
+                    variant="outline"
+                    className="mt-4 border-white/20 text-white hover:bg-white/10"
+                  >
+                    Add Your First Wine
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {packageWines.map((wine, index) => (
+                  <Card key={wine.id} className="bg-white/5 border-white/10 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
+                          {wine.position}
+                        </div>
+                        <div>
+                          <h4 className="text-white font-medium">{wine.wineName}</h4>
+                          {wine.wineDescription && (
+                            <p className="text-white/60 text-sm mt-1 line-clamp-2">
+                              {wine.wineDescription}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {!isReadOnly && (
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            onClick={() => openWineModal('edit', wine)}
+                            variant="ghost"
+                            size="sm"
+                            className="text-white hover:bg-white/10"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            onClick={() => deleteWineMutation.mutate(wine.id)}
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-400 hover:bg-red-500/10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {/* Wine Modal for this package */}
+        {wineModalOpen && pkg?.id && (
+          <WineModal
+            mode={wineModalMode}
+            wine={selectedWine}
+            packageId={pkg.id}
+            onClose={() => setWineModalOpen(false)}
+            onSave={(data) => {
+              if (wineModalMode === 'create') {
+                createWineMutation.mutate(data);
+              } else if (wineModalMode === 'edit' && selectedWine) {
+                updateWineMutation.mutate({ id: selectedWine.id, data });
+              }
+            }}
+          />
+        )}
       </motion.div>
     </motion.div>
   );
