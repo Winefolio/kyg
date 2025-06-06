@@ -143,19 +143,19 @@ export default function VideoEditorPackageEditorNew() {
   );
 
   // Fetch package data
-  const { data: packageData, isLoading } = useQuery({
+  const { data: packageData, isLoading } = useQuery<any>({
     queryKey: ['/api/packages', code],
     enabled: !!code,
   });
 
   // Fetch package wines
-  const { data: winesData } = useQuery({
+  const { data: winesData } = useQuery<any[]>({
     queryKey: ['/api/packages', packageData?.id, 'wines'],
     enabled: !!packageData?.id,
   });
 
   // Fetch slides
-  const { data: slidesData } = useQuery({
+  const { data: slidesData } = useQuery<any>({
     queryKey: ['/api/packages', code, 'slides'],
     enabled: !!code,
   });
@@ -383,7 +383,7 @@ export default function VideoEditorPackageEditorNew() {
               <div className="p-3 border-b border-gray-700">
                 <h3 className="text-white font-semibold mb-3 text-sm">Select Wine</h3>
                 <div className="space-y-2">
-                  {packageData?.wines?.map((wine: Wine) => (
+                  {winesData?.map((wine: Wine) => (
                     <Button
                       key={wine.id}
                       variant={selectedWine?.id === wine.id ? "default" : "outline"}
@@ -448,7 +448,7 @@ export default function VideoEditorPackageEditorNew() {
                   onDragEnd={handleDragEnd}
                 >
                   <div className="space-y-3">
-                    {packageData?.wines?.map((wine: Wine) => {
+                    {winesData?.map((wine: Wine) => {
                       const wineSlides = slidesByWine[wine.id] || [];
                       return (
                         <div 
