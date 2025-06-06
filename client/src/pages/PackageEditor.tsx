@@ -371,8 +371,8 @@ export default function PackageEditor() {
   });
 
   useEffect(() => {
-    if (packageData) {
-      setSlides(packageData.slides);
+    if (packageData && packageData.wines && packageData.slides) {
+      setSlides(packageData.slides || []);
       // Auto-expand all wine sections
       setExpandedWines(new Set(packageData.wines.map(w => w.id)));
     }
@@ -464,7 +464,7 @@ export default function PackageEditor() {
     });
   };
 
-  if (isLoading) {
+  if (isLoading || !packageData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
         <div className="text-white text-center">
@@ -475,11 +475,24 @@ export default function PackageEditor() {
     );
   }
 
-  if (error || !packageData) {
+  if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
         <div className="text-white text-center">
-          <p>Package not found</p>
+          <p>Error loading package: {error.message}</p>
+          <Button onClick={() => setLocation('/sommelier')} className="mt-4">
+            Back to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!packageData.wines || !Array.isArray(packageData.wines)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-center">
+          <p>Package has no wines configured</p>
           <Button onClick={() => setLocation('/sommelier')} className="mt-4">
             Back to Dashboard
           </Button>
