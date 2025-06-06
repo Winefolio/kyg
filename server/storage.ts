@@ -116,6 +116,11 @@ export interface IStorage {
   deletePackage(id: string): Promise<void>;
   getAllSessions(): Promise<Session[]>;
 
+  // Wine management for sommelier dashboard
+  createPackageWineFromDashboard(wine: InsertPackageWine): Promise<PackageWine>;
+  updatePackageWine(id: string, data: Partial<InsertPackageWine>): Promise<PackageWine>;
+  deletePackageWine(id: string): Promise<void>;
+
   // Glossary
   getGlossaryTerms(): Promise<GlossaryTerm[]>;
   createGlossaryTerm(term: InsertGlossaryTerm): Promise<GlossaryTerm>;
@@ -995,6 +1000,28 @@ export class DatabaseStorage implements IStorage {
 
   async getAllSessions(): Promise<Session[]> {
     return await db.select().from(sessions).orderBy(sessions.id);
+  }
+
+  // Wine management methods for sommelier dashboard
+  async createPackageWineFromDashboard(wine: InsertPackageWine): Promise<PackageWine> {
+    const [newWine] = await db.insert(packageWines).values(wine).returning();
+    return newWine;
+  }
+
+  async updatePackageWine(id: string, data: Partial<InsertPackageWine>): Promise<PackageWine> {
+    const [updatedWine] = await db
+      .update(packageWines)
+      .set(data)
+      .where(eq(packageWines.id, id))
+      .returning();
+    return updatedWine;
+  }
+
+  async deletePackageWine(id: string): Promise<void> {
+    // First delete associated slides
+    await db.delete(slides).where(eq(slides.packageWineId, id));
+    // Then delete the wine
+    await db.delete(packageWines).where(eq(packageWines.id, id));
   }
 }
 

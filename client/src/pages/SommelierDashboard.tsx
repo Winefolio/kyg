@@ -126,6 +126,13 @@ export default function SommelierDashboard() {
     enabled: activeTab === 'sessions'
   });
 
+  // Fetch analytics
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+    queryKey: ['/api/analytics/overview'],
+    enabled: activeTab === 'analytics',
+    refetchInterval: 30000 // Refresh every 30 seconds
+  });
+
   // Create package mutation
   const createPackageMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -657,25 +664,142 @@ export default function SommelierDashboard() {
             {/* Analytics Tab */}
             {activeTab === 'analytics' && (
               <div className="space-y-6">
-                <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6">
-                  <h3 className="text-white font-semibold text-lg mb-4">Analytics Overview</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-white">{packages?.length || 0}</div>
-                      <div className="text-white/70 text-sm">Total Packages</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-white">{sessions?.length || 0}</div>
-                      <div className="text-white/70 text-sm">Active Sessions</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-white">
-                        {sessions?.reduce((acc, s) => acc + s.participantCount, 0) || 0}
-                      </div>
-                      <div className="text-white/70 text-sm">Total Participants</div>
-                    </div>
+                {analyticsLoading ? (
+                  <div className="flex justify-center py-12">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full"
+                    />
                   </div>
-                </Card>
+                ) : analytics ? (
+                  <>
+                    {/* Overview Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                      <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6 text-center">
+                        <TrendingUp className="w-8 h-8 text-blue-400 mx-auto mb-2" />
+                        <div className="text-2xl font-bold text-white">{analytics.overview.totalPackages}</div>
+                        <div className="text-white/70 text-sm">Total Packages</div>
+                        <div className="text-green-400 text-xs mt-1">
+                          {analytics.overview.activePackages} active
+                        </div>
+                      </Card>
+                      
+                      <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6 text-center">
+                        <Users className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+                        <div className="text-2xl font-bold text-white">{analytics.overview.totalSessions}</div>
+                        <div className="text-white/70 text-sm">Total Sessions</div>
+                        <div className="text-green-400 text-xs mt-1">
+                          {analytics.overview.activeSessions} active
+                        </div>
+                      </Card>
+                      
+                      <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6 text-center">
+                        <Activity className="w-8 h-8 text-pink-400 mx-auto mb-2" />
+                        <div className="text-2xl font-bold text-white">{analytics.overview.totalParticipants}</div>
+                        <div className="text-white/70 text-sm">Total Participants</div>
+                      </Card>
+                      
+                      <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6 text-center">
+                        <BarChart3 className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+                        <div className="text-2xl font-bold text-white">
+                          {analytics.overview.totalSessions > 0 ? 
+                            Math.round(analytics.overview.totalParticipants / analytics.overview.totalSessions * 10) / 10 : 0
+                          }
+                        </div>
+                        <div className="text-white/70 text-sm">Avg Participants</div>
+                      </Card>
+                      
+                      <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6 text-center">
+                        <Wine className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                        <div className="text-2xl font-bold text-white">
+                          {analytics.overview.activePackages > 0 ? 
+                            Math.round((analytics.overview.activeSessions / analytics.overview.activePackages) * 10) / 10 : 0
+                          }
+                        </div>
+                        <div className="text-white/70 text-sm">Sessions per Package</div>
+                      </Card>
+                    </div>
+
+                    {/* Package Usage Analytics */}
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6">
+                      <h3 className="text-white font-semibold text-lg mb-4">Package Performance</h3>
+                      <div className="space-y-4">
+                        {analytics.packageUsage.map((pkg: any, index: number) => (
+                          <motion.div
+                            key={pkg.packageId}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                            className="bg-white/5 rounded-lg p-4 border border-white/10"
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-purple-400 to-pink-400"></div>
+                                <h4 className="text-white font-medium">{pkg.packageName}</h4>
+                                <Badge variant="outline" className="text-xs border-white/20 text-white/70">
+                                  {pkg.packageCode}
+                                </Badge>
+                                {pkg.isActive && (
+                                  <Badge className="bg-green-500/20 text-green-200 text-xs">Active</Badge>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <div className="text-white font-medium">
+                                  {pkg.participantsCount} participants
+                                </div>
+                                <div className="text-white/60 text-sm">
+                                  {pkg.sessionsCount} sessions
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="w-full bg-white/10 rounded-full h-2">
+                              <div 
+                                className="bg-gradient-to-r from-purple-400 to-pink-400 h-2 rounded-full transition-all duration-500"
+                                style={{
+                                  width: `${Math.min(100, (pkg.participantsCount / Math.max(...analytics.packageUsage.map((p: any) => p.participantsCount), 1)) * 100)}%`
+                                }}
+                              ></div>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </Card>
+
+                    {/* Recent Activity */}
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6">
+                      <h3 className="text-white font-semibold text-lg mb-4">Recent Activity</h3>
+                      <div className="space-y-3">
+                        {analytics.recentActivity.map((activity: any, index: number) => (
+                          <motion.div
+                            key={activity.sessionId}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                            className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-2 h-2 rounded-full ${
+                                activity.status === 'active' ? 'bg-green-400' : 'bg-gray-400'
+                              }`}></div>
+                              <span className="text-white">Session started for {activity.packageCode}</span>
+                            </div>
+                            <div className="text-white/60 text-sm">
+                              {new Date(activity.createdAt).toLocaleString()}
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </Card>
+                  </>
+                ) : (
+                  <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-12 text-center">
+                    <BarChart3 className="w-16 h-16 text-white/30 mx-auto mb-4" />
+                    <h3 className="text-white font-semibold text-lg mb-2">No Analytics Data</h3>
+                    <p className="text-white/70">Analytics data will appear here once you have active packages and sessions.</p>
+                  </Card>
+                )}
               </div>
             )}
           </motion.div>

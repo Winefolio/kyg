@@ -526,5 +526,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Wine management endpoints for sommelier dashboard
+  app.post("/api/package-wines", async (req, res) => {
+    try {
+      const wineData = req.body;
+      const newWine = await storage.createPackageWineFromDashboard(wineData);
+      res.json(newWine);
+    } catch (error) {
+      console.error("Error creating wine:", error);
+      res.status(500).json({ message: "Failed to create wine" });
+    }
+  });
+
+  app.patch("/api/package-wines/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updateData = req.body;
+      const updatedWine = await storage.updatePackageWine(id, updateData);
+      res.json(updatedWine);
+    } catch (error) {
+      console.error("Error updating wine:", error);
+      res.status(500).json({ message: "Failed to update wine" });
+    }
+  });
+
+  app.delete("/api/package-wines/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deletePackageWine(id);
+      res.json({ message: "Wine deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting wine:", error);
+      res.status(500).json({ message: "Failed to delete wine" });
+    }
+  });
+
+  // Enhanced analytics endpoint
+  app.get("/api/analytics/overview", async (req, res) => {
+    try {
+      const packages = await storage.getAllPackages();
+      const sessions = await storage.getAllSessions();
+      
+      // Calculate comprehensive analytics
+      const totalPackages = packages.length;
+      const activePackages = packages.filter(p => p.isActive).length;
+      const totalSessions = sessions.length;
+      const activeSessions = sessions.filter(s => s.status === 'active').length;
+      
+      // Get total participants across all sessions
+      let totalParticipants = 0;
+      for (const session of sessions) {
+        const participants = await storage.getParticipantsBySessionId(session.id);
+        totalParticipants += participants.length;
+      }
+
+      // Package usage analytics
+      const packageUsage = await Promise.all(
+        packages.map(async (pkg) => {
+          const packageSessions = sessions.filter(s => s.packageCode === pkg.code);
+          let packageParticipants = 0;
+          for (const session of packageSessions) {
+            const participants = await storage.getParticipantsBySessionId(session.id);
+            packageParticipants += participants.length;
+          }
+          return {
+            packageId: pkg.id,
+            packageName: pkg.name,
+            packageCode: pkg.code,
+            sessionsCount: packageSessions.length,
+            participantsCount: packageParticipants,
+            isActive: pkg.isActive
+          };
+        })
+      );
+
+      const analytics = {
+        overview: {
+          totalPackages,
+          activePackages,
+          totalSessions,
+          activeSessions,
+          totalParticipants
+        },
+        packageUsage,
+        recentActivity: sessions.slice(-5).map(s => ({
+          sessionId: s.id,
+          packageCode: s.packageCode,
+          status: s.status,
+          createdAt: s.createdAt
+        }))
+      };
+
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
   return httpServer;
 }
