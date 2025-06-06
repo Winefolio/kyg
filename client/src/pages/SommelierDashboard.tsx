@@ -1302,7 +1302,7 @@ function PackageModal({
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-8 w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col"
+        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-4 sm:p-6 w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-8">
