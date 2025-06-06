@@ -1016,7 +1016,7 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
 
   useEffect(() => {
     if (wines) {
-      setPackageWines(wines);
+      setPackageWines(Array.isArray(wines) ? wines : wines.wines || []);
     }
   }, [wines]);
 
