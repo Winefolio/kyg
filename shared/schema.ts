@@ -154,7 +154,6 @@ export const insertPackageWineSchema = createInsertSchema(packageWines, {
 });
 
 export const insertSlideSchema = createInsertSchema(slides, {
-  packageWineId: z.string().nullable().optional(),
   type: z.enum(slideTypes),
   section_type: z.enum(['intro', 'deep_dive', 'ending']).optional().nullable(),
   payloadJson: z.any() // Accept any JSON payload, validation happens in application logic

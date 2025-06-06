@@ -335,13 +335,17 @@ export class DatabaseStorage implements IStorage {
       },
     ];
 
-    for (const slideInfo of slideData) {
-      await this.createSlide({
-        packageId: bordeauxPackage.id,
-        position: slideInfo.position,
-        type: slideInfo.type as "question" | "media" | "interlude" | "video_message" | "audio_message",
-        payloadJson: slideInfo.payloadJson,
-      });
+    // Create slides for both wines
+    for (const wine of [chateauMargaux, chateauLatour]) {
+      for (const slideTemplate of slideTemplates) {
+        await this.createSlide({
+          packageWineId: wine.id,
+          position: slideTemplate.position,
+          type: slideTemplate.type as "question" | "media" | "interlude" | "video_message" | "audio_message",
+          section_type: slideTemplate.section_type as "intro" | "deep_dive" | "ending" | null,
+          payloadJson: slideTemplate.payloadJson,
+        });
+      }
     }
 
     console.log("Wine tasting data initialized successfully!");
@@ -369,24 +373,37 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  // Package Wine methods
+  async createPackageWine(wine: InsertPackageWine): Promise<PackageWine> {
+    const result = await db
+      .insert(packageWines)
+      .values({
+        packageId: wine.packageId,
+        position: wine.position,
+        wineName: wine.wineName,
+        wineDescription: wine.wineDescription,
+        wineImageUrl: wine.wineImageUrl,
+      })
+      .returning();
+    return result[0];
+  }
+
+  async getPackageWines(packageId: string): Promise<PackageWine[]> {
+    const result = await db
+      .select()
+      .from(packageWines)
+      .where(eq(packageWines.packageId, packageId))
+      .orderBy(packageWines.position);
+    return result;
+  }
+
   // Slide methods
-  async getSlidesByPackageId(
-    packageId: string,
-    isHost = false,
-  ): Promise<Slide[]> {
-    let result = await db
+  async getSlidesByPackageWineId(packageWineId: string): Promise<Slide[]> {
+    const result = await db
       .select()
       .from(slides)
-      .where(eq(slides.packageId, packageId))
+      .where(eq(slides.packageWineId, packageWineId))
       .orderBy(slides.position);
-
-    if (!isHost) {
-      result = result.filter((slide) => {
-        const payload = slide.payloadJson as any;
-        return !payload.for_host;
-      });
-    }
-
     return result;
   }
 
@@ -403,9 +420,10 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .insert(slides)
       .values({
-        packageId: slide.packageId,
+        packageWineId: slide.packageWineId,
         position: slide.position,
         type: slide.type,
+        section_type: slide.section_type,
         payloadJson: slide.payloadJson,
       })
       .returning();
@@ -680,11 +698,14 @@ export class DatabaseStorage implements IStorage {
     const sessionParticipants =
       await this.getParticipantsBySessionId(sessionId);
 
-    // 4. Fetch all slides for this package
-    const sessionSlides = await this.getSlidesByPackageId(
-      session.packageId!,
-      true,
-    ); // Include host slides
+    // 4. Fetch all package wines and their slides for this package
+    const packageWines = await this.getPackageWines(session.packageId!);
+    let sessionSlides: Slide[] = [];
+    
+    for (const wine of packageWines) {
+      const wineSlides = await this.getSlidesByPackageWineId(wine.id);
+      sessionSlides = sessionSlides.concat(wineSlides);
+    }
 
     // 5. Fetch all responses for all participants in this session (optimized single query)
     const participantIds = sessionParticipants
