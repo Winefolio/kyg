@@ -167,6 +167,42 @@ export default function VideoEditorPackageEditorNew() {
   const [wineDropdownOpen, setWineDropdownOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const [previewSlideIndex, setPreviewSlideIndex] = useState(0);
+
+  // Enhanced slide navigation
+  const navigateSlide = (direction: 'next' | 'prev') => {
+    const allSlides = getAllSlidesWithTransitions();
+    if (direction === 'next' && previewSlideIndex < allSlides.length - 1) {
+      setPreviewSlideIndex(previewSlideIndex + 1);
+    } else if (direction === 'prev' && previewSlideIndex > 0) {
+      setPreviewSlideIndex(previewSlideIndex - 1);
+    }
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!previewMode) return;
+      
+      switch (event.key) {
+        case 'ArrowRight':
+        case ' ':
+          event.preventDefault();
+          navigateSlide('next');
+          break;
+        case 'ArrowLeft':
+          event.preventDefault();
+          navigateSlide('prev');
+          break;
+        case 'Escape':
+          event.preventDefault();
+          setPreviewMode(false);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [previewMode, previewSlideIndex]);
   const [collapsedWines, setCollapsedWines] = useState<Record<string, boolean>>({});
 
   const sensors = useSensors(
@@ -222,30 +258,45 @@ export default function VideoEditorPackageEditorNew() {
     
     sortedWines.forEach((wine: any, wineIndex: number) => {
       const wineSlides = slidesByWine[wine.id] || [];
+      const validSlides = wineSlides.filter(slide => {
+        const payload = slide.payloadJson || {};
+        // Filter out empty template slides
+        return payload.title || payload.question || payload.description || 
+               (payload.options && payload.options.length > 0) ||
+               payload.videoUrl || payload.audioUrl || 
+               (payload.mediaItems && payload.mediaItems.length > 0);
+      });
       
-      // Add wine transition slide (except for the first wine)
-      if (wineIndex > 0) {
-        allSlidesWithTransitions.push({
-          id: `transition-${wine.id}`,
-          type: 'wine_transition',
-          title: `Wine ${wineIndex + 1}: ${wine.wineName}`,
-          description: wine.wineDescription || 'Prepare for the next wine in our tasting journey',
-          payloadJson: {
-            wineName: wine.wineName,
-            wineDescription: wine.wineDescription,
-            wineImageUrl: wine.wineImageUrl,
-            position: wine.position,
-            animationType: 'slide_transition',
-            backgroundImage: wine.wineImageUrl || 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080'
-          },
-          packageWineId: wine.id,
-          position: -1, // Special position for transitions
-          sectionType: 'transition'
-        });
-      }
+      // Add wine transition slide for every wine (including first one as intro)
+      const transitionTitle = wineIndex === 0 
+        ? `Welcome to Wine ${wineIndex + 1}: ${wine.wineName}`
+        : `Wine ${wineIndex + 1}: ${wine.wineName}`;
+      
+      const transitionDescription = wineIndex === 0
+        ? `Let's begin our wine tasting journey with ${wine.wineName}`
+        : `Moving on to our next wine: ${wine.wineName}`;
+        
+      allSlidesWithTransitions.push({
+        id: `transition-${wine.id}`,
+        type: 'wine_transition',
+        title: transitionTitle,
+        description: wine.wineDescription || transitionDescription,
+        payloadJson: {
+          wineName: wine.wineName,
+          wineDescription: wine.wineDescription,
+          wineImageUrl: wine.wineImageUrl,
+          position: wine.position,
+          animationType: 'wine_glass_fill',
+          backgroundImage: wine.wineImageUrl || 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080',
+          isFirstWine: wineIndex === 0
+        },
+        packageWineId: wine.id,
+        position: -1, // Special position for transitions
+        sectionType: 'transition'
+      });
       
       // Add wine slides sorted by position
-      const sortedSlides = [...wineSlides].sort((a, b) => a.position - b.position);
+      const sortedSlides = [...validSlides].sort((a, b) => a.position - b.position);
       allSlidesWithTransitions.push(...sortedSlides);
     });
     
@@ -325,7 +376,7 @@ export default function VideoEditorPackageEditorNew() {
               allow_multiple: payload.allow_multiple || payload.allowMultiple || false,
               allow_notes: payload.allow_notes || payload.allowNotes || false
             }}
-            value={null}
+            value={{ selected: [], notes: '' }}
             onChange={() => {}}
           />
         </div>
@@ -527,17 +578,17 @@ export default function VideoEditorPackageEditorNew() {
     );
   };
 
-  // Render wine transition slide
+  // Render wine transition slide with glass filling animation
   const renderWineTransition = (slide: any, isPreview: boolean = false) => {
     const payload = slide.payloadJson;
     
     return (
       <motion.div
-        initial={{ opacity: 0, x: isPreview ? 50 : 0 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -50 }}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
-        className="w-full max-w-4xl mx-auto bg-gradient-to-br from-amber-900/90 to-orange-900/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl relative overflow-hidden"
+        className="w-full max-w-4xl mx-auto bg-gradient-to-br from-purple-900/90 to-amber-900/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl relative overflow-hidden"
       >
         {payload.backgroundImage && (
           <img 
@@ -555,41 +606,164 @@ export default function VideoEditorPackageEditorNew() {
             transition={{ delay: 0.3, duration: 0.6 }}
             className="mb-8"
           >
-            <div className="w-24 h-24 mx-auto mb-6 bg-white/10 rounded-full flex items-center justify-center">
-              <Video className="w-12 h-12 text-amber-300" />
+            {/* Wine Glass with Filling Animation */}
+            <div className="w-32 h-32 mx-auto mb-6 relative">
+              {/* Wine Glass SVG */}
+              <svg viewBox="0 0 100 100" className="w-full h-full">
+                {/* Glass outline */}
+                <path
+                  d="M25 20 L75 20 L70 40 L65 70 L35 70 L30 40 Z"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.8)"
+                  strokeWidth="2"
+                />
+                {/* Stem */}
+                <line
+                  x1="50" y1="70"
+                  x2="50" y2="85"
+                  stroke="rgba(255,255,255,0.8)"
+                  strokeWidth="2"
+                />
+                {/* Base */}
+                <line
+                  x1="40" y1="85"
+                  x2="60" y2="85"
+                  stroke="rgba(255,255,255,0.8)"
+                  strokeWidth="3"
+                />
+                
+                {/* Wine filling animation */}
+                <motion.path
+                  d="M30 40 L70 40 L65 70 L35 70 Z"
+                  fill="url(#wineGradient)"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ 
+                    duration: 2, 
+                    delay: 0.5,
+                    ease: "easeInOut"
+                  }}
+                />
+                
+                {/* Wine surface animation */}
+                <motion.ellipse
+                  cx="50" cy="40"
+                  rx="20" ry="3"
+                  fill="rgba(139, 69, 19, 0.8)"
+                  initial={{ opacity: 0, scaleY: 0 }}
+                  animate={{ opacity: 1, scaleY: 1 }}
+                  transition={{ 
+                    duration: 0.5, 
+                    delay: 2,
+                    ease: "easeOut"
+                  }}
+                />
+                
+                {/* Gradient definition */}
+                <defs>
+                  <linearGradient id="wineGradient" x1="0%" y1="100%" x2="0%" y2="0%">
+                    <stop offset="0%" stopColor="#8B2635" />
+                    <stop offset="50%" stopColor="#A0304E" />
+                    <stop offset="100%" stopColor="#722F37" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              
+              {/* Sparkle effects */}
+              <div className="absolute inset-0">
+                {[...Array(6)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute w-1 h-1 bg-amber-300 rounded-full"
+                    style={{
+                      left: `${20 + Math.random() * 60}%`,
+                      top: `${30 + Math.random() * 40}%`,
+                    }}
+                    initial={{ opacity: 0, scale: 0 }}
+                    animate={{ 
+                      opacity: [0, 1, 0], 
+                      scale: [0, 1, 0],
+                      rotate: 360
+                    }}
+                    transition={{ 
+                      duration: 1.5, 
+                      delay: 2.5 + (i * 0.2),
+                      repeat: Infinity,
+                      repeatDelay: 3
+                    }}
+                  />
+                ))}
+              </div>
             </div>
-            <h2 className="text-4xl font-bold mb-4">{slide.title}</h2>
-            <p className="text-xl opacity-90 max-w-2xl mx-auto">{slide.description}</p>
+            
+            <motion.h2 
+              className="text-4xl font-bold mb-4"
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.8, duration: 0.6 }}
+            >
+              {slide.title}
+            </motion.h2>
+            
+            <motion.p 
+              className="text-xl opacity-90 max-w-2xl mx-auto mb-6"
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 1, duration: 0.6 }}
+            >
+              {slide.description}
+            </motion.p>
           </motion.div>
           
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.6, duration: 0.6 }}
+            transition={{ delay: 1.2, duration: 0.6 }}
             className="text-amber-200"
           >
-            <p className="text-lg">Take a moment to cleanse your palate</p>
-            <p className="text-sm opacity-75 mt-2">Prepare for the next wine experience</p>
+            {payload.isFirstWine ? (
+              <>
+                <p className="text-lg">Welcome to your wine tasting journey</p>
+                <p className="text-sm opacity-75 mt-2">Take your time to explore each wine's unique character</p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg">Take a moment to cleanse your palate</p>
+                <p className="text-sm opacity-75 mt-2">Prepare for the next wine experience</p>
+              </>
+            )}
           </motion.div>
           
-          {/* Floating particles animation */}
+          {/* Enhanced floating particles */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {[...Array(8)].map((_, i) => (
+            {[...Array(12)].map((_, i) => (
               <motion.div
                 key={i}
-                initial={{ y: '100%', x: Math.random() * 100 + '%', opacity: 0 }}
+                className="absolute"
+                initial={{ 
+                  y: '100%', 
+                  x: Math.random() * 100 + '%', 
+                  opacity: 0,
+                  rotate: 0
+                }}
                 animate={{ 
                   y: '-20%', 
-                  opacity: [0, 0.6, 0],
+                  opacity: [0, 0.8, 0],
+                  rotate: 360
                 }}
                 transition={{ 
-                  duration: 4, 
-                  delay: i * 0.5,
+                  duration: 6, 
+                  delay: i * 0.3,
                   repeat: Infinity,
-                  repeatDelay: 2
+                  repeatDelay: 2,
+                  ease: "easeInOut"
                 }}
-                className="absolute w-1 h-8 bg-amber-300/40 rounded-full"
-              />
+              >
+                <div className={`w-1 h-6 ${
+                  i % 3 === 0 ? 'bg-amber-300/60' : 
+                  i % 3 === 1 ? 'bg-purple-300/60' : 'bg-rose-300/60'
+                } rounded-full`} />
+              </motion.div>
             ))}
           </div>
         </div>
@@ -845,26 +1019,34 @@ export default function VideoEditorPackageEditorNew() {
               
               <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-4">
                 <Button
-                  onClick={() => setPreviewSlideIndex(Math.max(0, previewSlideIndex - 1))}
+                  onClick={() => navigateSlide('prev')}
                   disabled={previewSlideIndex === 0}
-                  className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 transition-all duration-200"
                 >
                   <ChevronLeft className="w-4 h-4 mr-2" />
                   Previous
                 </Button>
                 
-                <div className="text-white px-4 py-2 bg-black/30 rounded-lg">
-                  {previewSlideIndex + 1} / {getAllSlidesWithTransitions().length}
+                <div className="text-white px-4 py-2 bg-black/30 rounded-lg backdrop-blur-sm">
+                  <span className="font-mono">{previewSlideIndex + 1}</span>
+                  <span className="text-white/60 mx-2">/</span>
+                  <span className="font-mono">{getAllSlidesWithTransitions().length}</span>
                 </div>
                 
                 <Button
-                  onClick={() => setPreviewSlideIndex(Math.min(getAllSlidesWithTransitions().length - 1, previewSlideIndex + 1))}
+                  onClick={() => navigateSlide('next')}
                   disabled={previewSlideIndex === getAllSlidesWithTransitions().length - 1}
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  className="bg-purple-600 hover:bg-purple-700 text-white transition-all duration-200"
                 >
                   Next
                   <ChevronRight className="w-4 h-4 ml-2" />
                 </Button>
+              </div>
+              
+              {/* Navigation instructions */}
+              <div className="absolute top-6 left-6 text-white/60 text-sm">
+                <p>Use arrow keys or spacebar to navigate</p>
+                <p>Press ESC to exit preview</p>
               </div>
             </motion.div>
           ) : selectedSlide ? (
