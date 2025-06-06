@@ -256,16 +256,22 @@ export default function VideoEditorPackageEditorNew() {
     let allSlidesWithTransitions: any[] = [];
     const sortedWines = [...selectedPackage.wines].sort((a: any, b: any) => a.position - b.position);
     
+    // Default wine bottle image for all wines
+    const defaultWineImage = 'https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600';
+    
     sortedWines.forEach((wine: any, wineIndex: number) => {
       const wineSlides = slidesByWine[wine.id] || [];
       const validSlides = wineSlides.filter(slide => {
         const payload = slide.payloadJson || {};
-        // Filter out empty template slides
+        // Filter out empty template slides - be more inclusive
         return payload.title || payload.question || payload.description || 
                (payload.options && payload.options.length > 0) ||
                payload.videoUrl || payload.audioUrl || 
-               (payload.mediaItems && payload.mediaItems.length > 0);
+               (payload.mediaItems && payload.mediaItems.length > 0) ||
+               payload.duration || payload.category;
       });
+      
+      console.log(`Wine ${wineIndex + 1} (${wine.wineName}): ${validSlides.length} valid slides`);
       
       // Sort slides by position and separate overall rating from other slides
       const sortedSlides = [...validSlides].sort((a, b) => a.position - b.position);
@@ -280,9 +286,11 @@ export default function VideoEditorPackageEditorNew() {
                 payload.category?.toLowerCase().includes('overall'));
       });
       
+      console.log(`  - Other slides: ${otherSlides.length}, Overall rating slides: ${overallRatingSlides.length}`);
+      
       // Add wine transition slide for first wine only (as intro)
       if (wineIndex === 0) {
-        allSlidesWithTransitions.push({
+        const introTransition = {
           id: `transition-${wine.id}-intro`,
           type: 'wine_transition',
           title: `Welcome to Wine ${wineIndex + 1}: ${wine.wineName}`,
@@ -290,16 +298,18 @@ export default function VideoEditorPackageEditorNew() {
           payloadJson: {
             wineName: wine.wineName,
             wineDescription: wine.wineDescription,
-            wineImageUrl: wine.wineImageUrl,
+            wineImageUrl: wine.wineImageUrl || defaultWineImage,
             position: wine.position,
             animationType: 'wine_glass_fill',
-            backgroundImage: wine.wineImageUrl || 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080',
+            backgroundImage: wine.wineImageUrl || defaultWineImage,
             isFirstWine: true
           },
           packageWineId: wine.id,
           position: -1,
           sectionType: 'transition'
-        });
+        };
+        allSlidesWithTransitions.push(introTransition);
+        console.log(`  + Added intro transition: ${introTransition.title}`);
       }
       
       // Add other wine slides first
@@ -311,7 +321,7 @@ export default function VideoEditorPackageEditorNew() {
       // Add wine transition slide after overall rating (except for last wine)
       if (wineIndex < sortedWines.length - 1) {
         const nextWine = sortedWines[wineIndex + 1];
-        allSlidesWithTransitions.push({
+        const nextTransition = {
           id: `transition-${nextWine.id}`,
           type: 'wine_transition',
           title: `Wine ${wineIndex + 2}: ${nextWine.wineName}`,
@@ -319,19 +329,22 @@ export default function VideoEditorPackageEditorNew() {
           payloadJson: {
             wineName: nextWine.wineName,
             wineDescription: nextWine.wineDescription,
-            wineImageUrl: nextWine.wineImageUrl,
+            wineImageUrl: nextWine.wineImageUrl || defaultWineImage,
             position: nextWine.position,
             animationType: 'wine_glass_fill',
-            backgroundImage: nextWine.wineImageUrl || 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080',
+            backgroundImage: nextWine.wineImageUrl || defaultWineImage,
             isFirstWine: false
           },
           packageWineId: nextWine.id,
           position: -1,
           sectionType: 'transition'
-        });
+        };
+        allSlidesWithTransitions.push(nextTransition);
+        console.log(`  + Added next wine transition: ${nextTransition.title}`);
       }
     });
     
+    console.log(`Total slides with transitions: ${allSlidesWithTransitions.length}`);
     return allSlidesWithTransitions;
   };
 
