@@ -31,7 +31,8 @@ import {
   MessageSquare,
   HelpCircle,
   Clapperboard,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Menu
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -149,6 +150,7 @@ export default function VideoEditorPackageEditor() {
   const [allSlides, setAllSlides] = useState<Slide[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const sensors = useSensors(
     useSensor(PointerSensor)
@@ -437,14 +439,37 @@ export default function VideoEditorPackageEditor() {
 
       {/* Video Editor Layout */}
       <div className="flex h-[calc(100vh-73px)]">
-        <ResizablePanelGroup direction="horizontal">
-          {/* Left Timeline Panel */}
-          <ResizablePanel defaultSize={25} minSize={20}>
-            <div className="h-full bg-gray-800/30 border-r border-gray-700">
+        {/* Left Sidebar - Collapsible */}
+        <div className={`${sidebarOpen ? 'w-80' : 'w-12'} transition-all duration-300 bg-gray-800/50 border-r border-gray-700 flex flex-col`}>
+          {/* Sidebar Header */}
+          <div className="p-3 border-b border-gray-700 flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="text-gray-400 hover:text-white"
+            >
+              <Menu size={20} />
+            </Button>
+            {sidebarOpen && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLocation('/sommelier-dashboard')}
+                className="text-gray-400 hover:text-white flex items-center gap-1"
+              >
+                <ArrowLeft size={16} />
+                <span className="text-sm">Dashboard</span>
+              </Button>
+            )}
+          </div>
+
+          {sidebarOpen && (
+            <div className="flex-1 overflow-y-auto">
               {/* Add Slide Templates */}
-              <div className="p-4 border-b border-gray-700">
-                <h3 className="text-white font-semibold mb-3">Add Slides</h3>
-                <div className="grid grid-cols-1 gap-2">
+              <div className="p-3 border-b border-gray-700">
+                <h3 className="text-white font-semibold mb-3 text-sm">Add Slides</h3>
+                <div className="space-y-2">
                   {SLIDE_TEMPLATES.map((template) => (
                     <Button
                       key={template.type}
@@ -461,18 +486,18 @@ export default function VideoEditorPackageEditor() {
                           });
                         }
                       }}
-                      className="flex items-center gap-2 p-2 h-auto border-gray-600 text-gray-300 hover:bg-gray-700 justify-start"
+                      className="w-full flex items-center gap-2 p-2 h-8 border-gray-600 text-gray-300 hover:bg-gray-700 justify-start text-xs"
                     >
                       {template.icon}
-                      <span className="text-xs">{template.name}</span>
+                      <span>{template.name}</span>
                     </Button>
                   ))}
                 </div>
               </div>
 
               {/* Timeline */}
-              <div className="p-4 overflow-y-auto">
-                <h3 className="text-white font-semibold mb-3">Timeline</h3>
+              <div className="p-3">
+                <h3 className="text-white font-semibold mb-3 text-sm">Timeline</h3>
                 
                 <DndContext
                   sensors={sensors}
@@ -552,13 +577,11 @@ export default function VideoEditorPackageEditor() {
                 </DndContext>
               </div>
             </div>
-          </ResizablePanel>
+          )}
+        </div>
 
-          <ResizableHandle withHandle />
-
-          {/* Center Preview Panel */}
-          <ResizablePanel defaultSize={50} minSize={30}>
-            <div className="h-full bg-gray-900/50 flex flex-col">
+        {/* Main Preview Area - Full Screen */}
+        <div className="flex-1 bg-gray-900/50 flex flex-col">
               <div className="p-4 border-b border-gray-700 bg-gray-800/30">
                 <div className="flex items-center justify-between">
                   <h2 className="font-bold text-white flex items-center gap-2">
