@@ -144,8 +144,14 @@ export default function VideoEditorPackageEditorNew() {
 
   // Fetch package data
   const { data: packageData, isLoading } = useQuery({
-    queryKey: ['/api/packages', code, 'editor'],
+    queryKey: ['/api/packages', code],
     enabled: !!code,
+  });
+
+  // Fetch package wines
+  const { data: winesData } = useQuery({
+    queryKey: ['/api/packages', packageData?.id, 'wines'],
+    enabled: !!packageData?.id,
   });
 
   // Fetch slides
@@ -172,10 +178,10 @@ export default function VideoEditorPackageEditorNew() {
 
   // Set default selected wine
   useEffect(() => {
-    if (packageData?.wines && packageData.wines.length > 0 && !selectedWine) {
-      setSelectedWine(packageData.wines[0]);
+    if (winesData && winesData.length > 0 && !selectedWine) {
+      setSelectedWine(winesData[0]);
     }
-  }, [packageData?.wines, selectedWine]);
+  }, [winesData, selectedWine]);
 
   // Create slide mutation
   const createSlideMutation = useMutation({
