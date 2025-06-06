@@ -216,8 +216,8 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Allow saving with minimal data - only wineName is required
-    const wineData = {
+    // Remove packageId from the wine data since it's not part of WineForm interface
+    const { packageId: _, ...wineData } = {
       ...wineForm,
       packageId,
       wineName: wineForm.wineName || 'Untitled Wine'

@@ -236,7 +236,7 @@ export default function SommelierDashboard() {
 
   // Create wine mutation
   const createWineMutation = useMutation({
-    mutationFn: (data: WineForm) =>
+    mutationFn: (data: any) =>
       apiRequest("/api/package-wines", "POST", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
