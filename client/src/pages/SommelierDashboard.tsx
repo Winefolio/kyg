@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { WineModal } from "@/components/WineModal";
 import { SlideEditor } from "@/components/SlideEditor";
 import { QRCodeModal } from "@/components/QRCodeModal";
@@ -54,6 +55,9 @@ import {
   GripVertical,
   TrendingUp,
   Activity,
+  MoreVertical,
+  Monitor,
+  ChevronUp,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -536,15 +540,6 @@ export default function SommelierDashboard() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => openPackageModal("view", pkg)}
-                                className="text-white hover:bg-white/10"
-                              >
-                                <Eye className="w-4 h-4 mr-2" />
-                                View
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
                                 onClick={() =>
                                   setLocation(`/editor/${pkg.code}`)
                                 }
@@ -553,25 +548,40 @@ export default function SommelierDashboard() {
                                 <Edit3 className="w-4 h-4 mr-2" />
                                 Edit Package
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openPackageModal("edit", pkg)}
-                                className="text-white hover:bg-white/10"
-                              >
-                                <Settings className="w-4 h-4 mr-2" />
-                                Settings
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  deletePackageMutation.mutate(pkg.id)
-                                }
-                                className="text-red-300 hover:bg-red-500/20"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-white hover:bg-white/10"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="bg-black/90 border-white/20">
+                                  <DropdownMenuItem 
+                                    onClick={() => openPackageModal("view", pkg)}
+                                    className="text-white hover:bg-white/10 cursor-pointer"
+                                  >
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => openPackageModal("edit", pkg)}
+                                    className="text-white hover:bg-white/10 cursor-pointer"
+                                  >
+                                    <Settings className="w-4 h-4 mr-2" />
+                                    Settings
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => deletePackageMutation.mutate(pkg.id)}
+                                    className="text-red-300 hover:bg-red-500/20 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Delete Package
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </div>
 
@@ -1304,7 +1314,7 @@ function PackageModal({
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-4 sm:p-6 w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col"
+        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-4 sm:p-6 w-full max-w-[95vw] h-[95vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-8">
