@@ -84,23 +84,65 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
       animate={{ opacity: 1, y: 0 }}
       className="bg-gradient-card backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/20 shadow-xl h-full flex flex-col justify-center"
     >
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="px-2 py-1 bg-purple-600/30 rounded-full text-purple-200 text-xs sm:text-sm font-medium">
+      <div className="mb-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="px-2 py-1 bg-purple-600/30 rounded-full text-purple-200 text-xs font-medium">
             {question.category}
           </span>
           {relevantTerms.length > 0 && (
-            <ModernButton
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                triggerHaptic('selection');
-                setIsInfoPanelOpen(!isInfoPanelOpen);
-              }}
-              className="text-purple-300 hover:text-white hover:bg-white/10 p-2 rounded-full transition-all duration-200"
-            >
-              <Info size={16} />
-            </ModernButton>
+            <div className="relative">
+              <ModernButton
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  triggerHaptic('selection');
+                  setIsInfoPanelOpen(!isInfoPanelOpen);
+                }}
+                className="text-purple-300 hover:text-white hover:bg-white/10 p-1.5 rounded-full transition-all duration-200"
+              >
+                <Info size={14} />
+              </ModernButton>
+              
+              {/* Glossary Panel - Positioned next to button */}
+              <AnimatePresence>
+                {isInfoPanelOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9, x: 10 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, x: 10 }}
+                    className="absolute top-0 right-full mr-2 z-50"
+                  >
+                    <div className="bg-gray-800/95 backdrop-blur-xl rounded-lg border border-purple-500/30 shadow-xl p-3 w-60">
+                      <h4 className="text-purple-300 font-semibold text-xs mb-2 flex items-center gap-1">
+                        <BookOpen className="w-3 h-3" />
+                        Wine Terms
+                      </h4>
+                      <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                        {relevantTerms.slice(0, 5).map((term) => (
+                          <div key={term.id} className="text-xs">
+                            <button
+                              onClick={() => {
+                                triggerHaptic('selection');
+                                // Show term definition popup - will be handled by parent
+                              }}
+                              className="text-purple-200 hover:text-white font-medium transition-colors underline decoration-purple-400/50 hover:decoration-purple-300"
+                            >
+                              {term.term}
+                            </button>
+                            <p className="text-gray-300 mt-0.5 leading-relaxed">
+                              {term.definition.length > 70 
+                                ? `${term.definition.substring(0, 70)}...` 
+                                : term.definition
+                              }
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           )}
         </div>
         <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">
