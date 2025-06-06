@@ -350,12 +350,12 @@ export default function SommelierDashboard() {
         </div>
       </motion.div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-8 py-12">
         {/* Tab Navigation */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex space-x-1 mb-8 bg-white/10 rounded-2xl p-1"
+          className="flex space-x-2 mb-12 bg-white/10 rounded-2xl p-2"
         >
           {[
             { id: 'packages', label: 'Wine Packages', icon: Wine },
@@ -366,13 +366,13 @@ export default function SommelierDashboard() {
               key={tab.id}
               variant={activeTab === tab.id ? "default" : "ghost"}
               onClick={() => setActiveTab(tab.id as TabType)}
-              className={`flex-1 ${
+              className={`flex-1 py-4 px-6 text-lg font-medium rounded-xl transition-all duration-200 ${
                 activeTab === tab.id 
-                  ? 'bg-white text-purple-900' 
-                  : 'text-white hover:bg-white/10'
+                  ? 'bg-white text-purple-900 shadow-lg' 
+                  : 'text-white hover:bg-white/10 hover:scale-105'
               }`}
             >
-              <tab.icon className="w-4 h-4 mr-2" />
+              <tab.icon className="w-5 h-5 mr-3" />
               {tab.label}
             </Button>
           ))}
@@ -399,7 +399,7 @@ export default function SommelierDashboard() {
                     />
                   </div>
                 ) : packages?.length ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                     {packages.map((pkg, index) => (
                       <motion.div
                         key={pkg.id}
@@ -407,7 +407,7 @@ export default function SommelierDashboard() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.1 }}
                       >
-                        <Card className="bg-gradient-card backdrop-blur-xl border-white/20 hover:border-white/30 transition-all duration-300">
+                        <Card className="bg-gradient-card backdrop-blur-xl border-white/20 hover:border-white/30 hover:shadow-2xl transition-all duration-300 h-full">
                           {/* Package Header */}
                           <div className="p-6 border-b border-white/10">
                             <div className="flex items-start justify-between mb-4">
@@ -1058,7 +1058,7 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-8 w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">
@@ -1075,19 +1075,19 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
           </Button>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)}>
-          <TabsList className="grid w-full grid-cols-2 bg-white/10 rounded-lg">
-            <TabsTrigger value="details" className="text-white">
+        <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)} className="flex flex-col h-full">
+          <TabsList className="grid w-full grid-cols-2 bg-white/10 rounded-lg p-1 mb-6">
+            <TabsTrigger value="details" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white py-3">
               <Settings className="w-4 h-4 mr-2" />
               Package Details
             </TabsTrigger>
-            <TabsTrigger value="wines" className="text-white" disabled={!pkg?.id}>
+            <TabsTrigger value="wines" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white py-3" disabled={!pkg?.id}>
               <Wine className="w-4 h-4 mr-2" />
               Wines ({packageWines.length})
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="details" className="space-y-6 mt-6">
+          <TabsContent value="details" className="space-y-6 flex-1 overflow-y-auto pr-2">
             <div>
               <Label className="text-white">Package Name</Label>
               <Input
@@ -1150,78 +1150,98 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
           )}
           </TabsContent>
 
-          <TabsContent value="wines" className="space-y-6 mt-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-white font-medium">Package Wines</h3>
-              {!isReadOnly && (
-                <Button
-                  onClick={() => openWineModal('create')}
-                  className="bg-purple-600 hover:bg-purple-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Wine
-                </Button>
-              )}
-            </div>
-
-            {packageWines.length === 0 ? (
-              <div className="text-center py-8">
-                <Wine className="w-12 h-12 mx-auto text-white/40 mb-4" />
-                <p className="text-white/60">No wines added yet</p>
+          <TabsContent value="wines" className="flex-1 overflow-y-auto pr-2">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-white font-medium text-lg">Package Wines</h3>
                 {!isReadOnly && (
                   <Button
                     onClick={() => openWineModal('create')}
-                    variant="outline"
-                    className="mt-4 border-white/20 text-white hover:bg-white/10"
+                    className="bg-purple-600 hover:bg-purple-700"
                   >
-                    Add Your First Wine
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Wine
                   </Button>
                 )}
               </div>
-            ) : (
-              <div className="space-y-3">
-                {packageWines.map((wine, index) => (
-                  <Card key={wine.id} className="bg-white/5 border-white/10 p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
-                          {wine.position}
+
+              {packageWines.length === 0 ? (
+                <div className="text-center py-12">
+                  <Wine className="w-16 h-16 mx-auto text-white/40 mb-6" />
+                  <h4 className="text-white font-medium mb-2">No wines added yet</h4>
+                  <p className="text-white/60 mb-6">Start building your wine collection for this package</p>
+                  {!isReadOnly && (
+                    <Button
+                      onClick={() => openWineModal('create')}
+                      variant="outline"
+                      className="border-white/20 text-white hover:bg-white/10"
+                    >
+                      Add Your First Wine
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {packageWines.map((wine, index) => (
+                    <Card key={wine.id} className="bg-white/5 border-white/10 p-6 hover:bg-white/10 transition-colors">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-4 flex-1">
+                          <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center text-white font-medium">
+                            {wine.position}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-white font-medium text-lg mb-1">{wine.wineName}</h4>
+                            {wine.wineDescription && (
+                              <p className="text-white/70 text-sm mb-2 leading-relaxed">
+                                {wine.wineDescription}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap gap-2">
+                              {wine.wineType && (
+                                <Badge variant="outline" className="bg-purple-500/20 border-purple-400/30 text-purple-200">
+                                  {wine.wineType}
+                                </Badge>
+                              )}
+                              {wine.vintage && (
+                                <Badge variant="outline" className="bg-blue-500/20 border-blue-400/30 text-blue-200">
+                                  {wine.vintage}
+                                </Badge>
+                              )}
+                              {wine.region && (
+                                <Badge variant="outline" className="bg-green-500/20 border-green-400/30 text-green-200">
+                                  {wine.region}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-white font-medium">{wine.wineName}</h4>
-                          {wine.wineDescription && (
-                            <p className="text-white/60 text-sm mt-1 line-clamp-2">
-                              {wine.wineDescription}
-                            </p>
-                          )}
-                        </div>
+                        
+                        {!isReadOnly && (
+                          <div className="flex items-center space-x-2 ml-4">
+                            <Button
+                              onClick={() => openWineModal('edit', wine)}
+                              variant="ghost"
+                              size="sm"
+                              className="text-white hover:bg-white/10"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              onClick={() => deleteWineMutation.mutate(wine.id)}
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-400 hover:bg-red-500/10"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                      
-                      {!isReadOnly && (
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            onClick={() => openWineModal('edit', wine)}
-                            variant="ghost"
-                            size="sm"
-                            className="text-white hover:bg-white/10"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            onClick={() => deleteWineMutation.mutate(wine.id)}
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-400 hover:bg-red-500/10"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
 
