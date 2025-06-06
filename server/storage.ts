@@ -898,9 +898,16 @@ export class DatabaseStorage implements IStorage {
         const scores = slideResponses
           .map((response) => {
             const answerData = response.answerJson as any;
-            return typeof answerData === "number" ? answerData : null;
+            // ROBUSTNESS FIX: Handle both numeric and object-based scale answers
+            if (typeof answerData === "number") {
+              return answerData;
+            }
+            if (typeof answerData === "object" && answerData !== null && typeof answerData.value === "number") {
+              return answerData.value;
+            }
+            return null;
           })
-          .filter((score) => score !== null);
+          .filter((score): score is number => score !== null);
 
         if (scores.length > 0) {
           const averageScore =
