@@ -11,6 +11,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { Home, Save, PlusCircle, Edit, ArrowLeft, Eye, Layers, Wine, HelpCircle, Video, Trash2 } from 'lucide-react';
 import type { Package, PackageWine, Slide } from "@shared/schema";
 import { WineModal } from '@/components/WineModal';
+import { SlideConfigPanel } from '@/components/editor/SlideConfigPanel';
 import { SLIDE_TEMPLATES } from '@/lib/wineTemplates';
 
 type EditorData = Package & { wines: PackageWine[]; slides: Slide[] };
@@ -428,40 +429,11 @@ export default function PackageEditor() {
                         </div>
                         <div className="p-4 h-[calc(100%-60px)] overflow-y-auto">
                             {activeSlide ? (
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-sm font-medium text-white">Title</label>
-                                        <input
-                                            type="text"
-                                            value={(activeSlide.payloadJson as any)?.title || ''}
-                                            onChange={(e) => {
-                                                const newPayload = { ...(activeSlide.payloadJson as any), title: e.target.value };
-                                                handleUpdateSlide(activeSlide.id, { payloadJson: newPayload });
-                                            }}
-                                            className="w-full mt-1 p-2 bg-white/10 border border-white/20 rounded text-white"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium text-white">Description</label>
-                                        <textarea
-                                            value={(activeSlide.payloadJson as any)?.description || ''}
-                                            onChange={(e) => {
-                                                const newPayload = { ...(activeSlide.payloadJson as any), description: e.target.value };
-                                                handleUpdateSlide(activeSlide.id, { payloadJson: newPayload });
-                                            }}
-                                            className="w-full mt-1 p-2 bg-white/10 border border-white/20 rounded text-white h-20"
-                                        />
-                                    </div>
-                                    <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() => deleteSlideMutation.mutate(activeSlide.id)}
-                                        className="w-full"
-                                    >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Delete Slide
-                                    </Button>
-                                </div>
+                                <SlideConfigPanel
+                                    slide={activeSlide}
+                                    onUpdate={handleUpdateSlide}
+                                    onDelete={() => deleteSlideMutation.mutate(activeSlide.id)}
+                                />
                             ) : (
                                 <div className="flex items-center justify-center h-full text-white/60">
                                     <p>Select a slide to configure</p>

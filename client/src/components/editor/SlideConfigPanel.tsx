@@ -1,214 +1,248 @@
-import { AnimatePresence, motion } from "framer-motion";
-import { InterludeConfigForm } from "./InterludeConfigForm";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Settings, HelpCircle, Clapperboard, Video, Music, Image } from "lucide-react";
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Trash2, Plus, Minus } from 'lucide-react';
 import type { Slide } from "@shared/schema";
 
-function QuestionConfigForm({ slide, onSave }: { slide: Slide; onSave: (updatedPayload: any) => void }) {
-  return (
-    <Card className="bg-gray-800 border-gray-700">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg text-white flex items-center gap-2">
-          <HelpCircle className="w-5 h-5 text-blue-500" />
-          Question Slide Configuration
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-center text-gray-400 py-8">
-          <HelpCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p className="text-sm mb-2">Question configuration coming soon!</p>
-          <p className="text-xs">This will include question types, options, timing, and scoring.</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
+interface SlideConfigPanelProps {
+    slide: Slide;
+    onUpdate: (slideId: string, updates: any) => void;
+    onDelete: () => void;
 }
 
-function VideoConfigForm({ slide, onSave }: { slide: Slide; onSave: (updatedPayload: any) => void }) {
-  return (
-    <Card className="bg-gray-800 border-gray-700">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg text-white flex items-center gap-2">
-          <Video className="w-5 h-5 text-red-500" />
-          Video Message Configuration
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-center text-gray-400 py-8">
-          <Video className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p className="text-sm mb-2">Video configuration coming soon!</p>
-          <p className="text-xs">This will include video upload, playback controls, and captions.</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+export function SlideConfigPanel({ slide, onUpdate, onDelete }: SlideConfigPanelProps) {
+    const [payload, setPayload] = useState(slide.payloadJson as any || {});
 
-function AudioConfigForm({ slide, onSave }: { slide: Slide; onSave: (updatedPayload: any) => void }) {
-  return (
-    <Card className="bg-gray-800 border-gray-700">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg text-white flex items-center gap-2">
-          <Music className="w-5 h-5 text-green-500" />
-          Audio Message Configuration
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-center text-gray-400 py-8">
-          <Music className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p className="text-sm mb-2">Audio configuration coming soon!</p>
-          <p className="text-xs">This will include audio upload, playback controls, and transcripts.</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+    const updatePayload = (updates: any) => {
+        const newPayload = { ...payload, ...updates };
+        setPayload(newPayload);
+        onUpdate(slide.id, { payloadJson: newPayload });
+    };
 
-function MediaConfigForm({ slide, onSave }: { slide: Slide; onSave: (updatedPayload: any) => void }) {
-  return (
-    <Card className="bg-gray-800 border-gray-700">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg text-white flex items-center gap-2">
-          <Image className="w-5 h-5 text-purple-500" />
-          Media Slide Configuration
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-center text-gray-400 py-8">
-          <Image className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p className="text-sm mb-2">Media configuration coming soon!</p>
-          <p className="text-xs">This will include image upload, galleries, and annotations.</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+    const renderQuestionConfig = () => {
+        if (slide.type !== 'question') return null;
 
-export function SlideConfigPanel({ 
-  activeSlide, 
-  onSlideUpdate 
-}: { 
-  activeSlide: Slide | undefined;
-  onSlideUpdate: (slideId: string, updatedPayload: any) => void;
-}) {
-  const getSlideTypeInfo = (type: string) => {
-    switch (type) {
-      case 'interlude':
-        return { icon: Clapperboard, color: 'text-purple-500', name: 'Interlude' };
-      case 'question':
-        return { icon: HelpCircle, color: 'text-blue-500', name: 'Question' };
-      case 'video_message':
-        return { icon: Video, color: 'text-red-500', name: 'Video Message' };
-      case 'audio_message':
-        return { icon: Music, color: 'text-green-500', name: 'Audio Message' };
-      case 'media':
-        return { icon: Image, color: 'text-purple-500', name: 'Media' };
-      default:
-        return { icon: Settings, color: 'text-gray-500', name: 'Unknown' };
-    }
-  };
+        return (
+            <div className="space-y-4">
+                <div>
+                    <Label htmlFor="question-type" className="text-white">Question Type</Label>
+                    <Select
+                        value={payload.question_type || 'multiple_choice'}
+                        onValueChange={(value) => updatePayload({ question_type: value })}
+                    >
+                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                            <SelectItem value="scale">Scale (1-10)</SelectItem>
+                            <SelectItem value="text">Text Input</SelectItem>
+                            <SelectItem value="boolean">Yes/No</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
 
-  return (
-    <div className="h-full bg-gray-900/50 overflow-y-auto">
-      <div className="p-4 border-b border-gray-700 bg-gray-800/50">
-        <div className="flex items-center gap-3">
-          <Settings className="w-5 h-5 text-gray-400" />
-          <h2 className="font-bold text-lg text-white">Configuration Panel</h2>
-        </div>
-        {activeSlide && (
-          <div className="flex items-center gap-2 mt-3">
-            <Badge variant="outline" className="text-xs border-gray-600 text-gray-300">
-              Slide #{activeSlide.position}
-            </Badge>
-            <Badge variant="secondary" className="text-xs">
-              {activeSlide.section_type || 'general'}
-            </Badge>
-          </div>
-        )}
-      </div>
-
-      <div className="p-4">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeSlide?.id || 'empty'}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-          >
-            {!activeSlide && (
-              <div className="text-center text-gray-400 mt-20">
-                <Settings className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                <h3 className="text-lg font-medium mb-2">No Slide Selected</h3>
-                <p className="text-sm">Select a slide from the left panel to configure its properties.</p>
-              </div>
-            )}
-
-            {activeSlide && (
-              <div className="space-y-4">
-                {/* Slide Info Header */}
-                <Card className="bg-gray-800/50 border-gray-700">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      {(() => {
-                        const { icon: Icon, color, name } = getSlideTypeInfo(activeSlide.type);
-                        return (
-                          <>
-                            <Icon className={`w-6 h-6 ${color}`} />
-                            <div>
-                              <h3 className="font-medium text-white">{name} Slide</h3>
-                              <p className="text-xs text-gray-400">
-                                Configure the properties for this slide
-                              </p>
-                            </div>
-                          </>
-                        );
-                      })()}
+                {payload.question_type === 'multiple_choice' && (
+                    <div>
+                        <Label className="text-white">Options</Label>
+                        <div className="space-y-2 mt-2">
+                            {(payload.options || []).map((option: any, index: number) => (
+                                <div key={index} className="flex items-center space-x-2">
+                                    <Input
+                                        value={option.text || ''}
+                                        onChange={(e) => {
+                                            const newOptions = [...(payload.options || [])];
+                                            newOptions[index] = { ...option, text: e.target.value };
+                                            updatePayload({ options: newOptions });
+                                        }}
+                                        className="bg-white/10 border-white/20 text-white"
+                                        placeholder={`Option ${index + 1}`}
+                                    />
+                                    <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => {
+                                            const newOptions = (payload.options || []).filter((_: any, i: number) => i !== index);
+                                            updatePayload({ options: newOptions });
+                                        }}
+                                    >
+                                        <Minus className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ))}
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                    const newOptions = [...(payload.options || []), { text: '', value: (payload.options || []).length }];
+                                    updatePayload({ options: newOptions });
+                                }}
+                                className="w-full"
+                            >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Add Option
+                            </Button>
+                        </div>
                     </div>
-                  </CardContent>
-                </Card>
-
-                {/* Configuration Forms */}
-                {activeSlide.type === 'interlude' && (
-                  <InterludeConfigForm 
-                    slide={activeSlide} 
-                    onSave={(payload) => onSlideUpdate(activeSlide.id, payload)} 
-                  />
                 )}
 
-                {activeSlide.type === 'question' && (
-                  <QuestionConfigForm 
-                    slide={activeSlide} 
-                    onSave={(payload) => onSlideUpdate(activeSlide.id, payload)} 
-                  />
+                {payload.question_type === 'scale' && (
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="scale-min" className="text-white">Min Value</Label>
+                            <Input
+                                id="scale-min"
+                                type="number"
+                                value={payload.scale_min || 1}
+                                onChange={(e) => updatePayload({ scale_min: parseInt(e.target.value) })}
+                                className="bg-white/10 border-white/20 text-white"
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="scale-max" className="text-white">Max Value</Label>
+                            <Input
+                                id="scale-max"
+                                type="number"
+                                value={payload.scale_max || 10}
+                                onChange={(e) => updatePayload({ scale_max: parseInt(e.target.value) })}
+                                className="bg-white/10 border-white/20 text-white"
+                            />
+                        </div>
+                        <div className="col-span-2">
+                            <Label htmlFor="scale-min-label" className="text-white">Min Label</Label>
+                            <Input
+                                id="scale-min-label"
+                                value={payload.scale_min_label || ''}
+                                onChange={(e) => updatePayload({ scale_min_label: e.target.value })}
+                                className="bg-white/10 border-white/20 text-white"
+                                placeholder="e.g., Strongly Disagree"
+                            />
+                        </div>
+                        <div className="col-span-2">
+                            <Label htmlFor="scale-max-label" className="text-white">Max Label</Label>
+                            <Input
+                                id="scale-max-label"
+                                value={payload.scale_max_label || ''}
+                                onChange={(e) => updatePayload({ scale_max_label: e.target.value })}
+                                className="bg-white/10 border-white/20 text-white"
+                                placeholder="e.g., Strongly Agree"
+                            />
+                        </div>
+                    </div>
                 )}
+            </div>
+        );
+    };
 
-                {activeSlide.type === 'video_message' && (
-                  <VideoConfigForm 
-                    slide={activeSlide} 
-                    onSave={(payload) => onSlideUpdate(activeSlide.id, payload)} 
-                  />
-                )}
+    const renderVideoConfig = () => {
+        if (slide.type !== 'video_message') return null;
 
-                {activeSlide.type === 'audio_message' && (
-                  <AudioConfigForm 
-                    slide={activeSlide} 
-                    onSave={(payload) => onSlideUpdate(activeSlide.id, payload)} 
-                  />
-                )}
+        return (
+            <div className="space-y-4">
+                <div>
+                    <Label htmlFor="video-url" className="text-white">Video URL</Label>
+                    <Input
+                        id="video-url"
+                        value={payload.video_url || ''}
+                        onChange={(e) => updatePayload({ video_url: e.target.value })}
+                        className="bg-white/10 border-white/20 text-white"
+                        placeholder="https://..."
+                    />
+                </div>
+                <div>
+                    <Label htmlFor="video-duration" className="text-white">Duration (seconds)</Label>
+                    <Input
+                        id="video-duration"
+                        type="number"
+                        value={payload.duration_seconds || ''}
+                        onChange={(e) => updatePayload({ duration_seconds: parseInt(e.target.value) })}
+                        className="bg-white/10 border-white/20 text-white"
+                    />
+                </div>
+            </div>
+        );
+    };
 
-                {activeSlide.type === 'media' && (
-                  <MediaConfigForm 
-                    slide={activeSlide} 
-                    onSave={(payload) => onSlideUpdate(activeSlide.id, payload)} 
-                  />
-                )}
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    </div>
-  );
+    const renderInterludeConfig = () => {
+        if (slide.type !== 'interlude') return null;
+
+        return (
+            <div className="space-y-4">
+                <div>
+                    <Label htmlFor="background-color" className="text-white">Background Color</Label>
+                    <Input
+                        id="background-color"
+                        value={payload.background_color || '#1a1a1a'}
+                        onChange={(e) => updatePayload({ background_color: e.target.value })}
+                        className="bg-white/10 border-white/20 text-white"
+                        type="color"
+                    />
+                </div>
+                <div>
+                    <Label htmlFor="duration" className="text-white">Auto-advance after (seconds)</Label>
+                    <Input
+                        id="duration"
+                        type="number"
+                        value={payload.auto_advance_seconds || ''}
+                        onChange={(e) => updatePayload({ auto_advance_seconds: parseInt(e.target.value) })}
+                        className="bg-white/10 border-white/20 text-white"
+                        placeholder="Leave empty for manual advance"
+                    />
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Basic Configuration */}
+            <div className="space-y-4">
+                <div>
+                    <Label htmlFor="slide-title" className="text-white">Title</Label>
+                    <Input
+                        id="slide-title"
+                        value={payload.title || ''}
+                        onChange={(e) => updatePayload({ title: e.target.value })}
+                        className="bg-white/10 border-white/20 text-white"
+                        placeholder="Enter slide title"
+                    />
+                </div>
+                <div>
+                    <Label htmlFor="slide-description" className="text-white">Description</Label>
+                    <Textarea
+                        id="slide-description"
+                        value={payload.description || ''}
+                        onChange={(e) => updatePayload({ description: e.target.value })}
+                        className="bg-white/10 border-white/20 text-white"
+                        placeholder="Enter slide description"
+                        rows={3}
+                    />
+                </div>
+            </div>
+
+            {/* Type-specific Configuration */}
+            <div>
+                <h3 className="text-sm font-medium text-white mb-3">Type-specific Settings</h3>
+                {renderQuestionConfig()}
+                {renderVideoConfig()}
+                {renderInterludeConfig()}
+            </div>
+
+            {/* Actions */}
+            <div className="pt-4 border-t border-white/10">
+                <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={onDelete}
+                    className="w-full"
+                >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Slide
+                </Button>
+            </div>
+        </div>
+    );
 }
