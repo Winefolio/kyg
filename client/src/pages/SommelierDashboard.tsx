@@ -12,6 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WineModal } from "@/components/WineModal";
 import { SlideEditor } from "@/components/SlideEditor";
+import { QRCodeModal } from "@/components/QRCodeModal";
+import { WINE_TEMPLATES, getWineImage, getGrapeVarietals, getWineTypes, getWineRegions } from "@/lib/wineTemplates";
 import { 
   Plus, 
   Edit3, 
