@@ -696,14 +696,36 @@ export default function SommelierDashboard() {
                             </div>
                           </div>
                           
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full text-white hover:bg-white/10"
-                          >
-                            <BarChart3 className="w-4 h-4 mr-2" />
-                            View Analytics
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedSessionForQR({
+                                  ...session,
+                                  packageName: packages?.find((p: any) => p.id === session.packageId)?.name || 'Wine Package',
+                                  packageCode: packages?.find((p: any) => p.id === session.packageId)?.code || session.packageId,
+                                  maxParticipants: session.maxParticipants || 50
+                                });
+                                setShowQRModal(true);
+                              }}
+                              className="flex-1 text-purple-400 hover:bg-purple-500/20"
+                            >
+                              <QrCode className="w-4 h-4 mr-2" />
+                              QR Code
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const sessionUrl = `${window.location.origin}/join/${session.id}`;
+                                navigator.clipboard.writeText(sessionUrl);
+                              }}
+                              className="text-white/70 hover:bg-white/10"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </Card>
                       </motion.div>
                     ))}
