@@ -12,7 +12,7 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import { useHaptics } from "@/hooks/useHaptics";
 import { apiRequest } from "@/lib/queryClient";
-import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause, Award, Wine } from "lucide-react";
+import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause, Award, Wine, ChevronDown } from "lucide-react";
 import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
 import type { Slide, Participant, Session } from "@shared/schema";
 
@@ -25,6 +25,7 @@ export default function TastingSession() {
   const [completedSlides, setCompletedSlides] = useState<number[]>([]);
   const [isTransitioningSection, setIsTransitioningSection] = useState(false);
   const [transitionSectionName, setTransitionSectionName] = useState("");
+  const [isNavigating, setIsNavigating] = useState(false);
   const { saveResponse, syncStatus, initializeForSession, endSession } = useSessionPersistence();
   const { triggerHaptic } = useHaptics();
   const queryClient = useQueryClient();
@@ -149,106 +150,51 @@ export default function TastingSession() {
   const slides = processedSlides();
   const currentSlide = slides[currentSlideIndex];
   
-  // Calculate wine-specific progress with distinct sections
+  // Calculate wine-specific progress with clickable wine sections
   const calculateSectionProgress = () => {
-    if (slides.length === 0) return { sections: [], currentWineName: "", progressInfo: "", wineProgress: [] };
+    if (slides.length === 0 || !packageData?.wines) return { sections: [], currentWineName: "", progressInfo: "", wineProgress: [] };
     
-    // Group slides by wine and create wine-specific sections
-    const wineProgressData: any[] = [];
-    const wines = packageData?.wines || [];
+    const wines = packageData.wines.sort((a: any, b: any) => a.position - b.position);
     
-    wines.forEach((wine: any, wineIndex: number) => {
+    // Create sections for each wine (clickable wine headers)
+    const sections = wines.map((wine: any, index: number) => {
       const wineSlides = slides.filter(slide => slide.packageWineId === wine.id);
-      
-      // Categorize wine slides into sections
-      const introSlides = wineSlides.filter(slide => 
-        slide.type === 'interlude' || slide.position <= 2
-      );
-      const deepDiveSlides = wineSlides.filter(slide => 
-        slide.type === 'question' && slide.position > 2 && slide.position < 9
-      );
-      const endingSlides = wineSlides.filter(slide => 
-        slide.position >= 9 || (slide.payloadJson as any)?.category === 'Overall'
-      );
-      
-      const calculateWineSectionProgress = (sectionSlides: any[], sectionName: string) => {
-        if (sectionSlides.length === 0) return 0;
-        
-        const completedInSection = sectionSlides.filter(slide => {
-          const slideIndex = slides.findIndex(s => s.id === slide.id);
-          return completedSlides.includes(slideIndex);
-        }).length;
-        
-        const isCurrentSection = sectionSlides.some(slide => slide.id === currentSlide?.id);
-        if (isCurrentSection) {
-          return ((completedInSection + 0.5) / sectionSlides.length) * 100;
-        }
-        
-        return (completedInSection / sectionSlides.length) * 100;
-      };
-      
-      wineProgressData.push({
-        wineName: wine.wineName || wine.wine_name,
-        wineNumber: wineIndex + 1,
-        isCurrentWine: wineSlides.some(slide => slide.id === currentSlide?.id),
-        sections: [
-          {
-            name: "Intro",
-            progress: calculateWineSectionProgress(introSlides, 'intro'),
-            isActive: introSlides.some(slide => slide.id === currentSlide?.id),
-            isCompleted: introSlides.length > 0 && introSlides.every(slide => {
-              const slideIndex = slides.findIndex(s => s.id === slide.id);
-              return completedSlides.includes(slideIndex);
-            })
-          },
-          {
-            name: "Deep Dive", 
-            progress: calculateWineSectionProgress(deepDiveSlides, 'deep_dive'),
-            isActive: deepDiveSlides.some(slide => slide.id === currentSlide?.id),
-            isCompleted: deepDiveSlides.length > 0 && deepDiveSlides.every(slide => {
-              const slideIndex = slides.findIndex(s => s.id === slide.id);
-              return completedSlides.includes(slideIndex);
-            })
-          },
-          {
-            name: "Ending",
-            progress: calculateWineSectionProgress(endingSlides, 'ending'),
-            isActive: endingSlides.some(slide => slide.id === currentSlide?.id),
-            isCompleted: endingSlides.length > 0 && endingSlides.every(slide => {
-              const slideIndex = slides.findIndex(s => s.id === slide.id);
-              return completedSlides.includes(slideIndex);
-            })
-          }
-        ]
+      const completedWineSlides = wineSlides.filter(slide => {
+        const slideIndex = slides.findIndex(s => s.id === slide.id);
+        return completedSlides.includes(slideIndex);
       });
+      
+      const isCurrentWine = wineSlides.some(slide => slide.id === currentSlide?.id);
+      const progress = wineSlides.length > 0 ? Math.round((completedWineSlides.length / wineSlides.length) * 100) : 0;
+      
+      return {
+        name: wine.wineName || wine.wine_name || `Wine ${index + 1}`,
+        progress: progress,
+        isActive: isCurrentWine,
+        isCompleted: progress === 100,
+        wineId: wine.id,
+        firstSlideIndex: slides.findIndex(s => s.packageWineId === wine.id)
+      };
     });
     
-    // Legacy sections for overall progress
-    const sections = [
-      {
-        name: "Wine Exploration",
-        progress: Math.round((completedSlides.length / slides.length) * 100),
-        isActive: true,
-        isCompleted: completedSlides.length === slides.length
-      }
-    ];
+    const currentWine = wines.find((wine: any) => {
+      return slides.some(slide => slide.packageWineId === wine.id && slide.id === currentSlide?.id);
+    });
     
-    const currentWineName = wineProgressData.find(w => w.isCurrentWine)?.wineName || "Wine Tasting";
+    const currentWineName = currentWine?.wineName || currentWine?.wine_name || "Wine Tasting";
     const progressInfo = `Slide ${currentSlideIndex + 1} of ${slides.length}`;
     
-    return { sections, currentWineName, progressInfo, wineProgress: wineProgressData };
+    return { sections, currentWineName, progressInfo, wineProgress: [] };
   };
   
   const { sections, currentWineName, progressInfo } = calculateSectionProgress();
 
-  // Handle section clicks to jump to first slide of that section
+  // Handle section clicks to jump to first slide of that wine
   const handleSectionClick = (sectionName: string) => {
-    let sectionType = sectionName.toLowerCase();
-    if (sectionType === 'deep dive') sectionType = 'deep_dive';
-    
-    const firstSlideInSection = slides.findIndex(slide => slide.section_type === sectionType);
-    if (firstSlideInSection !== -1) {
-      setCurrentSlideIndex(firstSlideInSection);
+    const section = sections.find(s => s.name === sectionName);
+    if (section && section.firstSlideIndex !== -1) {
+      setCurrentSlideIndex(section.firstSlideIndex);
+      triggerHaptic('navigation');
     }
   };
 
@@ -259,15 +205,19 @@ export default function TastingSession() {
   };
 
   const handleNext = () => {
+    if (isNavigating || isTransitioningSection) return; // Prevent multiple clicks
+    
+    setIsNavigating(true);
+    
     // Mark current slide as completed
     if (!completedSlides.includes(currentSlideIndex)) {
       setCompletedSlides(prev => [...prev, currentSlideIndex]);
     }
     
     if (currentSlideIndex < slides.length - 1) {
-      const currentSectionType = currentSlide?.section_type;
+      const currentSectionType = currentSlide?.sectionType;
       const nextSlide = slides[currentSlideIndex + 1];
-      const nextSectionType = nextSlide?.section_type;
+      const nextSectionType = nextSlide?.sectionType;
       
       // Check for section transition
       if (currentSectionType && nextSectionType && currentSectionType !== nextSectionType) {
@@ -287,15 +237,19 @@ export default function TastingSession() {
         setTimeout(() => {
           setIsTransitioningSection(false);
           setCurrentSlideIndex(prev => prev + 1);
+          setIsNavigating(false);
         }, 1500);
       } else {
         triggerHaptic('navigation');
         setCurrentSlideIndex(prev => prev + 1);
+        // Small delay to prevent rapid clicking
+        setTimeout(() => setIsNavigating(false), 300);
       }
     } else {
       // Session completed
       triggerHaptic('success');
       completeSession();
+      setIsNavigating(false);
     }
   };
 
@@ -681,69 +635,132 @@ export default function TastingSession() {
             </Button>
           </div>
 
-          <div className="space-y-3">
-            {slides.map((slide, index) => {
-              const isCompleted = completedSlides.includes(index);
-              const isCurrent = index === currentSlideIndex;
-              const isAccessible = index <= currentSlideIndex || isCompleted;
+          {/* Wine-organized dropdown sections */}
+          <div className="space-y-4">
+            {packageData?.wines?.sort((a: any, b: any) => a.position - b.position).map((wine: any, wineIndex: number) => {
+              const wineSlides = slides.filter(slide => slide.packageWineId === wine.id);
+              const hasCurrentSlide = wineSlides.some(slide => slide.id === currentSlide?.id);
+              const [isWineExpanded, setIsWineExpanded] = useState(hasCurrentSlide);
+              
+              const completedWineSlides = wineSlides.filter(slide => {
+                const slideIndex = slides.findIndex(s => s.id === slide.id);
+                return completedSlides.includes(slideIndex);
+              });
+              
+              const wineProgress = wineSlides.length > 0 ? Math.round((completedWineSlides.length / wineSlides.length) * 100) : 0;
               
               return (
-                <motion.div
-                  key={slide.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05, duration: 0.3 }}
-                  whileHover={isAccessible ? { 
-                    scale: 1.02, 
-                    x: 5,
-                    transition: { duration: 0.2 }
-                  } : {}}
-                  whileTap={isAccessible ? { 
-                    scale: 0.98,
-                    transition: { duration: 0.1 }
-                  } : {}}
-                  className={`p-3 rounded-lg border transition-all cursor-pointer ${
-                    isCurrent 
-                      ? 'bg-white/20 border-white/30 text-white shadow-lg' 
-                      : isCompleted
-                        ? 'bg-green-500/20 border-green-400/30 text-green-200 hover:bg-green-500/30'
-                        : isAccessible
-                          ? 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
-                          : 'bg-white/5 border-white/5 text-white/30 cursor-not-allowed'
-                  }`}
-                  onClick={() => {
-                    if (isAccessible) {
-                      setCurrentSlideIndex(index);
-                      setSidebarOpen(false);
-                      triggerHaptic('navigation');
-                    }
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
-                        isCompleted ? 'bg-green-500 text-white' : 'bg-white/20 text-white'
-                      }`}>
-                        {isCompleted ? <CheckCircle size={14} /> : index + 1}
+                <div key={wine.id} className="space-y-2">
+                  {/* Wine Header - Clickable to expand/collapse */}
+                  <button
+                    onClick={() => setIsWineExpanded(!isWineExpanded)}
+                    className={`w-full p-3 rounded-lg border transition-all text-left ${
+                      hasCurrentSlide
+                        ? 'bg-purple-500/20 border-purple-400/40 text-white'
+                        : wineProgress === 100
+                          ? 'bg-green-500/20 border-green-400/30 text-green-200'
+                          : 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Wine className="w-5 h-5" />
+                        <div>
+                          <p className="font-medium text-sm">
+                            {wine.wineName || wine.wine_name || `Wine ${wineIndex + 1}`}
+                          </p>
+                          <div className="flex items-center space-x-2 text-xs opacity-75">
+                            <span>{completedWineSlides.length}/{wineSlides.length} completed</span>
+                            <span>•</span>
+                            <span>{wineProgress}%</span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-sm">
-                          {slide.type === 'interlude' ? 'Introduction' : `Question ${index}`}
-                        </p>
-                        <p className="text-xs opacity-75 truncate">
-                          {(slide.payloadJson as any).title || 'Wine Information'}
-                        </p>
+                      <div className="flex items-center space-x-2">
+                        {wineProgress === 100 && <CheckCircle className="w-4 h-4 text-green-400" />}
+                        <motion.div
+                          animate={{ rotate: isWineExpanded ? 180 : 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <ChevronDown className="w-4 h-4" />
+                        </motion.div>
                       </div>
                     </div>
-                    {isCurrent && (
-                      <motion.div 
-                        className="w-2 h-2 bg-purple-400 rounded-full"
-                        animate={{ scale: [1, 1.2, 1] }}
-                        transition={{ duration: 1, repeat: Infinity }}
+                  </button>
+                  
+                  {/* Wine Progress Bar */}
+                  <div className="px-3">
+                    <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${wineProgress}%` }}
+                        transition={{ duration: 0.5, delay: 0.1 }}
                       />
-                    )}
+                    </div>
                   </div>
-                </motion.div>
+                  
+                  {/* Expandable Slides List */}
+                  <AnimatePresence>
+                    {isWineExpanded && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-1 ml-4 overflow-hidden"
+                      >
+                        {wineSlides.map((slide, slideIndex) => {
+                          const globalIndex = slides.findIndex(s => s.id === slide.id);
+                          const isCompleted = completedSlides.includes(globalIndex);
+                          const isCurrent = globalIndex === currentSlideIndex;
+                          const isAccessible = globalIndex <= currentSlideIndex || isCompleted;
+                          
+                          return (
+                            <motion.div
+                              key={slide.id}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: slideIndex * 0.05 }}
+                              className={`p-2 rounded border transition-all cursor-pointer text-sm ${
+                                isCurrent 
+                                  ? 'bg-white/15 border-white/25 text-white' 
+                                  : isCompleted
+                                    ? 'bg-green-500/10 border-green-400/20 text-green-200 hover:bg-green-500/20'
+                                    : isAccessible
+                                      ? 'bg-white/5 border-white/5 text-white/60 hover:bg-white/10'
+                                      : 'bg-white/5 border-white/5 text-white/30 cursor-not-allowed'
+                              }`}
+                              onClick={() => {
+                                if (isAccessible) {
+                                  setCurrentSlideIndex(globalIndex);
+                                  setSidebarOpen(false);
+                                  triggerHaptic('navigation');
+                                }
+                              }}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  <div className={`w-4 h-4 rounded-full flex items-center justify-center text-xs ${
+                                    isCompleted ? 'bg-green-500 text-white' : 'bg-white/20 text-white'
+                                  }`}>
+                                    {isCompleted ? <CheckCircle size={10} /> : slideIndex + 1}
+                                  </div>
+                                  <span className="truncate">
+                                    {slide.type === 'interlude' ? 'Introduction' : 
+                                     (slide.payloadJson as any)?.title || `Question ${slideIndex + 1}`}
+                                  </span>
+                                </div>
+                                {isCurrent && (
+                                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse" />
+                                )}
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               );
             })}
           </div>
