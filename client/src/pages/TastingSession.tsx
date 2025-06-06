@@ -158,6 +158,17 @@ export default function TastingSession() {
   
   const { sections, currentWineName, progressInfo } = calculateSectionProgress();
 
+  // Handle section clicks to jump to first slide of that section
+  const handleSectionClick = (sectionName: string) => {
+    let sectionType = sectionName.toLowerCase();
+    if (sectionType === 'deep dive') sectionType = 'deep_dive';
+    
+    const firstSlideInSection = slides.findIndex(slide => slide.section_type === sectionType);
+    if (firstSlideInSection !== -1) {
+      setCurrentSlideIndex(firstSlideInSection);
+    }
+  };
+
   const handleAnswerChange = (slideId: string, answer: any) => {
     setAnswers(prev => ({ ...prev, [slideId]: answer }));
     // Auto-save response
@@ -490,12 +501,13 @@ export default function TastingSession() {
             sections={sections}
             currentWineName={currentWineName}
             currentOverallProgressInfo={progressInfo}
+            onSectionClick={handleSectionClick}
           />
         </div>
       </div>
 
       {/* Sidebar Navigation */}
-      <div className={`fixed top-0 left-0 h-full w-80 bg-gradient-primary/95 backdrop-blur-xl border-r border-white/10 transform transition-transform duration-300 z-40 ${
+      <div className={`fixed top-0 left-0 h-full w-80 bg-gradient-primary/95 backdrop-blur-xl border-r border-white/10 transform transition-transform duration-300 z-50 ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="p-6">

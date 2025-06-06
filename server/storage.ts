@@ -346,9 +346,8 @@ export class DatabaseStorage implements IStorage {
           payloadJson = {
             ...payloadJson,
             wine_name: wine.wineName,
-            wine_image: wine.wineImageUrl,
-            wine_description: wine.wineDescription
-          };
+            wine_image: wine.wineImageUrl
+          } as any; // Type assertion for dynamic payload extension
         }
 
         await this.createSlide({
