@@ -623,194 +623,61 @@ export default function VideoEditorPackageEditorNew() {
     );
   };
 
-  // Render wine transition slide with glass filling animation
+  // Render wine transition slide - same style as section transitions
   const renderWineTransition = (slide: any, isPreview: boolean = false) => {
     const payload = slide.payloadJson;
     
     return (
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="w-full max-w-4xl mx-auto bg-gradient-to-br from-purple-900/90 to-amber-900/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl relative overflow-hidden"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6 bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-xl text-center flex flex-col justify-center h-full"
       >
-        {payload.backgroundImage && (
-          <img 
-            src={payload.backgroundImage} 
-            alt="Wine Background" 
-            className="absolute inset-0 w-full h-full object-cover opacity-30"
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/40 to-transparent" />
-        
-        <div className="relative z-10 text-center text-white">
+        <div className="space-y-4">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
-            className="mb-8"
+            transition={{ delay: 0.2, duration: 0.6 }}
+            className="mx-auto w-24 h-24 bg-purple-600/20 rounded-full flex items-center justify-center backdrop-blur-sm border border-purple-400/30"
           >
-            {/* Wine Glass with Filling Animation */}
-            <div className="w-32 h-32 mx-auto mb-6 relative">
-              {/* Wine Glass SVG */}
-              <svg viewBox="0 0 100 100" className="w-full h-full">
-                {/* Glass outline */}
-                <path
-                  d="M25 20 L75 20 L70 40 L65 70 L35 70 L30 40 Z"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.8)"
-                  strokeWidth="2"
-                />
-                {/* Stem */}
-                <line
-                  x1="50" y1="70"
-                  x2="50" y2="85"
-                  stroke="rgba(255,255,255,0.8)"
-                  strokeWidth="2"
-                />
-                {/* Base */}
-                <line
-                  x1="40" y1="85"
-                  x2="60" y2="85"
-                  stroke="rgba(255,255,255,0.8)"
-                  strokeWidth="3"
-                />
-                
-                {/* Wine filling animation */}
-                <motion.path
-                  d="M30 40 L70 40 L65 70 L35 70 Z"
-                  fill="url(#wineGradient)"
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{ 
-                    duration: 2, 
-                    delay: 0.5,
-                    ease: "easeInOut"
-                  }}
-                />
-                
-                {/* Wine surface animation */}
-                <motion.ellipse
-                  cx="50" cy="40"
-                  rx="20" ry="3"
-                  fill="rgba(139, 69, 19, 0.8)"
-                  initial={{ opacity: 0, scaleY: 0 }}
-                  animate={{ opacity: 1, scaleY: 1 }}
-                  transition={{ 
-                    duration: 0.5, 
-                    delay: 2,
-                    ease: "easeOut"
-                  }}
-                />
-                
-                {/* Gradient definition */}
-                <defs>
-                  <linearGradient id="wineGradient" x1="0%" y1="100%" x2="0%" y2="0%">
-                    <stop offset="0%" stopColor="#8B2635" />
-                    <stop offset="50%" stopColor="#A0304E" />
-                    <stop offset="100%" stopColor="#722F37" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              
-              {/* Sparkle effects */}
-              <div className="absolute inset-0">
-                {[...Array(6)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className="absolute w-1 h-1 bg-amber-300 rounded-full"
-                    style={{
-                      left: `${20 + Math.random() * 60}%`,
-                      top: `${30 + Math.random() * 40}%`,
-                    }}
-                    initial={{ opacity: 0, scale: 0 }}
-                    animate={{ 
-                      opacity: [0, 1, 0], 
-                      scale: [0, 1, 0],
-                      rotate: 360
-                    }}
-                    transition={{ 
-                      duration: 1.5, 
-                      delay: 2.5 + (i * 0.2),
-                      repeat: Infinity,
-                      repeatDelay: 3
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-            
-            <motion.h2 
-              className="text-4xl font-bold mb-4"
+            <Wine className="w-12 h-12 text-purple-300" />
+          </motion.div>
+          
+          <motion.h2 
+            className="text-2xl md:text-3xl font-bold text-white"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+          >
+            Moving to {payload.wineName}
+          </motion.h2>
+          
+          <motion.p 
+            className="text-white/70 text-lg max-w-2xl mx-auto"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.6, duration: 0.6 }}
+          >
+            {payload.isFirstWine ? 
+              "Welcome to your wine tasting journey. Let's begin with our first wine." :
+              "Take a moment to cleanse your palate before we explore the next wine."
+            }
+          </motion.p>
+
+          {payload.wineImageUrl && (
+            <motion.div
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.8, duration: 0.6 }}
+              className="mx-auto w-32 h-48 rounded-lg overflow-hidden shadow-2xl"
             >
-              {slide.title}
-            </motion.h2>
-            
-            <motion.p 
-              className="text-xl opacity-90 max-w-2xl mx-auto mb-6"
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 1, duration: 0.6 }}
-            >
-              {slide.description}
-            </motion.p>
-          </motion.div>
-          
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 1.2, duration: 0.6 }}
-            className="text-amber-200"
-          >
-            {payload.isFirstWine ? (
-              <>
-                <p className="text-lg">Welcome to your wine tasting journey</p>
-                <p className="text-sm opacity-75 mt-2">Take your time to explore each wine's unique character</p>
-              </>
-            ) : (
-              <>
-                <p className="text-lg">Take a moment to cleanse your palate</p>
-                <p className="text-sm opacity-75 mt-2">Prepare for the next wine experience</p>
-              </>
-            )}
-          </motion.div>
-          
-          {/* Enhanced floating particles */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {[...Array(12)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute"
-                initial={{ 
-                  y: '100%', 
-                  x: Math.random() * 100 + '%', 
-                  opacity: 0,
-                  rotate: 0
-                }}
-                animate={{ 
-                  y: '-20%', 
-                  opacity: [0, 0.8, 0],
-                  rotate: 360
-                }}
-                transition={{ 
-                  duration: 6, 
-                  delay: i * 0.3,
-                  repeat: Infinity,
-                  repeatDelay: 2,
-                  ease: "easeInOut"
-                }}
-              >
-                <div className={`w-1 h-6 ${
-                  i % 3 === 0 ? 'bg-amber-300/60' : 
-                  i % 3 === 1 ? 'bg-purple-300/60' : 'bg-rose-300/60'
-                } rounded-full`} />
-              </motion.div>
-            ))}
-          </div>
+              <img 
+                src={payload.wineImageUrl} 
+                alt={payload.wineName}
+                className="w-full h-full object-cover"
+              />
+            </motion.div>
+          )}
         </div>
       </motion.div>
     );
