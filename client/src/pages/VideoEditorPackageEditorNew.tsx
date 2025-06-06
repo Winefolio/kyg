@@ -188,6 +188,7 @@ export default function VideoEditorPackageEditorNew() {
   const [wineDropdownOpen, setWineDropdownOpen] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const [previewSlideIndex, setPreviewSlideIndex] = useState(0);
+  const [collapsedWines, setCollapsedWines] = useState<Record<string, boolean>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor)
@@ -229,6 +230,64 @@ export default function VideoEditorPackageEditorNew() {
     acc[slide.packageWineId].push(slide);
     return acc;
   }, {} as Record<string, Slide[]>);
+
+  // Get wine slides for the selected wine
+  const wineSlides = selectedWine ? slidesByWine[selectedWine.id] || [] : [];
+
+  // Generate all slides with automatic wine transitions for preview
+  const getAllSlidesWithTransitions = () => {
+    if (!selectedPackage?.wines) return [];
+    
+    let allSlidesWithTransitions: any[] = [];
+    const sortedWines = [...selectedPackage.wines].sort((a: any, b: any) => a.position - b.position);
+    
+    sortedWines.forEach((wine: any, wineIndex: number) => {
+      const wineSlides = slidesByWine[wine.id] || [];
+      
+      // Add wine transition slide (except for the first wine)
+      if (wineIndex > 0) {
+        allSlidesWithTransitions.push({
+          id: `transition-${wine.id}`,
+          type: 'wine_transition',
+          title: `Wine ${wineIndex + 1}: ${wine.wineName}`,
+          description: wine.wineDescription || 'Prepare for the next wine in our tasting journey',
+          payloadJson: {
+            wineName: wine.wineName,
+            wineDescription: wine.wineDescription,
+            wineImageUrl: wine.wineImageUrl,
+            position: wine.position,
+            animationType: 'slide_transition',
+            backgroundImage: wine.wineImageUrl || 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080'
+          },
+          packageWineId: wine.id,
+          position: -1, // Special position for transitions
+          sectionType: 'transition'
+        });
+      }
+      
+      // Add wine slides sorted by position
+      const sortedSlides = [...wineSlides].sort((a, b) => a.position - b.position);
+      allSlidesWithTransitions.push(...sortedSlides);
+    });
+    
+    return allSlidesWithTransitions;
+  };
+
+  // Get progress for each wine
+  const getWineProgress = (wineId: string) => {
+    const slides = slidesByWine[wineId] || [];
+    const totalSlides = slides.length;
+    const completedSlides = slides.filter(slide => slide.id === selectedSlide?.id).length;
+    return totalSlides > 0 ? Math.round((completedSlides / totalSlides) * 100) : 0;
+  };
+
+  // Toggle wine collapse state
+  const toggleWineCollapse = (wineId: string) => {
+    setCollapsedWines(prev => ({
+      ...prev,
+      [wineId]: !prev[wineId]
+    }));
+  };
 
   // Update slides when data changes
   useEffect(() => {
@@ -1689,55 +1748,98 @@ export default function VideoEditorPackageEditorNew() {
                 </select>
               </div>
 
-              {/* Wine Selection */}
+              {/* Wine Progress Overview */}
               <div className="p-3 border-b border-gray-700">
-                <h3 className="text-white font-semibold mb-3 text-sm">Select Wine</h3>
-                <div className="relative">
-                  <Button
-                    variant="outline"
-                    onClick={() => setWineDropdownOpen(!wineDropdownOpen)}
-                    className="w-full justify-between border-gray-600 text-gray-300 hover:bg-gray-700"
-                  >
-                    {selectedWine ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                          {selectedWine.position}
-                        </div>
-                        <span className="truncate">{selectedWine.wineName}</span>
-                      </div>
-                    ) : (
-                      <span>Choose wine...</span>
-                    )}
-                    <ChevronDown className={`w-4 h-4 transition-transform ${wineDropdownOpen ? 'rotate-180' : ''}`} />
-                  </Button>
-                  
-                  {wineDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-gray-700 border border-gray-600 rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
-                      {selectedPackage?.wines?.map((wine: Wine) => (
-                        <Button
-                          key={wine.id}
-                          variant="ghost"
+                <h3 className="text-white font-semibold mb-3 text-sm flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  Wine Progress
+                </h3>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {selectedPackage?.wines?.sort((a: any, b: any) => a.position - b.position).map((wine: Wine) => {
+                    const wineSlides = slidesByWine[wine.id] || [];
+                    const progress = wineSlides.length > 0 ? Math.round((wineSlides.filter(slide => slide.id === selectedSlide?.id).length / wineSlides.length) * 100) : 0;
+                    const isCollapsed = collapsedWines[wine.id];
+                    const isSelected = selectedWine?.id === wine.id;
+                    
+                    return (
+                      <div key={wine.id} className="space-y-1">
+                        <div 
+                          className={`p-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                            isSelected ? 'bg-purple-600/20 border border-purple-500/30' : 'bg-gray-700/50 hover:bg-gray-600/50'
+                          }`}
                           onClick={() => {
                             setSelectedWine(wine);
-                            setWineDropdownOpen(false);
+                            toggleWineCollapse(wine.id);
                           }}
-                          className="w-full justify-start p-2 h-auto text-gray-300 hover:bg-gray-600 border-0"
                         >
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                              {wine.position}
-                            </div>
-                            <div className="text-left">
-                              <div className="font-medium">{wine.wineName}</div>
-                              <div className="text-xs opacity-70">
-                                {slidesByWine[wine.id]?.length || 0} slides
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className="w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                {wine.position}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium text-white text-sm truncate">{wine.wineName}</div>
+                                <div className="text-xs text-gray-400">
+                                  {wineSlides.length} slides • {progress}% complete
+                                </div>
                               </div>
                             </div>
+                            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isCollapsed ? '' : 'rotate-180'}`} />
                           </div>
-                        </Button>
-                      ))}
-                    </div>
-                  )}
+                          
+                          {/* Progress bar */}
+                          <div className="mt-2 h-1 bg-gray-600 rounded-full overflow-hidden">
+                            <motion.div 
+                              className="h-full bg-purple-500 rounded-full"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${progress}%` }}
+                              transition={{ duration: 0.5 }}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Collapsible slides list */}
+                        <AnimatePresence>
+                          {!isCollapsed && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="ml-4 space-y-1 overflow-hidden"
+                            >
+                              {wineSlides.sort((a, b) => a.position - b.position).map((slide, index) => (
+                                <motion.div
+                                  key={slide.id}
+                                  initial={{ opacity: 0, x: -10 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: index * 0.05 }}
+                                  className={`p-2 rounded text-xs cursor-pointer transition-all ${
+                                    selectedSlide?.id === slide.id 
+                                      ? 'bg-purple-500/30 text-purple-200 border border-purple-400/50' 
+                                      : 'bg-gray-600/30 text-gray-300 hover:bg-gray-500/30'
+                                  }`}
+                                  onClick={() => setSelectedSlide(slide)}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 flex items-center justify-center">
+                                      {slide.type === 'question' && <HelpCircle className="w-3 h-3" />}
+                                      {slide.type === 'interlude' && <Pause className="w-3 h-3" />}
+                                      {slide.type === 'video_message' && <Video className="w-3 h-3" />}
+                                      {slide.type === 'audio_message' && <Volume2 className="w-3 h-3" />}
+                                      {slide.type === 'media' && <ImageIcon className="w-3 h-3" />}
+                                    </div>
+                                    <span className="truncate flex-1">{slide.title || `${slide.type} slide`}</span>
+                                    <span className="text-xs opacity-60">#{slide.position}</span>
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
