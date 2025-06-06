@@ -30,7 +30,9 @@ import {
   MessageSquare,
   HelpCircle,
   Image as ImageIcon,
-  Menu
+  Menu,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -138,6 +140,8 @@ export default function VideoEditorPackageEditorNew() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [expandedWines, setExpandedWines] = useState<Set<string>>(new Set());
+  const [wineDropdownOpen, setWineDropdownOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor)
@@ -266,12 +270,39 @@ export default function VideoEditorPackageEditorNew() {
     const wineSlides = slidesByWine[wineId] || [];
     const nextPosition = wineSlides.length + 1;
     
-    createSlideMutation.mutate({
+    const newSlideData = {
       packageWineId: wineId,
       position: nextPosition,
       type: template.type,
       sectionType: 'deep_dive',
+      title: template.defaultPayload.title,
+      description: template.defaultPayload.description,
       payloadJson: template.defaultPayload,
+    };
+    
+    createSlideMutation.mutate(newSlideData, {
+      onSuccess: (response) => {
+        // Auto-select the newly created slide for immediate editing
+        setSelectedSlide(response.slide);
+        // Expand the wine section in timeline
+        setExpandedWines(prev => {
+          const newSet = new Set(prev);
+          newSet.add(wineId);
+          return newSet;
+        });
+      }
+    });
+  };
+
+  const toggleWineExpansion = (wineId: string) => {
+    setExpandedWines(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(wineId)) {
+        newSet.delete(wineId);
+      } else {
+        newSet.add(wineId);
+      }
+      return newSet;
     });
   };
 
@@ -433,30 +464,52 @@ export default function VideoEditorPackageEditorNew() {
               {/* Wine Selection */}
               <div className="p-3 border-b border-gray-700">
                 <h3 className="text-white font-semibold mb-3 text-sm">Select Wine</h3>
-                <div className="space-y-2">
-                  {selectedPackage?.wines?.map((wine: Wine) => (
-                    <Button
-                      key={wine.id}
-                      variant={selectedWine?.id === wine.id ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedWine(wine)}
-                      className={`w-full flex items-center gap-2 p-2 h-10 justify-start text-xs ${
-                        selectedWine?.id === wine.id 
-                          ? 'bg-purple-600 hover:bg-purple-700 text-white border-purple-500' 
-                          : 'border-gray-600 text-gray-300 hover:bg-gray-700'
-                      }`}
-                    >
-                      <div className="w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                        {wine.position}
-                      </div>
-                      <div className="flex-1 min-w-0 text-left">
-                        <div className="font-medium truncate">{wine.wineName}</div>
-                        <div className="text-xs opacity-70">
-                          {slidesByWine[wine.id]?.length || 0} slides
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    onClick={() => setWineDropdownOpen(!wineDropdownOpen)}
+                    className="w-full justify-between border-gray-600 text-gray-300 hover:bg-gray-700"
+                  >
+                    {selectedWine ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                          {selectedWine.position}
                         </div>
+                        <span className="truncate">{selectedWine.wineName}</span>
                       </div>
-                    </Button>
-                  ))}
+                    ) : (
+                      <span>Choose wine...</span>
+                    )}
+                    <ChevronUp className={`w-4 h-4 transition-transform ${wineDropdownOpen ? '' : 'rotate-180'}`} />
+                  </Button>
+                  
+                  {wineDropdownOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-gray-700 border border-gray-600 rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
+                      {selectedPackage?.wines?.map((wine: Wine) => (
+                        <Button
+                          key={wine.id}
+                          variant="ghost"
+                          onClick={() => {
+                            setSelectedWine(wine);
+                            setWineDropdownOpen(false);
+                          }}
+                          className="w-full justify-start p-2 h-auto text-gray-300 hover:bg-gray-600 border-0"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                              {wine.position}
+                            </div>
+                            <div className="text-left">
+                              <div className="font-medium">{wine.wineName}</div>
+                              <div className="text-xs opacity-70">
+                                {slidesByWine[wine.id]?.length || 0} slides
+                              </div>
+                            </div>
+                          </div>
+                        </Button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -493,72 +546,66 @@ export default function VideoEditorPackageEditorNew() {
               <div className="p-3">
                 <h3 className="text-white font-semibold mb-3 text-sm">Timeline</h3>
                 
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <div className="space-y-3">
-                    {selectedPackage?.wines?.map((wine: Wine) => {
-                      const wineSlides = slidesByWine[wine.id] || [];
-                      return (
+                <div className="space-y-3">
+                  {selectedPackage?.wines?.map((wine: Wine) => {
+                    const wineSlides = slidesByWine[wine.id] || [];
+                    const isExpanded = expandedWines.has(wine.id);
+                    return (
+                      <div 
+                        key={wine.id}
+                        className={`border rounded-lg transition-colors ${
+                          selectedWine?.id === wine.id 
+                            ? 'border-purple-500 bg-purple-500/10' 
+                            : 'border-gray-600 bg-gray-800/50'
+                        }`}
+                      >
                         <div 
-                          key={wine.id}
-                          className={`border rounded-lg p-2 transition-colors ${
-                            selectedWine?.id === wine.id 
-                              ? 'border-purple-500 bg-purple-500/10' 
-                              : 'border-gray-600 bg-gray-800/50'
-                          }`}
+                          className="flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-700/50"
+                          onClick={() => toggleWineExpansion(wine.id)}
                         >
-                          <div 
-                            className="flex items-center gap-2 mb-2 cursor-pointer"
-                            onClick={() => setSelectedWine(wine)}
-                          >
-                            <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                              {wine.position}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="text-white font-medium text-sm truncate">{wine.wineName}</h4>
-                              <p className="text-xs text-gray-400">{wineSlides.length} slides</p>
-                            </div>
+                          <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                            {wine.position}
                           </div>
-
-                          <SortableContext
-                            items={wineSlides.map(s => s.id)}
-                            strategy={verticalListSortingStrategy}
-                          >
-                            <div className="space-y-1">
-                              {wineSlides.map((slide) => (
-                                <motion.div
-                                  key={slide.id}
-                                  className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-colors ${
-                                    selectedSlide?.id === slide.id
-                                      ? 'border-blue-500 bg-blue-500/10'
-                                      : 'border-gray-600 bg-gray-700/50 hover:bg-gray-600/50'
-                                  }`}
-                                  onClick={() => setSelectedSlide(slide)}
-                                >
-                                  <div className="text-gray-400">
-                                    {SLIDE_TEMPLATES.find(t => t.type === slide.type)?.icon}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-white text-xs truncate">
-                                      {slide.payloadJson?.title || slide.type}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-xs text-purple-400">#{slide.position}</span>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        deleteSlideMutation.mutate(slide.id);
-                                      }}
-                                      className="h-5 w-5 p-0 text-red-400 hover:bg-red-500/20"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </Button>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-white font-medium text-sm truncate">{wine.wineName}</h4>
+                            <p className="text-xs text-gray-400">{wineSlides.length} slides</p>
+                          </div>
+                          <ChevronDown 
+                            className={`w-4 h-4 text-gray-400 transition-transform ${
+                              isExpanded ? 'rotate-180' : ''
+                            }`} 
+                          />
+                        </div>
+                        
+                        {isExpanded && wineSlides.length > 0 && (
+                          <div className="border-t border-gray-600 p-2 space-y-1">
+                            {wineSlides.map((slide: Slide) => (
+                              <div
+                                key={slide.id}
+                                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                                  selectedSlide?.id === slide.id
+                                    ? 'bg-purple-600 text-white'
+                                    : 'hover:bg-gray-600 text-gray-300'
+                                }`}
+                                onClick={() => setSelectedSlide(slide)}
+                              >
+                                <div className="flex-shrink-0">
+                                  {slide.type === 'question' && <HelpCircle className="w-3 h-3" />}
+                                  {slide.type === 'video_message' && <Video className="w-3 h-3" />}
+                                  {slide.type === 'audio_message' && <Volume2 className="w-3 h-3" />}
+                                  {slide.type === 'interlude' && <Pause className="w-3 h-3" />}
+                                  {slide.type === 'media' && <ImageIcon className="w-3 h-3" />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-medium truncate">{slide.payloadJson?.title || slide.type}</div>
+                                  <div className="text-xs opacity-70 truncate">{slide.type}</div>
+                                </div>
+                                <div className="text-xs opacity-50">#{slide.position}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                                   </div>
                                 </motion.div>
                               ))}
