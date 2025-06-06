@@ -51,14 +51,8 @@ export default function TastingSession() {
     enabled: !!participantId
   });
 
-  // Get package data
-  const { data: packageData } = useQuery<{ wines: any[] }>({
-    queryKey: [`/api/packages/${currentSession?.packageCode}`],
-    enabled: !!currentSession?.packageCode
-  });
-
-  // Get session slides - use dynamic package code from session
-  const { data: slidesData, isLoading } = useQuery<{ slides: Slide[]; totalCount: number }>({
+  // Get session slides and wine data - use dynamic package code from session
+  const { data: slidesData, isLoading } = useQuery<{ slides: Slide[]; totalCount: number; wines: any[] }>({
     queryKey: [`/api/packages/${currentSession?.packageCode}/slides`, participantId],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/packages/${currentSession?.packageCode}/slides?participantId=${participantId}`, null);
@@ -66,6 +60,9 @@ export default function TastingSession() {
     },
     enabled: !!currentSession?.packageCode && !!participantId
   });
+
+  // Extract wines data from slides response
+  const packageData = slidesData ? { wines: slidesData.wines } : null;
 
   // Get participant responses
   const { data: responses } = useQuery({
@@ -153,7 +150,9 @@ export default function TastingSession() {
   
   // Calculate wine-specific progress with clickable wine sections
   const calculateSectionProgress = () => {
-    if (slides.length === 0 || !packageData?.wines) return { sections: [], currentWineName: "", progressInfo: "" };
+    if (slides.length === 0 || !packageData?.wines) {
+      return { sections: [], currentWineName: "", progressInfo: "" };
+    }
     
     const wines = packageData.wines.sort((a: any, b: any) => a.position - b.position);
     
