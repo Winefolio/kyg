@@ -34,7 +34,10 @@ import {
   Image as ImageIcon,
   Menu,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Upload,
+  X,
+  GripVertical
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -371,6 +374,18 @@ export default function VideoEditorPackageEditorNew() {
     } : null);
   };
 
+  // Image upload handler
+  const handleImageUpload = (file: File, field: string) => {
+    if (!selectedSlide) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const imageUrl = e.target?.result as string;
+      handleSlideUpdate(field, imageUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Create a sortable slide component
   const SortableSlide = ({ slide }: { slide: Slide }) => {
     const {
@@ -379,26 +394,36 @@ export default function VideoEditorPackageEditorNew() {
       setNodeRef,
       transform,
       transition,
+      isDragging,
     } = useSortable({ id: slide.id });
 
     const style = {
       transform: CSS.Transform.toString(transform),
       transition,
+      opacity: isDragging ? 0.5 : 1,
     };
 
     return (
-      <div
+      <motion.div
         ref={setNodeRef}
         style={style}
-        {...attributes}
-        {...listeners}
-        className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-all duration-200 border ${
           selectedSlide?.id === slide.id
-            ? 'bg-purple-600 text-white'
-            : 'hover:bg-gray-600 text-gray-300'
+            ? 'bg-purple-600 text-white border-purple-400'
+            : 'hover:bg-gray-600 text-gray-300 border-transparent hover:border-gray-500'
         }`}
         onClick={() => setSelectedSlide(slide)}
       >
+        <div 
+          {...attributes}
+          {...listeners}
+          className="flex-shrink-0 p-1 hover:bg-white/10 rounded cursor-grab active:cursor-grabbing"
+        >
+          <GripVertical className="w-3 h-3" />
+        </div>
         <div className="flex-shrink-0">
           {slide.type === 'question' && <HelpCircle className="w-3 h-3" />}
           {slide.type === 'video_message' && <Video className="w-3 h-3" />}
@@ -411,7 +436,18 @@ export default function VideoEditorPackageEditorNew() {
           <div className="text-xs opacity-70 truncate">{slide.type}</div>
         </div>
         <div className="text-xs opacity-50">#{slide.position}</div>
-      </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            deleteSlideMutation.mutate(slide.id);
+          }}
+          className="h-5 w-5 p-0 text-red-400 hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <Trash2 className="w-3 h-3" />
+        </Button>
+      </motion.div>
     );
   };
 
@@ -642,109 +678,415 @@ export default function VideoEditorPackageEditorNew() {
 
     if (selectedSlide.type === 'question') {
       return (
-        <div className="flex-1 p-6 overflow-y-auto">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex-1 p-6 overflow-y-auto"
+        >
           <div className="max-w-4xl mx-auto space-y-6">
-            <div className="bg-gradient-card backdrop-blur-xl rounded-2xl p-6 border border-white/20">
-              <h3 className="text-xl font-bold text-white mb-4">Question Slide Editor</h3>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1 }}
+              className="bg-gradient-to-br from-purple-900/90 to-blue-900/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                  <HelpCircle className="w-8 h-8" />
+                  Question Slide Editor
+                </h3>
+                <Badge variant="outline" className="text-white border-white/30">
+                  Interactive Question
+                </Badge>
+              </div>
               
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-white">Title</Label>
-                  <Input
-                    value={selectedSlide.title || ''}
-                    onChange={(e) => handleSlideUpdate('title', e.target.value)}
-                    className="bg-white/10 border-white/20 text-white mt-2"
-                  />
-                </div>
-                
-                <div>
-                  <Label className="text-white">Description</Label>
-                  <Textarea
-                    value={selectedSlide.description || ''}
-                    onChange={(e) => handleSlideUpdate('description', e.target.value)}
-                    className="bg-white/10 border-white/20 text-white mt-2"
-                  />
-                </div>
-                
-                <div>
-                  <Label className="text-white">Question Type</Label>
-                  <select
-                    value={payload.question_type || 'multiple_choice'}
-                    onChange={(e) => handleSlideUpdate('question_type', e.target.value)}
-                    className="w-full bg-white/10 border border-white/20 text-white mt-2 rounded px-3 py-2"
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 }}
                   >
-                    <option value="multiple_choice">Multiple Choice</option>
-                    <option value="scale">Rating Scale</option>
-                    <option value="text">Text Response</option>
-                  </select>
-                </div>
+                    <Label className="text-white text-lg font-medium">Question Title</Label>
+                    <Input
+                      value={selectedSlide.title || ''}
+                      onChange={(e) => handleSlideUpdate('title', e.target.value)}
+                      className="bg-white/10 border-white/20 text-white mt-3 text-lg p-4 rounded-xl"
+                      placeholder="Enter your question title..."
+                    />
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <Label className="text-white text-lg font-medium">Description</Label>
+                    <Textarea
+                      value={selectedSlide.description || ''}
+                      onChange={(e) => handleSlideUpdate('description', e.target.value)}
+                      className="bg-white/10 border-white/20 text-white mt-3 p-4 rounded-xl min-h-[120px]"
+                      placeholder="Provide context or instructions..."
+                    />
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <Label className="text-white text-lg font-medium">Question Type</Label>
+                    <select
+                      value={payload.question_type || 'multiple_choice'}
+                      onChange={(e) => handleSlideUpdate('question_type', e.target.value)}
+                      className="w-full bg-white/10 border border-white/20 text-white mt-3 rounded-xl px-4 py-3"
+                    >
+                      <option value="multiple_choice">Multiple Choice</option>
+                      <option value="scale">Rating Scale</option>
+                      <option value="text">Text Response</option>
+                    </select>
+                  </motion.div>
 
-                {payload.question_type === 'multiple_choice' && (
-                  <div>
-                    <Label className="text-white">Options</Label>
-                    <div className="space-y-2 mt-2">
-                      {payload.options?.map((option: any, index: number) => (
-                        <div key={index} className="flex gap-2">
-                          <Input
-                            value={option.text}
-                            onChange={(e) => {
-                              const newOptions = [...payload.options];
-                              newOptions[index] = { ...option, text: e.target.value };
-                              handleSlideUpdate('options', newOptions);
-                            }}
-                            className="bg-white/10 border-white/20 text-white"
-                            placeholder={`Option ${index + 1}`}
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const newOptions = payload.options.filter((_: any, i: number) => i !== index);
-                              handleSlideUpdate('options', newOptions);
-                            }}
-                            className="text-red-400 border-red-400 hover:bg-red-400/20"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          const newOptions = [...(payload.options || []), { id: Date.now().toString(), text: 'New Option', description: '' }];
-                          handleSlideUpdate('options', newOptions);
-                        }}
-                        className="border-white/20 text-white hover:bg-white/10"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Option
-                      </Button>
+                  {payload.question_type === 'multiple_choice' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <Label className="text-white text-lg font-medium">Answer Options</Label>
+                      <div className="space-y-3 mt-3">
+                        <AnimatePresence>
+                          {payload.options?.map((option: any, index: number) => (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, scale: 0.95 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.95 }}
+                              className="flex gap-3"
+                            >
+                              <Input
+                                value={option.text}
+                                onChange={(e) => {
+                                  const newOptions = [...payload.options];
+                                  newOptions[index] = { ...option, text: e.target.value };
+                                  handleSlideUpdate('options', newOptions);
+                                }}
+                                className="bg-white/10 border-white/20 text-white rounded-xl p-3"
+                                placeholder={`Option ${index + 1}`}
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const newOptions = payload.options.filter((_: any, i: number) => i !== index);
+                                  handleSlideUpdate('options', newOptions);
+                                }}
+                                className="text-red-400 border-red-400 hover:bg-red-400/20 rounded-xl px-3"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            const newOptions = [...(payload.options || []), { id: Date.now().toString(), text: 'New Option', description: '' }];
+                            handleSlideUpdate('options', newOptions);
+                          }}
+                          className="border-white/20 text-white hover:bg-white/10 rounded-xl p-3 w-full"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Option
+                        </Button>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+                
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="bg-black/30 backdrop-blur-sm rounded-2xl p-6 border border-white/10"
+                >
+                  <h4 className="text-white font-medium mb-4 text-lg">Live Preview</h4>
+                  <div className="min-h-[400px] flex items-center justify-center">
+                    {payload.question_type === 'multiple_choice' ? (
+                      <MultipleChoiceQuestion
+                        question={payload}
+                        value={{ selected: [], notes: '' }}
+                        onChange={() => {}}
+                      />
+                    ) : payload.question_type === 'scale' ? (
+                      <ScaleQuestion
+                        question={payload}
+                        value={5}
+                        onChange={() => {}}
+                      />
+                    ) : (
+                      <div className="text-center text-white/70">
+                        <MessageSquare className="w-12 h-12 mx-auto mb-4" />
+                        <p>Text response question preview</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      );
+    }
+
+    if (selectedSlide.type === 'interlude') {
+      return (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex-1 p-6 overflow-y-auto"
+        >
+          <div className="max-w-4xl mx-auto space-y-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1 }}
+              className="bg-gradient-to-br from-indigo-900/90 to-purple-900/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                  <Pause className="w-8 h-8" />
+                  Interlude Slide Editor
+                </h3>
+                <Badge variant="outline" className="text-white border-white/30">
+                  Transition
+                </Badge>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <Label className="text-white text-lg font-medium">Title</Label>
+                    <Input
+                      value={selectedSlide.title || ''}
+                      onChange={(e) => handleSlideUpdate('title', e.target.value)}
+                      className="bg-white/10 border-white/20 text-white mt-3 text-lg p-4 rounded-xl"
+                      placeholder="Enter transition title..."
+                    />
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <Label className="text-white text-lg font-medium">Message</Label>
+                    <Textarea
+                      value={selectedSlide.description || ''}
+                      onChange={(e) => handleSlideUpdate('description', e.target.value)}
+                      className="bg-white/10 border-white/20 text-white mt-3 p-4 rounded-xl min-h-[120px]"
+                      placeholder="Enter your transition message..."
+                    />
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <Label className="text-white text-lg font-medium">Background Image</Label>
+                    <div className="mt-3 space-y-3">
+                      <Input
+                        value={payload.backgroundImage || ''}
+                        onChange={(e) => handleSlideUpdate('backgroundImage', e.target.value)}
+                        className="bg-white/10 border-white/20 text-white rounded-xl p-3"
+                        placeholder="Enter image URL or upload..."
+                      />
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleImageUpload(file, 'backgroundImage');
+                          }}
+                          className="hidden"
+                          id="background-upload"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById('background-upload')?.click()}
+                          className="border-white/20 text-white hover:bg-white/10 rounded-xl"
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          Upload Image
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <Label className="text-white text-lg font-medium">Duration (seconds)</Label>
+                    <Input
+                      type="number"
+                      value={payload.duration || 5}
+                      onChange={(e) => handleSlideUpdate('duration', parseInt(e.target.value))}
+                      className="bg-white/10 border-white/20 text-white mt-3 rounded-xl p-3"
+                      min="1"
+                      max="300"
+                    />
+                  </motion.div>
+                </div>
+                
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="bg-black/30 backdrop-blur-sm rounded-2xl p-6 border border-white/10"
+                >
+                  <h4 className="text-white font-medium mb-4 text-lg">Live Preview</h4>
+                  <div className="aspect-video bg-gradient-to-br from-indigo-900 to-purple-900 rounded-xl flex items-center justify-center relative overflow-hidden">
+                    {payload.backgroundImage && (
+                      <img 
+                        src={payload.backgroundImage} 
+                        alt="Background" 
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-black/30" />
+                    <div className="relative z-10 text-center text-white p-4">
+                      <h2 className="text-2xl font-bold mb-4">{selectedSlide.title || 'Title'}</h2>
+                      <p className="text-lg opacity-80">{selectedSlide.description || 'Description'}</p>
                     </div>
                   </div>
-                )}
+                </motion.div>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      );
+    }
+
+    if (selectedSlide.type === 'video_message') {
+      return (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex-1 p-6 overflow-y-auto"
+        >
+          <div className="max-w-4xl mx-auto space-y-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1 }}
+              className="bg-gradient-to-br from-gray-900/90 to-black/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                  <Video className="w-8 h-8" />
+                  Video Message Editor
+                </h3>
+                <Badge variant="outline" className="text-white border-white/30">
+                  Video Content
+                </Badge>
               </div>
               
-              <div className="mt-6 p-4 bg-gray-800/50 rounded-lg">
-                <h4 className="text-white font-medium mb-4">Preview</h4>
-                {payload.question_type === 'multiple_choice' ? (
-                  <MultipleChoiceQuestion
-                    question={payload}
-                    value={{ selected: [], notes: '' }}
-                    onChange={() => {}}
-                  />
-                ) : payload.question_type === 'scale' ? (
-                  <ScaleQuestion
-                    question={payload}
-                    value={5}
-                    onChange={() => {}}
-                  />
-                ) : (
-                  <div className="text-white">Text response question preview</div>
-                )}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <Label className="text-white text-lg font-medium">Video Title</Label>
+                    <Input
+                      value={selectedSlide.title || ''}
+                      onChange={(e) => handleSlideUpdate('title', e.target.value)}
+                      className="bg-white/10 border-white/20 text-white mt-3 text-lg p-4 rounded-xl"
+                      placeholder="Enter video title..."
+                    />
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <Label className="text-white text-lg font-medium">Description</Label>
+                    <Textarea
+                      value={selectedSlide.description || ''}
+                      onChange={(e) => handleSlideUpdate('description', e.target.value)}
+                      className="bg-white/10 border-white/20 text-white mt-3 p-4 rounded-xl min-h-[120px]"
+                      placeholder="Describe the video content..."
+                    />
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <Label className="text-white text-lg font-medium">Video URL</Label>
+                    <Input
+                      value={payload.videoUrl || ''}
+                      onChange={(e) => handleSlideUpdate('videoUrl', e.target.value)}
+                      className="bg-white/10 border-white/20 text-white mt-3 rounded-xl p-3"
+                      placeholder="Enter video URL..."
+                    />
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <Label className="text-white text-lg font-medium">Duration (seconds)</Label>
+                    <Input
+                      type="number"
+                      value={payload.duration || 120}
+                      onChange={(e) => handleSlideUpdate('duration', parseInt(e.target.value))}
+                      className="bg-white/10 border-white/20 text-white mt-3 rounded-xl p-3"
+                      min="1"
+                      max="1800"
+                    />
+                  </motion.div>
+                </div>
+                
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="bg-black/30 backdrop-blur-sm rounded-2xl p-6 border border-white/10"
+                >
+                  <h4 className="text-white font-medium mb-4 text-lg">Video Preview</h4>
+                  <div className="aspect-video bg-black rounded-xl flex items-center justify-center">
+                    {payload.videoUrl ? (
+                      <video 
+                        src={payload.videoUrl} 
+                        controls 
+                        className="w-full h-full rounded-xl"
+                        poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cpath fill='%23333' d='M0 0h400v300H0z'/%3E%3C/svg%3E"
+                      />
+                    ) : (
+                      <div className="text-center text-white/60">
+                        <Play className="w-16 h-16 mx-auto mb-4" />
+                        <p>Add a video URL to preview</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
               </div>
-            </div>
+            </motion.div>
           </div>
-        </div>
+        </motion.div>
       );
     }
 
