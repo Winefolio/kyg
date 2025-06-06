@@ -1,6 +1,8 @@
 import {
   type Package,
   type InsertPackage,
+  type PackageWine,
+  type InsertPackageWine,
   type Slide,
   type InsertSlide,
   type Session,
@@ -12,6 +14,7 @@ import {
   type GlossaryTerm,
   type InsertGlossaryTerm,
   packages,
+  packageWines,
   slides,
   sessions,
   participants,
@@ -62,8 +65,12 @@ export interface IStorage {
   getPackageByCode(code: string): Promise<Package | undefined>;
   createPackage(pkg: InsertPackage): Promise<Package>;
 
+  // Package Wines
+  createPackageWine(wine: InsertPackageWine): Promise<PackageWine>;
+  getPackageWines(packageId: string): Promise<PackageWine[]>;
+
   // Slides
-  getSlidesByPackageId(packageId: string, isHost?: boolean): Promise<Slide[]>;
+  getSlidesByPackageWineId(packageWineId: string): Promise<Slide[]>;
   getSlideById(id: string): Promise<Slide | undefined>;
   createSlide(slide: InsertSlide): Promise<Slide>;
 
@@ -133,18 +140,32 @@ export class DatabaseStorage implements IStorage {
         "Explore the finest wines from France's most prestigious region",
     });
 
-    // Create all 8 wine tasting slides
-    const slideData = [
+    // Create two wines for this package
+    const chateauMargaux = await this.createPackageWine({
+      packageId: bordeauxPackage.id,
+      position: 1,
+      wineName: "2018 Château Margaux",
+      wineDescription: "A legendary Bordeaux from one of the most prestigious estates",
+      wineImageUrl: "https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600"
+    });
+
+    const chateauLatour = await this.createPackageWine({
+      packageId: bordeauxPackage.id,
+      position: 2,
+      wineName: "2019 Château Latour",
+      wineDescription: "A powerful and elegant wine from Pauillac's premier grand cru classé",
+      wineImageUrl: "https://images.unsplash.com/photo-1584464491033-06628f3a6b7b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600"
+    });
+
+    // Define slide templates that will be used for both wines
+    const slideTemplates = [
       {
         position: 1,
         type: "interlude",
         section_type: "intro",
         payloadJson: {
           title: "Welcome to Your Wine Tasting",
-          description: "Let's begin our journey through Bordeaux",
-          wine_name: "2018 Château Margaux",
-          wine_image:
-            "https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600",
+          description: "Let's begin our journey through this exceptional wine",
         },
       },
       {

@@ -14,20 +14,33 @@ export const packages = pgTable("packages", {
   codeIdx: index("idx_packages_code").on(table.code)
 }));
 
+// Package wines table - intermediate layer between packages and slides
+export const packageWines = pgTable("package_wines", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  packageId: uuid("package_id").notNull().references(() => packages.id, { onDelete: "cascade" }),
+  position: integer("position").notNull(),
+  wineName: text("wine_name").notNull(),
+  wineDescription: text("wine_description"),
+  wineImageUrl: text("wine_image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniquePosition: unique().on(table.packageId, table.position)
+}));
+
 // Define all allowed slide types
 const slideTypes = ['question', 'media', 'interlude', 'video_message', 'audio_message'] as const;
 
-// Slides table - ALL content lives here
+// Slides table - ALL content lives here, now linked to package wines
 export const slides = pgTable("slides", {
   id: uuid("id").primaryKey().defaultRandom(),
-  packageId: uuid("package_id").references(() => packages.id, { onDelete: "cascade" }),
+  packageWineId: uuid("package_wine_id").notNull().references(() => packageWines.id, { onDelete: "cascade" }),
   position: integer("position").notNull(),
   type: varchar("type", { length: 50 }).$type<typeof slideTypes[number]>().notNull(),
   section_type: varchar("section_type", { length: 20 }),
   payloadJson: jsonb("payload_json").notNull(),
   createdAt: timestamp("created_at").defaultNow()
 }, (table) => ({
-  packagePositionIdx: index("idx_slides_package_position").on(table.packageId, table.position)
+  packageWinePositionIdx: index("idx_slides_package_wine_position").on(table.packageWineId, table.position)
 }));
 
 // Sessions table
@@ -132,8 +145,16 @@ export const insertPackageSchema = createInsertSchema(packages, {
   updatedAt: true
 });
 
+export const insertPackageWineSchema = createInsertSchema(packageWines, {
+  wineDescription: z.string().nullable().optional(),
+  wineImageUrl: z.string().nullable().optional()
+}).omit({
+  id: true,
+  createdAt: true
+});
+
 export const insertSlideSchema = createInsertSchema(slides, {
-  packageId: z.string().nullable().optional(),
+  packageWineId: z.string().nullable().optional(),
   type: z.enum(slideTypes),
   section_type: z.enum(['intro', 'deep_dive', 'ending']).optional().nullable(),
   payloadJson: z.any() // Accept any JSON payload, validation happens in application logic
@@ -186,6 +207,8 @@ export const insertGlossaryTermSchema = createInsertSchema(glossaryTerms, {
 // Types
 export type Package = typeof packages.$inferSelect;
 export type InsertPackage = z.infer<typeof insertPackageSchema>;
+export type PackageWine = typeof packageWines.$inferSelect;
+export type InsertPackageWine = z.infer<typeof insertPackageWineSchema>;
 export type Slide = typeof slides.$inferSelect;
 export type InsertSlide = z.infer<typeof insertSlideSchema>;
 export type Session = typeof sessions.$inferSelect;
