@@ -338,12 +338,25 @@ export class DatabaseStorage implements IStorage {
     // Create slides for both wines
     for (const wine of [chateauMargaux, chateauLatour]) {
       for (const slideTemplate of slideTemplates) {
+        // Add wine context to slide payload
+        let payloadJson = { ...slideTemplate.payloadJson };
+        
+        // For interlude slides, add wine image and name
+        if (slideTemplate.type === "interlude") {
+          payloadJson = {
+            ...payloadJson,
+            wine_name: wine.wineName,
+            wine_image: wine.wineImageUrl,
+            wine_description: wine.wineDescription
+          };
+        }
+
         await this.createSlide({
           packageWineId: wine.id,
           position: slideTemplate.position,
           type: slideTemplate.type as "question" | "media" | "interlude" | "video_message" | "audio_message",
           section_type: slideTemplate.section_type as "intro" | "deep_dive" | "ending" | null,
-          payloadJson: slideTemplate.payloadJson,
+          payloadJson: payloadJson,
         });
       }
     }
