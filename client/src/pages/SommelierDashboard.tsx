@@ -1244,6 +1244,7 @@ function PackageModal({
       queryClient.invalidateQueries({
         queryKey: ["/api/packages", pkg?.id, "wines"],
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
       setWineModalOpen(false);
     },
   });
@@ -1259,6 +1260,7 @@ function PackageModal({
       queryClient.invalidateQueries({
         queryKey: ["/api/packages", pkg?.id, "wines"],
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
       setWineModalOpen(false);
     },
   });
