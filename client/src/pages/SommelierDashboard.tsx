@@ -409,25 +409,25 @@ export default function SommelierDashboard() {
                       >
                         <Card className="bg-gradient-card backdrop-blur-xl border-white/20 hover:border-white/30 hover:shadow-2xl transition-all duration-300 h-full">
                           {/* Package Header */}
-                          <div className="p-6 border-b border-white/10">
-                            <div className="flex items-start justify-between mb-4">
+                          <div className="p-8 border-b border-white/10">
+                            <div className="flex items-start justify-between mb-6">
                               <div className="flex-1">
-                                <div className="flex items-center space-x-3 mb-2">
+                                <div className="flex items-center space-x-4 mb-3">
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => togglePackageExpansion(pkg.id)}
-                                    className="p-1 h-auto text-white/60 hover:text-white hover:bg-white/10"
+                                    className="p-2 h-auto text-white/60 hover:text-white hover:bg-white/10 rounded-lg"
                                   >
                                     {expandedPackages.has(pkg.id) ? 
-                                      <ChevronDown className="w-4 h-4" /> : 
-                                      <ChevronRight className="w-4 h-4" />
+                                      <ChevronDown className="w-5 h-5" /> : 
+                                      <ChevronRight className="w-5 h-5" />
                                     }
                                   </Button>
-                                  <h3 className="text-white font-semibold text-lg">{pkg.name}</h3>
+                                  <h3 className="text-white font-bold text-xl">{pkg.name}</h3>
                                   <Badge 
                                     variant={pkg.isActive ? "default" : "secondary"}
-                                    className={pkg.isActive ? "bg-green-500/20 text-green-200" : "bg-gray-500/20 text-gray-200"}
+                                    className={pkg.isActive ? "bg-green-500/20 text-green-200 px-3 py-1" : "bg-gray-500/20 text-gray-200 px-3 py-1"}
                                   >
                                     {pkg.isActive ? 'Active' : 'Inactive'}
                                   </Badge>
@@ -1061,17 +1061,17 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
         className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-8 w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-white font-semibold text-xl">
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-white font-bold text-2xl">
             {mode === 'create' ? 'Create Package' : mode === 'edit' ? 'Edit Package' : 'Package Details'}
           </h2>
           <Button
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="text-white hover:bg-white/10"
+            className="text-white hover:bg-white/10 p-2"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </Button>
         </div>
 
@@ -1087,48 +1087,48 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="details" className="space-y-6 flex-1 overflow-y-auto pr-2">
-            <div>
-              <Label className="text-white">Package Name</Label>
+          <TabsContent value="details" className="space-y-8 flex-1 overflow-y-auto pr-2">
+            <div className="space-y-3">
+              <Label className="text-white text-lg font-medium">Package Name</Label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="bg-white/10 border-white/20 text-white"
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/50 h-12 text-lg"
                 placeholder="Enter package name"
                 disabled={isReadOnly}
               />
             </div>
 
-            <div>
-              <Label className="text-white">Package Code</Label>
+            <div className="space-y-3">
+              <Label className="text-white text-lg font-medium">Package Code</Label>
               <Input
                 value={formData.code}
                 onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
-                className="bg-white/10 border-white/20 text-white font-mono"
+                className="bg-white/10 border-white/20 text-white font-mono placeholder:text-white/50 h-12 text-lg"
                 placeholder="WINE01"
                 disabled={isReadOnly}
               />
             </div>
 
-            <div>
-              <Label className="text-white">Description</Label>
+            <div className="space-y-3">
+              <Label className="text-white text-lg font-medium">Description</Label>
               <Textarea
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              className="bg-white/10 border-white/20 text-white"
-              placeholder="Describe this wine package"
-              disabled={isReadOnly}
-            />
-          </div>
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/50 min-h-[120px] text-lg"
+                placeholder="Describe this wine package"
+                disabled={isReadOnly}
+              />
+            </div>
 
-          <div className="flex items-center space-x-2">
-            <Switch
-              checked={formData.isActive}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
-              disabled={isReadOnly}
-            />
-            <Label className="text-white">Active Package</Label>
-          </div>
+            <div className="flex items-center space-x-4 p-4 bg-white/5 rounded-lg">
+              <Switch
+                checked={formData.isActive}
+                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
+                disabled={isReadOnly}
+              />
+              <Label className="text-white text-lg font-medium">Active Package</Label>
+            </div>
 
           {!isReadOnly && (
             <div className="flex space-x-3">
@@ -1197,21 +1197,12 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
                               </p>
                             )}
                             <div className="flex flex-wrap gap-2">
-                              {wine.wineType && (
-                                <Badge variant="outline" className="bg-purple-500/20 border-purple-400/30 text-purple-200">
-                                  {wine.wineType}
-                                </Badge>
-                              )}
-                              {wine.vintage && (
-                                <Badge variant="outline" className="bg-blue-500/20 border-blue-400/30 text-blue-200">
-                                  {wine.vintage}
-                                </Badge>
-                              )}
-                              {wine.region && (
-                                <Badge variant="outline" className="bg-green-500/20 border-green-400/30 text-green-200">
-                                  {wine.region}
-                                </Badge>
-                              )}
+                              <Badge variant="outline" className="bg-purple-500/20 border-purple-400/30 text-purple-200">
+                                Position {wine.position}
+                              </Badge>
+                              <Badge variant="outline" className="bg-blue-500/20 border-blue-400/30 text-blue-200">
+                                Wine #{wine.position}
+                              </Badge>
                             </div>
                           </div>
                         </div>
