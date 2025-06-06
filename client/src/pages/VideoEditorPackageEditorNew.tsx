@@ -67,6 +67,7 @@ interface Wine {
   position: number;
 }
 
+// Modular slide template system with enhanced animations
 const SLIDE_TEMPLATES = [
   {
     type: 'question',
@@ -79,8 +80,10 @@ const SLIDE_TEMPLATES = [
       question_type: 'multiple_choice',
       category: 'General',
       options: [
-        { id: '1', text: 'Option 1', description: 'Description 1' },
-        { id: '2', text: 'Option 2', description: 'Description 2' }
+        { id: '1', text: 'Red fruit flavors', description: 'Cherry, strawberry, raspberry' },
+        { id: '2', text: 'Dark fruit flavors', description: 'Blackberry, plum, blackcurrant' },
+        { id: '3', text: 'Herbal notes', description: 'Mint, eucalyptus, green bell pepper' },
+        { id: '4', text: 'Spice characteristics', description: 'Black pepper, clove, cinnamon' }
       ],
       allow_multiple: true,
       allow_notes: true
@@ -88,13 +91,41 @@ const SLIDE_TEMPLATES = [
   },
   {
     type: 'interlude',
-    name: 'Interlude',
+    name: 'Reflection',
     icon: <Pause className="w-4 h-4" />,
-    description: 'Break or transition slide',
+    description: 'Mindful pause for reflection',
     defaultPayload: {
       title: 'Take a Moment',
-      description: 'Reflect on what you\'ve experienced so far',
-      duration: 30
+      description: 'Close your eyes and savor the aromas. What memories does this wine evoke?',
+      duration: 30,
+      animationType: 'gentle_fade',
+      backgroundImage: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080'
+    }
+  },
+  {
+    type: 'interlude',
+    name: 'Transition',
+    icon: <Pause className="w-4 h-4" />,
+    description: 'Smooth transition between wines',
+    defaultPayload: {
+      title: 'Moving Forward',
+      description: 'Prepare your palate for the next wine in our journey',
+      duration: 20,
+      animationType: 'slide_transition',
+      backgroundImage: 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080'
+    }
+  },
+  {
+    type: 'interlude',
+    name: 'Celebration',
+    icon: <Pause className="w-4 h-4" />,
+    description: 'Celebratory moment',
+    defaultPayload: {
+      title: 'Cheers!',
+      description: 'A toast to the art of winemaking and the joy of discovery',
+      duration: 15,
+      animationType: 'celebration',
+      backgroundImage: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080'
     }
   },
   {
@@ -106,7 +137,9 @@ const SLIDE_TEMPLATES = [
       title: 'Sommelier Insights',
       description: 'Expert commentary on this wine',
       videoUrl: '',
-      duration: 120
+      duration: 120,
+      autoplay: false,
+      showControls: true
     }
   },
   {
@@ -118,18 +151,22 @@ const SLIDE_TEMPLATES = [
       title: 'Tasting Notes',
       description: 'Listen to detailed tasting notes',
       audioUrl: '',
-      duration: 90
+      duration: 90,
+      autoplay: false,
+      showWaveform: true
     }
   },
   {
     type: 'media',
-    name: 'Media',
+    name: 'Gallery',
     icon: <ImageIcon className="w-4 h-4" />,
     description: 'Image gallery or visual content',
     defaultPayload: {
       title: 'Visual Guide',
       description: 'Visual elements for this wine',
-      mediaItems: []
+      mediaItems: [],
+      layout: 'grid',
+      showCaptions: true
     }
   }
 ];
@@ -573,6 +610,101 @@ export default function VideoEditorPackageEditorNew() {
       );
     }
 
+    if (slide.type === 'audio_message') {
+      return (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+          className="w-full max-w-4xl mx-auto bg-gradient-to-br from-green-900/90 to-teal-900/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl"
+        >
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 mx-auto mb-6 bg-white/10 rounded-full flex items-center justify-center">
+              <Volume2 className="w-10 h-10 text-white" />
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-4">{slide.title}</h3>
+            <p className="text-white/80 mb-6">{slide.description}</p>
+          </div>
+          
+          <div className="bg-black/30 rounded-2xl p-6 mb-6">
+            {payload.audioUrl ? (
+              <audio controls className="w-full">
+                <source src={payload.audioUrl} type="audio/mpeg" />
+                Your browser does not support the audio element.
+              </audio>
+            ) : (
+              <div className="text-center text-white/60 py-8">
+                <Volume2 className="w-12 h-12 mx-auto mb-4" />
+                <p>Audio content will appear here</p>
+              </div>
+            )}
+          </div>
+          
+          {isPreview && (
+            <div className="flex justify-center gap-4">
+              <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30">
+                Previous
+              </Button>
+              <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                Next
+              </Button>
+            </div>
+          )}
+        </motion.div>
+      );
+    }
+
+    if (slide.type === 'media') {
+      return (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+          className="w-full max-w-4xl mx-auto bg-gradient-to-br from-orange-900/90 to-red-900/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl"
+        >
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-white mb-4">{slide.title}</h2>
+            <p className="text-xl text-white/80">{slide.description}</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            {payload.mediaItems?.map((item: any, index: number) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.1 }}
+                className="aspect-square bg-black/30 rounded-xl overflow-hidden"
+              >
+                <img 
+                  src={item.url} 
+                  alt={item.caption || `Media ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              </motion.div>
+            ))}
+            {(!payload.mediaItems || payload.mediaItems.length === 0) && (
+              <div className="col-span-full text-center text-white/60 py-12">
+                <ImageIcon className="w-16 h-16 mx-auto mb-4" />
+                <p>Media gallery will appear here</p>
+              </div>
+            )}
+          </div>
+          
+          {isPreview && (
+            <div className="flex justify-center gap-4">
+              <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30">
+                Previous
+              </Button>
+              <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                Next
+              </Button>
+            </div>
+          )}
+        </motion.div>
+      );
+    }
+
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -600,6 +732,257 @@ export default function VideoEditorPackageEditorNew() {
         )}
       </motion.div>
     );
+  };
+
+  // Create a modular slide editor component
+  const renderSlideEditor = (slide: Slide) => {
+    const payload = slide.payloadJson;
+
+    const editorComponents = {
+      audio_message: () => (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex-1 p-6 overflow-y-auto"
+        >
+          <div className="max-w-4xl mx-auto space-y-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1 }}
+              className="bg-gradient-to-br from-green-900/90 to-teal-900/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                  <Volume2 className="w-8 h-8" />
+                  Audio Message Editor
+                </h3>
+                <Badge variant="outline" className="text-white border-white/30">
+                  Audio Content
+                </Badge>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+                    <Label className="text-white text-lg font-medium">Audio Title</Label>
+                    <Input
+                      value={slide.title || ''}
+                      onChange={(e) => handleSlideUpdate('title', e.target.value)}
+                      className="bg-white/10 border-white/20 text-white mt-3 text-lg p-4 rounded-xl"
+                      placeholder="Enter audio title..."
+                    />
+                  </motion.div>
+                  
+                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
+                    <Label className="text-white text-lg font-medium">Description</Label>
+                    <Textarea
+                      value={slide.description || ''}
+                      onChange={(e) => handleSlideUpdate('description', e.target.value)}
+                      className="bg-white/10 border-white/20 text-white mt-3 p-4 rounded-xl min-h-[120px]"
+                      placeholder="Describe the audio content..."
+                    />
+                  </motion.div>
+                  
+                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
+                    <Label className="text-white text-lg font-medium">Audio URL</Label>
+                    <Input
+                      value={payload.audioUrl || ''}
+                      onChange={(e) => handleSlideUpdate('audioUrl', e.target.value)}
+                      className="bg-white/10 border-white/20 text-white mt-3 rounded-xl p-3"
+                      placeholder="Enter audio URL..."
+                    />
+                  </motion.div>
+                </div>
+                
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 }} className="bg-black/30 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+                  <h4 className="text-white font-medium mb-4 text-lg">Audio Preview</h4>
+                  <div className="aspect-video bg-gradient-to-br from-green-800 to-teal-800 rounded-xl flex items-center justify-center">
+                    {payload.audioUrl ? (
+                      <div className="w-full p-6">
+                        <audio controls className="w-full mb-4">
+                          <source src={payload.audioUrl} type="audio/mpeg" />
+                          Your browser does not support the audio element.
+                        </audio>
+                        <div className="text-center text-white/80">
+                          <Volume2 className="w-8 h-8 mx-auto mb-2" />
+                          <p className="text-sm">Audio ready to play</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center text-white/60">
+                        <Volume2 className="w-16 h-16 mx-auto mb-4" />
+                        <p>Add an audio URL to preview</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      ),
+
+      media: () => (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex-1 p-6 overflow-y-auto"
+        >
+          <div className="max-w-4xl mx-auto space-y-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1 }}
+              className="bg-gradient-to-br from-orange-900/90 to-red-900/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+                  <ImageIcon className="w-8 h-8" />
+                  Media Gallery Editor
+                </h3>
+                <Badge variant="outline" className="text-white border-white/30">
+                  Visual Content
+                </Badge>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+                    <Label className="text-white text-lg font-medium">Gallery Title</Label>
+                    <Input
+                      value={slide.title || ''}
+                      onChange={(e) => handleSlideUpdate('title', e.target.value)}
+                      className="bg-white/10 border-white/20 text-white mt-3 text-lg p-4 rounded-xl"
+                      placeholder="Enter gallery title..."
+                    />
+                  </motion.div>
+                  
+                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
+                    <Label className="text-white text-lg font-medium">Description</Label>
+                    <Textarea
+                      value={slide.description || ''}
+                      onChange={(e) => handleSlideUpdate('description', e.target.value)}
+                      className="bg-white/10 border-white/20 text-white mt-3 p-4 rounded-xl min-h-[120px]"
+                      placeholder="Describe the visual content..."
+                    />
+                  </motion.div>
+                  
+                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}>
+                    <Label className="text-white text-lg font-medium">Media Items</Label>
+                    <div className="space-y-3 mt-3">
+                      <AnimatePresence>
+                        {payload.mediaItems?.map((item: any, index: number) => (
+                          <motion.div
+                            key={index}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-white/5 rounded-xl p-4 border border-white/10"
+                          >
+                            <div className="space-y-3">
+                              <Input
+                                value={item.url || ''}
+                                onChange={(e) => {
+                                  const newItems = [...(payload.mediaItems || [])];
+                                  newItems[index] = { ...item, url: e.target.value };
+                                  handleSlideUpdate('mediaItems', newItems);
+                                }}
+                                className="bg-white/10 border-white/20 text-white rounded-xl p-3"
+                                placeholder="Image URL..."
+                              />
+                              <div className="flex gap-3">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleImageUpload(file, 'mediaItemUrl');
+                                  }}
+                                  className="hidden"
+                                  id={`media-upload-${index}`}
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => document.getElementById(`media-upload-${index}`)?.click()}
+                                  className="border-white/20 text-white hover:bg-white/10 rounded-xl"
+                                >
+                                  <Upload className="w-4 h-4 mr-2" />
+                                  Upload
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const newItems = (payload.mediaItems || []).filter((_: any, i: number) => i !== index);
+                                    handleSlideUpdate('mediaItems', newItems);
+                                  }}
+                                  className="text-red-400 border-red-400 hover:bg-red-400/20 rounded-xl"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const newItems = [...(payload.mediaItems || []), { url: '', caption: '' }];
+                          handleSlideUpdate('mediaItems', newItems);
+                        }}
+                        className="border-white/20 text-white hover:bg-white/10 rounded-xl p-3 w-full"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Media Item
+                      </Button>
+                    </div>
+                  </motion.div>
+                </div>
+                
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 }} className="bg-black/30 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+                  <h4 className="text-white font-medium mb-4 text-lg">Gallery Preview</h4>
+                  <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+                    {payload.mediaItems?.map((item: any, index: number) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="aspect-square bg-black/30 rounded-xl overflow-hidden"
+                      >
+                        {item.url ? (
+                          <img 
+                            src={item.url} 
+                            alt={item.caption || `Media ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-white/40">
+                            <ImageIcon className="w-8 h-8" />
+                          </div>
+                        )}
+                      </motion.div>
+                    ))}
+                    {(!payload.mediaItems || payload.mediaItems.length === 0) && (
+                      <div className="col-span-2 text-center text-white/60 py-12">
+                        <ImageIcon className="w-16 h-16 mx-auto mb-4" />
+                        <p>Add media items to see preview</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      )
+    };
+
+    const editorComponent = editorComponents[slide.type as keyof typeof editorComponents];
+    return editorComponent ? editorComponent() : null;
   };
 
   const renderSlidePreview = () => {
@@ -675,6 +1058,12 @@ export default function VideoEditorPackageEditorNew() {
     }
 
     const payload = selectedSlide.payloadJson;
+
+    // Use modular editor for audio and media slides
+    if (selectedSlide.type === 'audio_message' || selectedSlide.type === 'media') {
+      const modularEditor = renderSlideEditor(selectedSlide);
+      if (modularEditor) return modularEditor;
+    }
 
     if (selectedSlide.type === 'question') {
       return (
@@ -933,6 +1322,25 @@ export default function VideoEditorPackageEditorNew() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.5 }}
+                  >
+                    <Label className="text-white text-lg font-medium">Animation Type</Label>
+                    <select
+                      value={payload.animationType || 'gentle_fade'}
+                      onChange={(e) => handleSlideUpdate('animationType', e.target.value)}
+                      className="w-full bg-white/10 border border-white/20 text-white mt-3 rounded-xl px-4 py-3"
+                    >
+                      <option value="gentle_fade">Gentle Fade</option>
+                      <option value="slide_transition">Slide Transition</option>
+                      <option value="celebration">Celebration</option>
+                      <option value="zoom_in">Zoom In</option>
+                      <option value="particle_flow">Particle Flow</option>
+                    </select>
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.6 }}
                   >
                     <Label className="text-white text-lg font-medium">Duration (seconds)</Label>
                     <Input
