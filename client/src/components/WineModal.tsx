@@ -139,8 +139,13 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(wineForm);
-    onClose();
+    // Allow saving with minimal data - only wineName is required
+    const wineData = {
+      ...wineForm,
+      packageId,
+      wineName: wineForm.wineName || 'Untitled Wine'
+    };
+    onSave(wineData);
   };
 
   const addGrapeVarietal = (grape: string) => {
@@ -202,10 +207,10 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-4 sm:p-6 w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between p-2 border-b border-white/10 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <Wine className="w-6 h-6 text-purple-400" />
             <h2 className="text-white font-semibold text-xl">
@@ -221,6 +226,8 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
             <X className="w-4 h-4" />
           </Button>
         </div>
+        
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
 
         <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)}>
           <TabsList className="grid w-full grid-cols-3 bg-white/10 rounded-lg">
@@ -238,8 +245,8 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="details" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <TabsContent value="details" className="space-y-4 mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <Label className="text-white">Wine Name</Label>
                 <Input
@@ -572,6 +579,7 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
             </Button>
           </div>
         )}
+        </div>
       </motion.div>
     </motion.div>
   );
