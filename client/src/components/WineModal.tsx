@@ -216,12 +216,15 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Remove packageId from the wine data since it's not part of WineForm interface
-    const { packageId: _, ...wineData } = {
+    console.log("WineModal handleSubmit called");
+    console.log("Current wineForm:", wineForm);
+    console.log("Package ID:", packageId);
+    
+    const wineData = {
       ...wineForm,
-      packageId,
       wineName: wineForm.wineName || 'Untitled Wine'
     };
+    console.log("Final wine data being sent:", wineData);
     onSave(wineData);
   };
 

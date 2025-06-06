@@ -236,9 +236,12 @@ export default function SommelierDashboard() {
 
   // Create wine mutation
   const createWineMutation = useMutation({
-    mutationFn: (data: any) =>
-      apiRequest("/api/package-wines", "POST", data),
-    onSuccess: () => {
+    mutationFn: (data: any) => {
+      console.log("Mutation function called with:", data);
+      return apiRequest("/api/package-wines", "POST", data);
+    },
+    onSuccess: (result) => {
+      console.log("Wine creation successful:", result);
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
       setWineModalOpen(false);
       toast({
@@ -246,10 +249,11 @@ export default function SommelierDashboard() {
         description: "The wine has been added to your package.",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Wine creation error:", error);
       toast({
         title: "Error adding wine",
-        description: "Please try again.",
+        description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
     },
@@ -324,6 +328,7 @@ export default function SommelierDashboard() {
   };
 
   const openWineModal = (mode: WineModalMode, wine?: PackageWine) => {
+    console.log("Opening wine modal:", { mode, wine, selectedPackage });
     setWineModalMode(mode);
     setSelectedWine(wine || null);
     setWineModalOpen(true);
@@ -352,11 +357,20 @@ export default function SommelierDashboard() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="sticky top-0 z-50 bg-black/50 backdrop-blur-xl border-b border-white/10"
+        className="sticky top-0 z-50 bg-black/30 backdrop-blur-xl border-b border-white/10"
       >
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLocation("/")}
+                className="text-white hover:bg-white/10"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
               <div className="flex items-center space-x-2">
                 <Wine className="w-6 h-6 text-white flex items-center" />
                 <h1 className="text-white font-bold text-xl flex items-center">
@@ -369,7 +383,7 @@ export default function SommelierDashboard() {
               onClick={() => openPackageModal("create")}
               className="bg-white text-purple-900 hover:bg-white/90 flex items-center"
             >
-              <Plus className="w-4 h-4 ml-2" />
+              <Plus className="w-4 h-4 mr-2" />
               New Package
             </Button>
           </div>
@@ -997,11 +1011,14 @@ export default function SommelierDashboard() {
           packageId={selectedPackage.id}
           onClose={() => setWineModalOpen(false)}
           onSave={(data) => {
+            console.log("Wine save triggered:", { data, mode: wineModalMode, packageId: selectedPackage.id });
             if (wineModalMode === "create") {
-              createWineMutation.mutate({
+              const wineData = {
                 ...data,
                 packageId: selectedPackage.id,
-              } as any);
+              };
+              console.log("Creating wine with data:", wineData);
+              createWineMutation.mutate(wineData);
             } else if (wineModalMode === "edit" && selectedWine) {
               updateWineMutation.mutate({ id: selectedWine.id, data });
             }
