@@ -122,7 +122,7 @@ export class DatabaseStorage implements IStorage {
 
   private async initializeWineTastingData() {
     // Check if data already exists
-    const existingPackage = await this.getPackageByCode("WINE01");
+    const existingPackage = await this.getPackageByCode("PABLO1");
     if (existingPackage) {
       return; // Data already exists
     }
@@ -134,7 +134,7 @@ export class DatabaseStorage implements IStorage {
 
     // Create the Bordeaux wine package
     const bordeauxPackage = await this.createPackage({
-      code: "WINE01",
+      code: "PABLO1",
       name: "Bordeaux Discovery Collection",
       description:
         "Explore the finest wines from France's most prestigious region",

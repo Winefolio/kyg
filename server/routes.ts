@@ -28,7 +28,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get slides for a package
+  // Get slides for a package (now organized by wines)
   app.get("/api/packages/:code/slides", async (req, res) => {
     try {
       const { code } = req.params;
@@ -46,8 +46,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isHost = participant?.isHost || false;
       }
 
-      const slides = await storage.getSlidesByPackageId(pkg.id, isHost);
-      res.json({ slides, totalCount: slides.length });
+      // Get all wines for this package
+      const wines = await storage.getPackageWines(pkg.id);
+      let allSlides: any[] = [];
+
+      // Get slides for each wine and combine them
+      for (const wine of wines) {
+        const wineSlides = await storage.getSlidesByPackageWineId(wine.id);
+        // Add wine context to each slide
+        const slidesWithWineContext = wineSlides.map(slide => ({
+          ...slide,
+          wineInfo: {
+            id: wine.id,
+            wineName: wine.wineName,
+            wineDescription: wine.wineDescription,
+            wineImageUrl: wine.wineImageUrl,
+            position: wine.position
+          }
+        }));
+        allSlides = allSlides.concat(slidesWithWineContext);
+      }
+
+      // Filter host-only slides if not host
+      if (!isHost) {
+        allSlides = allSlides.filter((slide) => {
+          const payload = slide.payloadJson as any;
+          return !payload.for_host;
+        });
+      }
+
+      res.json({ slides: allSlides, totalCount: allSlides.length, wines });
     } catch (error) {
       res.status(500).json({ message: "Internal server error" });
     }
