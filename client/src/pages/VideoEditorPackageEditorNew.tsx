@@ -14,7 +14,9 @@ import {
   arrayMove,
   SortableContext,
   verticalListSortingStrategy,
+  useSortable,
 } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { 
   ArrowLeft, 
   Save, 
@@ -144,6 +146,8 @@ export default function VideoEditorPackageEditorNew() {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [expandedWines, setExpandedWines] = useState<Set<string>>(new Set());
   const [wineDropdownOpen, setWineDropdownOpen] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [previewSlideIndex, setPreviewSlideIndex] = useState(0);
 
   const sensors = useSensors(
     useSensor(PointerSensor)
@@ -309,7 +313,36 @@ export default function VideoEditorPackageEditorNew() {
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    // Implement drag and drop reordering
+    const { active, over } = event;
+    
+    if (!over || active.id === over.id) return;
+    
+    if (selectedWine) {
+      const wineSlides = slidesByWine[selectedWine.id] || [];
+      const oldIndex = wineSlides.findIndex(slide => slide.id === active.id);
+      const newIndex = wineSlides.findIndex(slide => slide.id === over.id);
+      
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reorderedSlides = arrayMove(wineSlides, oldIndex, newIndex);
+        
+        // Update positions and save to database
+        const slideUpdates = reorderedSlides.map((slide, index) => ({
+          slideId: slide.id,
+          packageWineId: selectedWine.id,
+          position: index + 1
+        }));
+        
+        // Call API to update slide positions
+        fetch('/api/slides/reorder', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ updates: slideUpdates })
+        }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/packages', code, 'slides'] });
+          toast({ title: 'Slides reordered successfully' });
+        });
+      }
+    }
   };
 
   const handleSlideUpdate = (field: string, value: any) => {
@@ -338,7 +371,261 @@ export default function VideoEditorPackageEditorNew() {
     } : null);
   };
 
+  // Create a sortable slide component
+  const SortableSlide = ({ slide }: { slide: Slide }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+    } = useSortable({ id: slide.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    };
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        {...attributes}
+        {...listeners}
+        className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+          selectedSlide?.id === slide.id
+            ? 'bg-purple-600 text-white'
+            : 'hover:bg-gray-600 text-gray-300'
+        }`}
+        onClick={() => setSelectedSlide(slide)}
+      >
+        <div className="flex-shrink-0">
+          {slide.type === 'question' && <HelpCircle className="w-3 h-3" />}
+          {slide.type === 'video_message' && <Video className="w-3 h-3" />}
+          {slide.type === 'audio_message' && <Volume2 className="w-3 h-3" />}
+          {slide.type === 'interlude' && <Pause className="w-3 h-3" />}
+          {slide.type === 'media' && <ImageIcon className="w-3 h-3" />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-medium truncate">{slide.payloadJson?.title || slide.type}</div>
+          <div className="text-xs opacity-70 truncate">{slide.type}</div>
+        </div>
+        <div className="text-xs opacity-50">#{slide.position}</div>
+      </div>
+    );
+  };
+
+  // Render slide content for both preview and editor modes
+  const renderSlideContent = (slide: Slide, isPreview: boolean = false) => {
+    const payload = slide.payloadJson;
+
+    if (slide.type === 'question') {
+      if (isPreview) {
+        return (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+            className="w-full max-w-4xl mx-auto bg-gradient-to-br from-purple-900/90 to-blue-900/90 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl"
+          >
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-white mb-4">{slide.title}</h2>
+              <p className="text-xl text-white/80">{slide.description}</p>
+            </div>
+            
+            {payload.question_type === 'multiple_choice' && (
+              <div className="space-y-4">
+                {payload.options?.map((option: any, index: number) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:bg-white/20 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full border-2 border-white/60" />
+                      <span className="text-white text-lg">{option.text}</span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="flex justify-center mt-8 gap-4"
+            >
+              <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30">
+                Previous
+              </Button>
+              <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                Next
+              </Button>
+            </motion.div>
+          </motion.div>
+        );
+      }
+      return null; // Will be handled in the editor section
+    }
+
+    if (slide.type === 'interlude') {
+      return (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6 }}
+          className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-900 to-purple-900 relative overflow-hidden"
+        >
+          <div className="absolute inset-0 bg-black/30" />
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.8 }}
+            className="relative z-10 text-center max-w-2xl mx-auto px-8"
+          >
+            <h2 className="text-4xl font-bold text-white mb-6">{slide.title}</h2>
+            <p className="text-xl text-white/80 mb-8">{slide.description}</p>
+            
+            {isPreview && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1 }}
+                className="flex justify-center gap-4"
+              >
+                <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30">
+                  Previous
+                </Button>
+                <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                  Continue
+                </Button>
+              </motion.div>
+            )}
+          </motion.div>
+        </motion.div>
+      );
+    }
+
+    if (slide.type === 'video_message') {
+      return (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+          className="w-full max-w-4xl mx-auto bg-gradient-to-br from-gray-900 to-black rounded-3xl p-8 border border-white/20 shadow-2xl"
+        >
+          <div className="aspect-video bg-black rounded-xl mb-6 flex items-center justify-center">
+            <Play className="w-16 h-16 text-white/60" />
+          </div>
+          <h3 className="text-2xl font-bold text-white mb-4">{slide.title}</h3>
+          <p className="text-white/80 mb-6">{slide.description}</p>
+          
+          {isPreview && (
+            <div className="flex justify-center gap-4">
+              <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30">
+                Previous
+              </Button>
+              <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                Next
+              </Button>
+            </div>
+          )}
+        </motion.div>
+      );
+    }
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4 }}
+        className="w-full max-w-4xl mx-auto bg-gradient-card backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl"
+      >
+        <h3 className="text-2xl font-bold text-white mb-4">{slide.title}</h3>
+        <p className="text-white/80 mb-6">{slide.description}</p>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-white border-white/30">
+            {slide.type}
+          </Badge>
+        </div>
+        
+        {isPreview && (
+          <div className="flex justify-center gap-4 mt-6">
+            <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30">
+              Previous
+            </Button>
+            <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+              Next
+            </Button>
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
   const renderSlidePreview = () => {
+    if (previewMode && selectedWine) {
+      const wineSlides = slidesByWine[selectedWine.id] || [];
+      const currentSlide = wineSlides[previewSlideIndex];
+      
+      if (!currentSlide) {
+        return (
+          <div className="flex-1 flex items-center justify-center bg-gray-900">
+            <div className="text-center text-white">
+              <h3 className="text-xl mb-4">No slides to preview</h3>
+              <Button onClick={() => setPreviewMode(false)} className="bg-purple-600">
+                Exit Preview
+              </Button>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="flex-1 flex flex-col bg-gray-900 relative">
+          {/* Preview Navigation */}
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+            <div className="bg-black/50 backdrop-blur-lg rounded-lg px-3 py-1 text-white text-sm">
+              {previewSlideIndex + 1} / {wineSlides.length}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewSlideIndex(Math.max(0, previewSlideIndex - 1))}
+              disabled={previewSlideIndex === 0}
+              className="bg-black/50 backdrop-blur-lg border-white/20"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPreviewSlideIndex(Math.min(wineSlides.length - 1, previewSlideIndex + 1))}
+              disabled={previewSlideIndex === wineSlides.length - 1}
+              className="bg-black/50 backdrop-blur-lg border-white/20"
+            >
+              <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
+            </Button>
+          </div>
+
+          {/* Full Screen Slide Preview */}
+          <motion.div
+            key={currentSlide.id}
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.3 }}
+            className="flex-1 flex items-center justify-center p-8"
+          >
+            {renderSlideContent(currentSlide, true)}
+          </motion.div>
+        </div>
+      );
+    }
+
     if (!selectedSlide) {
       return (
         <div className="flex-1 flex items-center justify-center">
@@ -509,24 +796,27 @@ export default function VideoEditorPackageEditorNew() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-            {selectedWine && (
-              <div className="text-xs text-gray-300 bg-gray-700 px-2 py-1 rounded">
-                Editing: {selectedWine.wineName}
-              </div>
-            )}
             <Button 
               variant="outline" 
               size="sm"
-              onClick={() => setIsPlaying(!isPlaying)}
-              className="text-xs px-2"
+              onClick={() => {
+                setPreviewMode(!previewMode);
+                if (!previewMode && selectedWine) {
+                  const wineSlides = slidesByWine[selectedWine.id] || [];
+                  if (wineSlides.length > 0) {
+                    setPreviewSlideIndex(0);
+                  }
+                }
+              }}
+              className="text-xs px-3 py-2"
             >
-              <Eye className="w-3 h-3 mr-1" />
-              Preview
+              <Eye className="w-4 h-4 mr-2" />
+              {previewMode ? 'Exit Preview' : 'Preview'}
             </Button>
             <Button 
               variant="default" 
               size="sm" 
-              className="bg-purple-600 hover:bg-purple-700 text-xs px-2"
+              className="bg-purple-600 hover:bg-purple-700 text-xs px-3 py-2"
               onClick={() => {
                 toast({
                   title: "Changes Saved",
@@ -534,7 +824,7 @@ export default function VideoEditorPackageEditorNew() {
                 });
               }}
             >
-              <Save className="w-3 h-3 mr-1" />
+              <Save className="w-4 h-4 mr-2" />
               Save
             </Button>
           </div>
@@ -682,7 +972,10 @@ export default function VideoEditorPackageEditorNew() {
                       >
                         <div 
                           className="flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-700/50"
-                          onClick={() => toggleWineExpansion(wine.id)}
+                          onClick={() => {
+                            setSelectedWine(wine);
+                            toggleWineExpansion(wine.id);
+                          }}
                         >
                           <div className="w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
                             {wine.position}
@@ -699,31 +992,23 @@ export default function VideoEditorPackageEditorNew() {
                         </div>
                         
                         {isExpanded && wineSlides.length > 0 && (
-                          <div className="border-t border-gray-600 p-2 space-y-1">
-                            {wineSlides.map((slide: Slide) => (
-                              <div
-                                key={slide.id}
-                                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-                                  selectedSlide?.id === slide.id
-                                    ? 'bg-purple-600 text-white'
-                                    : 'hover:bg-gray-600 text-gray-300'
-                                }`}
-                                onClick={() => setSelectedSlide(slide)}
+                          <div className="border-t border-gray-600 p-2">
+                            <DndContext
+                              sensors={sensors}
+                              collisionDetection={closestCenter}
+                              onDragEnd={handleDragEnd}
+                            >
+                              <SortableContext
+                                items={wineSlides.map(s => s.id)}
+                                strategy={verticalListSortingStrategy}
                               >
-                                <div className="flex-shrink-0">
-                                  {slide.type === 'question' && <HelpCircle className="w-3 h-3" />}
-                                  {slide.type === 'video_message' && <Video className="w-3 h-3" />}
-                                  {slide.type === 'audio_message' && <Volume2 className="w-3 h-3" />}
-                                  {slide.type === 'interlude' && <Pause className="w-3 h-3" />}
-                                  {slide.type === 'media' && <ImageIcon className="w-3 h-3" />}
+                                <div className="space-y-1">
+                                  {wineSlides.map((slide: Slide) => (
+                                    <SortableSlide key={slide.id} slide={slide} />
+                                  ))}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-medium truncate">{slide.payloadJson?.title || slide.type}</div>
-                                  <div className="text-xs opacity-70 truncate">{slide.type}</div>
-                                </div>
-                                <div className="text-xs opacity-50">#{slide.position}</div>
-                              </div>
-                            ))}
+                              </SortableContext>
+                            </DndContext>
                           </div>
                         )}
                       </div>
