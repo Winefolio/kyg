@@ -146,7 +146,7 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
               <div className="flex items-center justify-between">
                 <span className="text-gray-400 text-sm">Package</span>
                 <span className="text-white text-sm font-medium">
-                  {session.packageName || session.packageCode || 'Wine Package'}
+                  {session.packageCode || 'Wine Package'}
                 </span>
               </div>
 
@@ -163,7 +163,7 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
               <div className="flex items-center justify-between">
                 <span className="text-gray-400 text-sm">Participants</span>
                 <span className="text-white text-sm">
-                  {session.participantCount} / {session.maxParticipants}
+                  {session.participantCount} / 50
                 </span>
               </div>
             </CardContent>
@@ -172,31 +172,37 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
           {/* QR Code */}
           <div className="bg-white p-6 rounded-lg flex justify-center">
             <QRCodeSVG
-              value={sessionUrl}
+              value={sessionCode}
               size={200}
               level="M"
               includeMargin={true}
             />
           </div>
 
-          {/* Session URL */}
+          {/* Session Code */}
           <div className="space-y-2">
-            <Label className="text-gray-300 text-sm">Session URL</Label>
+            <Label className="text-gray-300 text-sm">Session Code</Label>
             <div className="flex gap-2">
               <Input
-                value={sessionUrl}
+                value={sessionCode}
                 readOnly
-                className="bg-gray-800 border-gray-600 text-gray-300 font-mono text-xs"
+                className="bg-gray-800 border-gray-600 text-gray-300 font-mono text-lg font-bold text-center"
               />
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => copyToClipboard(sessionUrl)}
+                onClick={() => copyToClipboard(sessionCode)}
                 className="border-gray-600 text-gray-300 hover:bg-gray-700"
               >
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
+          </div>
+          
+          {/* Instructions */}
+          <div className="text-center text-gray-400 text-sm">
+            <p>Participants can scan the QR code or enter the session code at:</p>
+            <p className="font-mono text-purple-400 mt-1">{baseUrl}/join</p>
           </div>
 
           {/* Action Buttons */}

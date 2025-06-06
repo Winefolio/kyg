@@ -52,15 +52,15 @@ export function SelectionView({
         </motion.div>
       </div>
 
-      {/* Sophisticated Hero Section */}
+      {/* Compact Hero Section */}
       <motion.div 
-        className="text-center mb-8 md:mb-12 mt-2 md:mt-6"
+        className="text-center mb-4 mt-2"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
         <motion.div
-          className="inline-flex items-center justify-center w-32 h-32 md:w-36 md:h-36 mb-8 md:mb-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl"
+          className="inline-flex items-center justify-center w-16 h-16 mb-4 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl"
           variants={itemVariants}
           animate={{
             rotate: [0, 3, -3, 0],
@@ -73,11 +73,11 @@ export function SelectionView({
           }}
           transition={{ duration: 6, repeat: Infinity }}
         >
-          <Wine className="text-white" size={60} />
+          <Wine className="text-white" size={28} />
         </motion.div>
         
         <motion.h1
-          className="text-5xl md:text-6xl font-bold text-white mb-4 md:mb-6 tracking-tight"
+          className="text-2xl font-bold text-white mb-2 tracking-tight"
           variants={itemVariants}
           style={{
             background: "linear-gradient(135deg, #ffffff 0%, #e0e7ff 100%)",
@@ -90,34 +90,34 @@ export function SelectionView({
         </motion.h1>
         
         <motion.p
-          className="text-xl md:text-2xl text-white/80 font-light tracking-wide mb-2"
+          className="text-sm text-white/80 font-light tracking-wide mb-2"
           variants={itemVariants}
         >
           Premium Wine Tasting Experience
         </motion.p>
         
         <motion.div
-          className="w-24 h-1 bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 rounded-full mx-auto"
+          className="w-16 h-0.5 bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 rounded-full mx-auto"
           variants={itemVariants}
         />
       </motion.div>
 
-      {/* Premium Action Cards */}
+      {/* Compact Action Cards */}
       <motion.div 
-        className="space-y-6 md:space-y-8 w-full max-w-2xl mx-auto px-4 pt-8 md:pt-12"
+        className="space-y-3 w-full max-w-sm mx-auto px-4 pt-4"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
         {/* Join Session Card */}
         <motion.div
-          className="group relative bg-white/5 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl cursor-pointer overflow-hidden"
+          className="group relative bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/20 shadow-xl cursor-pointer overflow-hidden"
           variants={itemVariants}
           whileHover={{ 
             scale: 1.02, 
-            y: -6,
+            y: -3,
             backgroundColor: "rgba(255, 255, 255, 0.12)",
-            boxShadow: "0 25px 50px -12px rgba(59, 130, 246, 0.25)"
+            boxShadow: "0 15px 30px -8px rgba(59, 130, 246, 0.25)"
           }}
           whileTap={{ scale: 0.98 }}
           onClick={() => {
