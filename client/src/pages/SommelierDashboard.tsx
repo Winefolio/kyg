@@ -157,7 +157,18 @@ export default function SommelierDashboard() {
   });
 
   // Fetch analytics
-  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+  const { data: analytics = {
+    overview: {
+      totalPackages: 0,
+      totalSessions: 0,
+      activeParticipants: 0,
+      completionRate: 0,
+      averageRating: 0,
+      totalResponses: 0
+    },
+    packageUsage: [],
+    recentActivity: []
+  }, isLoading: analyticsLoading } = useQuery({
     queryKey: ['/api/analytics/overview'],
     enabled: activeTab === 'analytics',
     refetchInterval: 30000 // Refresh every 30 seconds

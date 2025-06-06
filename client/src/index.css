@@ -86,6 +86,42 @@
   }
 }
 
+/* Mobile-First Responsive Design */
+@media (max-width: 640px) {
+  .mobile-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+  
+  .wine-actions-mobile {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+  }
+  
+  .wine-actions-mobile button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  
+  .tab-container {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .tab-container::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .touch-button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
 /* Custom slider styling */
 .slider::-webkit-slider-thumb {
   appearance: none;
