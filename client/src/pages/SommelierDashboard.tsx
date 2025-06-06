@@ -504,11 +504,20 @@ export default function SommelierDashboard() {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => setLocation(`/editor/${pkg.code}`)}
+                                className="text-purple-300 hover:bg-purple-500/20 border border-purple-400/30"
+                              >
+                                <Edit3 className="w-4 h-4 mr-2" />
+                                Edit Package
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => openPackageModal('edit', pkg)}
                                 className="text-white hover:bg-white/10"
                               >
-                                <Edit3 className="w-4 h-4 mr-2" />
-                                Edit
+                                <Settings className="w-4 h-4 mr-2" />
+                                Settings
                               </Button>
                               <Button
                                 variant="ghost"
@@ -1229,16 +1238,13 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
                         {!isReadOnly && (
                           <div className="flex items-center space-x-2 ml-4">
                             <Button
-                              onClick={() => {
-                                setSelectedWineForSlides(wine);
-                                setSlideEditorOpen(true);
-                              }}
+                              onClick={() => setLocation(`/editor/${packages?.find(p => p.id === wine.packageId)?.code || ''}`)}
                               variant="ghost"
                               size="sm"
-                              className="text-blue-400 hover:bg-blue-500/10"
-                              title="Edit Slides"
+                              className="text-purple-400 hover:bg-purple-500/10"
+                              title="Edit Package"
                             >
-                              <Settings className="w-4 h-4" />
+                              <Edit3 className="w-4 h-4" />
                             </Button>
                             <Button
                               onClick={() => openWineModal('edit', wine)}
@@ -1286,17 +1292,7 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
           />
         )}
 
-        {/* Slide Editor */}
-        {slideEditorOpen && selectedWineForSlides && (
-          <SlideEditor
-            packageWineId={selectedWineForSlides.id}
-            wineName={selectedWineForSlides.wineName}
-            onClose={() => {
-              setSlideEditorOpen(false);
-              setSelectedWineForSlides(null);
-            }}
-          />
-        )}
+
       </motion.div>
     </motion.div>
   );
