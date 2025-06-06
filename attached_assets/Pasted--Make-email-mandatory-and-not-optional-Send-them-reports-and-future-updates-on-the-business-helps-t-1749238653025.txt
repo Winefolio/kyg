@@ -1,0 +1,31 @@
+
+Make email mandatory and not optional
+Send them reports and future updates on the business (helps them get an identifier)
+High-level= like the gradient design ~ sleek, modern AI aesthetic. Is what they like. 
+Liked the first page (the waiting)
+On the progress bar
+They break up casing into: intro, deep dive, and ending for each wine
+Want it to be more distinct to add more structure
+1 main intro slide and then specific wines would have name of wine and then audio recording priming you for wine and given you ~
+Q2 → UI wants everything on one screen so you don’t need to scroll (most things will be 4 qs so we’re chillin)
+Given that some terms are unfamiliar, they want to have more prominent tool tips (help, pop-ups) 
+One Q that chief somm comes up is “does this taste like stone fruit” and then no one really knows what that means. They have 10-12 terms they can define for people 
+“Hey remember what som nick said” when on the aroma question
+Make additional notes a drop-down to make it simpler/less busy
+Make som feedback very easy to turn around so it can be more deterministic/easier to get feedback to som 
+Q3 
+They need more context to be shown → more explanation (liek what does 10 mean here for q3?)
+You want to click on the dash and not the slider.. Interesting! Make them both clickable
+Take enough space vertically → make it centered
+A diagram of how to smell
+CONTEXT= they wanted to identify wine tasters?
+Immediate feedback and get some sort of quick synthesis?
+“Based on data, this is what you think you might like ~ somm will give you list of bottles”
+“You tend to like stone fruit.. Blah”
+Somms has answers for all questions that he would ask taster to go through “maybe things more right or wrong” what flavors should you be tasting vs qualitative 
+Allow somm to choose how many wines to show in a package
+People have responded super positively to the responses → based on that here are a couple of bottles
+Quick response (review) then a more comprehensive somm send
+Diagnostic type package (different types of wines to gauge what people are and where they are and what they might like).
+Lets say you most enjoyed the X of the original package then we will have package based on that answer
+If someone 
