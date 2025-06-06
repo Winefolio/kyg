@@ -267,37 +267,69 @@ export default function VideoEditorPackageEditorNew() {
                (payload.mediaItems && payload.mediaItems.length > 0);
       });
       
-      // Add wine transition slide for every wine (including first one as intro)
-      const transitionTitle = wineIndex === 0 
-        ? `Welcome to Wine ${wineIndex + 1}: ${wine.wineName}`
-        : `Wine ${wineIndex + 1}: ${wine.wineName}`;
-      
-      const transitionDescription = wineIndex === 0
-        ? `Let's begin our wine tasting journey with ${wine.wineName}`
-        : `Moving on to our next wine: ${wine.wineName}`;
-        
-      allSlidesWithTransitions.push({
-        id: `transition-${wine.id}`,
-        type: 'wine_transition',
-        title: transitionTitle,
-        description: wine.wineDescription || transitionDescription,
-        payloadJson: {
-          wineName: wine.wineName,
-          wineDescription: wine.wineDescription,
-          wineImageUrl: wine.wineImageUrl,
-          position: wine.position,
-          animationType: 'wine_glass_fill',
-          backgroundImage: wine.wineImageUrl || 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080',
-          isFirstWine: wineIndex === 0
-        },
-        packageWineId: wine.id,
-        position: -1, // Special position for transitions
-        sectionType: 'transition'
+      // Sort slides by position and separate overall rating from other slides
+      const sortedSlides = [...validSlides].sort((a, b) => a.position - b.position);
+      const overallRatingSlides = sortedSlides.filter(slide => {
+        const payload = slide.payloadJson || {};
+        return payload.title?.toLowerCase().includes('overall') || 
+               payload.category?.toLowerCase().includes('overall');
+      });
+      const otherSlides = sortedSlides.filter(slide => {
+        const payload = slide.payloadJson || {};
+        return !(payload.title?.toLowerCase().includes('overall') || 
+                payload.category?.toLowerCase().includes('overall'));
       });
       
-      // Add wine slides sorted by position
-      const sortedSlides = [...validSlides].sort((a, b) => a.position - b.position);
-      allSlidesWithTransitions.push(...sortedSlides);
+      // Add wine transition slide for first wine only (as intro)
+      if (wineIndex === 0) {
+        allSlidesWithTransitions.push({
+          id: `transition-${wine.id}-intro`,
+          type: 'wine_transition',
+          title: `Welcome to Wine ${wineIndex + 1}: ${wine.wineName}`,
+          description: `Let's begin our wine tasting journey with ${wine.wineName}`,
+          payloadJson: {
+            wineName: wine.wineName,
+            wineDescription: wine.wineDescription,
+            wineImageUrl: wine.wineImageUrl,
+            position: wine.position,
+            animationType: 'wine_glass_fill',
+            backgroundImage: wine.wineImageUrl || 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080',
+            isFirstWine: true
+          },
+          packageWineId: wine.id,
+          position: -1,
+          sectionType: 'transition'
+        });
+      }
+      
+      // Add other wine slides first
+      allSlidesWithTransitions.push(...otherSlides);
+      
+      // Add overall rating slides
+      allSlidesWithTransitions.push(...overallRatingSlides);
+      
+      // Add wine transition slide after overall rating (except for last wine)
+      if (wineIndex < sortedWines.length - 1) {
+        const nextWine = sortedWines[wineIndex + 1];
+        allSlidesWithTransitions.push({
+          id: `transition-${nextWine.id}`,
+          type: 'wine_transition',
+          title: `Wine ${wineIndex + 2}: ${nextWine.wineName}`,
+          description: `Moving on to our next wine: ${nextWine.wineName}`,
+          payloadJson: {
+            wineName: nextWine.wineName,
+            wineDescription: nextWine.wineDescription,
+            wineImageUrl: nextWine.wineImageUrl,
+            position: nextWine.position,
+            animationType: 'wine_glass_fill',
+            backgroundImage: nextWine.wineImageUrl || 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080',
+            isFirstWine: false
+          },
+          packageWineId: nextWine.id,
+          position: -1,
+          sectionType: 'transition'
+        });
+      }
     });
     
     return allSlidesWithTransitions;
