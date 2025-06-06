@@ -149,6 +149,7 @@ export class DatabaseStorage implements IStorage {
       name: "Bordeaux Discovery Collection",
       description:
         "Explore the finest wines from France's most prestigious region",
+      sommelierId: null,
     });
 
     // Create two wines for this package
@@ -391,6 +392,7 @@ export class DatabaseStorage implements IStorage {
         code: pkg.code.toUpperCase(),
         name: pkg.name,
         description: pkg.description,
+        sommelierId: pkg.sommelierId,
       })
       .returning();
     return result[0];
