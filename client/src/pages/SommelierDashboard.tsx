@@ -335,8 +335,7 @@ export default function SommelierDashboard() {
   };
 
   const openSlideEditor = (wine: PackageWine) => {
-    setSelectedWineForSlides(wine);
-    setSlideEditorOpen(true);
+    setLocation(`/video-editor?packageWineId=${wine.id}&wineName=${encodeURIComponent(wine.wineName)}`);
   };
 
   const togglePackageExpansion = (packageId: string) => {

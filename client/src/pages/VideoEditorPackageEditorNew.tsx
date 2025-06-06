@@ -133,6 +133,7 @@ export default function VideoEditorPackageEditorNew() {
 
   const [selectedSlide, setSelectedSlide] = useState<Slide | null>(null);
   const [selectedWine, setSelectedWine] = useState<Wine | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [allSlides, setAllSlides] = useState<Slide[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -142,7 +143,17 @@ export default function VideoEditorPackageEditorNew() {
     useSensor(PointerSensor)
   );
 
-  // Fetch package data
+  // Get URL parameters for pre-selection
+  const urlParams = new URLSearchParams(window.location.search);
+  const preSelectedWineId = urlParams.get('packageWineId');
+  const preSelectedWineName = urlParams.get('wineName');
+
+  // Fetch all packages for selection
+  const { data: packages, isLoading: packagesLoading } = useQuery<any[]>({
+    queryKey: ['/api/packages'],
+  });
+
+  // Fetch package data when code is provided
   const { data: packageData, isLoading } = useQuery<any>({
     queryKey: ['/api/packages', code],
     enabled: !!code,
@@ -176,12 +187,29 @@ export default function VideoEditorPackageEditorNew() {
     }
   }, [slidesData]);
 
-  // Set default selected wine
+  // Initialize with pre-selected wine from URL or default
   useEffect(() => {
-    if (winesData && winesData.length > 0 && !selectedWine) {
+    if (packages && preSelectedWineId) {
+      // Find the wine and package from URL parameters
+      for (const pkg of packages) {
+        const wine = pkg.wines?.find((w: any) => w.id === preSelectedWineId);
+        if (wine) {
+          setSelectedPackage(pkg);
+          setSelectedWine(wine);
+          break;
+        }
+      }
+    } else if (winesData && winesData.length > 0 && !selectedWine) {
       setSelectedWine(winesData[0]);
     }
-  }, [winesData, selectedWine]);
+  }, [packages, winesData, preSelectedWineId, selectedWine]);
+
+  // Set default package when packages load
+  useEffect(() => {
+    if (packages && packages.length > 0 && !selectedPackage) {
+      setSelectedPackage(packages[0]);
+    }
+  }, [packages, selectedPackage]);
 
   // Create slide mutation
   const createSlideMutation = useMutation({
@@ -379,11 +407,34 @@ export default function VideoEditorPackageEditorNew() {
 
           {sidebarOpen && (
             <div className="flex-1 overflow-y-auto">
+              {/* Package Selection */}
+              <div className="p-3 border-b border-gray-700">
+                <h3 className="text-white font-semibold mb-3 text-sm">Select Package</h3>
+                <select
+                  value={selectedPackage?.id || ''}
+                  onChange={(e) => {
+                    const pkg = packages?.find(p => p.id === e.target.value);
+                    if (pkg) {
+                      setSelectedPackage(pkg);
+                      setSelectedWine(null); // Reset wine selection
+                    }
+                  }}
+                  className="w-full bg-gray-700 border border-gray-600 text-white text-xs rounded px-2 py-1"
+                >
+                  <option value="">Choose package...</option>
+                  {packages?.map((pkg: any) => (
+                    <option key={pkg.id} value={pkg.id}>
+                      {pkg.name} ({pkg.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Wine Selection */}
               <div className="p-3 border-b border-gray-700">
                 <h3 className="text-white font-semibold mb-3 text-sm">Select Wine</h3>
                 <div className="space-y-2">
-                  {winesData?.map((wine: Wine) => (
+                  {selectedPackage?.wines?.map((wine: Wine) => (
                     <Button
                       key={wine.id}
                       variant={selectedWine?.id === wine.id ? "default" : "outline"}
