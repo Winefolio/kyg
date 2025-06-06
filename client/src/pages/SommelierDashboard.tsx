@@ -701,12 +701,7 @@ export default function SommelierDashboard() {
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                setSelectedSessionForQR({
-                                  ...session,
-                                  packageName: packages?.find((p: any) => p.id === session.packageId)?.name || 'Wine Package',
-                                  packageCode: packages?.find((p: any) => p.id === session.packageId)?.code || session.packageId,
-                                  maxParticipants: session.maxParticipants || 50
-                                });
+                                setSelectedSessionForQR(session);
                                 setShowQRModal(true);
                               }}
                               className="flex-1 text-purple-400 hover:bg-purple-500/20"
@@ -922,8 +917,8 @@ export default function SommelierDashboard() {
       {showQRModal && selectedSessionForQR && (
         <QRCodeModal
           session={selectedSessionForQR}
+          isOpen={showQRModal}
           onClose={() => setShowQRModal(false)}
-          onCopyLink={(sessionCode) => copySessionLink(sessionCode)}
         />
       )}
     </div>

@@ -12,12 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 interface QRCodeModalProps {
   session: {
     id: string;
-    packageId: string;
-    packageName?: string;
-    packageCode?: string;
+    packageCode: string;
+    code: string;
     status: string;
     participantCount: number;
-    maxParticipants: number;
     createdAt: string;
   };
   isOpen: boolean;
@@ -30,7 +28,8 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
 
   // Generate the session join URL
   const baseUrl = window.location.origin;
-  const sessionUrl = `${baseUrl}/join/${session.id}`;
+  const sessionUrl = `${baseUrl}/join`;
+  const sessionCode = session.code;
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -95,7 +94,7 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
           </head>
           <body>
             <h1>Wine Tasting Session</h1>
-            <h2>${session.packageName || 'Wine Package'}</h2>
+            <h2>Wine Package</h2>
             <div class="qr-container">
               <div id="qr-code"></div>
             </div>
