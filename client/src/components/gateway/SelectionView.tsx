@@ -52,15 +52,15 @@ export function SelectionView({
         </motion.div>
       </div>
 
-      {/* Compact Hero Section */}
+      {/* Hero Section */}
       <motion.div 
-        className="text-center mb-4 mt-2"
+        className="text-center mb-6 mt-4"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
         <motion.div
-          className="inline-flex items-center justify-center w-16 h-16 mb-4 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl"
+          className="inline-flex items-center justify-center w-20 h-20 mb-6 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl"
           variants={itemVariants}
           animate={{
             rotate: [0, 3, -3, 0],
@@ -73,11 +73,11 @@ export function SelectionView({
           }}
           transition={{ duration: 6, repeat: Infinity }}
         >
-          <Wine className="text-white" size={28} />
+          <Wine className="text-white" size={36} />
         </motion.div>
         
         <motion.h1
-          className="text-2xl font-bold text-white mb-2 tracking-tight"
+          className="text-3xl font-bold text-white mb-3 tracking-tight"
           variants={itemVariants}
           style={{
             background: "linear-gradient(135deg, #ffffff 0%, #e0e7ff 100%)",
@@ -90,28 +90,28 @@ export function SelectionView({
         </motion.h1>
         
         <motion.p
-          className="text-sm text-white/80 font-light tracking-wide mb-2"
+          className="text-base text-white/80 font-light tracking-wide mb-3"
           variants={itemVariants}
         >
           Premium Wine Tasting Experience
         </motion.p>
         
         <motion.div
-          className="w-16 h-0.5 bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 rounded-full mx-auto"
+          className="w-20 h-0.5 bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 rounded-full mx-auto"
           variants={itemVariants}
         />
       </motion.div>
 
-      {/* Compact Action Cards */}
+      {/* Action Cards */}
       <motion.div 
-        className="space-y-3 w-full max-w-sm mx-auto px-4 pt-4"
+        className="space-y-4 w-full max-w-md mx-auto px-4 pt-6"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
         {/* Join Session Card */}
         <motion.div
-          className="group relative bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/20 shadow-xl cursor-pointer overflow-hidden"
+          className="group relative bg-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/20 shadow-xl cursor-pointer overflow-hidden"
           variants={itemVariants}
           whileHover={{ 
             scale: 1.02, 
@@ -126,29 +126,29 @@ export function SelectionView({
           }}
         >
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2.5 rounded-xl shadow-lg">
-                <Users className="text-white" size={20} />
+            <div className="flex items-center space-x-4">
+              <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-3 rounded-xl shadow-lg">
+                <Users className="text-white" size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white group-hover:text-blue-100 transition-colors duration-300">
+                <h3 className="text-xl font-bold text-white group-hover:text-blue-100 transition-colors duration-300">
                   Join Session
                 </h3>
-                <p className="text-white/70 text-sm">
+                <p className="text-white/70 text-base">
                   Enter with Session ID
                 </p>
               </div>
             </div>
             <ArrowRight
               className="text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all duration-300"
-              size={18}
+              size={20}
             />
           </div>
         </motion.div>
 
         {/* Host Session Card */}
         <motion.div
-          className="group relative bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/20 shadow-xl cursor-pointer overflow-hidden"
+          className="group relative bg-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/20 shadow-xl cursor-pointer overflow-hidden"
           variants={itemVariants}
           whileHover={{ 
             scale: 1.02, 
@@ -163,22 +163,22 @@ export function SelectionView({
           }}
         >
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 rounded-xl shadow-lg">
-                <UserPlus className="text-white" size={20} />
+            <div className="flex items-center space-x-4">
+              <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-3 rounded-xl shadow-lg">
+                <UserPlus className="text-white" size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white group-hover:text-amber-100 transition-colors duration-300">
+                <h3 className="text-xl font-bold text-white group-hover:text-amber-100 transition-colors duration-300">
                   Host Session
                 </h3>
-                <p className="text-white/70 text-sm">
+                <p className="text-white/70 text-base">
                   Start with Package Code
                 </p>
               </div>
             </div>
             <ArrowRight
               className="text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all duration-300"
-              size={18}
+              size={20}
             />
           </div>
         </motion.div>

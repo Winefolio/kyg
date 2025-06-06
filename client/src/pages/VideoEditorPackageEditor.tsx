@@ -444,7 +444,7 @@ export default function VideoEditorPackageEditor() {
               {/* Add Slide Templates */}
               <div className="p-4 border-b border-gray-700">
                 <h3 className="text-white font-semibold mb-3">Add Slides</h3>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 gap-2">
                   {SLIDE_TEMPLATES.map((template) => (
                     <Button
                       key={template.type}
@@ -461,10 +461,10 @@ export default function VideoEditorPackageEditor() {
                           });
                         }
                       }}
-                      className="flex flex-col items-center p-3 h-auto border-gray-600 text-gray-300 hover:bg-gray-700"
+                      className="flex items-center gap-2 p-2 h-auto border-gray-600 text-gray-300 hover:bg-gray-700 justify-start"
                     >
                       {template.icon}
-                      <span className="text-xs mt-1">{template.name}</span>
+                      <span className="text-xs">{template.name}</span>
                     </Button>
                   ))}
                 </div>

@@ -82,7 +82,7 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-2xl h-full flex flex-col justify-center"
+      className="bg-gradient-card backdrop-blur-xl rounded-2xl p-3 sm:p-4 border border-white/20 shadow-xl h-full flex flex-col justify-center"
     >
       <div className="mb-4">
         <div className="flex items-center justify-between mb-3">
@@ -133,10 +133,10 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
               <Label
                 htmlFor={option.id}
                 className={`
-                  flex items-center p-3 rounded-xl cursor-pointer transition-all duration-300 group
+                  flex items-center p-2 rounded-lg cursor-pointer transition-all duration-300 group
                   transform-gpu
                   ${isSelected 
-                    ? 'bg-purple-500/20 border border-purple-400/50 shadow-lg shadow-purple-500/20' 
+                    ? 'bg-purple-500/20 border border-purple-400/50 shadow-md shadow-purple-500/20' 
                     : 'bg-white/5 hover:bg-white/10 border border-transparent hover:border-white/20'
                   }
                 `}
@@ -154,7 +154,7 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
                 </motion.div>
                 <div className="flex-1">
                   <motion.div 
-                    className={`text-sm sm:text-base font-medium transition-colors duration-300 ${
+                    className={`text-xs sm:text-sm font-medium transition-colors duration-300 ${
                       isSelected ? 'text-purple-100' : 'text-white group-hover:text-purple-200'
                     }`}
                     animate={isSelected ? { x: 2 } : { x: 0 }}
@@ -164,7 +164,7 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
                   </motion.div>
                   {option.description && (
                     <motion.div 
-                      className="text-white/60 text-xs sm:text-sm mt-1 leading-relaxed"
+                      className="text-white/60 text-xs mt-0.5 leading-relaxed"
                       animate={isSelected ? { opacity: 0.9 } : { opacity: 0.6 }}
                     >
                       {option.description}
