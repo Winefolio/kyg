@@ -35,7 +35,7 @@ export const wineCharacteristics = pgTable("wine_characteristics", {
 // Slide templates for reusable question patterns
 export const slideTemplates = pgTable("slide_templates", {
   id: uuid("id").primaryKey().defaultRandom(),
-  sommelierId: uuid("sommelier_id").references(() => sommeliers.id, { onDelete: "cascade" }),
+  sommelierId: uuid("sommelier_id"),
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
   type: varchar("type", { length: 50 }).notNull(),
@@ -45,14 +45,13 @@ export const slideTemplates = pgTable("slide_templates", {
   usageCount: integer("usage_count").default(0),
   createdAt: timestamp("created_at").defaultNow()
 }, (table) => ({
-  sommelierIdx: index("idx_slide_templates_sommelier").on(table.sommelierId),
   typeIdx: index("idx_slide_templates_type").on(table.type)
 }));
 
 // Packages table with sommelier ownership
 export const packages = pgTable("packages", {
   id: uuid("id").primaryKey().defaultRandom(),
-  sommelierId: uuid("sommelier_id").notNull().references(() => sommeliers.id, { onDelete: "cascade" }),
+  sommelierId: uuid("sommelier_id"),
   code: varchar("code", { length: 10 }).notNull().unique(),
   name: text("name").notNull(),
   description: text("description"),
@@ -61,8 +60,7 @@ export const packages = pgTable("packages", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 }, (table) => ({
-  codeIdx: index("idx_packages_code").on(table.code),
-  sommelierIdx: index("idx_packages_sommelier").on(table.sommelierId)
+  codeIdx: index("idx_packages_code").on(table.code)
 }));
 
 // Package wines table with enhanced tracking capabilities
@@ -216,7 +214,8 @@ export type MediaPayload = z.infer<typeof mediaPayloadSchema>;
 
 // Insert schemas
 export const insertPackageSchema = createInsertSchema(packages, {
-  description: z.string().nullable().optional()
+  description: z.string().nullable().optional(),
+  sommelierId: z.string().nullable().optional()
 }).omit({
   id: true,
   createdAt: true,
