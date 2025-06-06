@@ -56,7 +56,7 @@ export default function PackageEditor() {
 
   // Sort slides within each wine by position
   Object.keys(slidesByWine).forEach(wineId => {
-    slidesByWine[wineId].sort((a: any, b: any) => a.position - b.position);
+    slidesByWine[wineId].sort((a, b) => a.position - b.position);
   });
 
   // Update slides when package data changes
@@ -109,8 +109,8 @@ export default function PackageEditor() {
     
     if (!over || active.id === over.id) return;
 
-    const activeSlide = allSlides.find((s: any) => s.id === active.id);
-    const overSlide = allSlides.find((s: any) => s.id === over.id);
+    const activeSlide = allSlides.find(s => s.id === active.id);
+    const overSlide = allSlides.find(s => s.id === over.id);
     
     if (!activeSlide || !overSlide) return;
 
@@ -125,26 +125,26 @@ export default function PackageEditor() {
     }
 
     const wineSlides = slidesByWine[activeSlide.packageWineId] || [];
-    const oldIndex = wineSlides.findIndex((s: any) => s.id === active.id);
-    const newIndex = wineSlides.findIndex((s: any) => s.id === over.id);
+    const oldIndex = wineSlides.findIndex(s => s.id === active.id);
+    const newIndex = wineSlides.findIndex(s => s.id === over.id);
 
     if (oldIndex === -1 || newIndex === -1) return;
 
     const reorderedSlides = arrayMove(wineSlides, oldIndex, newIndex);
     
     // Update positions
-    const updates = reorderedSlides.map((slide: any, index: number) => ({
+    const updates = reorderedSlides.map((slide, index) => ({
       slideId: slide.id,
       packageWineId: slide.packageWineId,
       position: index + 1,
     }));
 
     // Update local state immediately for responsiveness
-    setAllSlides((prevSlides: any[]) => {
+    setAllSlides(prevSlides => {
       const newSlides = [...prevSlides];
       const slideUpdatesMap = new Map(updates.map(u => [u.slideId, u.position]));
       
-      return newSlides.map((slide: any) => {
+      return newSlides.map(slide => {
         const newPosition = slideUpdatesMap.get(slide.id);
         return newPosition !== undefined ? { ...slide, position: newPosition } : slide;
       });
@@ -154,7 +154,7 @@ export default function PackageEditor() {
   };
 
   const handleSlideSelect = (slideId: string) => {
-    const slide = allSlides.find((s: any) => s.id === slideId);
+    const slide = allSlides.find(s => s.id === slideId);
     setSelectedSlide(slide || null);
   };
 
@@ -163,7 +163,7 @@ export default function PackageEditor() {
     
     // Update local state
     setSelectedSlide((prev: any) => prev?.id === slideId ? { ...prev, payloadJson: updatedPayload } : prev);
-    setAllSlides((prev: any[]) => prev.map((slide: any) => 
+    setAllSlides((prev: any[]) => prev.map(slide => 
       slide.id === slideId ? { ...slide, payloadJson: updatedPayload } : slide
     ));
   };
@@ -257,7 +257,7 @@ export default function PackageEditor() {
                   return (
                     <SortableContext
                       key={wine.id}
-                      items={wineSlides.map((s: any) => s.id)}
+                      items={wineSlides.map(s => s.id)}
                       strategy={verticalListSortingStrategy}
                     >
                       <SortableWineSection

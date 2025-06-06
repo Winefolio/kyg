@@ -1111,7 +1111,7 @@ export class DatabaseStorage implements IStorage {
   async updateSlide(id: string, data: Partial<InsertSlide>): Promise<Slide> {
     const [updatedSlide] = await db
       .update(slides)
-      .set({ ...data, updatedAt: new Date() })
+      .set(data)
       .where(eq(slides.id, id))
       .returning();
     return updatedSlide;
