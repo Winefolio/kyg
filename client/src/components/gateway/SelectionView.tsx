@@ -125,44 +125,36 @@ export function SelectionView({
             setUserMode("join");
           }}
         >
-          {/* Gradient overlay on hover */}
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl" />
-          
-          <div className="relative z-10">
-            <div className="flex items-start justify-between mb-5">
-              <div className="flex items-center space-x-5">
-                <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-4 rounded-2xl shadow-lg group-hover:shadow-blue-500/25 transition-all duration-300">
-                  <Users className="text-white" size={32} />
-                </div>
-                <div>
-                  <h3 className="text-2xl md:text-3xl font-bold text-white mb-2 group-hover:text-blue-100 transition-colors duration-300">
-                    Join Session
-                  </h3>
-                  <p className="text-white/70 text-base md:text-lg font-medium">
-                    Enter with Session ID
-                  </p>
-                </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="bg-gradient-to-br from-blue-500 to-purple-600 p-2.5 rounded-xl shadow-lg">
+                <Users className="text-white" size={20} />
               </div>
-              <ArrowRight
-                className="text-white/50 group-hover:text-white group-hover:translate-x-2 transition-all duration-300 mt-2"
-                size={24}
-              />
+              <div>
+                <h3 className="text-lg font-bold text-white group-hover:text-blue-100 transition-colors duration-300">
+                  Join Session
+                </h3>
+                <p className="text-white/70 text-sm">
+                  Enter with Session ID
+                </p>
+              </div>
             </div>
-            <p className="text-white/80 leading-relaxed text-base md:text-lg">
-              Join an ongoing wine tasting session with your unique session identifier.
-            </p>
+            <ArrowRight
+              className="text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all duration-300"
+              size={18}
+            />
           </div>
         </motion.div>
 
         {/* Host Session Card */}
         <motion.div
-          className="group relative bg-white/5 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl cursor-pointer overflow-hidden"
+          className="group relative bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/20 shadow-xl cursor-pointer overflow-hidden"
           variants={itemVariants}
           whileHover={{ 
             scale: 1.02, 
-            y: -6,
+            y: -3,
             backgroundColor: "rgba(255, 255, 255, 0.12)",
-            boxShadow: "0 25px 50px -12px rgba(245, 158, 11, 0.25)"
+            boxShadow: "0 15px 30px -8px rgba(245, 158, 11, 0.25)"
           }}
           whileTap={{ scale: 0.98 }}
           onClick={() => {
@@ -170,32 +162,24 @@ export function SelectionView({
             setUserMode("host");
           }}
         >
-          {/* Gradient overlay on hover */}
-          <div className="absolute inset-0 bg-gradient-to-r from-amber-500/10 to-orange-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl" />
-          
-          <div className="relative z-10">
-            <div className="flex items-start justify-between mb-5">
-              <div className="flex items-center space-x-5">
-                <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-4 rounded-2xl shadow-lg group-hover:shadow-amber-500/25 transition-all duration-300">
-                  <UserPlus className="text-white" size={32} />
-                </div>
-                <div>
-                  <h3 className="text-2xl md:text-3xl font-bold text-white mb-2 group-hover:text-amber-100 transition-colors duration-300">
-                    Host Session
-                  </h3>
-                  <p className="text-white/70 text-base md:text-lg font-medium">
-                    Start with Package Code
-                  </p>
-                </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-2.5 rounded-xl shadow-lg">
+                <UserPlus className="text-white" size={20} />
               </div>
-              <ArrowRight
-                className="text-white/50 group-hover:text-white group-hover:translate-x-2 transition-all duration-300 mt-2"
-                size={24}
-              />
+              <div>
+                <h3 className="text-lg font-bold text-white group-hover:text-amber-100 transition-colors duration-300">
+                  Host Session
+                </h3>
+                <p className="text-white/70 text-sm">
+                  Start with Package Code
+                </p>
+              </div>
             </div>
-            <p className="text-white/80 leading-relaxed text-base md:text-lg">
-              Create a new tasting experience and invite participants to join.
-            </p>
+            <ArrowRight
+              className="text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all duration-300"
+              size={18}
+            />
           </div>
         </motion.div>
       </motion.div>
