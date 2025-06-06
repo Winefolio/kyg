@@ -2,19 +2,70 @@ import { pgTable, text, serial, uuid, integer, boolean, timestamp, jsonb, varcha
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Packages table
-export const packages = pgTable("packages", {
+// Sommeliers table for multi-tenant authentication
+export const sommeliers = pgTable("sommeliers", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 10 }).notNull().unique(),
-  name: text("name").notNull(),
-  description: text("description"),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  displayName: varchar("display_name", { length: 100 }).notNull(),
+  passwordHash: text("password_hash").notNull(),
+  profileImageUrl: text("profile_image_url"),
+  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
 }, (table) => ({
-  codeIdx: index("idx_packages_code").on(table.code)
+  emailIdx: index("idx_sommeliers_email").on(table.email)
 }));
 
-// Package wines table - intermediate layer between packages and slides
+// Wine characteristics table for tracking attributes
+export const wineCharacteristics = pgTable("wine_characteristics", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  category: varchar("category", { length: 50 }).notNull(), // 'structure', 'flavor', 'aroma', etc.
+  description: text("description"),
+  scaleType: varchar("scale_type", { length: 20 }).notNull(), // 'numeric', 'descriptive', 'boolean'
+  scaleMin: integer("scale_min"),
+  scaleMax: integer("scale_max"),
+  scaleLabels: jsonb("scale_labels"), // Array of label options
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow()
+}, (table) => ({
+  categoryIdx: index("idx_wine_characteristics_category").on(table.category)
+}));
+
+// Slide templates for reusable question patterns
+export const slideTemplates = pgTable("slide_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sommelierId: uuid("sommelier_id").references(() => sommeliers.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  type: varchar("type", { length: 50 }).notNull(),
+  sectionType: varchar("section_type", { length: 20 }),
+  payloadTemplate: jsonb("payload_template").notNull(),
+  isPublic: boolean("is_public").default(false), // Can be used by other sommeliers
+  usageCount: integer("usage_count").default(0),
+  createdAt: timestamp("created_at").defaultNow()
+}, (table) => ({
+  sommelierIdx: index("idx_slide_templates_sommelier").on(table.sommelierId),
+  typeIdx: index("idx_slide_templates_type").on(table.type)
+}));
+
+// Packages table with sommelier ownership
+export const packages = pgTable("packages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sommelierId: uuid("sommelier_id").notNull().references(() => sommeliers.id, { onDelete: "cascade" }),
+  code: varchar("code", { length: 10 }).notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  isPublic: boolean("is_public").default(false), // Can be viewed/used by other sommeliers
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+}, (table) => ({
+  codeIdx: index("idx_packages_code").on(table.code),
+  sommelierIdx: index("idx_packages_sommelier").on(table.sommelierId)
+}));
+
+// Package wines table with enhanced tracking capabilities
 export const packageWines = pgTable("package_wines", {
   id: uuid("id").primaryKey().defaultRandom(),
   packageId: uuid("package_id").notNull().references(() => packages.id, { onDelete: "cascade" }),
@@ -22,9 +73,36 @@ export const packageWines = pgTable("package_wines", {
   wineName: text("wine_name").notNull(),
   wineDescription: text("wine_description"),
   wineImageUrl: text("wine_image_url"),
+  // Wine Analytics Attributes
+  wineType: varchar("wine_type", { length: 50 }), // 'red', 'white', 'rosé', 'sparkling', 'dessert'
+  vintage: integer("vintage"),
+  region: text("region"),
+  producer: text("producer"),
+  grapeVarietals: jsonb("grape_varietals"), // Array of grape varieties
+  alcoholContent: text("alcohol_content"), // e.g., "13.5%"
+  // Expected characteristics for analytics comparison
+  expectedCharacteristics: jsonb("expected_characteristics"), // Sommelier's expected ratings
+  // Metadata
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
 }, (table) => ({
-  uniquePosition: unique().on(table.packageId, table.position)
+  uniquePosition: unique().on(table.packageId, table.position),
+  wineTypeIdx: index("idx_package_wines_type").on(table.wineType),
+  vintageIdx: index("idx_package_wines_vintage").on(table.vintage)
+}));
+
+// Wine response analytics for tracking user accuracy
+export const wineResponseAnalytics = pgTable("wine_response_analytics", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  packageWineId: uuid("package_wine_id").notNull().references(() => packageWines.id, { onDelete: "cascade" }),
+  characteristicName: varchar("characteristic_name", { length: 100 }).notNull(),
+  expectedValue: text("expected_value"), // Sommelier's expected answer
+  averageUserValue: text("average_user_value"), // Average user response
+  accuracyScore: integer("accuracy_score"), // 0-100 percentage
+  responseCount: integer("response_count").default(0),
+  lastUpdated: timestamp("last_updated").defaultNow()
+}, (table) => ({
+  wineCharacteristicIdx: index("idx_wine_analytics_wine_char").on(table.packageWineId, table.characteristicName)
 }));
 
 // Define all allowed slide types

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { WineModal } from "@/components/WineModal";
 import { 
   Plus, 
   Edit3, 
@@ -73,6 +74,31 @@ interface WineForm {
   wineDescription: string;
   wineImageUrl: string;
   position: number;
+  wineType: string;
+  vintage: number | null;
+  region: string;
+  producer: string;
+  grapeVarietals: string[];
+  alcoholContent: string;
+  expectedCharacteristics: Record<string, any>;
+}
+
+interface SlideOrderItem {
+  id: string;
+  position: number;
+  type: string;
+  sectionType: string;
+  title: string;
+  description: string;
+}
+
+interface SlideTemplate {
+  id: string;
+  name: string;
+  type: string;
+  sectionType: string;
+  payloadTemplate: any;
+  isPublic: boolean;
 }
 
 interface Slide {
