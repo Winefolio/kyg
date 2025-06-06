@@ -918,14 +918,33 @@ interface PackageModalProps {
 
 
 
-// QR Code Modal Component
-interface QRCodeModalProps {
+// Wine template helper functions
+const handleQuickWineCreate = (templateId: string) => {
+  const template = WINE_TEMPLATES.find(t => t.id === templateId);
+  if (template && selectedPackage) {
+    const wineData = {
+      wineName: template.name,
+      wineDescription: template.description,
+      wineImageUrl: template.imageUrl,
+      wineType: template.wineType,
+      vintage: template.vintage,
+      region: template.region,
+      producer: template.producer,
+      grapeVarietals: template.grapeVarietals,
+      alcoholContent: template.alcoholContent,
+      expectedCharacteristics: template.expectedCharacteristics
+    };
+    
+    createWineMutation.mutate({ ...wineData, packageId: selectedPackage.id });
+  }
+};
+
+// Session QR code handling
+function SessionQRCodeModal({ session, onClose, onCopyLink }: {
   session: Session;
   onClose: () => void;
   onCopyLink: (sessionCode: string) => void;
-}
-
-function QRCodeModal({ session, onClose, onCopyLink }: QRCodeModalProps) {
+}) {
   const sessionUrl = `${window.location.origin}/session/${session.code}`;
   
   return (
