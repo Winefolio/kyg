@@ -198,10 +198,21 @@ export default function TastingSession() {
     }
   };
 
-  const handleAnswerChange = (slideId: string, answer: any) => {
-    setAnswers(prev => ({ ...prev, [slideId]: answer }));
-    // Auto-save response
-    saveResponseMutation.mutate({ slideId, answerJson: answer });
+  const handleAnswerChange = (slideId: string, answer: any, questionType?: string) => {
+    let answerJson = answer;
+    
+    // CRITICAL FIX: If the question is a scale, we only want to store the numeric value
+    // to ensure our analytics can aggregate it properly.
+    if (questionType === 'scale' && typeof answer === 'object' && answer !== null && 'value' in answer) {
+      answerJson = answer.value;
+    } else if (questionType === 'scale' && typeof answer !== 'number') {
+      // Handle the case where the initial value might be an object
+      answerJson = answer?.value ?? answer;
+    }
+
+    setAnswers(prev => ({ ...prev, [slideId]: answerJson }));
+    // Auto-save response with potentially modified answer
+    saveResponseMutation.mutate({ slideId, answerJson });
   };
 
   const handleNext = () => {
@@ -308,8 +319,8 @@ export default function TastingSession() {
         return (
           <ScaleQuestion
             question={payload}
-            value={answer.value || payload.scale_min}
-            onChange={(value) => handleAnswerChange(slide.id, { value })}
+            value={answer || payload.scale_min}
+            onChange={(value) => handleAnswerChange(slide.id, value, 'scale')}
           />
         );
       default:
