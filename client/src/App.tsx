@@ -20,7 +20,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Gateway} />
       <Route path="/sommelier" component={SommelierDashboard} />
-      <Route path="/editor/:code" component={PackageEditor} />
+      <Route path="/editor/:code" component={VideoEditorPackageEditorNew} />
       <Route path="/video-editor/:code" component={VideoEditorPackageEditorNew} />
       <Route path="/profile" component={Profile} />
       <Route path="/join" component={SessionJoin} />

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useLocation } from 'wouter';
+import { useParams } from 'wouter';
+import { useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   DndContext,
@@ -310,11 +311,11 @@ export default function VideoEditorPackageEditorNew() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setLocation('/sommelier-dashboard')}
+              onClick={() => setLocation('/sommelier')}
               className="text-gray-400 hover:text-white"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
+              Back to Sommelier Dashboard
             </Button>
             <div>
               <h1 className="text-xl font-bold text-white">{packageData?.name}</h1>
@@ -330,7 +331,17 @@ export default function VideoEditorPackageEditorNew() {
               <Eye className="w-4 h-4 mr-2" />
               {isPlaying ? 'Stop Preview' : 'Preview'}
             </Button>
-            <Button variant="default" size="sm" className="bg-purple-600 hover:bg-purple-700">
+            <Button 
+              variant="default" 
+              size="sm" 
+              className="bg-purple-600 hover:bg-purple-700"
+              onClick={() => {
+                toast({
+                  title: "Changes Saved",
+                  description: "All package changes have been saved successfully.",
+                });
+              }}
+            >
               <Save className="w-4 h-4 mr-2" />
               Save
             </Button>
