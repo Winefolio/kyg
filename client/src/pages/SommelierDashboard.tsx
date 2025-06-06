@@ -95,6 +95,7 @@ interface WineForm {
   grapeVarietals: string[];
   alcoholContent: string;
   expectedCharacteristics: Record<string, any>;
+  packageId?: string;
 }
 
 interface SlideOrderItem {
@@ -298,9 +299,9 @@ export default function SommelierDashboard() {
   const createSessionMutation = useMutation({
     mutationFn: (packageCode: string) =>
       apiRequest("/api/sessions", "POST", { packageCode }),
-    onSuccess: (session) => {
+    onSuccess: (session: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
-      setSelectedSessionForQR(session);
+      setSelectedSessionForQR(session as Session);
       setShowQRModal(true);
       toast({
         title: "Session created successfully",
@@ -476,6 +477,19 @@ export default function SommelierDashboard() {
                                   </div>
                                 </div>
                               </div>
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => togglePackageExpansion(pkg.id)}
+                                className="text-white/60 hover:text-white hover:bg-white/10"
+                              >
+                                {expandedPackages.has(pkg.id) ? (
+                                  <ChevronUp className="w-4 h-4" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4" />
+                                )}
+                              </Button>
                             </div>
 
                             <div className="flex space-x-2">
