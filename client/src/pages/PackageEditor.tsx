@@ -542,7 +542,7 @@ export default function PackageEditor() {
               onDragEnd={handleDragEnd}
             >
               <div className="space-y-4">
-                {packageData.wines.map(wine => {
+                {(packageData?.wines || []).map(wine => {
                   const wineSlides = slides.filter(s => s.packageWineId === wine.id);
                   return (
                     <WineSection
