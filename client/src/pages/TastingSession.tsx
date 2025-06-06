@@ -84,9 +84,21 @@ export default function TastingSession() {
   // Process slides and inject wine transitions after overall ratings
   const processedSlides = () => {
     const originalSlides = slidesData?.slides || [];
+    console.log('Processing slides:', originalSlides.length, 'original slides');
     
-    // For now, just return original slides and add transitions manually
-    // We'll identify overall rating slides and insert transitions after them
+    // Add debug logging
+    originalSlides.forEach((slide, index) => {
+      const payload = (slide as any).payloadJson || (slide as any).payload_json || {};
+      console.log(`Slide ${index}:`, {
+        id: slide.id,
+        type: slide.type,
+        packageWineId: slide.packageWineId,
+        title: payload.title,
+        category: payload.category,
+        isOverall: payload.title?.toLowerCase().includes('overall') || payload.category?.toLowerCase().includes('overall')
+      });
+    });
+    
     const result: any[] = [];
     
     for (let i = 0; i < originalSlides.length; i++) {
@@ -98,16 +110,29 @@ export default function TastingSession() {
       const isOverallRating = payload.title?.toLowerCase().includes('overall') || 
                              payload.category?.toLowerCase().includes('overall');
       
+      console.log(`Checking slide ${i}:`, {
+        title: payload.title,
+        category: payload.category,
+        isOverallRating,
+        slideType: slide.type
+      });
+      
       // If this is an overall rating slide and not the last slide, add transition
       if (isOverallRating && i < originalSlides.length - 1) {
+        console.log('Found overall rating slide, looking for next wine...');
+        
         // Find the next wine by looking at subsequent slides
         const nextSlides = originalSlides.slice(i + 1);
         const nextWineSlide = nextSlides.find(s => s.packageWineId !== slide.packageWineId);
         
+        console.log('Next wine slide:', nextWineSlide?.packageWineId, 'vs current:', slide.packageWineId);
+        
         if (nextWineSlide && packageData) {
           const nextWine = (packageData as any).wines?.find((w: any) => w.id === nextWineSlide.packageWineId);
+          console.log('Found next wine:', nextWine);
+          
           if (nextWine) {
-            result.push({
+            const transition = {
               id: `transition-${nextWine.id}-${Date.now()}`,
               type: 'wine_transition' as any,
               title: `Wine: ${nextWine.wineName || nextWine.wine_name}`,
@@ -125,12 +150,16 @@ export default function TastingSession() {
               position: -1,
               sectionType: 'deep_dive',
               createdAt: null
-            });
+            };
+            
+            console.log('Adding wine transition:', transition);
+            result.push(transition);
           }
         }
       }
     }
     
+    console.log('Final processed slides:', result.length, 'total slides');
     return result;
   };
 
