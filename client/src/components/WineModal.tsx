@@ -63,6 +63,83 @@ const wineTypes = [
   { value: 'fortified', label: 'Fortified Wine' }
 ];
 
+const wineTemplates = [
+  {
+    name: 'Bordeaux Red Blend',
+    type: 'red',
+    grapeVarietals: ['Cabernet Sauvignon', 'Merlot', 'Cabernet Franc'],
+    region: 'Bordeaux, France',
+    characteristics: {
+      'Body': 'Full',
+      'Tannins': 8,
+      'Acidity': 7,
+      'Fruit Intensity': 8,
+      'Oak Influence': 7
+    },
+    description: 'A classic Bordeaux blend with structured tannins and complex fruit flavors',
+    imageUrl: 'https://images.unsplash.com/photo-1574505208894-83b2be2ee276?w=400'
+  },
+  {
+    name: 'Burgundy Pinot Noir',
+    type: 'red',
+    grapeVarietals: ['Pinot Noir'],
+    region: 'Burgundy, France',
+    characteristics: {
+      'Body': 'Medium',
+      'Tannins': 5,
+      'Acidity': 8,
+      'Fruit Intensity': 7,
+      'Oak Influence': 6
+    },
+    description: 'Elegant Pinot Noir with bright acidity and earthy undertones',
+    imageUrl: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400'
+  },
+  {
+    name: 'Chablis Chardonnay',
+    type: 'white',
+    grapeVarietals: ['Chardonnay'],
+    region: 'Chablis, France',
+    characteristics: {
+      'Body': 'Medium',
+      'Acidity': 9,
+      'Mineral Notes': true,
+      'Oak Influence': 2,
+      'Fruit Intensity': 6
+    },
+    description: 'Crisp, mineral-driven Chardonnay with citrus and green apple notes',
+    imageUrl: 'https://images.unsplash.com/photo-1587381420270-3e1a5b9e6904?w=400'
+  },
+  {
+    name: 'Champagne Blend',
+    type: 'sparkling',
+    grapeVarietals: ['Chardonnay', 'Pinot Noir', 'Pinot Meunier'],
+    region: 'Champagne, France',
+    characteristics: {
+      'Body': 'Light',
+      'Acidity': 9,
+      'Fruit Intensity': 7,
+      'Mineral Notes': true
+    },
+    description: 'Traditional Champagne method sparkling wine with fine bubbles',
+    imageUrl: 'https://images.unsplash.com/photo-1549418885-0da47c3b70fd?w=400'
+  },
+  {
+    name: 'Napa Valley Cabernet',
+    type: 'red',
+    grapeVarietals: ['Cabernet Sauvignon'],
+    region: 'Napa Valley, California',
+    characteristics: {
+      'Body': 'Full',
+      'Tannins': 9,
+      'Acidity': 6,
+      'Fruit Intensity': 9,
+      'Oak Influence': 8
+    },
+    description: 'Bold Napa Cabernet with rich fruit and robust tannins',
+    imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400'
+  }
+];
+
 const commonGrapes = [
   'Cabernet Sauvignon', 'Merlot', 'Pinot Noir', 'Syrah/Shiraz', 'Grenache',
   'Chardonnay', 'Sauvignon Blanc', 'Riesling', 'Pinot Grigio/Pinot Gris', 'Gewürztraminer'
@@ -183,6 +260,22 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
     }));
   };
 
+  const applyWineTemplate = (template: any) => {
+    setWineForm(prev => ({
+      ...prev,
+      wineName: template.name,
+      wineDescription: template.description,
+      wineImageUrl: template.imageUrl,
+      wineType: template.type,
+      vintage: new Date().getFullYear() - 2,
+      region: template.region,
+      producer: 'Premium Winery',
+      grapeVarietals: template.grapeVarietals,
+      alcoholContent: template.type === 'red' ? '14.5%' : template.type === 'white' ? '12.5%' : '13%',
+      expectedCharacteristics: template.characteristics
+    }));
+  };
+
   const addSlideFromTemplate = (template: SlideTemplate) => {
     const newSlide: SlideOrderItem = {
       id: `slide_${Date.now()}`,
@@ -246,6 +339,31 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
           </TabsList>
 
           <TabsContent value="details" className="space-y-4 mt-6">
+            {mode === 'create' && (
+              <div className="mb-6">
+                <Label className="text-white mb-2 block">Wine Templates</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {wineTemplates.map((template, index) => (
+                    <Card 
+                      key={index}
+                      className="bg-white/5 border-white/20 p-3 cursor-pointer hover:bg-white/10 transition-colors"
+                      onClick={() => applyWineTemplate(template)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                          <Wine className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-white font-medium text-sm">{template.name}</h4>
+                          <p className="text-white/60 text-xs">{template.region}</p>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+            
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <Label className="text-white">Wine Name</Label>

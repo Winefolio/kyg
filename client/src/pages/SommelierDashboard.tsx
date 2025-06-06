@@ -1001,7 +1001,7 @@ export default function SommelierDashboard() {
               createWineMutation.mutate({
                 ...data,
                 packageId: selectedPackage.id,
-              });
+              } as any);
             } else if (wineModalMode === "edit" && selectedWine) {
               updateWineMutation.mutate({ id: selectedWine.id, data });
             }
