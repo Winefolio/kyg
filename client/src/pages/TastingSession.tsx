@@ -50,7 +50,7 @@ export default function TastingSession() {
   });
 
   // Get package data
-  const { data: packageData } = useQuery({
+  const { data: packageData } = useQuery<{ wines: any[] }>({
     queryKey: [`/api/packages/${currentSession?.packageCode}`],
     enabled: !!currentSession?.packageCode
   });

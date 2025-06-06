@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Nose, ArrowUp, ArrowDown, RotateCcw } from "lucide-react";
+import { User, ArrowUp, ArrowDown, RotateCcw } from "lucide-react";
 
 interface AromaDiagramProps {
   isOpen: boolean;
@@ -26,7 +26,7 @@ export function AromaDiagram({ isOpen, onClose }: AromaDiagramProps) {
       >
         <div className="text-center space-y-6">
           <h2 className="text-xl font-bold text-white flex items-center justify-center gap-2">
-            <Nose className="w-6 h-6 text-purple-300" />
+            <User className="w-6 h-6 text-purple-300" />
             How to Smell Wine
           </h2>
           

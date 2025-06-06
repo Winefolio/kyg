@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { WineTermText } from "@/components/WineTastingTooltip";
 import { AromaDiagram } from "@/components/AromaDiagram";
-import { ChevronDown, ChevronUp, Nose, MessageCircle, HelpCircle } from "lucide-react";
+import { ChevronDown, ChevronUp, User, MessageCircle, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -70,7 +70,7 @@ export function EnhancedMultipleChoice({ question, value, onChange }: EnhancedMu
               className="text-purple-300 hover:text-white hover:bg-white/10 p-2"
               title="How to smell wine"
             >
-              <Nose className="w-5 h-5" />
+              <User className="w-5 h-5" />
             </Button>
           )}
         </div>
