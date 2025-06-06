@@ -982,24 +982,40 @@ export default function TastingSession() {
           >
             <Button
               onClick={handleNext}
-              className="w-full py-3 px-4 bg-gradient-button text-white font-semibold shadow-xl hover:shadow-2xl transition-all duration-300 text-sm relative overflow-hidden"
+              disabled={isNavigating || isTransitioningSection}
+              className="w-full py-3 px-4 bg-gradient-button text-white font-semibold shadow-xl hover:shadow-2xl transition-all duration-300 text-sm relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <motion.div
-                animate={{ x: [0, 2, 0] }}
+                animate={{ x: isNavigating ? 0 : [0, 2, 0] }}
                 transition={{ duration: 0.3 }}
                 className="flex items-center justify-center"
               >
-                {currentSlideIndex === slides.length - 1 ? 'Finish' : 'Next'}
-                <ArrowRight className="ml-1" size={14} />
+                {isNavigating ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full mr-2"
+                    />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    {currentSlideIndex === slides.length - 1 ? 'Finish' : 'Next'}
+                    <ArrowRight className="ml-1" size={14} />
+                  </>
+                )}
               </motion.div>
               
-              {/* Subtle shimmer effect */}
-              <motion.div
-                initial={{ x: "-100%" }}
-                animate={{ x: "100%" }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform skew-x-12"
-              />
+              {/* Subtle shimmer effect - only when not loading */}
+              {!isNavigating && (
+                <motion.div
+                  initial={{ x: "-100%" }}
+                  animate={{ x: "100%" }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform skew-x-12"
+                />
+              )}
             </Button>
           </motion.div>
         </div>
