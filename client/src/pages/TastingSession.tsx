@@ -84,89 +84,52 @@ export default function TastingSession() {
   // Process slides and inject wine transitions after overall ratings
   const processedSlides = () => {
     const originalSlides = slidesData?.slides || [];
-    if (!packageData || !packageData.wines) return originalSlides;
     
-    // Group slides by wine (packageWineId)
-    const slidesByWine: Record<string, any[]> = {};
-    originalSlides.forEach(slide => {
-      if (slide.packageWineId) {
-        if (!slidesByWine[slide.packageWineId]) {
-          slidesByWine[slide.packageWineId] = [];
-        }
-        slidesByWine[slide.packageWineId].push(slide);
-      }
-    });
-    
+    // For now, just return original slides and add transitions manually
+    // We'll identify overall rating slides and insert transitions after them
     const result: any[] = [];
-    const sortedWines = [...(packageData.wines || [])].sort((a: any, b: any) => a.position - b.position);
     
-    sortedWines.forEach((wine: any, wineIndex: number) => {
-      const wineSlides = slidesByWine[wine.id] || [];
+    for (let i = 0; i < originalSlides.length; i++) {
+      const slide = originalSlides[i];
+      result.push(slide);
       
-      // Sort slides by position and separate overall rating from other slides
-      const sortedSlides = [...wineSlides].sort((a, b) => a.position - b.position);
-      const overallRatingSlides = sortedSlides.filter(slide => {
-        const payload = slide.payload_json || {};
-        return payload.title?.toLowerCase().includes('overall') || 
-               payload.category?.toLowerCase().includes('overall');
-      });
-      const otherSlides = sortedSlides.filter(slide => {
-        const payload = slide.payload_json || {};
-        return !(payload.title?.toLowerCase().includes('overall') || 
-                payload.category?.toLowerCase().includes('overall'));
-      });
+      // Check if this is an overall rating slide
+      const payload = (slide as any).payloadJson || (slide as any).payload_json || {};
+      const isOverallRating = payload.title?.toLowerCase().includes('overall') || 
+                             payload.category?.toLowerCase().includes('overall');
       
-      // Add wine transition for first wine (intro)
-      if (wineIndex === 0) {
-        result.push({
-          id: `transition-${wine.id}-intro`,
-          type: 'wine_transition',
-          title: `Welcome to Wine ${wineIndex + 1}: ${wine.wine_name}`,
-          description: `Let's begin our wine tasting journey with ${wine.wine_name}`,
-          payload_json: {
-            wineName: wine.wine_name,
-            wineDescription: wine.wine_description,
-            wineImageUrl: wine.wine_image_url || 'https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600',
-            position: wine.position,
-            animationType: 'wine_glass_fill',
-            backgroundImage: wine.wine_image_url || 'https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600',
-            isFirstWine: true
-          },
-          package_wine_id: wine.id,
-          position: -1,
-          section_type: 'intro'
-        });
+      // If this is an overall rating slide and not the last slide, add transition
+      if (isOverallRating && i < originalSlides.length - 1) {
+        // Find the next wine by looking at subsequent slides
+        const nextSlides = originalSlides.slice(i + 1);
+        const nextWineSlide = nextSlides.find(s => s.packageWineId !== slide.packageWineId);
+        
+        if (nextWineSlide && packageData) {
+          const nextWine = (packageData as any).wines?.find((w: any) => w.id === nextWineSlide.packageWineId);
+          if (nextWine) {
+            result.push({
+              id: `transition-${nextWine.id}-${Date.now()}`,
+              type: 'wine_transition' as any,
+              title: `Wine: ${nextWine.wineName || nextWine.wine_name}`,
+              description: `Moving on to our next wine: ${nextWine.wineName || nextWine.wine_name}`,
+              payloadJson: {
+                wineName: nextWine.wineName || nextWine.wine_name,
+                wineDescription: nextWine.wineDescription || nextWine.wine_description,
+                wineImageUrl: nextWine.wineImageUrl || nextWine.wine_image_url || 'https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600',
+                position: nextWine.position,
+                animationType: 'wine_glass_fill',
+                backgroundImage: nextWine.wineImageUrl || nextWine.wine_image_url || 'https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600',
+                isFirstWine: false
+              },
+              packageWineId: nextWine.id,
+              position: -1,
+              sectionType: 'deep_dive',
+              createdAt: null
+            });
+          }
+        }
       }
-      
-      // Add other wine slides
-      result.push(...otherSlides);
-      
-      // Add overall rating slides
-      result.push(...overallRatingSlides);
-      
-      // Add wine transition after overall rating (except for last wine)
-      if (wineIndex < sortedWines.length - 1) {
-        const nextWine = sortedWines[wineIndex + 1];
-        result.push({
-          id: `transition-${nextWine.id}`,
-          type: 'wine_transition',
-          title: `Wine ${wineIndex + 2}: ${nextWine.wine_name}`,
-          description: `Moving on to our next wine: ${nextWine.wine_name}`,
-          payload_json: {
-            wineName: nextWine.wine_name,
-            wineDescription: nextWine.wine_description,
-            wineImageUrl: nextWine.wine_image_url || 'https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600',
-            position: nextWine.position,
-            animationType: 'wine_glass_fill',
-            backgroundImage: nextWine.wine_image_url || 'https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600',
-            isFirstWine: false
-          },
-          package_wine_id: nextWine.id,
-          position: -1,
-          section_type: 'deep_dive'
-        });
-      }
-    });
+    }
     
     return result;
   };
@@ -418,7 +381,7 @@ export default function TastingSession() {
     }
 
     // Handle wine transitions with glass filling animation
-    if (slide.type === 'wine_transition') {
+    if ((slide as any).type === 'wine_transition') {
       return (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -538,7 +501,7 @@ export default function TastingSession() {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.8, duration: 0.6 }}
               >
-                {slide.title}
+                {(slide as any).title}
               </motion.h2>
               
               <motion.p 
@@ -547,7 +510,7 @@ export default function TastingSession() {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 1, duration: 0.6 }}
               >
-                {slide.description}
+                {(slide as any).description}
               </motion.p>
             </motion.div>
             
