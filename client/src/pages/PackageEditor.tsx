@@ -309,7 +309,7 @@ export default function PackageEditor() {
               animate={{ x: 0 }}
               exit={{ x: -320 }}
               transition={{ type: "spring", damping: 20 }}
-              className="fixed lg:relative inset-y-0 left-0 z-50 w-80 bg-black/20 backdrop-blur-xl border-r border-white/10 overflow-y-auto"
+              className="fixed lg:relative inset-y-0 left-0 z-50 w-full sm:w-80 lg:w-96 bg-black/95 backdrop-blur-xl border-r border-white/10 overflow-y-auto"
             >
               <div className="p-4">
                 <div className="flex items-center justify-between mb-6">
@@ -450,7 +450,7 @@ export default function PackageEditor() {
         {/* Main Content Area */}
         <div className="flex-1 flex overflow-hidden">
           {/* Content Editor */}
-          <div className="flex-1 p-6 overflow-y-auto">
+          <div className="flex-1 p-4 md:p-6 overflow-y-auto">
             {activeSlide ? (
               <motion.div
                 key={activeSlide.id}
@@ -466,10 +466,10 @@ export default function PackageEditor() {
                     </Badge>
                   </div>
                   
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
                     {/* Basic Settings */}
                     <Card className="bg-white/5 border-white/10">
-                      <div className="p-6">
+                      <div className="p-4 md:p-6">
                         <h3 className="text-lg font-medium mb-4">Basic Settings</h3>
                         <div className="space-y-4">
                           <div>
