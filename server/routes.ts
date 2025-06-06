@@ -583,7 +583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Package usage analytics
       const packageUsage = await Promise.all(
         packages.map(async (pkg) => {
-          const packageSessions = sessions.filter(s => s.packageCode === pkg.code);
+          const packageSessions = sessions.filter(s => s.packageId === pkg.id);
           let packageParticipants = 0;
           for (const session of packageSessions) {
             const participants = await storage.getParticipantsBySessionId(session.id);
@@ -611,9 +611,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         packageUsage,
         recentActivity: sessions.slice(-5).map(s => ({
           sessionId: s.id,
-          packageCode: s.packageCode,
+          packageCode: packages.find(p => p.id === s.packageId)?.code || '',
           status: s.status,
-          createdAt: s.createdAt
+          createdAt: s.startedAt || new Date()
         }))
       };
 
