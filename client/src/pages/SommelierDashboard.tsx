@@ -1,400 +1,579 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { QrCode, Users, Wine, Plus, Copy, Download } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { 
+  Plus, 
+  Edit3, 
+  Trash2, 
+  Wine, 
+  Users, 
+  BarChart3,
+  Settings,
+  Copy,
+  Eye,
+  PlayCircle,
+  PauseCircle,
+  ArrowLeft,
+  Save,
+  X,
+  Upload,
+  Image as ImageIcon,
+  Video,
+  Volume2,
+  MessageSquare,
+  Star,
+  Clock,
+  Download
+} from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Link } from "wouter";
+
+interface Package {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  isActive: boolean;
+  createdAt: string;
+  wines: PackageWine[];
+}
+
+interface PackageWine {
+  id: string;
+  packageId: string;
+  wineName: string;
+  wineDescription: string;
+  wineImageUrl: string;
+  position: number;
+  slides: Slide[];
+}
+
+interface Slide {
+  id: string;
+  packageWineId: string;
+  position: number;
+  type: 'interlude' | 'question' | 'video_message' | 'audio_message' | 'media';
+  sectionType: 'intro' | 'deep_dive' | 'ending';
+  title: string;
+  description: string;
+  payloadJson: any;
+}
+
+interface Session {
+  id: string;
+  packageCode: string;
+  code: string;
+  participantCount: number;
+  status: string;
+  createdAt: string;
+}
+
+type TabType = 'packages' | 'sessions' | 'analytics';
+type PackageModalMode = 'create' | 'edit' | 'view';
 
 export default function SommelierDashboard() {
-  const [newSessionName, setNewSessionName] = useState("");
-  const [selectedPackage, setSelectedPackage] = useState("WINE01");
-  const [customCode, setCustomCode] = useState("");
-  const [packageName, setPackageName] = useState("");
-  const [packageDescription, setPackageDescription] = useState("");
-  const [isCreatingCustom, setIsCreatingCustom] = useState(false);
+  const [, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState<TabType>('packages');
+  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [packageModalOpen, setPackageModalOpen] = useState(false);
+  const [packageModalMode, setPackageModalMode] = useState<PackageModalMode>('view');
+  const [editingSlide, setEditingSlide] = useState<Slide | null>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Generate random wine codes
-  const generateRandomCode = () => {
-    const wineWords = ['VINE', 'GRAPE', 'CORK', 'VINO', 'CELLAR', 'BARREL', 'TANNIN'];
-    const randomWord = wineWords[Math.floor(Math.random() * wineWords.length)];
-    const randomNum = Math.floor(Math.random() * 999) + 1;
-    return `${randomWord}${randomNum.toString().padStart(3, '0')}`;
-  };
-
-  const generateShortCode = () => {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const numbers = '0123456789';
-    let result = '';
-    for (let i = 0; i < 3; i++) {
-      result += letters.charAt(Math.floor(Math.random() * letters.length));
-    }
-    for (let i = 0; i < 3; i++) {
-      result += numbers.charAt(Math.floor(Math.random() * numbers.length));
-    }
-    return result;
-  };
-
-  // Fetch available wine packages
-  const { data: packages = [] } = useQuery({
+  // Fetch packages
+  const { data: packages, isLoading: packagesLoading } = useQuery<Package[]>({
     queryKey: ['/api/packages'],
-    enabled: false // We'll create packages dynamically
+    enabled: true
   });
 
-  // Fetch active sessions
-  const { data: sessions = [] } = useQuery({
+  // Fetch sessions
+  const { data: sessions, isLoading: sessionsLoading } = useQuery<Session[]>({
     queryKey: ['/api/sessions'],
-    enabled: false // We'll implement this when needed
+    enabled: activeTab === 'sessions'
   });
 
-  // Create custom wine package
+  // Create package mutation
   const createPackageMutation = useMutation({
-    mutationFn: async ({ code, name, description }: { code: string; name: string; description: string }) => {
-      const response = await apiRequest('POST', '/api/packages', { code, name, description });
+    mutationFn: async (data: any) => {
+      const response = await fetch('/api/packages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!response.ok) throw new Error('Failed to create package');
       return response.json();
     },
-    onSuccess: (newPackage) => {
-      toast({
-        title: "Wine Package Created!",
-        description: `Package "${newPackage.code}" is ready for tastings`
-      });
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
-      setCustomCode("");
-      setPackageName("");
-      setPackageDescription("");
-      setIsCreatingCustom(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
+      setPackageModalOpen(false);
+      toast({ title: "Package created successfully" });
     }
   });
 
-  // Create new tasting session
-  const createSessionMutation = useMutation({
-    mutationFn: async () => {
-      // Create session using the correct endpoint that matches our backend
-      const sessionResponse = await apiRequest('POST', '/api/sessions', {
-        packageCode: selectedPackage,
-        hostName: 'Sommelier',
-        createHost: true
+  // Update package mutation
+  const updatePackageMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string, data: any }) => {
+      const response = await fetch(`/api/packages/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
       });
-      return sessionResponse.json();
+      if (!response.ok) throw new Error('Failed to update package');
+      return response.json();
     },
-    onSuccess: (sessionData) => {
-      toast({
-        title: "Session Created!",
-        description: `Your tasting session "${newSessionName}" is ready.`
-      });
-      setNewSessionName("");
-      // Navigate to host dashboard
-      window.location.href = `/host/${sessionData.session.id}/${sessionData.hostParticipantId}`;
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
+      setPackageModalOpen(false);
+      toast({ title: "Package updated successfully" });
     }
   });
 
-  const generateQRData = (code: string) => {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/join?code=${code}`;
+  // Delete package mutation
+  const deletePackageMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/packages/${id}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error('Failed to delete package');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
+      toast({ title: "Package deleted successfully" });
+    }
+  });
+
+  const openPackageModal = (mode: PackageModalMode, pkg?: Package) => {
+    setPackageModalMode(mode);
+    setSelectedPackage(pkg || null);
+    setPackageModalOpen(true);
   };
 
-  const copyQRLink = (code: string) => {
-    navigator.clipboard.writeText(generateQRData(code));
-    toast({
-      title: "Link Copied!",
-      description: "Share this link with your guests"
-    });
-  };
-
-  const downloadQR = (code: string, sessionName: string) => {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&data=${encodeURIComponent(generateQRData(code))}`;
-    
-    const link = document.createElement('a');
-    link.href = qrUrl;
-    link.download = `${sessionName.replace(/\s+/g, '-')}-qr-code.png`;
-    link.click();
-    
-    toast({
-      title: "QR Code Downloaded!",
-      description: "Print and display for your guests"
-    });
-  };
-
-  const viewQR = (code: string, sessionName: string) => {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&data=${encodeURIComponent(generateQRData(code))}`;
-    window.open(qrUrl, '_blank');
-    
-    toast({
-      title: "QR Code Opened!",
-      description: "QR code opened in new tab"
-    });
+  const copyPackageCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    toast({ title: "Package code copied to clipboard" });
   };
 
   return (
     <div className="min-h-screen bg-gradient-primary">
-      <div className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">
-            Sommelier Dashboard
-          </h1>
-          <p className="text-purple-200">
-            Create and manage your wine tasting experiences
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-          {/* Create Custom Wine Package */}
-          <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Wine size={20} />
-                Create Wine Package
-              </CardTitle>
-              <CardDescription className="text-purple-200">
-                Design your custom wine tasting experience
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="packageName" className="text-white">
-                  Package Name
-                </Label>
-                <Input
-                  id="packageName"
-                  value={packageName}
-                  onChange={(e) => setPackageName(e.target.value)}
-                  placeholder="e.g., Italian Reds Collection"
-                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="customCode" className="text-white">
-                  Package Code
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="customCode"
-                    value={customCode}
-                    onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
-                    placeholder="e.g., ITALY01"
-                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                    maxLength={10}
-                  />
-                  <Button
-                    onClick={() => setCustomCode(generateRandomCode())}
-                    variant="outline"
-                    className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                  >
-                    🎲 Random
-                  </Button>
-                  <Button
-                    onClick={() => setCustomCode(generateShortCode())}
-                    variant="outline"
-                    className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                  >
-                    Short
-                  </Button>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="packageDescription" className="text-white">
-                  Description
-                </Label>
-                <Input
-                  id="packageDescription"
-                  value={packageDescription}
-                  onChange={(e) => setPackageDescription(e.target.value)}
-                  placeholder="Describe your wine selection..."
-                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                />
-              </div>
-
+      {/* Header */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="sticky top-0 bg-gradient-primary/95 backdrop-blur-xl border-b border-white/10 z-40"
+      >
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
               <Button
-                onClick={() => createPackageMutation.mutate({ 
-                  code: customCode, 
-                  name: packageName, 
-                  description: packageDescription 
-                })}
-                disabled={!customCode.trim() || !packageName.trim() || createPackageMutation.isPending}
-                className="w-full bg-gradient-button text-white font-semibold"
+                variant="ghost"
+                onClick={() => setLocation('/')}
+                className="text-white hover:bg-white/10"
               >
-                {createPackageMutation.isPending ? "Creating..." : "Create Package & QR Code"}
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Home
               </Button>
-            </CardContent>
-          </Card>
-
-          {/* Create New Session */}
-          <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Plus size={20} />
-                Create Tasting Session
-              </CardTitle>
-              <CardDescription className="text-purple-200">
-                Start a session with existing wine packages
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="sessionName" className="text-white">
-                  Session Name
-                </Label>
-                <Input
-                  id="sessionName"
-                  value={newSessionName}
-                  onChange={(e) => setNewSessionName(e.target.value)}
-                  placeholder="e.g., Evening Bordeaux Tasting"
-                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                />
-              </div>
               
-              <div>
-                <Label htmlFor="winePackage" className="text-white">
-                  Wine Collection
-                </Label>
-                <select
-                  id="winePackage"
-                  value={selectedPackage}
-                  onChange={(e) => setSelectedPackage(e.target.value)}
-                  className="w-full mt-1 px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white"
-                >
-                  <option value="WINE01">Bordeaux Discovery Collection</option>
-                  {/* Add created packages dynamically here */}
-                </select>
+              <div className="flex items-center space-x-2">
+                <Wine className="w-6 h-6 text-white" />
+                <h1 className="text-white font-bold text-xl">Sommelier Dashboard</h1>
               </div>
-
-              <Button
-                onClick={() => createSessionMutation.mutate()}
-                disabled={!newSessionName.trim() || createSessionMutation.isPending}
-                className="w-full bg-gradient-button text-white font-semibold"
-              >
-                {createSessionMutation.isPending ? "Creating..." : "Create Session"}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Quick Start Guide */}
-          <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Wine size={20} />
-                How to Host a Tasting
-              </CardTitle>
-              <CardDescription className="text-purple-200">
-                Your step-by-step guide
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-purple-500 text-white text-sm flex items-center justify-center font-semibold mt-0.5">
-                    1
-                  </div>
-                  <div>
-                    <p className="text-white font-medium">Create Your Session</p>
-                    <p className="text-purple-200 text-sm">Give it a memorable name and select your wine collection</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-purple-500 text-white text-sm flex items-center justify-center font-semibold mt-0.5">
-                    2
-                  </div>
-                  <div>
-                    <p className="text-white font-medium">Generate QR Code</p>
-                    <p className="text-purple-200 text-sm">Download and print the QR code for easy guest access</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-purple-500 text-white text-sm flex items-center justify-center font-semibold mt-0.5">
-                    3
-                  </div>
-                  <div>
-                    <p className="text-white font-medium">Host Your Tasting</p>
-                    <p className="text-purple-200 text-sm">Guests scan to join and follow along with the guided experience</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+            
+            <Button
+              onClick={() => openPackageModal('create')}
+              className="bg-white text-purple-900 hover:bg-white/90"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Package
+            </Button>
+          </div>
         </div>
+      </motion.div>
 
-        {/* Demo Session for Testing */}
-        <div className="mt-8 max-w-4xl mx-auto">
-          <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <QrCode size={20} />
-                Demo Session Available
-              </CardTitle>
-              <CardDescription className="text-purple-200">
-                Test the platform with our ready-made Bordeaux tasting
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-4">
-                <Button
-                  onClick={() => copyQRLink('WINE01')}
-                  variant="outline"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  <Copy size={16} className="mr-2" />
-                  Copy Demo Link
-                </Button>
-                
-                <Button
-                  onClick={() => viewQR('WINE01', 'Bordeaux Demo')}
-                  variant="outline"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  <QrCode size={16} className="mr-2" />
-                  View QR Code
-                </Button>
-                
-                <Button
-                  onClick={() => downloadQR('WINE01', 'Bordeaux Demo')}
-                  variant="outline"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  <Download size={16} className="mr-2" />
-                  Download QR Code
-                </Button>
-                
-                <Link href="/join?code=WINE01">
-                  <Button className="bg-gradient-button text-white">
-                    <Users size={16} className="mr-2" />
-                    Join as Guest
-                  </Button>
-                </Link>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Tab Navigation */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex space-x-1 mb-8 bg-white/10 rounded-2xl p-1"
+        >
+          {[
+            { id: 'packages', label: 'Wine Packages', icon: Wine },
+            { id: 'sessions', label: 'Active Sessions', icon: Users },
+            { id: 'analytics', label: 'Analytics', icon: BarChart3 }
+          ].map(tab => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? "default" : "ghost"}
+              onClick={() => setActiveTab(tab.id as TabType)}
+              className={`flex-1 ${
+                activeTab === tab.id 
+                  ? 'bg-white text-purple-900' 
+                  : 'text-white hover:bg-white/10'
+              }`}
+            >
+              <tab.icon className="w-4 h-4 mr-2" />
+              {tab.label}
+            </Button>
+          ))}
+        </motion.div>
+
+        {/* Tab Content */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            {/* Packages Tab */}
+            {activeTab === 'packages' && (
+              <div className="space-y-6">
+                {packagesLoading ? (
+                  <div className="flex justify-center py-12">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full"
+                    />
+                  </div>
+                ) : packages?.length ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {packages.map((pkg, index) => (
+                      <motion.div
+                        key={pkg.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6 hover:border-white/30 transition-all duration-300">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-2">
+                                <h3 className="text-white font-semibold text-lg">{pkg.name}</h3>
+                                <Badge 
+                                  variant={pkg.isActive ? "default" : "secondary"}
+                                  className={pkg.isActive ? "bg-green-500/20 text-green-200" : "bg-gray-500/20 text-gray-200"}
+                                >
+                                  {pkg.isActive ? 'Active' : 'Inactive'}
+                                </Badge>
+                              </div>
+                              
+                              <div className="flex items-center space-x-2 mb-3">
+                                <code className="bg-white/10 text-purple-200 px-2 py-1 rounded text-sm font-mono">
+                                  {pkg.code}
+                                </code>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => copyPackageCode(pkg.code)}
+                                  className="p-1 h-auto text-white/60 hover:text-white hover:bg-white/10"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </Button>
+                              </div>
+                              
+                              <p className="text-white/70 text-sm mb-4 line-clamp-2">{pkg.description}</p>
+                              
+                              <div className="flex items-center space-x-4 text-sm text-white/60">
+                                <div className="flex items-center space-x-1">
+                                  <Wine className="w-4 h-4" />
+                                  <span>{pkg.wines?.length || 0} wines</span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  <Clock className="w-4 h-4" />
+                                  <span>{new Date(pkg.createdAt).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openPackageModal('view', pkg)}
+                              className="flex-1 text-white hover:bg-white/10"
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              View
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openPackageModal('edit', pkg)}
+                              className="flex-1 text-white hover:bg-white/10"
+                            >
+                              <Edit3 className="w-4 h-4 mr-2" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deletePackageMutation.mutate(pkg.id)}
+                              className="text-red-300 hover:bg-red-500/20"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-12 text-center">
+                    <Wine className="w-16 h-16 text-white/30 mx-auto mb-4" />
+                    <h3 className="text-white font-semibold text-lg mb-2">No Wine Packages</h3>
+                    <p className="text-white/70 mb-6">Create your first wine package to get started.</p>
+                    <Button onClick={() => openPackageModal('create')} className="bg-white text-purple-900 hover:bg-white/90">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Package
+                    </Button>
+                  </Card>
+                )}
               </div>
-              
-              <div className="mt-4 p-4 bg-white/5 rounded-lg">
-                <p className="text-purple-200 text-sm">
-                  <strong>Demo Code:</strong> WINE01 | 
-                  <strong className="ml-2">Experience:</strong> 8 interactive wine tasting questions covering aroma, taste, body, and overall rating
-                </p>
+            )}
+
+            {/* Sessions Tab */}
+            {activeTab === 'sessions' && (
+              <div className="space-y-6">
+                {sessionsLoading ? (
+                  <div className="flex justify-center py-12">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full"
+                    />
+                  </div>
+                ) : sessions?.length ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {sessions.map((session, index) => (
+                      <motion.div
+                        key={session.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <h3 className="text-white font-semibold text-lg">Session {session.code}</h3>
+                              <p className="text-white/70 text-sm">Package: {session.packageCode}</p>
+                            </div>
+                            <Badge 
+                              variant={session.status === 'active' ? "default" : "secondary"}
+                              className={session.status === 'active' ? "bg-green-500/20 text-green-200" : "bg-gray-500/20 text-gray-200"}
+                            >
+                              {session.status}
+                            </Badge>
+                          </div>
+                          
+                          <div className="flex items-center space-x-4 text-sm text-white/60 mb-4">
+                            <div className="flex items-center space-x-1">
+                              <Users className="w-4 h-4" />
+                              <span>{session.participantCount} participants</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Clock className="w-4 h-4" />
+                              <span>{new Date(session.createdAt).toLocaleTimeString()}</span>
+                            </div>
+                          </div>
+                          
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full text-white hover:bg-white/10"
+                          >
+                            <BarChart3 className="w-4 h-4 mr-2" />
+                            View Analytics
+                          </Button>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-12 text-center">
+                    <Users className="w-16 h-16 text-white/30 mx-auto mb-4" />
+                    <h3 className="text-white font-semibold text-lg mb-2">No Active Sessions</h3>
+                    <p className="text-white/70">Active tasting sessions will appear here.</p>
+                  </Card>
+                )}
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            )}
+
+            {/* Analytics Tab */}
+            {activeTab === 'analytics' && (
+              <div className="space-y-6">
+                <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6">
+                  <h3 className="text-white font-semibold text-lg mb-4">Analytics Overview</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-white">{packages?.length || 0}</div>
+                      <div className="text-white/70 text-sm">Total Packages</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-white">{sessions?.length || 0}</div>
+                      <div className="text-white/70 text-sm">Active Sessions</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-white">
+                        {sessions?.reduce((acc, s) => acc + s.participantCount, 0) || 0}
+                      </div>
+                      <div className="text-white/70 text-sm">Total Participants</div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
+
+      {/* Package Modal */}
+      {packageModalOpen && (
+        <PackageModal
+          mode={packageModalMode}
+          package={selectedPackage}
+          onClose={() => setPackageModalOpen(false)}
+          onSave={(data) => {
+            if (packageModalMode === 'create') {
+              createPackageMutation.mutate(data);
+            } else if (packageModalMode === 'edit' && selectedPackage) {
+              updatePackageMutation.mutate({ id: selectedPackage.id, data });
+            }
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// Package Modal Component
+interface PackageModalProps {
+  mode: PackageModalMode;
+  package: Package | null;
+  onClose: () => void;
+  onSave: (data: any) => void;
+}
+
+function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps) {
+  const [formData, setFormData] = useState({
+    name: pkg?.name || '',
+    code: pkg?.code || '',
+    description: pkg?.description || '',
+    isActive: pkg?.isActive ?? true
+  });
+
+  const handleSave = () => {
+    onSave(formData);
+  };
+
+  const isReadOnly = mode === 'view';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-white font-semibold text-xl">
+            {mode === 'create' ? 'Create Package' : mode === 'edit' ? 'Edit Package' : 'Package Details'}
+          </h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="text-white hover:bg-white/10"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+
+        <div className="space-y-6">
+          <div>
+            <Label className="text-white">Package Name</Label>
+            <Input
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              className="bg-white/10 border-white/20 text-white"
+              placeholder="Enter package name"
+              disabled={isReadOnly}
+            />
+          </div>
+
+          <div>
+            <Label className="text-white">Package Code</Label>
+            <Input
+              value={formData.code}
+              onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+              className="bg-white/10 border-white/20 text-white font-mono"
+              placeholder="WINE01"
+              disabled={isReadOnly}
+            />
+          </div>
+
+          <div>
+            <Label className="text-white">Description</Label>
+            <Textarea
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              className="bg-white/10 border-white/20 text-white"
+              placeholder="Describe this wine package"
+              disabled={isReadOnly}
+            />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              checked={formData.isActive}
+              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: checked }))}
+              disabled={isReadOnly}
+            />
+            <Label className="text-white">Active Package</Label>
+          </div>
+
+          {!isReadOnly && (
+            <div className="flex space-x-3">
+              <Button
+                onClick={handleSave}
+                className="flex-1 bg-white text-purple-900 hover:bg-white/90"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {mode === 'create' ? 'Create Package' : 'Save Changes'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={onClose}
+                className="flex-1 text-white hover:bg-white/10"
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

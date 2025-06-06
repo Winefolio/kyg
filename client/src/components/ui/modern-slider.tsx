@@ -167,9 +167,12 @@ export function ModernSlider({
             if (!trackRef.current) return;
             
             const rect = trackRef.current.getBoundingClientRect();
-            // Use offset instead of absolute position for better precision
+            // More stable drag calculation with damping for fast movements
+            const sensitivity = Math.min(1, 50 / Math.abs(info.velocity.x || 1)); // Reduce sensitivity for fast drags
+            const dampedDelta = info.delta.x * sensitivity;
+            
             const currentOffset = (percentage / 100) * rect.width;
-            const newOffset = Math.max(0, Math.min(rect.width, currentOffset + info.delta.x));
+            const newOffset = Math.max(0, Math.min(rect.width, currentOffset + dampedDelta));
             const newPercentage = (newOffset / rect.width) * 100;
             const newValue = Math.round((newPercentage / 100) * (max - min) + min);
             

@@ -441,5 +441,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  // Profile endpoints
+  app.get("/api/profile", async (req, res) => {
+    try {
+      // For now, return mock profile data - in production this would use authentication
+      const mockProfile = {
+        id: "user-123",
+        email: "wine.lover@example.com",
+        displayName: "Wine Enthusiast",
+        tastingSessions: [],
+        totalSessions: 0,
+        completedSessions: 0
+      };
+      
+      res.json(mockProfile);
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+      res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  });
+
+  app.get("/api/profile/recent-session", async (req, res) => {
+    try {
+      // Return the most recent completed session if any
+      res.json(null); // No recent session for now
+    } catch (error) {
+      console.error("Error fetching recent session:", error);
+      res.status(500).json({ message: "Failed to fetch recent session" });
+    }
+  });
+
   return httpServer;
 }
