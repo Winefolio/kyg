@@ -50,6 +50,8 @@ interface Slide {
   position: number;
   type: 'interlude' | 'question' | 'video_message' | 'audio_message' | 'media';
   sectionType: 'intro' | 'deep_dive' | 'ending';
+  title: string;
+  description: string;
   payloadJson: any;
 }
 
@@ -249,8 +251,8 @@ export default function VideoEditorPackageEditorNew() {
 
   // Update slide mutation
   const updateSlideMutation = useMutation({
-    mutationFn: async ({ slideId, data }: { slideId: string; data: any }) => {
-      const response = await fetch(`/api/slides/${slideId}`, {
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const response = await fetch(`/api/slides/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -310,6 +312,32 @@ export default function VideoEditorPackageEditorNew() {
     // Implement drag and drop reordering
   };
 
+  const handleSlideUpdate = (field: string, value: any) => {
+    if (!selectedSlide) return;
+    
+    const updatedData: any = {};
+    if (field === 'title' || field === 'description') {
+      updatedData[field] = value;
+    } else {
+      updatedData.payloadJson = {
+        ...selectedSlide.payloadJson,
+        [field]: value
+      };
+    }
+    
+    updateSlideMutation.mutate({ 
+      id: selectedSlide.id, 
+      data: updatedData 
+    });
+    
+    // Update local state
+    setSelectedSlide(prev => prev ? {
+      ...prev,
+      ...updatedData,
+      payloadJson: updatedData.payloadJson || prev.payloadJson
+    } : null);
+  };
+
   const renderSlidePreview = () => {
     if (!selectedSlide) {
       return (
@@ -317,7 +345,7 @@ export default function VideoEditorPackageEditorNew() {
           <div className="text-center text-gray-400">
             <Settings className="w-16 h-16 mx-auto mb-4 opacity-50" />
             <h3 className="text-xl font-semibold mb-2">No Slide Selected</h3>
-            <p>Select a slide from the left panel to preview and configure its properties.</p>
+            <p>Select a slide from the timeline to preview and edit.</p>
           </div>
         </div>
       );
@@ -326,34 +354,123 @@ export default function VideoEditorPackageEditorNew() {
     const payload = selectedSlide.payloadJson;
 
     if (selectedSlide.type === 'question') {
-      if (payload.question_type === 'multiple_choice') {
-        return (
-          <div className="flex-1 p-6 overflow-y-auto">
-            <MultipleChoiceQuestion
-              question={payload}
-              value={{ selected: [], notes: '' }}
-              onChange={() => {}}
-            />
+      return (
+        <div className="flex-1 p-6 overflow-y-auto">
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div className="bg-gradient-card backdrop-blur-xl rounded-2xl p-6 border border-white/20">
+              <h3 className="text-xl font-bold text-white mb-4">Question Slide Editor</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-white">Title</Label>
+                  <Input
+                    value={selectedSlide.title || ''}
+                    onChange={(e) => handleSlideUpdate('title', e.target.value)}
+                    className="bg-white/10 border-white/20 text-white mt-2"
+                  />
+                </div>
+                
+                <div>
+                  <Label className="text-white">Description</Label>
+                  <Textarea
+                    value={selectedSlide.description || ''}
+                    onChange={(e) => handleSlideUpdate('description', e.target.value)}
+                    className="bg-white/10 border-white/20 text-white mt-2"
+                  />
+                </div>
+                
+                <div>
+                  <Label className="text-white">Question Type</Label>
+                  <select
+                    value={payload.question_type || 'multiple_choice'}
+                    onChange={(e) => handleSlideUpdate('question_type', e.target.value)}
+                    className="w-full bg-white/10 border border-white/20 text-white mt-2 rounded px-3 py-2"
+                  >
+                    <option value="multiple_choice">Multiple Choice</option>
+                    <option value="scale">Rating Scale</option>
+                    <option value="text">Text Response</option>
+                  </select>
+                </div>
+
+                {payload.question_type === 'multiple_choice' && (
+                  <div>
+                    <Label className="text-white">Options</Label>
+                    <div className="space-y-2 mt-2">
+                      {payload.options?.map((option: any, index: number) => (
+                        <div key={index} className="flex gap-2">
+                          <Input
+                            value={option.text}
+                            onChange={(e) => {
+                              const newOptions = [...payload.options];
+                              newOptions[index] = { ...option, text: e.target.value };
+                              handleSlideUpdate('options', newOptions);
+                            }}
+                            className="bg-white/10 border-white/20 text-white"
+                            placeholder={`Option ${index + 1}`}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newOptions = payload.options.filter((_: any, i: number) => i !== index);
+                              handleSlideUpdate('options', newOptions);
+                            }}
+                            className="text-red-400 border-red-400 hover:bg-red-400/20"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const newOptions = [...(payload.options || []), { id: Date.now().toString(), text: 'New Option', description: '' }];
+                          handleSlideUpdate('options', newOptions);
+                        }}
+                        className="border-white/20 text-white hover:bg-white/10"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Option
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="mt-6 p-4 bg-gray-800/50 rounded-lg">
+                <h4 className="text-white font-medium mb-4">Preview</h4>
+                {payload.question_type === 'multiple_choice' ? (
+                  <MultipleChoiceQuestion
+                    question={payload}
+                    value={{ selected: [], notes: '' }}
+                    onChange={() => {}}
+                  />
+                ) : payload.question_type === 'scale' ? (
+                  <ScaleQuestion
+                    question={payload}
+                    value={5}
+                    onChange={() => {}}
+                  />
+                ) : (
+                  <div className="text-white">Text response question preview</div>
+                )}
+              </div>
+            </div>
           </div>
-        );
-      } else if (payload.question_type === 'scale') {
-        return (
-          <div className="flex-1 p-6 overflow-y-auto">
-            <ScaleQuestion
-              question={payload}
-              value={5}
-              onChange={() => {}}
-            />
-          </div>
-        );
-      }
+        </div>
+      );
     }
 
     return (
       <div className="flex-1 p-6 overflow-y-auto">
         <div className="bg-gradient-card backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
-          <h3 className="text-xl font-bold text-white mb-2">{payload.title}</h3>
-          <p className="text-white/70">{payload.description}</p>
+          <h3 className="text-xl font-bold text-white mb-2">{selectedSlide.title}</h3>
+          <p className="text-white/70">{selectedSlide.description}</p>
+          <div className="mt-4">
+            <Badge variant="outline" className="text-white">
+              {selectedSlide.type}
+            </Badge>
+          </div>
         </div>
       </div>
     );
@@ -383,8 +500,12 @@ export default function VideoEditorPackageEditorNew() {
               Back
             </Button>
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg font-bold text-white truncate">{packageData?.name}</h1>
-              <p className="text-gray-400 text-xs">Code: {packageData?.code}</p>
+              <h1 className="text-lg font-bold text-white truncate">
+                {selectedPackage?.name || packageData?.name || 'Slide Editor'}
+              </h1>
+              <p className="text-gray-400 text-xs">
+                {selectedPackage?.code || packageData?.code || 'No package selected'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
@@ -480,7 +601,7 @@ export default function VideoEditorPackageEditorNew() {
                     ) : (
                       <span>Choose wine...</span>
                     )}
-                    <ChevronUp className={`w-4 h-4 transition-transform ${wineDropdownOpen ? '' : 'rotate-180'}`} />
+                    <ChevronDown className={`w-4 h-4 transition-transform ${wineDropdownOpen ? 'rotate-180' : ''}`} />
                   </Button>
                   
                   {wineDropdownOpen && (
@@ -606,37 +727,16 @@ export default function VideoEditorPackageEditorNew() {
                           </div>
                         )}
                       </div>
-                                  </div>
-                                </motion.div>
-                              ))}
-                            </div>
-                          </SortableContext>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </DndContext>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Main Preview Area - Full Screen */}
-        <div className="flex-1 bg-gray-900/50 flex flex-col">
-          <div className="p-4 border-b border-gray-700 bg-gray-800/30">
-            <div className="flex items-center justify-between">
-              <h2 className="font-bold text-white flex items-center gap-2">
-                <Eye className="w-5 h-5" />
-                Live Preview
-              </h2>
-              {selectedSlide && (
-                <Badge variant="outline" className="text-white">
-                  {selectedSlide.type} - Position {selectedSlide.position}
-                </Badge>
-              )}
-            </div>
-          </div>
-
+        {/* Main Editor Area */}
+        <div className="flex-1 flex flex-col overflow-hidden">
           {renderSlidePreview()}
         </div>
       </div>
