@@ -1333,14 +1333,7 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
           />
         )}
 
-        {/* QR Code Modal */}
-        {showQRModal && selectedSessionForQR && (
-          <QRCodeModal
-            session={selectedSessionForQR}
-            isOpen={showQRModal}
-            onClose={() => setShowQRModal(false)}
-          />
-        )}
+
 
       </motion.div>
     </motion.div>
