@@ -121,6 +121,10 @@ export interface IStorage {
   updatePackageWine(id: string, data: Partial<InsertPackageWine>): Promise<PackageWine>;
   deletePackageWine(id: string): Promise<void>;
 
+  // Slide management for slide editor
+  updateSlide(id: string, data: Partial<InsertSlide>): Promise<Slide>;
+  deleteSlide(id: string): Promise<void>;
+
   // Glossary
   getGlossaryTerms(): Promise<GlossaryTerm[]>;
   createGlossaryTerm(term: InsertGlossaryTerm): Promise<GlossaryTerm>;
@@ -1081,6 +1085,19 @@ export class DatabaseStorage implements IStorage {
     await db.delete(slides).where(eq(slides.packageWineId, id));
     // Then delete the wine
     await db.delete(packageWines).where(eq(packageWines.id, id));
+  }
+
+  async updateSlide(id: string, data: Partial<InsertSlide>): Promise<Slide> {
+    const [updatedSlide] = await db
+      .update(slides)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(slides.id, id))
+      .returning();
+    return updatedSlide;
+  }
+
+  async deleteSlide(id: string): Promise<void> {
+    await db.delete(slides).where(eq(slides.id, id));
   }
 }
 
