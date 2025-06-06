@@ -145,19 +145,34 @@ export class DatabaseStorage implements IStorage {
 
     // Create the Bordeaux wine package
     const bordeauxPackage = await this.createPackage({
-      code: "PABLO1",
+      code: "WINE01",
       name: "Bordeaux Discovery Collection",
       description:
         "Explore the finest wines from France's most prestigious region",
       sommelierId: null,
     });
 
-    // Create two wines for this package
+    // Create additional packages
+    const tuscanyPackage = await this.createPackage({
+      code: "PABL01",
+      name: "Tuscany Masterclass",
+      description: "Journey through the rolling hills of Tuscany with exceptional Italian wines",
+      sommelierId: null,
+    });
+
+    const napaPackage = await this.createPackage({
+      code: "NAPA01",
+      name: "Napa Valley Prestige",
+      description: "Premium Californian wines from world-renowned Napa Valley",
+      sommelierId: null,
+    });
+
+    // Create wines for Bordeaux package
     const chateauMargaux = await this.createPackageWine({
       packageId: bordeauxPackage.id,
       position: 1,
       wineName: "2018 Château Margaux",
-      wineDescription: "A legendary Bordeaux from one of the most prestigious estates",
+      wineDescription: "A legendary Bordeaux from one of the most prestigious estates. Elegant and refined first growth with notes of blackcurrant, violets, and subtle oak.",
       wineImageUrl: "https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600"
     });
 
@@ -165,8 +180,50 @@ export class DatabaseStorage implements IStorage {
       packageId: bordeauxPackage.id,
       position: 2,
       wineName: "2019 Château Latour",
-      wineDescription: "A powerful and elegant wine from Pauillac's premier grand cru classé",
+      wineDescription: "A powerful and elegant wine from Pauillac's premier grand cru classé. Dense, structured wine with cassis, cedar, and graphite minerality.",
       wineImageUrl: "https://images.unsplash.com/photo-1584464491033-06628f3a6b7b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600"
+    });
+
+    const chateauYquem = await this.createPackageWine({
+      packageId: bordeauxPackage.id,
+      position: 3,
+      wineName: "2016 Château d'Yquem",
+      wineDescription: "Legendary Sauternes dessert wine with honeyed apricot and botrytis complexity. A masterpiece of sweetness and acidity balance.",
+      wineImageUrl: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600"
+    });
+
+    // Create wines for Tuscany package
+    const brunello = await this.createPackageWine({
+      packageId: tuscanyPackage.id,
+      position: 1,
+      wineName: "2017 Brunello di Montalcino",
+      wineDescription: "Noble Sangiovese expressing the terroir of Montalcino with cherry, leather, and herbs. A wine of exceptional depth and complexity.",
+      wineImageUrl: "https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600"
+    });
+
+    const chianti = await this.createPackageWine({
+      packageId: tuscanyPackage.id,
+      position: 2,
+      wineName: "2019 Chianti Classico Riserva",
+      wineDescription: "Traditional Tuscan blend with bright cherry, earth, and balanced oak aging. A perfect expression of Sangiovese.",
+      wineImageUrl: "https://images.unsplash.com/photo-1547595628-c61a29f496f0?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600"
+    });
+
+    // Create wines for Napa package
+    const opusOne = await this.createPackageWine({
+      packageId: napaPackage.id,
+      position: 1,
+      wineName: "2018 Opus One",
+      wineDescription: "Iconic Bordeaux-style blend showcasing Napa's finest terroir with cassis and cedar. A collaboration between two wine legends.",
+      wineImageUrl: "https://images.unsplash.com/photo-1474722883778-792e7990302f?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600"
+    });
+
+    const screamingEagle = await this.createPackageWine({
+      packageId: napaPackage.id,
+      position: 2,
+      wineName: "2019 Screaming Eagle Cabernet",
+      wineDescription: "Cult Napa Cabernet with intense concentration and power. Dark fruits, chocolate, and spice in perfect harmony.",
+      wineImageUrl: "https://images.unsplash.com/photo-1506377872b23-6629d73b7e06?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=600"
     });
 
     // Define slide templates that will be used for both wines
@@ -347,8 +404,8 @@ export class DatabaseStorage implements IStorage {
       },
     ];
 
-    // Create slides for both wines
-    for (const wine of [chateauMargaux, chateauLatour]) {
+    // Create slides for all wines
+    for (const wine of [chateauMargaux, chateauLatour, chateauYquem, brunello, chianti, opusOne, screamingEagle]) {
       for (const slideTemplate of slideTemplates) {
         // Add wine context to slide payload
         let payloadJson = { ...slideTemplate.payloadJson };
