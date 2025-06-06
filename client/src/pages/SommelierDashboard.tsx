@@ -1218,7 +1218,10 @@ function PackageModal({ mode, package: pkg, onClose, onSave }: PackageModalProps
                         {!isReadOnly && (
                           <div className="flex items-center space-x-2 ml-4">
                             <Button
-                              onClick={() => openSlideEditor(wine)}
+                              onClick={() => {
+                                setSelectedWineForSlides(wine);
+                                setSlideEditorOpen(true);
+                              }}
                               variant="ghost"
                               size="sm"
                               className="text-blue-400 hover:bg-blue-500/10"

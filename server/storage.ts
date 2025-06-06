@@ -1067,7 +1067,28 @@ export class DatabaseStorage implements IStorage {
 
   // Wine management methods for sommelier dashboard
   async createPackageWineFromDashboard(wine: InsertPackageWine): Promise<PackageWine> {
-    const [newWine] = await db.insert(packageWines).values(wine).returning();
+    // Get the next position for this package
+    const existingWines = await this.getPackageWines(wine.packageId);
+    const nextPosition = existingWines.length + 1;
+    
+    const wineData = {
+      ...wine,
+      position: nextPosition,
+      wineType: wine.wineType || 'Red',
+      vintage: wine.vintage || new Date().getFullYear() - 2,
+      region: wine.region || 'Napa Valley',
+      producer: wine.producer || 'Premium Winery',
+      grapeVarietals: wine.grapeVarietals || ['Cabernet Sauvignon'],
+      alcoholContent: wine.alcoholContent || '14.5%',
+      expectedCharacteristics: wine.expectedCharacteristics || {
+        aroma: ['Dark fruits', 'Oak', 'Vanilla'],
+        taste: ['Bold', 'Full-bodied', 'Smooth tannins'],
+        color: 'Deep ruby red',
+        finish: 'Long and elegant'
+      }
+    };
+    
+    const [newWine] = await db.insert(packageWines).values(wineData).returning();
     return newWine;
   }
 
