@@ -254,7 +254,7 @@ export default function PackageEditor() {
                                         onClick={() => handleAddSlide(wine.id, template)}
                                         title={template.description}
                                       >
-                                        <template.icon className="mr-2 h-3 w-3 flex-shrink-0 text-purple-400" />
+                                        {template.icon && <template.icon className="mr-2 h-3 w-3 flex-shrink-0 text-purple-400" />}
                                         <span className="truncate">Add {template.name}</span>
                                       </Button>
                                     ))}
