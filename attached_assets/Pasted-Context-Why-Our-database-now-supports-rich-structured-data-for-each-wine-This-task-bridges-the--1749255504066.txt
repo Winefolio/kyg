@@ -1,0 +1,31 @@
+Context & Why
+Our database now supports rich, structured data for each wine. This task bridges the gap between our powerful backend and the sommelier's user interface, directly addressing a core client requirement for creating detailed, customizable tasting experiences.
+What Needs to Be Done
+Expand the WineForm state in WineModal.tsx to include all new fields from the package_wines table schema.
+Add UI form controls within the modal for editing these new fields (vintage, region, producer, alcohol content, etc.).
+Implement a dynamic editor for the expectedCharacteristics JSONB field, allowing sommeliers to define expert ratings.
+Ensure the handleSubmit function correctly collects all new data from the form and passes it to the onSave callback.
+How to Implement
+File to Modify: client/src/components/WineModal.tsx
+Update WineForm Interface and Initial State:
+Modify the WineForm interface (around line 17) and the useState<WineForm> hook (around line 196) to include all new fields from the package_wines schema (wineType, vintage, region, producer, alcoholContent) and initialize them.
+Add Form Fields to the "Details" Tab:
+Inside the <TabsContent value="details"> section, within the grid layout (around line 370), add the following controls:
+An <Input> for producer.
+An <Input> for alcoholContent.
+A <Select> component for wineType using the wineTypes constant.
+Wire up all new inputs to the wineForm state using value and onChange handlers.
+Implement the "Characteristics" Tab Editor:
+Locate the <TabsContent value="characteristics"> section (around line 538).
+This tab is for editing the expectedCharacteristics JSONB field.
+Use the wineCharacteristics constant (defined around line 148) to dynamically render a grid of <Card> components for each characteristic.
+Inside each card, render the appropriate control based on scaleType:
+'numeric': an <Input type="number">.
+'descriptive': a <Select> populated with the options.
+'boolean': a <Switch>.
+The onChange handler for these controls must update the expectedCharacteristics object in the wineForm state. Use the addCharacteristic helper function as a reference.
+Guidance for the Target AI
+Reuse existing shadcn/ui components (<Card>, <Label>, <Input>, <Select>, <Switch>) to maintain visual consistency.
+The expectedCharacteristics editor should be a user-friendly grid, making it easy for the sommelier to see and edit all characteristics.
+Pay close attention to data types: vintage is a number, and expectedCharacteristics is a Record<string, any>. The form state management must handle these correctly.
+Do not hallucinate that the work is already done. The task is to add the missing form controls and logic to the WineModal.tsx file.
