@@ -27,6 +27,34 @@ export function ImageUpload({
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const compressImage = (file: File, maxWidth: number = 1200, quality: number = 0.8): Promise<string> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      const img = new Image();
+      
+      img.onload = () => {
+        // Calculate new dimensions while maintaining aspect ratio
+        let { width, height } = img;
+        
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Draw and compress
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedDataUrl);
+      };
+      
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       return;
@@ -34,14 +62,10 @@ export function ImageUpload({
 
     setIsUploading(true);
     try {
-      // Convert file to base64 data URL for immediate preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        onChange(dataUrl);
-        setIsUploading(false);
-      };
-      reader.readAsDataURL(file);
+      // Compress large images for better performance
+      const compressedDataUrl = await compressImage(file);
+      onChange(compressedDataUrl);
+      setIsUploading(false);
     } catch (error) {
       console.error('Error uploading image:', error);
       setIsUploading(false);
