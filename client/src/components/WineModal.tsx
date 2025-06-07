@@ -746,31 +746,25 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
               <div>
                 <Label className="text-white font-medium mb-3 block">Question Order</Label>
                 <div className="space-y-2">
-                  {slideOrder.map((slide, index) => (
-                    <Card key={slide.id} className="bg-white/5 border-white/10 p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <GripVertical className="w-4 h-4 text-white/40 cursor-grab" />
-                          <div>
-                            <h4 className="text-white font-medium text-sm">{slide.title}</h4>
-                            <p className="text-white/60 text-xs">
-                              {slide.sectionType} • Position {slide.position}
-                            </p>
-                          </div>
-                        </div>
-                        {!isReadOnly && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setSlideOrder(prev => prev.filter(s => s.id !== slide.id))}
-                            className="text-red-400 hover:bg-red-500/20"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
+                  <DndContext 
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext 
+                      items={slideOrder.map(slide => slide.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {slideOrder.map((slide) => (
+                        <SortableItem
+                          key={slide.id}
+                          slide={slide}
+                          onRemove={(id) => setSlideOrder(prev => prev.filter(s => s.id !== id))}
+                          isReadOnly={isReadOnly}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                   
                   {slideOrder.length === 0 && (
                     <div className="text-center py-8 text-white/50">
