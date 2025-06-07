@@ -53,18 +53,12 @@ const commonGrapes = [
   'Chardonnay', 'Sauvignon Blanc', 'Riesling', 'Pinot Grigio/Pinot Gris', 'Gewürztraminer'
 ];
 
-const wineCharacteristics = [
-  { name: 'Acidity', category: 'structure', scaleType: 'numeric', min: 1, max: 10 },
-  { name: 'Tannins', category: 'structure', scaleType: 'numeric', min: 1, max: 10 },
-  { name: 'Body', category: 'structure', scaleType: 'descriptive', options: ['Light', 'Medium', 'Full'] },
-  { name: 'Sweetness', category: 'structure', scaleType: 'descriptive', options: ['Bone Dry', 'Dry', 'Off-Dry', 'Medium Sweet', 'Sweet'] },
-  { name: 'Fruit Intensity', category: 'flavor', scaleType: 'numeric', min: 1, max: 10 },
-  { name: 'Oak Influence', category: 'flavor', scaleType: 'numeric', min: 1, max: 10 },
-  { name: 'Mineral Notes', category: 'flavor', scaleType: 'boolean' },
-  { name: 'Spice Notes', category: 'flavor', scaleType: 'boolean' }
-];
-
 export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalProps) {
+  // Fetch wine characteristics from API
+  const { data: wineCharacteristics, isLoading: characteristicsLoading } = useQuery<any[]>({
+    queryKey: ["/api/wine-characteristics"],
+    enabled: true,
+  });
   const [wineForm, setWineForm] = useState<WineForm>({
     wineName: wine?.wineName || '',
     wineDescription: wine?.wineDescription || '',
@@ -215,16 +209,58 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
                 <p className="text-white/70 text-sm">Set the "expert" answers for this wine. Taster responses will be compared against these values.</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {wineCharacteristics.map(char => (
-                  <Card key={char.name} className="bg-white/5 border-white/10 p-4">
-                    <div className="flex items-center justify-between mb-3"><Label className="text-white font-medium">{char.name}</Label><Badge variant="outline" className="text-xs border-white/20 text-white/70">{char.category}</Badge></div>
-                    <div className="space-y-3">
-                      {char.scaleType === 'numeric' && <Input type="number" min={char.min} max={char.max} value={wineForm.expectedCharacteristics[char.name] || ''} onChange={(e) => handleCharacteristicChange(char.name, parseInt(e.target.value))} className="bg-white/10 border-white/20 text-white" placeholder={`${char.min} - ${char.max}`} disabled={isReadOnly} />}
-                      {char.scaleType === 'descriptive' && <Select value={wineForm.expectedCharacteristics[char.name] || ''} onValueChange={(value) => handleCharacteristicChange(char.name, value)} disabled={isReadOnly}><SelectTrigger className="bg-white/10 border-white/20 text-white"><SelectValue placeholder="Select option" /></SelectTrigger><SelectContent>{char.options?.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>}
-                      {char.scaleType === 'boolean' && <div className="flex items-center space-x-2"><Switch checked={wineForm.expectedCharacteristics[char.name] || false} onCheckedChange={(checked) => handleCharacteristicChange(char.name, checked)} disabled={isReadOnly} /><Label className="text-white/70">Present</Label></div>}
-                    </div>
-                  </Card>
-                ))}
+                {characteristicsLoading ? (
+                  <p className="text-white/70">Loading...</p>
+                ) : (
+                  wineCharacteristics?.map((char: any) => (
+                    <Card key={char.name} className="bg-white/5 border-white/10 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <Label className="text-white font-medium">{char.name}</Label>
+                        <Badge variant="outline" className="text-xs border-white/20 text-white/70">{char.category}</Badge>
+                      </div>
+                      <div className="space-y-3">
+                        {char.scaleType === 'numeric' && (
+                          <Input 
+                            type="number" 
+                            min={char.scaleLabels?.min || 1} 
+                            max={char.scaleLabels?.max || 10} 
+                            value={wineForm.expectedCharacteristics[char.name] || ''} 
+                            onChange={(e) => handleCharacteristicChange(char.name, parseInt(e.target.value))} 
+                            className="bg-white/10 border-white/20 text-white" 
+                            placeholder={`${char.scaleLabels?.min || 1} - ${char.scaleLabels?.max || 10}`} 
+                            disabled={isReadOnly} 
+                          />
+                        )}
+                        {char.scaleType === 'descriptive' && (
+                          <Select 
+                            value={wineForm.expectedCharacteristics[char.name] || ''} 
+                            onValueChange={(value) => handleCharacteristicChange(char.name, value)} 
+                            disabled={isReadOnly}
+                          >
+                            <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                              <SelectValue placeholder="Select option" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {char.scaleLabels?.options?.map((option: string) => (
+                                <SelectItem key={option} value={option}>{option}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {char.scaleType === 'boolean' && (
+                          <div className="flex items-center space-x-2">
+                            <Switch 
+                              checked={wineForm.expectedCharacteristics[char.name] || false} 
+                              onCheckedChange={(checked) => handleCharacteristicChange(char.name, checked)} 
+                              disabled={isReadOnly} 
+                            />
+                            <Label className="text-white/70">Present</Label>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  ))
+                )}
               </div>
             </TabsContent>
           </Tabs>
