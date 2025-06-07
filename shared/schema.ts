@@ -135,6 +135,20 @@ export const sessions = pgTable("sessions", {
   shortCodeIdx: index("idx_sessions_short_code").on(table.short_code)
 }));
 
+// Session Wine Selections - allows hosts to choose specific wines for their session
+export const sessionWineSelections = pgTable("session_wine_selections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: uuid("session_id").notNull().references(() => sessions.id, { onDelete: "cascade" }),
+  packageWineId: uuid("package_wine_id").notNull().references(() => packageWines.id, { onDelete: "cascade" }),
+  position: integer("position").notNull(), // Custom order set by host
+  isIncluded: boolean("is_included").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow()
+}, (table) => ({
+  sessionIdIdx: index("idx_session_wines_session_id").on(table.sessionId),
+  sessionPositionIdx: index("idx_session_wines_session_position").on(table.sessionId, table.position),
+  uniqueSessionWine: index("idx_unique_session_wine").on(table.sessionId, table.packageWineId)
+}));
+
 // Participants table
 export const participants = pgTable("participants", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -281,6 +295,16 @@ export const insertGlossaryTermSchema = createInsertSchema(glossaryTerms, {
   updatedAt: true
 });
 
+export const insertSessionWineSelectionSchema = createInsertSchema(sessionWineSelections, {
+  sessionId: z.string(),
+  packageWineId: z.string(),
+  position: z.number(),
+  isIncluded: z.boolean().default(true)
+}).omit({
+  id: true,
+  createdAt: true
+});
+
 // Types
 export type Package = typeof packages.$inferSelect;
 export type InsertPackage = z.infer<typeof insertPackageSchema>;
@@ -290,6 +314,8 @@ export type Slide = typeof slides.$inferSelect;
 export type InsertSlide = z.infer<typeof insertSlideSchema>;
 export type Session = typeof sessions.$inferSelect;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
+export type SessionWineSelection = typeof sessionWineSelections.$inferSelect;
+export type InsertSessionWineSelection = z.infer<typeof insertSessionWineSelectionSchema>;
 export type Participant = typeof participants.$inferSelect;
 export type InsertParticipant = z.infer<typeof insertParticipantSchema>;
 export type Response = typeof responses.$inferSelect;
