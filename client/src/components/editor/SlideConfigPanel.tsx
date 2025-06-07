@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
 import type { Slide } from "@shared/schema";
 import { QuestionConfigForm } from "./QuestionConfigForm"; // We will use this
@@ -14,7 +15,7 @@ interface SlideConfigPanelProps {
     slide: Slide;
     onUpdate: (
         slideId: string,
-        updates: Partial<Pick<Slide, "payloadJson">>,
+        updates: Partial<Pick<Slide, "payloadJson" | "section_type">>,
     ) => void;
     onDelete: (slideId: string) => void;
 }
@@ -79,7 +80,7 @@ export function SlideConfigPanel({
                         <Label htmlFor="section-type" className="text-white/80">Section</Label>
                         <Select
                             value={slide.section_type || 'deep_dive'}
-                            onValueChange={(value) => onUpdate(slide.id, { section_type: value as any })}
+                            onValueChange={(value: string) => onUpdate(slide.id, { section_type: value })}
                         >
                             <SelectTrigger className="bg-white/10 border-white/20 text-white">
                                 <SelectValue />

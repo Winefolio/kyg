@@ -70,10 +70,10 @@ export const SLIDE_TEMPLATES = [
     description: 'Rate the tannin structure',
     payloadTemplate: {
       question: 'Rate the tannin level',
-      type: 'slider',
-      min: 1,
-      max: 10,
-      step: 1
+      question_type: 'scale',
+      scale_min: 1,
+      scale_max: 10,
+      scale_step: 1
     },
     isPublic: true
   },
@@ -86,10 +86,10 @@ export const SLIDE_TEMPLATES = [
     description: 'Assess the wine\'s acidity',
     payloadTemplate: {
       question: 'Rate the acidity level',
-      type: 'slider',
-      min: 1,
-      max: 10,
-      step: 1
+      question_type: 'scale',
+      scale_min: 1,
+      scale_max: 10,
+      scale_step: 1
     },
     isPublic: true
   },
@@ -117,10 +117,10 @@ export const SLIDE_TEMPLATES = [
     description: 'Rate your overall experience',
     payloadTemplate: {
       question: 'Rate your overall impression of this wine',
-      type: 'slider',
-      min: 1,
-      max: 10,
-      step: 1
+      question_type: 'scale',
+      scale_min: 1,
+      scale_max: 10,
+      scale_step: 1
     },
     isPublic: true
   }
