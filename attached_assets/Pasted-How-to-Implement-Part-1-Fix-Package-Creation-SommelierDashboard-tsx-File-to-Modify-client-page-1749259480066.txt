@@ -1,0 +1,93 @@
+How to Implement
+Part 1: Fix Package Creation (SommelierDashboard.tsx)
+File to Modify: client/pages/SommelierDashboard.tsx
+Add Imports: At the top of the file, add the necessary imports.
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+Use code with caution.
+TypeScript
+Implement Mutation: Inside the SommelierDashboard component function, define the createPackageMutation.
+export default function SommelierDashboard() {
+  // ... existing hooks (setLocation, useState, etc.)
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const createPackageMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/packages", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      setPackageModalOpen(false);
+      toast({
+        title: "Package created successfully",
+        description: "Your new wine package is ready to be configured.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error creating package",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // ... rest of the component
+}
+Use code with caution.
+TypeScript
+Update PackageModal onSave Prop: Find the <PackageModal> component in the return statement (around line 991). Change its onSave prop to call the mutation.
+// From this:
+onSave={(data) => {
+  if (packageModalMode === "create") {
+    createPackageMutation.mutate(data);
+  } else if (packageModalMode === "edit" && selectedPackage) {
+    updatePackageMutation.mutate({ id: selectedPackage.id, data });
+  }
+}}
+
+// To this (simplified for clarity, as this modal only creates):
+onSave={(data) => {
+  createPackageMutation.mutate(data);
+}}
+Use code with caution.
+Tsx
+Part 2: Implement "Click-Off" Sidebar Behavior
+File to Modify: client/pages/PackageEditor.tsx
+Add Backdrop Overlay: In the main div of the return statement (around line 254), insert the backdrop motion.div right after the main header and before the main content div.
+// client/pages/PackageEditor.tsx
+
+return (
+  <div className="min-h-screen bg-gradient-primary text-white">
+    {/* Header */}
+    <div className="sticky top-0 z-40 ...">
+      {/* ... header content ... */}
+    </div>
+
+    {/* ADD THIS BACKDROP OVERLAY */}
+    <AnimatePresence>
+      {sidebarOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden"
+        />
+      )}
+    </AnimatePresence>
+    
+    <div className="flex h-[calc(100vh-57px)]">
+      {/* Sidebar */}
+      {/* ... existing sidebar code ... */}
+
+      {/* Main Content Area */}
+      {/* ... existing main content code ... */}
+    </div>
+    
+    {/* ... existing modal code ... */}
+  </div>
+);
+Use code with caution.
+Tsx
+The key here is lg:hidden, which makes the backdrop only appear on smaller screens where the sidebar acts as an overlay.

@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+// client/src/components/WineModal.tsx
+
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,30 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  X, Save, Plus, Trash2, Wine, GripVertical, 
-  Settings, BarChart3, Target, Grape
-} from 'lucide-react';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import {
-  useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { X, Save, Plus, Trash2, Wine, Settings, BarChart3, Target, Grape } from 'lucide-react';
 
+// FORM INTERFACE
 interface WineForm {
   wineName: string;
   wineDescription: string;
@@ -47,32 +28,16 @@ interface WineForm {
   expectedCharacteristics: Record<string, any>;
 }
 
-interface SlideOrderItem {
-  id: string;
-  position: number;
-  type: string;
-  sectionType: string;
-  title: string;
-  description: string;
-}
-
-interface SlideTemplate {
-  id?: string;
-  name: string;
-  type: string;
-  sectionType: string;
-  payloadTemplate: any;
-  isPublic?: boolean;
-}
-
+// PROPS INTERFACE
 interface WineModalProps {
   mode: 'create' | 'edit' | 'view';
   wine: any | null;
   packageId: string;
   onClose: () => void;
-  onSave: (data: WineForm) => void;
+  onSave: (data: Partial<WineForm>) => void;
 }
 
+// CONSTANTS
 const wineTypes = [
   { value: 'red', label: 'Red Wine' },
   { value: 'white', label: 'White Wine' },
@@ -80,83 +45,6 @@ const wineTypes = [
   { value: 'sparkling', label: 'Sparkling' },
   { value: 'dessert', label: 'Dessert Wine' },
   { value: 'fortified', label: 'Fortified Wine' }
-];
-
-const wineTemplates = [
-  {
-    name: 'Bordeaux Red Blend',
-    type: 'red',
-    grapeVarietals: ['Cabernet Sauvignon', 'Merlot', 'Cabernet Franc'],
-    region: 'Bordeaux, France',
-    characteristics: {
-      'Body': 'Full',
-      'Tannins': 8,
-      'Acidity': 7,
-      'Fruit Intensity': 8,
-      'Oak Influence': 7
-    },
-    description: 'A classic Bordeaux blend with structured tannins and complex fruit flavors',
-    imageUrl: 'https://images.unsplash.com/photo-1574505208894-83b2be2ee276?w=400'
-  },
-  {
-    name: 'Burgundy Pinot Noir',
-    type: 'red',
-    grapeVarietals: ['Pinot Noir'],
-    region: 'Burgundy, France',
-    characteristics: {
-      'Body': 'Medium',
-      'Tannins': 5,
-      'Acidity': 8,
-      'Fruit Intensity': 7,
-      'Oak Influence': 6
-    },
-    description: 'Elegant Pinot Noir with bright acidity and earthy undertones',
-    imageUrl: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400'
-  },
-  {
-    name: 'Chablis Chardonnay',
-    type: 'white',
-    grapeVarietals: ['Chardonnay'],
-    region: 'Chablis, France',
-    characteristics: {
-      'Body': 'Medium',
-      'Acidity': 9,
-      'Mineral Notes': true,
-      'Oak Influence': 2,
-      'Fruit Intensity': 6
-    },
-    description: 'Crisp, mineral-driven Chardonnay with citrus and green apple notes',
-    imageUrl: 'https://images.unsplash.com/photo-1587381420270-3e1a5b9e6904?w=400'
-  },
-  {
-    name: 'Champagne Blend',
-    type: 'sparkling',
-    grapeVarietals: ['Chardonnay', 'Pinot Noir', 'Pinot Meunier'],
-    region: 'Champagne, France',
-    characteristics: {
-      'Body': 'Light',
-      'Acidity': 9,
-      'Fruit Intensity': 7,
-      'Mineral Notes': true
-    },
-    description: 'Traditional Champagne method sparkling wine with fine bubbles',
-    imageUrl: 'https://images.unsplash.com/photo-1549418885-0da47c3b70fd?w=400'
-  },
-  {
-    name: 'Napa Valley Cabernet',
-    type: 'red',
-    grapeVarietals: ['Cabernet Sauvignon'],
-    region: 'Napa Valley, California',
-    characteristics: {
-      'Body': 'Full',
-      'Tannins': 9,
-      'Acidity': 6,
-      'Fruit Intensity': 9,
-      'Oak Influence': 8
-    },
-    description: 'Bold Napa Cabernet with rich fruit and robust tannins',
-    imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400'
-  }
 ];
 
 const commonGrapes = [
@@ -175,223 +63,60 @@ const wineCharacteristics = [
   { name: 'Spice Notes', category: 'flavor', scaleType: 'boolean' }
 ];
 
-// SortableItem component for drag and drop
-function SortableItem({ slide, onRemove, isReadOnly }: { 
-  slide: SlideOrderItem; 
-  onRemove: (id: string) => void; 
-  isReadOnly: boolean; 
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-  } = useSortable({ id: slide.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  return (
-    <Card 
-      ref={setNodeRef} 
-      style={style} 
-      className="bg-white/5 border-white/10 p-3"
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div 
-            {...attributes} 
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing"
-          >
-            <GripVertical className="w-4 h-4 text-white/40" />
-          </div>
-          <div>
-            <h4 className="text-white font-medium text-sm">{slide.title}</h4>
-            <p className="text-white/60 text-xs">
-              {slide.sectionType} • Position {slide.position}
-            </p>
-          </div>
-        </div>
-        {!isReadOnly && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => onRemove(slide.id)}
-            className="text-red-400 hover:bg-red-500/20"
-          >
-            <Trash2 className="w-3 h-3" />
-          </Button>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-const slideTemplatePresets = [
-  {
-    name: 'Visual Assessment',
-    type: 'question',
-    sectionType: 'intro',
-    payloadTemplate: {
-      question: 'What do you observe about this wine\'s appearance?',
-      type: 'multiple_choice',
-      options: ['Clear', 'Hazy', 'Brilliant', 'Cloudy'],
-      allowMultiple: true
-    }
-  },
-  {
-    name: 'Aroma Intensity',
-    type: 'question',
-    sectionType: 'deep_dive',
-    payloadTemplate: {
-      question: 'Rate the intensity of the wine\'s aroma',
-      type: 'slider',
-      min: 1,
-      max: 10,
-      step: 1
-    }
-  },
-  {
-    name: 'Tasting Notes',
-    type: 'question',
-    sectionType: 'deep_dive',
-    payloadTemplate: {
-      question: 'Describe the flavors you taste',
-      type: 'text_input',
-      placeholder: 'e.g., dark fruit, vanilla, spice...'
-    }
-  }
-];
-
 export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalProps) {
   const [wineForm, setWineForm] = useState<WineForm>({
     wineName: wine?.wineName || '',
     wineDescription: wine?.wineDescription || '',
     wineImageUrl: wine?.wineImageUrl || '',
     position: wine?.position || 1,
-    wineType: wine?.wineType || '',
-    vintage: wine?.vintage || null,
+    wineType: wine?.wineType || 'red',
+    vintage: wine?.vintage || new Date().getFullYear() - 2,
     region: wine?.region || '',
     producer: wine?.producer || '',
     grapeVarietals: wine?.grapeVarietals || [],
-    alcoholContent: wine?.alcoholContent || '',
+    alcoholContent: wine?.alcoholContent || '13.5%',
     expectedCharacteristics: wine?.expectedCharacteristics || {}
   });
 
-  const [slideOrder, setSlideOrder] = useState<SlideOrderItem[]>([]);
-  const [availableTemplates] = useState<SlideTemplate[]>(slideTemplatePresets);
-  const [activeTab, setActiveTab] = useState<'details' | 'slides' | 'characteristics'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'characteristics'>('details');
   const [newGrape, setNewGrape] = useState('');
-
   const isReadOnly = mode === 'view';
-
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (active.id !== over?.id) {
-      setSlideOrder((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over?.id);
-
-        const newOrder = arrayMove(items, oldIndex, newIndex);
-        
-        // Update positions
-        const updatedOrder = newOrder.map((item, index) => ({
-          ...item,
-          position: index + 1
-        }));
-
-        return updatedOrder;
-      });
-    }
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("WineModal handleSubmit called");
-    console.log("Current wineForm:", wineForm);
-    console.log("Package ID:", packageId);
-    
-    const wineData = {
+    const dataToSave: Partial<WineForm> & { packageId?: string } = {
       ...wineForm,
-      wineName: wineForm.wineName || 'Untitled Wine'
+      vintage: wineForm.vintage ? Number(wineForm.vintage) : null,
     };
-    console.log("Final wine data being sent:", wineData);
-    onSave(wineData);
+    if (mode === 'create') {
+      dataToSave.packageId = packageId;
+    }
+    onSave(dataToSave);
+  };
+
+  const handleGrapeVarietalChange = (newVarietals: string[]) => {
+    setWineForm(prev => ({ ...prev, grapeVarietals: newVarietals }));
   };
 
   const addGrapeVarietal = (grape: string) => {
     if (grape && !wineForm.grapeVarietals.includes(grape)) {
-      setWineForm(prev => ({
-        ...prev,
-        grapeVarietals: [...prev.grapeVarietals, grape]
-      }));
+      handleGrapeVarietalChange([...wineForm.grapeVarietals, grape]);
       setNewGrape('');
     }
   };
 
-  const removeGrapeVarietal = (grape: string) => {
-    setWineForm(prev => ({
-      ...prev,
-      grapeVarietals: prev.grapeVarietals.filter(g => g !== grape)
-    }));
+  const removeGrapeVarietal = (grapeToRemove: string) => {
+    handleGrapeVarietalChange(wineForm.grapeVarietals.filter(g => g !== grapeToRemove));
   };
 
-  const addCharacteristic = (characteristic: any, value: any) => {
+  const handleCharacteristicChange = (name: string, value: any) => {
     setWineForm(prev => ({
       ...prev,
       expectedCharacteristics: {
         ...prev.expectedCharacteristics,
-        [characteristic.name]: value
+        [name]: value
       }
     }));
-  };
-
-  const removeCharacteristic = (name: string) => {
-    const { [name]: removed, ...rest } = wineForm.expectedCharacteristics;
-    setWineForm(prev => ({
-      ...prev,
-      expectedCharacteristics: rest
-    }));
-  };
-
-  const applyWineTemplate = (template: any) => {
-    setWineForm(prev => ({
-      ...prev,
-      wineName: template.name,
-      wineDescription: template.description,
-      wineImageUrl: template.imageUrl,
-      wineType: template.type,
-      vintage: new Date().getFullYear() - 2,
-      region: template.region,
-      producer: 'Premium Winery',
-      grapeVarietals: template.grapeVarietals,
-      alcoholContent: template.type === 'red' ? '14.5%' : template.type === 'white' ? '12.5%' : '13%',
-      expectedCharacteristics: template.characteristics
-    }));
-  };
-
-  const addSlideFromTemplate = (template: SlideTemplate) => {
-    const newSlide: SlideOrderItem = {
-      id: `slide_${Date.now()}`,
-      position: slideOrder.length + 1,
-      type: template.type,
-      sectionType: template.sectionType,
-      title: template.name,
-      description: template.payloadTemplate.question || template.name
-    };
-    setSlideOrder(prev => [...prev, newSlide]);
   };
 
   return (
@@ -406,397 +131,112 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-4 sm:p-6 w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col"
+        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-3xl p-4 sm:p-6 w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-2 border-b border-white/10 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <Wine className="w-6 h-6 text-purple-400" />
             <h2 className="text-white font-semibold text-xl">
-              {mode === 'create' ? 'Add Wine' : mode === 'edit' ? 'Edit Wine' : 'Wine Details'}
+              {mode === 'create' ? 'Add Wine' : 'Edit Wine'}
             </h2>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="text-white hover:bg-white/10"
-          >
+          <Button variant="ghost" size="sm" onClick={onClose} className="text-white hover:bg-white/10">
             <X className="w-4 h-4" />
           </Button>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)}>
+            <TabsList className="grid w-full grid-cols-2 bg-white/10 rounded-lg">
+              <TabsTrigger value="details" className="text-white data-[state=active]:bg-white/20">
+                <Settings className="w-4 h-4 mr-2" /> Details
+              </TabsTrigger>
+              <TabsTrigger value="characteristics" className="text-white data-[state=active]:bg-white/20">
+                <Target className="w-4 h-4 mr-2" /> Characteristics
+              </TabsTrigger>
+            </TabsList>
 
-        <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)}>
-          <TabsList className="grid w-full grid-cols-3 bg-white/10 rounded-lg">
-            <TabsTrigger value="details" className="text-white">
-              <Settings className="w-4 h-4 mr-2" />
-              Details
-            </TabsTrigger>
-            <TabsTrigger value="characteristics" className="text-white">
-              <Target className="w-4 h-4 mr-2" />
-              Characteristics
-            </TabsTrigger>
-            <TabsTrigger value="slides" className="text-white">
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Question Order
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="details" className="space-y-4 mt-6">
-            {mode === 'create' && (
-              <div className="mb-6">
-                <Label className="text-white mb-2 block">Wine Templates</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {wineTemplates.map((template, index) => (
-                    <Card 
-                      key={index}
-                      className="bg-white/5 border-white/20 p-3 cursor-pointer hover:bg-white/10 transition-colors"
-                      onClick={() => applyWineTemplate(template)}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                          <Wine className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="text-white font-medium text-sm">{template.name}</h4>
-                          <p className="text-white/60 text-xs">{template.region}</p>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
+            <TabsContent value="details" className="space-y-4 mt-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                <div>
+                  <Label className="text-white">Wine Name</Label>
+                  <Input value={wineForm.wineName} onChange={(e) => setWineForm(prev => ({ ...prev, wineName: e.target.value }))} className="bg-white/10 border-white/20 text-white" placeholder="Enter wine name" disabled={isReadOnly} />
+                </div>
+                <div>
+                  <Label className="text-white">Wine Type</Label>
+                  <Select value={wineForm.wineType} onValueChange={(value) => setWineForm(prev => ({ ...prev, wineType: value }))} disabled={isReadOnly}>
+                    <SelectTrigger className="bg-white/10 border-white/20 text-white"><SelectValue placeholder="Select wine type" /></SelectTrigger>
+                    <SelectContent>{wineTypes.map(type => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-white">Vintage</Label>
+                  <Input type="number" value={wineForm.vintage || ''} onChange={(e) => setWineForm(prev => ({ ...prev, vintage: e.target.value ? parseInt(e.target.value) : null }))} className="bg-white/10 border-white/20 text-white" placeholder="e.g., 2020" disabled={isReadOnly} />
+                </div>
+                <div>
+                  <Label className="text-white">Alcohol Content</Label>
+                  <Input value={wineForm.alcoholContent} onChange={(e) => setWineForm(prev => ({ ...prev, alcoholContent: e.target.value }))} className="bg-white/10 border-white/20 text-white" placeholder="e.g., 13.5%" disabled={isReadOnly} />
+                </div>
+                <div>
+                  <Label className="text-white">Producer</Label>
+                  <Input value={wineForm.producer} onChange={(e) => setWineForm(prev => ({ ...prev, producer: e.target.value }))} className="bg-white/10 border-white/20 text-white" placeholder="Vineyard name" disabled={isReadOnly} />
+                </div>
+                <div>
+                  <Label className="text-white">Region</Label>
+                  <Input value={wineForm.region} onChange={(e) => setWineForm(prev => ({ ...prev, region: e.target.value }))} className="bg-white/10 border-white/20 text-white" placeholder="e.g., Napa Valley, California" disabled={isReadOnly} />
                 </div>
               </div>
-            )}
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               <div>
-                <Label className="text-white">Wine Name</Label>
-                <Input
-                  value={wineForm.wineName}
-                  onChange={(e) => setWineForm(prev => ({ ...prev, wineName: e.target.value }))}
-                  className="bg-white/10 border-white/20 text-white"
-                  placeholder="Enter wine name"
-                  disabled={isReadOnly}
-                />
+                <Label className="text-white">Description</Label>
+                <Textarea value={wineForm.wineDescription} onChange={(e) => setWineForm(prev => ({ ...prev, wineDescription: e.target.value }))} className="bg-white/10 border-white/20 text-white" placeholder="Describe the wine..." disabled={isReadOnly} />
               </div>
-
               <div>
-                <Label className="text-white">Wine Type</Label>
-                <Select
-                  value={wineForm.wineType}
-                  onValueChange={(value) => setWineForm(prev => ({ ...prev, wineType: value }))}
-                  disabled={isReadOnly}
-                >
-                  <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                    <SelectValue placeholder="Select wine type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {wineTypes.map(type => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-white">Image URL</Label>
+                <Input value={wineForm.wineImageUrl} onChange={(e) => setWineForm(prev => ({ ...prev, wineImageUrl: e.target.value }))} className="bg-white/10 border-white/20 text-white" placeholder="https://example.com/wine-image.jpg" disabled={isReadOnly} />
               </div>
-
               <div>
-                <Label className="text-white">Vintage</Label>
-                <Input
-                  type="number"
-                  value={wineForm.vintage || ''}
-                  onChange={(e) => setWineForm(prev => ({ ...prev, vintage: e.target.value ? parseInt(e.target.value) : null }))}
-                  className="bg-white/10 border-white/20 text-white"
-                  placeholder="2020"
-                  disabled={isReadOnly}
-                />
-              </div>
-
-              <div>
-                <Label className="text-white">Alcohol Content</Label>
-                <Input
-                  value={wineForm.alcoholContent}
-                  onChange={(e) => setWineForm(prev => ({ ...prev, alcoholContent: e.target.value }))}
-                  className="bg-white/10 border-white/20 text-white"
-                  placeholder="13.5%"
-                  disabled={isReadOnly}
-                />
-              </div>
-
-              <div>
-                <Label className="text-white">Producer</Label>
-                <Input
-                  value={wineForm.producer}
-                  onChange={(e) => setWineForm(prev => ({ ...prev, producer: e.target.value }))}
-                  className="bg-white/10 border-white/20 text-white"
-                  placeholder="Vineyard name"
-                  disabled={isReadOnly}
-                />
-              </div>
-
-              <div>
-                <Label className="text-white">Region</Label>
-                <Input
-                  value={wineForm.region}
-                  onChange={(e) => setWineForm(prev => ({ ...prev, region: e.target.value }))}
-                  className="bg-white/10 border-white/20 text-white"
-                  placeholder="Napa Valley, California"
-                  disabled={isReadOnly}
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label className="text-white">Description</Label>
-              <Textarea
-                value={wineForm.wineDescription}
-                onChange={(e) => setWineForm(prev => ({ ...prev, wineDescription: e.target.value }))}
-                className="bg-white/10 border-white/20 text-white"
-                placeholder="Describe the wine..."
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div>
-              <Label className="text-white">Image URL</Label>
-              <Input
-                value={wineForm.wineImageUrl}
-                onChange={(e) => setWineForm(prev => ({ ...prev, wineImageUrl: e.target.value }))}
-                className="bg-white/10 border-white/20 text-white"
-                placeholder="https://example.com/wine-image.jpg"
-                disabled={isReadOnly}
-              />
-            </div>
-
-            {/* Grape Varietals */}
-            <div>
-              <Label className="text-white">Grape Varietals</Label>
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {wineForm.grapeVarietals.map((grape, index) => (
-                    <Badge
-                      key={index}
-                      variant="outline"
-                      className="bg-purple-500/20 border-purple-400/30 text-purple-200"
-                    >
-                      <Grape className="w-3 h-3 mr-1" />
-                      {grape}
-                      {!isReadOnly && (
-                        <button
-                          onClick={() => removeGrapeVarietal(grape)}
-                          className="ml-2 hover:text-red-400"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </Badge>
-                  ))}
-                </div>
-                
-                {!isReadOnly && (
+                <Label className="text-white">Grape Varietals</Label>
+                <div className="space-y-3 mt-2">
+                  <div className="flex flex-wrap gap-2">{wineForm.grapeVarietals.map((grape, index) => <Badge key={index} variant="outline" className="bg-purple-500/20 border-purple-400/30 text-purple-200"><Grape className="w-3 h-3 mr-1" />{grape}<button onClick={() => removeGrapeVarietal(grape)} className="ml-2 hover:text-red-400"><X className="w-3 h-3" /></button></Badge>)}</div>
                   <div className="flex space-x-2">
-                    <Select onValueChange={addGrapeVarietal}>
-                      <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                        <SelectValue placeholder="Select grape varietal" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {commonGrapes
-                          .filter(grape => !wineForm.grapeVarietals.includes(grape))
-                          .map(grape => (
-                            <SelectItem key={grape} value={grape}>
-                              {grape}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="flex space-x-2">
-                      <Input
-                        value={newGrape}
-                        onChange={(e) => setNewGrape(e.target.value)}
-                        className="bg-white/10 border-white/20 text-white"
-                        placeholder="Custom grape"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            addGrapeVarietal(newGrape);
-                          }
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        onClick={() => addGrapeVarietal(newGrape)}
-                        className="bg-purple-600 hover:bg-purple-700"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    <Select onValueChange={addGrapeVarietal}><SelectTrigger className="bg-white/10 border-white/20 text-white"><SelectValue placeholder="Select common grape" /></SelectTrigger><SelectContent>{commonGrapes.filter(g => !wineForm.grapeVarietals.includes(g)).map(grape => <SelectItem key={grape} value={grape}>{grape}</SelectItem>)}</SelectContent></Select>
+                    <Input value={newGrape} onChange={(e) => setNewGrape(e.target.value)} className="bg-white/10 border-white/20 text-white" placeholder="Or type custom grape" onKeyPress={(e) => { if (e.key === 'Enter') { e.preventDefault(); addGrapeVarietal(newGrape); } }} />
+                    <Button type="button" onClick={() => addGrapeVarietal(newGrape)} className="bg-purple-600 hover:bg-purple-700"><Plus className="w-4 h-4" /></Button>
                   </div>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="characteristics" className="space-y-6 mt-6">
-            <div className="mb-4">
-              <h3 className="text-white font-semibold mb-2">Expected Wine Characteristics</h3>
-              <p className="text-white/70 text-sm">
-                Set expected values for wine characteristics to track user accuracy in tastings.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {wineCharacteristics.map(characteristic => (
-                <Card key={characteristic.name} className="bg-white/5 border-white/10 p-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-white font-medium">{characteristic.name}</Label>
-                      <Badge variant="outline" className="text-xs border-white/20 text-white/70">
-                        {characteristic.category}
-                      </Badge>
-                    </div>
-
-                    {characteristic.scaleType === 'numeric' && (
-                      <div>
-                        <Input
-                          type="number"
-                          min={characteristic.min}
-                          max={characteristic.max}
-                          value={wineForm.expectedCharacteristics[characteristic.name] || ''}
-                          onChange={(e) => addCharacteristic(characteristic, parseInt(e.target.value))}
-                          className="bg-white/10 border-white/20 text-white"
-                          placeholder={`${characteristic.min}-${characteristic.max}`}
-                          disabled={isReadOnly}
-                        />
-                      </div>
-                    )}
-
-                    {characteristic.scaleType === 'descriptive' && (
-                      <Select
-                        value={wineForm.expectedCharacteristics[characteristic.name] || ''}
-                        onValueChange={(value) => addCharacteristic(characteristic, value)}
-                        disabled={isReadOnly}
-                      >
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                          <SelectValue placeholder="Select option" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {characteristic.options?.map(option => (
-                            <SelectItem key={option} value={option}>
-                              {option}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-
-                    {characteristic.scaleType === 'boolean' && (
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={wineForm.expectedCharacteristics[characteristic.name] || false}
-                          onCheckedChange={(checked) => addCharacteristic(characteristic, checked)}
-                          disabled={isReadOnly}
-                        />
-                        <Label className="text-white/70">Present</Label>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="slides" className="space-y-6 mt-6">
-            <div className="mb-4">
-              <h3 className="text-white font-semibold mb-2">Question Order</h3>
-              <p className="text-white/70 text-sm">
-                Customize the order and type of questions for this wine tasting.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Available Templates */}
-              <div>
-                <Label className="text-white font-medium mb-3 block">Available Question Templates</Label>
-                <div className="space-y-2">
-                  {availableTemplates.map(template => (
-                    <Card key={template.id} className="bg-white/5 border-white/10 p-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="text-white font-medium text-sm">{template.name}</h4>
-                          <p className="text-white/60 text-xs">{template.sectionType}</p>
-                        </div>
-                        {!isReadOnly && (
-                          <Button
-                            size="sm"
-                            onClick={() => addSlideFromTemplate(template)}
-                            className="bg-purple-600 hover:bg-purple-700"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
                 </div>
               </div>
+            </TabsContent>
 
-              {/* Current Slide Order */}
-              <div>
-                <Label className="text-white font-medium mb-3 block">Question Order</Label>
-                <div className="space-y-2">
-                  <DndContext 
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <SortableContext 
-                      items={slideOrder.map(slide => slide.id)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {slideOrder.map((slide) => (
-                        <SortableItem
-                          key={slide.id}
-                          slide={slide}
-                          onRemove={(id) => setSlideOrder(prev => prev.filter(s => s.id !== id))}
-                          isReadOnly={isReadOnly}
-                        />
-                      ))}
-                    </SortableContext>
-                  </DndContext>
-                  
-                  {slideOrder.length === 0 && (
-                    <div className="text-center py-8 text-white/50">
-                      <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p>No questions added yet</p>
-                      <p className="text-xs">Add templates from the left to customize the tasting experience</p>
-                    </div>
-                  )}
-                </div>
+            <TabsContent value="characteristics" className="space-y-6 mt-6">
+              <div className="mb-4">
+                <h3 className="text-white font-semibold mb-2">Expected Wine Characteristics</h3>
+                <p className="text-white/70 text-sm">Set the "expert" answers for this wine. Taster responses will be compared against these values.</p>
               </div>
-            </div>
-          </TabsContent>
-        </Tabs>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {wineCharacteristics.map(char => (
+                  <Card key={char.name} className="bg-white/5 border-white/10 p-4">
+                    <div className="flex items-center justify-between mb-3"><Label className="text-white font-medium">{char.name}</Label><Badge variant="outline" className="text-xs border-white/20 text-white/70">{char.category}</Badge></div>
+                    <div className="space-y-3">
+                      {char.scaleType === 'numeric' && <Input type="number" min={char.min} max={char.max} value={wineForm.expectedCharacteristics[char.name] || ''} onChange={(e) => handleCharacteristicChange(char.name, parseInt(e.target.value))} className="bg-white/10 border-white/20 text-white" placeholder={`${char.min} - ${char.max}`} disabled={isReadOnly} />}
+                      {char.scaleType === 'descriptive' && <Select value={wineForm.expectedCharacteristics[char.name] || ''} onValueChange={(value) => handleCharacteristicChange(char.name, value)} disabled={isReadOnly}><SelectTrigger className="bg-white/10 border-white/20 text-white"><SelectValue placeholder="Select option" /></SelectTrigger><SelectContent>{char.options?.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>}
+                      {char.scaleType === 'boolean' && <div className="flex items-center space-x-2"><Switch checked={wineForm.expectedCharacteristics[char.name] || false} onCheckedChange={(checked) => handleCharacteristicChange(char.name, checked)} disabled={isReadOnly} /><Label className="text-white/70">Present</Label></div>}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+          </Tabs>
 
-        {!isReadOnly && (
-          <div className="flex space-x-3 mt-8 pt-6 border-t border-white/20">
-            <Button
-              onClick={handleSubmit}
-              className="flex-1 bg-white text-purple-900 hover:bg-white/90"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              {mode === 'create' ? 'Add Wine' : 'Save Changes'}
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={onClose}
-              className="flex-1 text-white hover:bg-white/10"
-            >
-              Cancel
-            </Button>
-          </div>
-        )}
+          {!isReadOnly && (
+            <div className="flex space-x-3 mt-8 pt-6 border-t border-white/20">
+              <Button onClick={handleSubmit} className="flex-1 bg-white text-purple-900 hover:bg-white/90">
+                <Save className="w-4 h-4 mr-2" />
+                {mode === 'create' ? 'Add Wine' : 'Save Changes'}
+              </Button>
+              <Button variant="ghost" onClick={onClose} className="flex-1 text-white hover:bg-white/10">Cancel</Button>
+            </div>
+          )}
         </div>
       </motion.div>
     </motion.div>
