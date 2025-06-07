@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { WineModal } from "@/components/WineModal";
 import { SlideEditor } from "@/components/SlideEditor";
 import { QRCodeModal } from "@/components/QRCodeModal";
+import { ImageUpload } from "@/components/ui/image-upload";
 import {
   WINE_TEMPLATES,
   getWineImage,
@@ -1052,6 +1053,7 @@ function PackageModal({
   const [formData, setFormData] = useState({
     name: pkg?.name || "",
     description: pkg?.description || "",
+    imageUrl: pkg?.imageUrl || "",
     isActive: pkg?.isActive ?? true,
   });
 
@@ -1114,6 +1116,14 @@ function PackageModal({
               rows={3}
             />
           </div>
+
+          <ImageUpload
+            label="Package Image"
+            value={formData.imageUrl}
+            onChange={(imageUrl) => setFormData({ ...formData, imageUrl })}
+            disabled={mode === "view"}
+            placeholder="Upload an image for the package"
+          />
 
           <div className="flex items-center space-x-2">
             <Switch

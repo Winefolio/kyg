@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { X, Save, Plus, Trash2, Wine, Settings, BarChart3, Target, Grape } from 'lucide-react';
+import { ImageUpload } from '@/components/ui/image-upload';
 
 // FORM INTERFACE
 interface WineForm {
@@ -186,10 +187,13 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
                 <Label className="text-white">Description</Label>
                 <Textarea value={wineForm.wineDescription} onChange={(e) => setWineForm(prev => ({ ...prev, wineDescription: e.target.value }))} className="bg-white/10 border-white/20 text-white" placeholder="Describe the wine..." disabled={isReadOnly} />
               </div>
-              <div>
-                <Label className="text-white">Image URL</Label>
-                <Input value={wineForm.wineImageUrl} onChange={(e) => setWineForm(prev => ({ ...prev, wineImageUrl: e.target.value }))} className="bg-white/10 border-white/20 text-white" placeholder="https://example.com/wine-image.jpg" disabled={isReadOnly} />
-              </div>
+              <ImageUpload
+                label="Wine Image"
+                value={wineForm.wineImageUrl}
+                onChange={(imageUrl) => setWineForm(prev => ({ ...prev, wineImageUrl: imageUrl }))}
+                disabled={isReadOnly}
+                placeholder="Upload an image of the wine"
+              />
               <div>
                 <Label className="text-white">Grape Varietals</Label>
                 <div className="space-y-3 mt-2">
