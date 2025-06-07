@@ -64,6 +64,7 @@ export interface IStorage {
   // Packages
   getPackageByCode(code: string): Promise<Package | undefined>;
   createPackage(pkg: InsertPackage): Promise<Package>;
+  generateUniqueShortCode(length: number): Promise<string>;
 
   // Package Wines
   createPackageWine(wine: InsertPackageWine): Promise<PackageWine>;
@@ -446,6 +447,42 @@ export class DatabaseStorage implements IStorage {
       .where(eq(packages.code, code.toUpperCase()))
       .limit(1);
     return result[0];
+  }
+
+  async generateUniqueShortCode(length: number = 6): Promise<string> {
+    const characters = "ABCDEFGHIJKLMNPQRSTUVWXYZ123456789"; // Removed O, 0 to avoid confusion
+    let attempts = 0;
+    const maxAttempts = 20;
+
+    while (attempts < maxAttempts) {
+      let result = "";
+      for (let i = 0; i < length; i++) {
+        result += characters.charAt(
+          Math.floor(Math.random() * characters.length),
+        );
+      }
+
+      // Check if this code already exists in packages table
+      const existingPackage = await db.query.packages.findFirst({
+        columns: { id: true },
+        where: eq(packages.code, result),
+      });
+
+      if (!existingPackage) {
+        return result;
+      }
+      attempts++;
+    }
+    
+    // Fallback if a unique code can't be generated
+    console.error(
+      `Failed to generate a unique ${length}-char code after ${maxAttempts} attempts. Falling back.`,
+    );
+    return crypto
+      .randomBytes(Math.ceil(length / 2))
+      .toString("hex")
+      .slice(0, length)
+      .toUpperCase();
   }
 
   async createPackage(pkg: InsertPackage): Promise<Package> {

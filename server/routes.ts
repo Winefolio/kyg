@@ -418,24 +418,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create package with custom code
+  // Create package with server-generated code
   app.post("/api/packages", async (req, res) => {
     try {
-      const { code, name, description } = req.body;
-      
-      // Check if code already exists
-      const existing = await storage.getPackageByCode(code.toUpperCase());
-      if (existing) {
-        return res.status(409).json({ message: "Package code already exists" });
+      const { name, description } = req.body; // Only destructure name and description
+
+      if (!name) {
+        return res.status(400).json({ message: "Package name is required" });
       }
 
+      // Generate a unique code on the server
+      const uniqueCode = await storage.generateUniqueShortCode(6);
+
       const pkg = await storage.createPackage({
-        code: code.toUpperCase(),
+        code: uniqueCode,
         name,
-        description
+        description,
       });
 
-      res.json(pkg);
+      res.status(201).json(pkg); // Use 201 Created for successful creation
     } catch (error) {
       console.error("Error creating package:", error);
       res.status(500).json({ message: "Internal server error" });
@@ -484,16 +485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/packages", async (req, res) => {
-    try {
-      const packageData = req.body;
-      const newPackage = await storage.createPackage(packageData);
-      res.json(newPackage);
-    } catch (error) {
-      console.error("Error creating package:", error);
-      res.status(500).json({ message: "Failed to create package" });
-    }
-  });
+
 
   app.patch("/api/packages/:id", async (req, res) => {
     try {
