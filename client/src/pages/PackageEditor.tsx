@@ -17,6 +17,7 @@ import {
 import type { Package, PackageWine, Slide } from "@shared/schema";
 import { WineModal } from '@/components/WineModal';
 import { SlidePreview } from '@/components/SlidePreview';
+import { SlideConfigPanel } from '@/components/editor/SlideConfigPanel';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 // Section details for organizing slides
@@ -111,6 +112,25 @@ export default function PackageEditor() {
     onError: (error: any) => toast({ title: "Error creating slide", description: error.message, variant: "destructive" }),
   });
 
+  const updateSlideMutation = useMutation({
+    mutationFn: ({ slideId, data }: { slideId: string; data: any }) => apiRequest('PATCH', `/api/slides/${slideId}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+      toast({ title: "Slide updated successfully" });
+    },
+    onError: (error: any) => toast({ title: "Error updating slide", description: error.message, variant: "destructive" }),
+  });
+
+  const deleteSlideMutation = useMutation({
+    mutationFn: (slideId: string) => apiRequest('DELETE', `/api/slides/${slideId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+      toast({ title: "Slide deleted successfully" });
+      setActiveSlideId(null); // Clear selection when slide is deleted
+    },
+    onError: (error: any) => toast({ title: "Error deleting slide", description: error.message, variant: "destructive" }),
+  });
+
   // --- HANDLER FUNCTIONS ---
   const handleWineSave = (wineData: Partial<any>) => {
     if (editingWine) {
@@ -146,6 +166,14 @@ export default function PackageEditor() {
       },
     };
     createSlideMutation.mutate(slideData);
+  };
+
+  const handleSlideUpdate = (slideId: string, data: any) => {
+    updateSlideMutation.mutate({ slideId, data });
+  };
+
+  const handleSlideDelete = (slideId: string) => {
+    deleteSlideMutation.mutate(slideId);
   };
 
   if (isLoading) return <div className="min-h-screen bg-gradient-primary text-white flex items-center justify-center">Loading Editor...</div>;
@@ -295,11 +323,15 @@ export default function PackageEditor() {
         <div className="flex-1 p-6 overflow-y-auto">
           {activeSlide ? (
             <motion.div key={activeSlide.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-              <div className="text-center">
+              <div className="mb-6 text-center">
                 <h2 className="text-2xl font-bold">Slide Editor Panel</h2>
                 <p className="text-white/70">Editing: {(activeSlide.payloadJson as any)?.title}</p>
-                {/* Placeholder for actual slide editor UI */}
               </div>
+              <SlideConfigPanel
+                slide={activeSlide}
+                onUpdate={handleSlideUpdate}
+                onDelete={handleSlideDelete}
+              />
             </motion.div>
           ) : (
             <div className="flex items-center justify-center h-full"><div className="text-center"><Settings className="h-12 w-12 text-white/40 mx-auto mb-4" /><h3 className="text-lg font-medium text-white mb-2">Select a Wine or Slide</h3><p className="text-white/60">Choose an item from the sidebar to begin editing.</p></div></div>
