@@ -113,48 +113,58 @@ export function EnhancedMultipleChoice({ slideId, question, value, onChange }: E
           const isSelected = value.selected.includes(option.id);
           
           return (
-            <motion.button
+            <div
               key={`${slideId}-${option.id}`}
-              onClick={() => handleOptionToggle(option.id)}
-              className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                isSelected
-                  ? 'bg-gradient-to-r from-purple-600/30 to-indigo-600/30 border-purple-400/50 shadow-lg'
-                  : 'bg-white/5 border-white/20 hover:bg-white/10 hover:border-white/30'
-              }`}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              className="relative"
             >
-              <div className="flex items-start gap-3">
-                {/* Selection Indicator */}
-                <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 transition-all duration-200 ${
+              <input
+                type={question.allow_multiple ? "checkbox" : "radio"}
+                id={`${slideId}-option-${option.id}`}
+                name={`${slideId}-options`}
+                checked={isSelected}
+                onChange={() => handleOptionToggle(option.id)}
+                className="sr-only"
+              />
+              <label
+                htmlFor={`${slideId}-option-${option.id}`}
+                className={`block p-4 rounded-xl border-2 text-left cursor-pointer transition-all duration-200 ${
                   isSelected
-                    ? 'bg-gradient-to-r from-purple-500 to-indigo-500 border-white'
-                    : 'border-white/40'
-                }`}>
-                  {isSelected && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="w-full h-full rounded-full bg-white flex items-center justify-center"
-                    >
-                      <div className="w-2 h-2 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full" />
-                    </motion.div>
-                  )}
-                </div>
-                
-                {/* Option Content */}
-                <div className="flex-1">
-                  <div className="text-white font-medium">
-                    <WineTermText>{option.text}</WineTermText>
+                    ? 'bg-gradient-to-r from-purple-600/30 to-indigo-600/30 border-purple-400/50 shadow-lg'
+                    : 'bg-white/5 border-white/20 hover:bg-white/10 hover:border-white/30'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {/* Selection Indicator */}
+                  <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 transition-all duration-200 ${
+                    isSelected
+                      ? 'bg-gradient-to-r from-purple-500 to-indigo-500 border-white'
+                      : 'border-white/40'
+                  }`}>
+                    {isSelected && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="w-full h-full rounded-full bg-white flex items-center justify-center"
+                      >
+                        <div className="w-2 h-2 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full" />
+                      </motion.div>
+                    )}
                   </div>
-                  {option.description && (
-                    <div className="text-white/60 text-sm mt-1">
-                      <WineTermText>{option.description}</WineTermText>
+                  
+                  {/* Option Content */}
+                  <div className="flex-1">
+                    <div className="text-white font-medium">
+                      <WineTermText>{option.text}</WineTermText>
                     </div>
-                  )}
+                    {option.description && (
+                      <div className="text-white/60 text-sm mt-1">
+                        <WineTermText>{option.description}</WineTermText>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </motion.button>
+              </label>
+            </div>
           );
         })}
       </div>
