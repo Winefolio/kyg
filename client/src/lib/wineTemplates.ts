@@ -10,9 +10,13 @@ export const SLIDE_TEMPLATES = [
     description: 'Evaluate the wine\'s visual appearance',
     payloadTemplate: {
       question: 'What do you observe about this wine\'s appearance?',
-      type: 'multiple_choice',
-      options: ['Clear', 'Hazy', 'Brilliant', 'Cloudy'],
-      allowMultiple: true
+      question_type: 'multiple_choice',
+      options: [
+        { text: 'Clear', description: '', value: 'clear' },
+        { text: 'Hazy', description: '', value: 'hazy' },
+        { text: 'Brilliant', description: '', value: 'brilliant' },
+        { text: 'Cloudy', description: '', value: 'cloudy' }
+      ]
     },
     isPublic: true
   },
@@ -41,7 +45,7 @@ export const SLIDE_TEMPLATES = [
     description: 'Describe the flavors you taste',
     payloadTemplate: {
       question: 'Describe the flavors you taste',
-      type: 'text_input',
+      question_type: 'text',
       placeholder: 'e.g., dark fruit, vanilla, spice...'
     },
     isPublic: true
@@ -55,9 +59,12 @@ export const SLIDE_TEMPLATES = [
     description: 'Evaluate the wine\'s body weight',
     payloadTemplate: {
       question: 'How would you describe the body of this wine?',
-      type: 'multiple_choice',
-      options: ['Light', 'Medium', 'Full'],
-      allowMultiple: false
+      question_type: 'multiple_choice',
+      options: [
+        { text: 'Light', description: '', value: 'light' },
+        { text: 'Medium', description: '', value: 'medium' },
+        { text: 'Full', description: '', value: 'full' }
+      ]
     },
     isPublic: true
   },
@@ -102,9 +109,13 @@ export const SLIDE_TEMPLATES = [
     description: 'Evaluate how long flavors persist',
     payloadTemplate: {
       question: 'How would you describe the finish?',
-      type: 'multiple_choice',
-      options: ['Short', 'Medium', 'Long', 'Very Long'],
-      allowMultiple: false
+      question_type: 'multiple_choice',
+      options: [
+        { text: 'Short', description: '', value: 'short' },
+        { text: 'Medium', description: '', value: 'medium' },
+        { text: 'Long', description: '', value: 'long' },
+        { text: 'Very Long', description: '', value: 'very_long' }
+      ]
     },
     isPublic: true
   },
