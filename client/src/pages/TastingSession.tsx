@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { SegmentedProgressBar } from "@/components/ui/SegmentedProgressBar";
 import { MultipleChoiceQuestion } from "@/components/questions/MultipleChoiceQuestion";
+import { EnhancedMultipleChoice } from "@/components/questions/EnhancedMultipleChoice";
 import { ScaleQuestion } from "@/components/questions/ScaleQuestion";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
@@ -309,7 +310,8 @@ export default function TastingSession() {
     switch (payload.question_type) {
       case 'multiple_choice':
         return (
-          <MultipleChoiceQuestion
+          <EnhancedMultipleChoice
+            slideId={slide.id}
             question={payload}
             value={{ selected: answer.selected || [], notes: answer.notes }}
             onChange={(value) => handleAnswerChange(slide.id, value)}
