@@ -610,19 +610,7 @@ export default function SommelierDashboard() {
                                               <p className="text-white/60 text-sm mb-2">
                                                 {wine.wineDescription}
                                               </p>
-                                              <div className="flex items-center space-x-2">
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() =>
-                                                    openSlideEditor(wine)
-                                                  }
-                                                  className="text-purple-300 hover:text-purple-200 hover:bg-purple-500/20 text-xs"
-                                                >
-                                                  <Edit3 className="w-3 h-3 mr-1" />
-                                                  Edit Slides ({wine.slides?.length || 0})
-                                                </Button>
-                                              </div>
+
                                             </div>
 
                                             <div className="flex space-x-1">

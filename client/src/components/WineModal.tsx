@@ -13,6 +13,25 @@ import {
   X, Save, Plus, Trash2, Wine, GripVertical, 
   Settings, BarChart3, Target, Grape
 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface WineForm {
   wineName: string;
@@ -156,6 +175,62 @@ const wineCharacteristics = [
   { name: 'Spice Notes', category: 'flavor', scaleType: 'boolean' }
 ];
 
+// SortableItem component for drag and drop
+function SortableItem({ slide, onRemove, isReadOnly }: { 
+  slide: SlideOrderItem; 
+  onRemove: (id: string) => void; 
+  isReadOnly: boolean; 
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: slide.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <Card 
+      ref={setNodeRef} 
+      style={style} 
+      className="bg-white/5 border-white/10 p-3"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div 
+            {...attributes} 
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing"
+          >
+            <GripVertical className="w-4 h-4 text-white/40" />
+          </div>
+          <div>
+            <h4 className="text-white font-medium text-sm">{slide.title}</h4>
+            <p className="text-white/60 text-xs">
+              {slide.sectionType} • Position {slide.position}
+            </p>
+          </div>
+        </div>
+        {!isReadOnly && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => onRemove(slide.id)}
+            className="text-red-400 hover:bg-red-500/20"
+          >
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 const slideTemplatePresets = [
   {
     name: 'Visual Assessment',
@@ -213,6 +288,34 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
   const [newGrape, setNewGrape] = useState('');
 
   const isReadOnly = mode === 'view';
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
+      setSlideOrder((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over?.id);
+
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        
+        // Update positions
+        const updatedOrder = newOrder.map((item, index) => ({
+          ...item,
+          position: index + 1
+        }));
+
+        return updatedOrder;
+      });
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
