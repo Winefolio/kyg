@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -761,13 +762,13 @@ export default function SommelierDashboard() {
                           <div className="flex items-center justify-between">
                             <span>Participants:</span>
                             <span className="text-white">
-                              {session.participantCount}
+                              {session.activeParticipants || 0}
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span>Created:</span>
                             <span className="text-white">
-                              {new Date(session.createdAt).toLocaleDateString()}
+                              {session.updatedAt ? format(new Date(session.updatedAt), 'MMM d, yyyy') : 'N/A'}
                             </span>
                           </div>
                         </div>
@@ -843,33 +844,33 @@ export default function SommelierDashboard() {
                     <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center col-span-2 lg:col-span-1">
                       <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-blue-400 mx-auto mb-2" />
                       <div className="text-xl md:text-2xl font-bold text-white">
-                        {packages?.length || 0}
+                        {overview?.totalPackages || 0}
                       </div>
                       <div className="text-white/70 text-xs md:text-sm">
                         Total Packages
                       </div>
                       <div className="text-green-400 text-xs mt-1">
-                        {packages?.filter(p => p.isActive).length || 0} active
+                        {overview?.activePackages || 0} active
                       </div>
                     </Card>
 
                     <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
                       <Users className="w-6 h-6 md:w-8 md:h-8 text-purple-400 mx-auto mb-2" />
                       <div className="text-xl md:text-2xl font-bold text-white">
-                        {sessions?.length || 0}
+                        {overview?.totalSessions || 0}
                       </div>
                       <div className="text-white/70 text-xs md:text-sm">
                         Sessions
                       </div>
                       <div className="text-green-400 text-xs mt-1">
-                        {sessions?.filter(s => s.status === 'active').length || 0} active
+                        {overview?.activeSessions || 0} active
                       </div>
                     </Card>
 
                     <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
                       <Activity className="w-6 h-6 md:w-8 md:h-8 text-pink-400 mx-auto mb-2" />
                       <div className="text-xl md:text-2xl font-bold text-white">
-                        {sessions?.reduce((total, s) => total + s.participantCount, 0) || 0}
+                        {overview?.totalParticipants || 0}
                       </div>
                       <div className="text-white/70 text-xs md:text-sm">
                         Participants
@@ -879,13 +880,7 @@ export default function SommelierDashboard() {
                     <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
                       <BarChart3 className="w-6 h-6 md:w-8 md:h-8 text-yellow-400 mx-auto mb-2" />
                       <div className="text-xl md:text-2xl font-bold text-white">
-                        {sessions && sessions.length > 0
-                          ? Math.round(
-                              (sessions.reduce((total, s) => total + s.participantCount, 0) /
-                                sessions.length) *
-                                10,
-                            ) / 10
-                          : 0}
+                        {overview?.avgRate && !isNaN(overview.avgRate) ? overview.avgRate.toFixed(1) : "N/A"}
                       </div>
                       <div className="text-white/70 text-xs md:text-sm">
                         Avg Rate
@@ -895,7 +890,7 @@ export default function SommelierDashboard() {
                     <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
                       <Wine className="w-6 h-6 md:w-8 md:h-8 text-red-400 mx-auto mb-2" />
                       <div className="text-xl md:text-2xl font-bold text-white">
-                        {packages?.reduce((total, p) => total + (p.wines?.length || 0), 0) || 0}
+                        {overview?.totalWines || 0}
                       </div>
                       <div className="text-white/70 text-xs md:text-sm">
                         Total Wines
