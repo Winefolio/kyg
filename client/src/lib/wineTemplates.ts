@@ -1,4 +1,4 @@
-import { Eye, Wind, Palette, Coffee, Droplets, Zap, Clock, Star } from 'lucide-react';
+import { Eye, Wind, Palette, Droplets, Zap, Clock, Star, Type, CheckCircle } from 'lucide-react';
 
 export const SLIDE_TEMPLATES = [
   {
@@ -7,18 +7,16 @@ export const SLIDE_TEMPLATES = [
     type: 'question',
     sectionType: 'intro',
     icon: Eye,
-    description: 'Evaluate the wine\'s visual appearance',
+    description: "Evaluate the wine's appearance.",
     payloadTemplate: {
-      question: 'What do you observe about this wine\'s appearance?',
       question_type: 'multiple_choice',
       options: [
-        { text: 'Clear', description: '', value: 'clear' },
-        { text: 'Hazy', description: '', value: 'hazy' },
-        { text: 'Brilliant', description: '', value: 'brilliant' },
-        { text: 'Cloudy', description: '', value: 'cloudy' }
+        { text: 'Clear', value: 'clear' },
+        { text: 'Hazy', value: 'hazy' },
+        { text: 'Brilliant', value: 'brilliant' },
+        { text: 'Cloudy', value: 'cloudy' }
       ]
-    },
-    isPublic: true
+    }
   },
   {
     id: 'aroma-intensity',
@@ -26,15 +24,14 @@ export const SLIDE_TEMPLATES = [
     type: 'question',
     sectionType: 'deep_dive',
     icon: Wind,
-    description: 'Rate the intensity of the wine\'s aroma',
+    description: "Rate the wine's aroma intensity.",
     payloadTemplate: {
-      question: 'Rate the intensity of the wine\'s aroma',
-      type: 'slider',
-      min: 1,
-      max: 10,
-      step: 1
-    },
-    isPublic: true
+      question_type: 'scale',
+      scale_min: 1,
+      scale_max: 10,
+      scale_min_label: 'Subtle',
+      scale_max_label: 'Powerful'
+    }
   },
   {
     id: 'tasting-notes',
@@ -42,47 +39,42 @@ export const SLIDE_TEMPLATES = [
     type: 'question',
     sectionType: 'deep_dive',
     icon: Palette,
-    description: 'Describe the flavors you taste',
+    description: 'Describe the primary flavors.',
     payloadTemplate: {
-      question: 'Describe the flavors you taste',
       question_type: 'text',
       placeholder: 'e.g., dark fruit, vanilla, spice...'
-    },
-    isPublic: true
+    }
   },
   {
     id: 'body-assessment',
     name: 'Body Assessment',
     type: 'question',
     sectionType: 'deep_dive',
-    icon: Coffee,
-    description: 'Evaluate the wine\'s body weight',
+    icon: Droplets,
+    description: 'Determine the weight of the wine on your palate.',
     payloadTemplate: {
-      question: 'How would you describe the body of this wine?',
       question_type: 'multiple_choice',
       options: [
-        { text: 'Light', description: '', value: 'light' },
-        { text: 'Medium', description: '', value: 'medium' },
-        { text: 'Full', description: '', value: 'full' }
+        { text: 'Light', value: 'light' },
+        { text: 'Medium', value: 'medium' },
+        { text: 'Full', value: 'full' }
       ]
-    },
-    isPublic: true
+    }
   },
   {
     id: 'tannin-level',
     name: 'Tannin Level',
     type: 'question',
     sectionType: 'deep_dive',
-    icon: Droplets,
-    description: 'Rate the tannin structure',
+    icon: Zap,
+    description: "Rate the wine's tannin level.",
     payloadTemplate: {
-      question: 'Rate the tannin level',
       question_type: 'scale',
       scale_min: 1,
       scale_max: 10,
-      scale_step: 1
-    },
-    isPublic: true
+      scale_min_label: 'Soft',
+      scale_max_label: 'Grippy'
+    }
   },
   {
     id: 'acidity-level',
@@ -90,15 +82,14 @@ export const SLIDE_TEMPLATES = [
     type: 'question',
     sectionType: 'deep_dive',
     icon: Zap,
-    description: 'Assess the wine\'s acidity',
+    description: "Rate the wine's acidity.",
     payloadTemplate: {
-      question: 'Rate the acidity level',
       question_type: 'scale',
       scale_min: 1,
       scale_max: 10,
-      scale_step: 1
-    },
-    isPublic: true
+      scale_min_label: 'Low',
+      scale_max_label: 'High'
+    }
   },
   {
     id: 'finish-length',
@@ -106,18 +97,15 @@ export const SLIDE_TEMPLATES = [
     type: 'question',
     sectionType: 'ending',
     icon: Clock,
-    description: 'Evaluate how long flavors persist',
+    description: 'How long do the flavors linger?',
     payloadTemplate: {
-      question: 'How would you describe the finish?',
       question_type: 'multiple_choice',
       options: [
-        { text: 'Short', description: '', value: 'short' },
-        { text: 'Medium', description: '', value: 'medium' },
-        { text: 'Long', description: '', value: 'long' },
-        { text: 'Very Long', description: '', value: 'very_long' }
+        { text: 'Short', value: 'short' },
+        { text: 'Medium', value: 'medium' },
+        { text: 'Long', value: 'long' }
       ]
-    },
-    isPublic: true
+    }
   },
   {
     id: 'overall-impression',
@@ -125,15 +113,14 @@ export const SLIDE_TEMPLATES = [
     type: 'question',
     sectionType: 'ending',
     icon: Star,
-    description: 'Rate your overall experience',
+    description: 'Give your final rating for this wine.',
     payloadTemplate: {
-      question: 'Rate your overall impression of this wine',
       question_type: 'scale',
       scale_min: 1,
       scale_max: 10,
-      scale_step: 1
-    },
-    isPublic: true
+      scale_min_label: 'Poor',
+      scale_max_label: 'Excellent'
+    }
   }
 ];
 

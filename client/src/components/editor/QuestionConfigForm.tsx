@@ -1,10 +1,10 @@
 // client/src/components/editor/QuestionConfigForm.tsx
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch'; // Added missing import
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2, PlusCircle } from 'lucide-react';
 
@@ -14,7 +14,7 @@ interface QuestionConfigFormProps {
 }
 
 export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigFormProps) {
-  
+
   const handleFieldChange = (field: string, value: any) => {
     onPayloadChange({ ...payload, [field]: value });
   };
@@ -26,8 +26,8 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
   };
 
   const addOption = () => {
-    const newValue = `option_${Date.now()}`;
-    const newOptions = [...(payload.options || []), { text: '', description: '', value: newValue }];
+    // Correctly add a unique value to each new option
+    const newOptions = [...(payload.options || []), { text: '', description: '', value: `option_${Date.now()}` }];
     handleFieldChange('options', newOptions);
   };
 
@@ -42,20 +42,6 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
         <CardTitle className="text-lg text-white">Question Settings</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="mb-4 p-2 bg-blue-500/20 text-blue-200 text-xs">
-          Debug QuestionConfigForm: question_type = "{payload.question_type}", payload = {JSON.stringify(payload, null, 2)}
-        </div>
-        
-        <div>
-          <Label className="text-white/80">Question Text</Label>
-          <Input 
-            value={payload.question || ''} 
-            onChange={(e) => handleFieldChange('question', e.target.value)} 
-            className="bg-white/10 border-white/20 text-white" 
-            placeholder="Enter your question here..."
-          />
-        </div>
-
         <div>
           <Label className="text-white/80">Question Type</Label>
           <Select value={payload.question_type || 'multiple_choice'} onValueChange={(value) => handleFieldChange('question_type', value)}>
@@ -71,15 +57,17 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
 
         {payload.question_type === 'multiple_choice' && (
           <div className="space-y-4">
-            <Label className="text-white/80">Answer Options</Label>
-            {payload.options?.map((option: any, index: number) => (
-              <div key={option.value || option.text || index} className="p-3 bg-black/20 rounded-lg border border-white/10 space-y-2">
-                <div className="flex justify-between items-center">
-                  <Label className="text-white/70 text-sm">Option {index + 1}</Label>
-                  <Button size="icon" variant="ghost" onClick={() => removeOption(index)} className="h-7 w-7 text-red-400 hover:bg-red-500/20"><Trash2 className="h-4 w-4" /></Button>
+            <div className="flex items-center justify-between">
+                <Label className="text-white/80">Answer Options</Label>
+                <div className="flex items-center space-x-2">
+                    <Label htmlFor="allow_multiple" className="text-xs text-white/70">Allow Multiple</Label>
+                    <Switch id="allow_multiple" checked={payload.allow_multiple || false} onCheckedChange={(checked) => handleFieldChange('allow_multiple', checked)} />
                 </div>
+            </div>
+            {payload.options?.map((option: any, index: number) => (
+              <div key={option.value || index} className="p-3 bg-black/20 rounded-lg border border-white/10 space-y-2">
+                <div className="flex justify-between items-center"><Label className="text-white/70 text-sm">Option {index + 1}</Label><Button size="icon" variant="ghost" onClick={() => removeOption(index)} className="h-7 w-7 text-red-400 hover:bg-red-500/20"><Trash2 className="h-4 w-4" /></Button></div>
                 <Input value={option.text || ''} onChange={(e) => handleOptionChange(index, 'text', e.target.value)} className="bg-white/10 border-white/20 text-white" placeholder="Option Text" />
-                <Input value={option.description || ''} onChange={(e) => handleOptionChange(index, 'description', e.target.value)} className="bg-white/10 border-white/20 text-white text-xs" placeholder="Option Description (optional)" />
               </div>
             ))}
             <Button onClick={addOption} variant="outline" className="w-full border-dashed"><PlusCircle className="mr-2 h-4 w-4" /> Add Option</Button>
@@ -96,6 +84,11 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
             <div><Label className="text-white/80">Max Label</Label><Input value={payload.scale_max_label || ''} onChange={(e) => handleFieldChange('scale_max_label', e.target.value)} className="bg-white/10 border-white/20 text-white" placeholder="e.g., 'High'" /></div>
           </div>
         )}
+
+        {payload.question_type === 'text' && (
+           <div><Label className="text-white/80">Placeholder Text</Label><Input value={payload.placeholder || ''} onChange={(e) => handleFieldChange('placeholder', e.target.value)} className="bg-white/10 border-white/20 text-white" placeholder="e.g., Describe the aromas..." /></div>
+        )}
+
       </CardContent>
     </Card>
   );
