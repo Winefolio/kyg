@@ -374,9 +374,9 @@ export default function TastingSession() {
 
           <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-2xl flex-grow flex flex-col justify-center">
             {/* Section Badge */}
-            {slide.sectionType && (
+            {slide.section_type && (
               <div className="text-center mb-4">
-                {getSectionBadge(slide.sectionType)}
+                {getSectionBadge(slide.section_type)}
               </div>
             )}
             
@@ -409,9 +409,9 @@ export default function TastingSession() {
           className="w-full"
         >
           {/* Section Badge for Questions */}
-          {slide.sectionType && (
+          {slide.section_type && (
             <div className="text-center mb-4">
-              {getSectionBadge(slide.sectionType)}
+              {getSectionBadge(slide.section_type)}
             </div>
           )}
           {renderQuestion(slide)}
@@ -800,9 +800,9 @@ export default function TastingSession() {
                                       {slide.type === 'interlude' ? 'Introduction' : 
                                        (slide.payloadJson as any)?.title || `Question ${slideIndex + 1}`}
                                     </span>
-                                    {slide.sectionType && (
+                                    {slide.section_type && (
                                       <span className="text-xs opacity-60 capitalize">
-                                        {slide.sectionType.replace('_', ' ')}
+                                        {slide.section_type.replace('_', ' ')}
                                       </span>
                                     )}
                                   </div>
