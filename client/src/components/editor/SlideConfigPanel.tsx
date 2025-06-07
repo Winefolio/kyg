@@ -96,10 +96,15 @@ export function SlideConfigPanel({
             </Card>
 
             {slide.type === "question" && (
-                <QuestionConfigForm
-                    payload={payload}
-                    onPayloadChange={handlePayloadChange}
-                />
+                <div>
+                    <div className="mb-4 p-2 bg-yellow-500/20 text-yellow-200 text-xs">
+                        Debug: Slide type: {slide.type}, Payload: {JSON.stringify(payload, null, 2)}
+                    </div>
+                    <QuestionConfigForm
+                        payload={payload}
+                        onPayloadChange={handlePayloadChange}
+                    />
+                </div>
             )}
 
             {slide.type !== "question" && (
