@@ -1,120 +1,265 @@
-import { HelpCircle, Clapperboard, Video, Music, BarChart3, MessageSquare, Image, Type, CheckCircle } from "lucide-react";
-
 export const SLIDE_TEMPLATES = [
   {
+    id: 'visual-assessment',
+    name: 'Visual Assessment',
     type: 'question',
-    name: 'Multiple Choice',
-    icon: HelpCircle,
-    description: 'Ask participants to choose from multiple options with descriptions and tooltips.',
-    defaultPayload: {
-      title: 'What is your initial impression of this wine?',
-      description: 'Take a moment to smell and observe the wine before selecting your answer.',
-      question_type: 'multiple_choice',
-      options: [
-        { 
-          text: 'Fresh and vibrant', 
-          description: 'The wine feels lively with bright acidity and fresh fruit notes',
-          tooltip: 'Wines with high acidity often taste fresh and vibrant, like citrus or green apple',
-          value: 'fresh_vibrant' 
-        },
-        { 
-          text: 'Rich and full-bodied', 
-          description: 'The wine has weight and depth with complex flavors',
-          tooltip: 'Full-bodied wines have more alcohol, tannins, and concentrated flavors',
-          value: 'rich_full' 
-        },
-        { 
-          text: 'Delicate and subtle', 
-          description: 'The wine is gentle with nuanced, understated characteristics',
-          tooltip: 'Delicate wines often have lower alcohol and lighter flavors that require attention to appreciate',
-          value: 'delicate_subtle' 
-        }
-      ]
-    }
+    sectionType: 'intro',
+    payloadTemplate: {
+      question: 'What do you observe about this wine\'s appearance?',
+      type: 'multiple_choice',
+      options: ['Clear', 'Hazy', 'Brilliant', 'Cloudy'],
+      allowMultiple: true
+    },
+    isPublic: true
   },
   {
+    id: 'aroma-intensity',
+    name: 'Aroma Intensity',
     type: 'question',
-    name: 'Scale Rating',
-    icon: BarChart3,
-    description: 'Rate intensity, preference, or agreement on a sliding scale.',
-    defaultPayload: {
-      title: 'How intense is the aroma?',
-      description: 'Move the slider to rate the intensity of the wine\'s aroma from subtle to powerful.',
-      question_type: 'scale',
-      scale_min: 1,
-      scale_max: 10,
-      scale_min_label: 'Very Subtle',
-      scale_max_label: 'Very Intense'
-    }
+    sectionType: 'deep_dive',
+    payloadTemplate: {
+      question: 'Rate the intensity of the wine\'s aroma',
+      type: 'slider',
+      min: 1,
+      max: 10,
+      step: 1
+    },
+    isPublic: true
   },
   {
+    id: 'tasting-notes',
+    name: 'Tasting Notes',
     type: 'question',
-    name: 'Yes/No',
-    icon: CheckCircle,
-    description: 'Simple binary choice question.',
-    defaultPayload: {
-      title: 'Can you detect oak aging in this wine?',
-      description: 'Oak aging often adds vanilla, spice, or toasty flavors to wine.',
-      question_type: 'boolean'
-    }
+    sectionType: 'deep_dive',
+    payloadTemplate: {
+      question: 'Describe the flavors you taste',
+      type: 'text_input',
+      placeholder: 'e.g., dark fruit, vanilla, spice...'
+    },
+    isPublic: true
   },
   {
+    id: 'body-assessment',
+    name: 'Body Assessment',
     type: 'question',
-    name: 'Text Response',
-    icon: Type,
-    description: 'Free-form text input for detailed responses.',
-    defaultPayload: {
-      title: 'Describe the flavors you taste',
-      description: 'Use your own words to describe what you experience when tasting this wine.',
-      question_type: 'text'
-    }
+    sectionType: 'deep_dive',
+    payloadTemplate: {
+      question: 'How would you describe the body of this wine?',
+      type: 'multiple_choice',
+      options: ['Light', 'Medium', 'Full'],
+      allowMultiple: false
+    },
+    isPublic: true
   },
   {
-    type: 'interlude',
-    name: 'Interlude',
-    icon: Clapperboard,
-    description: 'Transition slide with information or instructions.',
-    defaultPayload: {
-      title: 'Take a moment to cleanse your palate',
-      description: 'Use the provided water and neutral crackers to prepare for the next wine.',
-      background_color: '#1a1a1a',
-      auto_advance_seconds: null
-    }
+    id: 'tannin-level',
+    name: 'Tannin Level',
+    type: 'question',
+    sectionType: 'deep_dive',
+    payloadTemplate: {
+      question: 'Rate the tannin level',
+      type: 'slider',
+      min: 1,
+      max: 10,
+      step: 1
+    },
+    isPublic: true
   },
   {
-    type: 'video_message',
-    name: 'Video Message',
-    icon: Video,
-    description: 'Personal video message from the sommelier.',
-    defaultPayload: {
-      title: 'A message from your sommelier',
-      description: 'Learn about the story behind this wine directly from the expert.',
-      video_url: '',
-      duration_seconds: 60
-    }
+    id: 'acidity-level',
+    name: 'Acidity Level',
+    type: 'question',
+    sectionType: 'deep_dive',
+    payloadTemplate: {
+      question: 'Rate the acidity level',
+      type: 'slider',
+      min: 1,
+      max: 10,
+      step: 1
+    },
+    isPublic: true
   },
   {
-    type: 'audio_message',
-    name: 'Audio Message',
-    icon: Music,
-    description: 'Audio-only message or wine education.',
-    defaultPayload: {
-      title: 'Listen: The vineyard\'s story',
-      description: 'Hear about the unique terroir and winemaking process.',
-      audio_url: '',
-      duration_seconds: 45
-    }
+    id: 'finish-length',
+    name: 'Finish Length',
+    type: 'question',
+    sectionType: 'ending',
+    payloadTemplate: {
+      question: 'How would you describe the finish?',
+      type: 'multiple_choice',
+      options: ['Short', 'Medium', 'Long', 'Very Long'],
+      allowMultiple: false
+    },
+    isPublic: true
   },
   {
-    type: 'media',
-    name: 'Image/Media',
-    icon: Image,
-    description: 'Display images, photos, or other visual content.',
-    defaultPayload: {
-      title: 'The vineyard where this wine was made',
-      description: 'This beautiful vineyard in [Region] produces exceptional wines.',
-      media_url: '',
-      media_type: 'image'
-    }
+    id: 'overall-impression',
+    name: 'Overall Impression',
+    type: 'question',
+    sectionType: 'ending',
+    payloadTemplate: {
+      question: 'Rate your overall impression of this wine',
+      type: 'slider',
+      min: 1,
+      max: 10,
+      step: 1
+    },
+    isPublic: true
   }
 ];
+
+export const WINE_TEMPLATES = [
+  {
+    name: 'Bordeaux Red Blend',
+    type: 'red',
+    grapeVarietals: ['Cabernet Sauvignon', 'Merlot', 'Cabernet Franc'],
+    region: 'Bordeaux, France',
+    characteristics: {
+      'Body': 'Full',
+      'Tannins': 8,
+      'Acidity': 7,
+      'Fruit Intensity': 8,
+      'Oak Influence': 7
+    },
+    description: 'A classic Bordeaux blend with structured tannins and complex fruit flavors',
+    imageUrl: 'https://images.unsplash.com/photo-1574505208894-83b2be2ee276?w=400'
+  },
+  {
+    name: 'Burgundy Pinot Noir',
+    type: 'red',
+    grapeVarietals: ['Pinot Noir'],
+    region: 'Burgundy, France',
+    characteristics: {
+      'Body': 'Medium',
+      'Tannins': 5,
+      'Acidity': 8,
+      'Fruit Intensity': 7,
+      'Oak Influence': 6
+    },
+    description: 'Elegant Pinot Noir with bright acidity and earthy undertones',
+    imageUrl: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400'
+  },
+  {
+    name: 'Chablis Chardonnay',
+    type: 'white',
+    grapeVarietals: ['Chardonnay'],
+    region: 'Chablis, France',
+    characteristics: {
+      'Body': 'Medium',
+      'Acidity': 9,
+      'Mineral Notes': true,
+      'Oak Influence': 2,
+      'Fruit Intensity': 6
+    },
+    description: 'Crisp, mineral-driven Chardonnay with citrus and green apple notes',
+    imageUrl: 'https://images.unsplash.com/photo-1587381420270-3e1a5b9e6904?w=400'
+  },
+  {
+    name: 'Champagne Blend',
+    type: 'sparkling',
+    grapeVarietals: ['Chardonnay', 'Pinot Noir', 'Pinot Meunier'],
+    region: 'Champagne, France',
+    characteristics: {
+      'Body': 'Light',
+      'Acidity': 9,
+      'Fruit Intensity': 7,
+      'Mineral Notes': true
+    },
+    description: 'Traditional Champagne method sparkling wine with fine bubbles',
+    imageUrl: 'https://images.unsplash.com/photo-1549418885-0da47c3b70fd?w=400'
+  },
+  {
+    name: 'Napa Valley Cabernet',
+    type: 'red',
+    grapeVarietals: ['Cabernet Sauvignon'],
+    region: 'Napa Valley, California',
+    characteristics: {
+      'Body': 'Full',
+      'Tannins': 9,
+      'Acidity': 6,
+      'Fruit Intensity': 9,
+      'Oak Influence': 8
+    },
+    description: 'Bold Napa Cabernet with rich fruit and robust tannins',
+    imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400'
+  }
+];
+
+export function getWineImage(wineType: string): string {
+  const images = {
+    red: 'https://images.unsplash.com/photo-1574505208894-83b2be2ee276?w=400',
+    white: 'https://images.unsplash.com/photo-1587381420270-3e1a5b9e6904?w=400',
+    rose: 'https://images.unsplash.com/photo-1586370434639-0fe43b2d32d6?w=400',
+    sparkling: 'https://images.unsplash.com/photo-1549418885-0da47c3b70fd?w=400',
+    dessert: 'https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=400',
+    fortified: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400'
+  };
+  return images[wineType as keyof typeof images] || images.red;
+}
+
+export function getGrapeVarietals(): string[] {
+  return [
+    'Cabernet Sauvignon',
+    'Merlot',
+    'Pinot Noir',
+    'Syrah/Shiraz',
+    'Grenache',
+    'Sangiovese',
+    'Tempranillo',
+    'Nebbiolo',
+    'Chardonnay',
+    'Sauvignon Blanc',
+    'Riesling',
+    'Pinot Grigio/Pinot Gris',
+    'Gewürztraminer',
+    'Viognier',
+    'Chenin Blanc',
+    'Sémillon'
+  ];
+}
+
+export function getWineTypes() {
+  return [
+    { value: 'red', label: 'Red Wine' },
+    { value: 'white', label: 'White Wine' },
+    { value: 'rose', label: 'Rosé' },
+    { value: 'sparkling', label: 'Sparkling' },
+    { value: 'dessert', label: 'Dessert Wine' },
+    { value: 'fortified', label: 'Fortified Wine' }
+  ];
+}
+
+export function getWineRegions(): string[] {
+  return [
+    'Bordeaux, France',
+    'Burgundy, France',
+    'Champagne, France',
+    'Loire Valley, France',
+    'Rhône Valley, France',
+    'Alsace, France',
+    'Tuscany, Italy',
+    'Piedmont, Italy',
+    'Veneto, Italy',
+    'Sicily, Italy',
+    'Rioja, Spain',
+    'Ribera del Duero, Spain',
+    'Priorat, Spain',
+    'Douro, Portugal',
+    'Napa Valley, California',
+    'Sonoma County, California',
+    'Paso Robles, California',
+    'Oregon',
+    'Washington State',
+    'New York',
+    'Barossa Valley, Australia',
+    'Hunter Valley, Australia',
+    'Margaret River, Australia',
+    'Marlborough, New Zealand',
+    'Central Otago, New Zealand',
+    'Stellenbosch, South Africa',
+    'Mendoza, Argentina',
+    'Maipo Valley, Chile',
+    'Mosel, Germany',
+    'Rheingau, Germany'
+  ];
+}
