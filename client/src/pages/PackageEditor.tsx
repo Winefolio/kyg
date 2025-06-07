@@ -129,7 +129,7 @@ export default function PackageEditor() {
     });
   };
 
-  const handleAddSlide = (wineId: string, sectionType: 'intro' | 'deep_dive' | 'ending', template: any) => {
+  const handleAddSlide = (wineId: string, template: any, sectionType?: 'intro' | 'deep_dive' | 'ending') => {
     const wineSlides = slides.filter(s => s.packageWineId === wineId);
     const nextPosition = (wineSlides.length > 0 ? Math.max(...wineSlides.map(s => s.position)) : 0) + 1;
 
@@ -137,7 +137,8 @@ export default function PackageEditor() {
       packageWineId: wineId,
       position: nextPosition,
       type: template.type,
-      section_type: sectionType, // Use the passed-in sectionType with correct property name
+      // Use the provided sectionType, or default from the template, or fallback to 'deep_dive'
+      section_type: sectionType || template.sectionType || 'deep_dive',
       payloadJson: {
         title: template.name,
         description: template.description || '',
@@ -231,12 +232,8 @@ export default function PackageEditor() {
                           </div>
                           <AnimatePresence>
                             {isExpanded && (
-                              <motion.div 
-                                initial={{ height: 0, opacity: 0 }} 
-                                animate={{ height: "auto", opacity: 1 }} 
-                                exit={{ height: 0, opacity: 0 }} 
-                                className="pl-4 mt-2 border-l-2 border-white/10 ml-5 space-y-4 py-2"
-                              >
+                              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="pl-4 mt-2 border-l-2 border-white/10 ml-5 space-y-4 py-2">
+                                {/* --- SECTION-BASED UI (POWER USER FLOW) --- */}
                                 {Object.entries(sectionDetails).map(([key, { title, icon }]) => {
                                   const sectionSlides = wineSlides.filter(s => s.section_type === key);
                                   return (
@@ -244,23 +241,12 @@ export default function PackageEditor() {
                                       <div className="flex items-center justify-between mb-1">
                                         <h4 className="text-sm font-semibold text-white/90 flex items-center">{icon}<span className="ml-2">{title}</span></h4>
                                         <Popover>
-                                          <PopoverTrigger asChild>
-                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-purple-300 hover:bg-purple-500/20 hover:text-purple-200">
-                                              <Plus className="h-4 w-4" />
-                                            </Button>
-                                          </PopoverTrigger>
+                                          <PopoverTrigger asChild><Button size="icon" variant="ghost" className="h-6 w-6 text-purple-300 hover:bg-purple-500/20 hover:text-purple-200"><Plus className="h-4 w-4" /></Button></PopoverTrigger>
                                           <PopoverContent className="w-56 p-1 bg-gray-900/80 border-gray-700 backdrop-blur-md">
                                             <div className="space-y-1">
-                                              {/* THE FIX: Map over ALL slideTemplates, not a filtered list */}
                                               {slideTemplates.map((template: any) => (
-                                                <Button
-                                                  key={template.id}
-                                                  variant="ghost"
-                                                  className="w-full justify-start font-normal h-8 text-white/80"
-                                                  onClick={() => handleAddSlide(wine.id, key as any, template)}
-                                                >
-                                                  <PlusCircle className="mr-2 h-4 w-4 text-purple-400" />
-                                                  {template.name}
+                                                <Button key={template.id} variant="ghost" className="w-full justify-start font-normal h-8 text-white/80" onClick={() => handleAddSlide(wine.id, template, key as any)}>
+                                                  <PlusCircle className="mr-2 h-4 w-4 text-purple-400" />{template.name}
                                                 </Button>
                                               ))}
                                             </div>
@@ -270,21 +256,28 @@ export default function PackageEditor() {
                                       <div className="pl-4 space-y-1">
                                         {sectionSlides.length > 0 ? (
                                           sectionSlides.map(slide => (
-                                            <div 
-                                              key={slide.id} 
-                                              className={`p-2 rounded-md cursor-pointer transition-colors ${activeSlideId === slide.id ? 'bg-purple-600/30' : 'hover:bg-white/10'}`} 
-                                              onClick={() => setActiveSlideId(slide.id)}
-                                            >
+                                            <div key={slide.id} className={`p-2 rounded-md cursor-pointer transition-colors ${activeSlideId === slide.id ? 'bg-purple-600/30' : 'hover:bg-white/10'}`} onClick={() => setActiveSlideId(slide.id)}>
                                               <p className="text-sm font-medium text-white truncate">{(slide.payloadJson as any)?.title || 'Untitled Slide'}</p>
                                             </div>
                                           ))
-                                        ) : (
-                                          <p className="text-xs text-white/50 italic px-2 py-1">No slides in this section.</p>
-                                        )}
+                                        ) : <p className="text-xs text-white/50 italic px-2 py-1">No slides in this section.</p>}
                                       </div>
                                     </div>
                                   );
                                 })}
+
+                                {/* --- TEMPLATE LIST UI (EXPLORER FLOW) --- */}
+                                <div className="mt-4 pt-4 border-t border-white/10">
+                                  <h4 className="text-sm font-semibold text-white/90 mb-2">Add from Full Library</h4>
+                                  <div className="space-y-1">
+                                    {SLIDE_TEMPLATES.map(template => (
+                                      <Button key={template.name} size="sm" variant="ghost" className="w-full text-sm h-9 justify-start text-white/70 hover:text-white hover:bg-white/5" onClick={() => handleAddSlide(wine.id, template)} title={template.description}>
+                                        {template.icon && <template.icon className="mr-2 h-4 w-4 flex-shrink-0 text-purple-400" />}
+                                        <span className="truncate">Add {template.name}</span>
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </div>
                               </motion.div>
                             )}
                           </AnimatePresence>

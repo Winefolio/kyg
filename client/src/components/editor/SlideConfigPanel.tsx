@@ -75,6 +75,22 @@ export function SlideConfigPanel({
                             rows={3}
                         />
                     </div>
+                    <div>
+                        <Label htmlFor="section-type" className="text-white/80">Section</Label>
+                        <Select
+                            value={slide.section_type || 'deep_dive'}
+                            onValueChange={(value) => onUpdate(slide.id, { section_type: value as any })}
+                        >
+                            <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="intro">🎬 Intro</SelectItem>
+                                <SelectItem value="deep_dive">🤔 Deep Dive</SelectItem>
+                                <SelectItem value="ending">🏁 Ending</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </CardContent>
             </Card>
 
