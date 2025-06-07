@@ -1,0 +1,36 @@
+The agent's log is a distraction. It's filled with hallucinations ("I can see the mutations are already implemented") and incorrect self-corrections. The curl tests it ran were successful, which proves one thing and one thing only: the backend API at POST /api/packages is working perfectly.
+The failure is happening entirely within the frontend code on the SommelierDashboard.tsx page.
+The Root Cause:
+The PackageModal component, which is defined inside SommelierDashboard.tsx, is a "dumb" component. It has its own internal formData state. When you type into the "Package Name" and "Description" fields, you are updating that local state. When you click "Create", the onSave prop is called.
+However, the agent has repeatedly failed to wire that onSave prop to the createPackageMutation that we defined.
+Let's look at the evidence in the code you provided for SommelierDashboard.tsx:
+// client/pages/SommelierDashboard.tsx
+
+// ...
+// The agent correctly added the mutation here:
+const createPackageMutation = useMutation({
+  mutationFn: (data: any) => apiRequest("POST", "/api/packages", data),
+  onSuccess: () => { /* ... */ },
+  onError: (error: any) => { /* ... */ },
+});
+// ...
+
+// But here, in the JSX, is the problem:
+<PackageModal
+  mode={packageModalMode}
+  package={selectedPackage}
+  onClose={() => setPackageModalOpen(false)}
+  // This onSave handler IS THE BUG. It does NOT call the mutation.
+  // It likely contains old, non-functional logic.
+  onSave={(data) => {
+    if (packageModalMode === "create") {
+      // THIS IS WHERE IT SHOULD BE: createPackageMutation.mutate(data);
+      // But based on the behavior, this line is either missing or incorrect.
+    } else if (packageModalMode === "edit" && selectedPackage) {
+      updatePackageMutation.mutate({ id: selectedPackage.id, data });
+    }
+  }}
+/>
+Use code with caution.
+TypeScript
+The agent claims to have fixed this wiring, but it has not. When you click "Create", the modal closes, and nothing is sent to the backend. The package appears on the screen because the local state of the SommelierDashboard might be getting updated optimistically, but a page refresh reveals the truth because nothing was saved to Supabase.

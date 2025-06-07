@@ -176,8 +176,12 @@ export default function SommelierDashboard() {
 
   // Create package mutation
   const createPackageMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/packages", data),
-    onSuccess: () => {
+    mutationFn: (data: any) => {
+      console.log("Creating package with data:", data);
+      return apiRequest("POST", "/api/packages", data);
+    },
+    onSuccess: (result) => {
+      console.log("Package created successfully:", result);
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
       setPackageModalOpen(false);
       toast({
@@ -185,10 +189,11 @@ export default function SommelierDashboard() {
         description: "Your wine package has been created.",
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Error creating package:", error);
       toast({
         title: "Error creating package",
-        description: "Please try again.",
+        description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
     },
@@ -982,7 +987,9 @@ export default function SommelierDashboard() {
           package={selectedPackage}
           onClose={() => setPackageModalOpen(false)}
           onSave={(data) => {
+            console.log("PackageModal onSave called with:", { data, mode: packageModalMode });
             if (packageModalMode === "create") {
+              console.log("Calling createPackageMutation.mutate with:", data);
               createPackageMutation.mutate(data);
             } else if (packageModalMode === "edit" && selectedPackage) {
               updatePackageMutation.mutate({ id: selectedPackage.id, data });
@@ -1048,6 +1055,7 @@ function PackageModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("PackageModal handleSubmit called with formData:", formData);
     onSave(formData);
   };
 
