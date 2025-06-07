@@ -133,6 +133,9 @@ export interface IStorage {
 
   // Wine Characteristics
   getWineCharacteristics(): Promise<any[]>;
+
+  // Dashboard Data
+  getDashboardData(): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1239,6 +1242,27 @@ export class DatabaseStorage implements IStorage {
           .where(eq(slides.id, update.slideId))
       ));
     });
+  }
+
+  async getDashboardData(): Promise<any> {
+    const [packagesData, sessionsData] = await Promise.all([
+      this.getAllPackages(), // This already includes wine counts
+      this.getAllSessions(), // This already includes participant counts
+    ]);
+
+    const overview = {
+      totalPackages: packagesData.length,
+      activePackages: packagesData.filter(p => p.isActive).length,
+      totalSessions: sessionsData.length,
+      activeSessions: sessionsData.filter(s => s.status === 'active').length,
+      totalParticipants: sessionsData.reduce((sum, s) => sum + ((s as any).participantCount || s.activeParticipants || 0), 0),
+      totalWines: packagesData.reduce((sum, p) => sum + ((p as any).wines?.length || 0), 0),
+    };
+
+    // Calculate average rating (placeholder for now)
+    const avgRate = NaN;
+
+    return { overview: { ...overview, avgRate }, packages: packagesData, sessions: sessionsData };
   }
 }
 

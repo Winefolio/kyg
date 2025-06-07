@@ -1,0 +1,87 @@
+Context & Why
+The Sommelier Dashboard is the central hub for our content creators. To be useful, it must provide an accurate, at-a-glance overview of their work. This task connects our beautiful UI to the robust backend, fixing visual bugs (like the "Invalid Date" error), making core features like session monitoring functional, and delivering the analytical insights that provide real value to our users.
+What Needs to Be Done
+Backend: Create a new, efficient storage method and API endpoint (/api/dashboard-data) that aggregates all data required for the dashboard (packages, sessions, analytics stats).
+Frontend: Refactor SommelierDashboard.tsx to use a single useQuery hook to fetch data from the new endpoint.
+UI Implementation: Use the fetched data to correctly render the "Sessions" and "Analytics" tabs.
+Bug Fix: Explicitly fix the "Invalid Date" issue by correctly formatting the date string.
+How to Implement
+Part 1: Backend - Create the Unified Data Endpoint
+File to Modify: server/storage.ts
+Add to IStorage Interface: Add the new method signature.
+// Inside IStorage interface
+getDashboardData(): Promise<any>;
+Use code with caution.
+TypeScript
+Implement the Method: Add the new method to the DatabaseStorage class. This method will efficiently fetch all data in parallel.
+// Inside DatabaseStorage class
+async getDashboardData(): Promise<any> {
+  const [packagesData, sessionsData] = await Promise.all([
+    this.getAllPackages(), // This already includes wine counts
+    this.getAllSessions(), // This already includes participant counts
+  ]);
+
+  const overview = {
+    totalPackages: packagesData.length,
+    activePackages: packagesData.filter(p => p.isActive).length,
+    totalSessions: sessionsData.length,
+    activeSessions: sessionsData.filter(s => s.status === 'active').length,
+    totalParticipants: sessionsData.reduce((sum, s) => sum + s.participantCount, 0),
+    totalWines: packagesData.reduce((sum, p) => sum + (p.wines?.length || 0), 0),
+  };
+
+  // Calculate average rating (example, can be enhanced later)
+  const avgRate = NaN; // Placeholder for now
+
+  return { overview: { ...overview, avgRate }, packages: packagesData, sessions: sessionsData };
+}
+Use code with caution.
+TypeScript
+File to Modify: server/routes.ts
+Add the New Endpoint: Create the new route that calls our new storage method.
+// In server/routes.ts
+app.get("/api/dashboard-data", async (_req, res) => {
+  try {
+    const data = await storage.getDashboardData();
+    res.json(data);
+  } catch (error) {
+    console.error("Error fetching dashboard data:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+Use code with caution.
+TypeScript
+Part 2: Frontend - Refactor SommelierDashboard.tsx
+File to Modify: client/pages/SommelierDashboard.tsx
+Refactor Data Fetching:
+Remove the old useQuery hooks for /api/packages and /api/sessions.
+Add a single useQuery hook to fetch all data from our new endpoint.
+// Replace old useQuery hooks with this one
+const { data: dashboardData, isLoading } = useQuery<any>({
+  queryKey: ["/api/dashboard-data"],
+});
+
+// Destructure the data for easy use
+const packages = dashboardData?.packages || [];
+const sessions = dashboardData?.sessions || [];
+const overviewStats = dashboardData?.overview || {};
+Use code with caution.
+TypeScript
+Implement the "Sessions" Tab:
+Locate the <TabsContent value="sessions"> component.
+Inside it, map over the sessions array you destructured from the dashboardData.
+For each session, render a <Card> component with the following details:
+Package Code: Display session.packageCode.
+Participants: Display session.participantCount.
+Status: Display session.status inside a <Badge>.
+Created Date (BUG FIX): Display the date using new Date(session.createdAt).toLocaleDateString().
+QR Code Button: The onClick handler should be () => { setSelectedSessionForQR(session); setShowQRModal(true); }.
+Implement the "Analytics" Tab:
+Locate the <TabsContent value="analytics"> component.
+Populate the summary statistic cards using the overviewStats object (e.g., overviewStats.totalPackages, overviewStats.totalSessions).
+Populate the "Package Performance" list by mapping over the packages array. For each package, display its name and the count of sessions associated with it from the sessions array.
+Guidance for the Target AI
+This is primarily a refactoring task. The goal is to consolidate data fetching into a single, efficient API call.
+Start with the backend changes in storage.ts and routes.ts first.
+When modifying SommelierDashboard.tsx, be careful to replace the old data sources (packages, sessions) with the new ones derived from the single dashboardData query.
+The most critical bug fix is the date formatting. Ensure you use new Date(dateString).toLocaleDateString() to prevent the "Invalid Date" error.
