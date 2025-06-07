@@ -762,13 +762,13 @@ export default function SommelierDashboard() {
                           <div className="flex items-center justify-between">
                             <span>Participants:</span>
                             <span className="text-white">
-                              {session.activeParticipants || 0}
+                              {(session as any).activeParticipants || 0}
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span>Created:</span>
                             <span className="text-white">
-                              {session.updatedAt ? format(new Date(session.updatedAt), 'MMM d, yyyy') : 'N/A'}
+                              {(session as any).updatedAt ? format(new Date((session as any).updatedAt), 'MMM d, yyyy') : 'N/A'}
                             </span>
                           </div>
                         </div>
