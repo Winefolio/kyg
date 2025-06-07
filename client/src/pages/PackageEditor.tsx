@@ -231,7 +231,12 @@ export default function PackageEditor() {
                           </div>
                           <AnimatePresence>
                             {isExpanded && (
-                              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="pl-4 mt-2 border-l-2 border-white/10 ml-5 space-y-4 py-2">
+                              <motion.div 
+                                initial={{ height: 0, opacity: 0 }} 
+                                animate={{ height: "auto", opacity: 1 }} 
+                                exit={{ height: 0, opacity: 0 }} 
+                                className="pl-4 mt-2 border-l-2 border-white/10 ml-5 space-y-4 py-2"
+                              >
                                 {Object.entries(sectionDetails).map(([key, { title, icon }]) => {
                                   const sectionSlides = wineSlides.filter(s => s.section_type === key);
                                   return (
@@ -246,7 +251,8 @@ export default function PackageEditor() {
                                           </PopoverTrigger>
                                           <PopoverContent className="w-56 p-1 bg-gray-900/80 border-gray-700 backdrop-blur-md">
                                             <div className="space-y-1">
-                                              {(slideTemplates as any[]).filter((template: any) => template.sectionType === key).map((template: any) => (
+                                              {/* THE FIX: Map over ALL slideTemplates, not a filtered list */}
+                                              {slideTemplates.map((template: any) => (
                                                 <Button
                                                   key={template.id}
                                                   variant="ghost"
@@ -261,10 +267,14 @@ export default function PackageEditor() {
                                           </PopoverContent>
                                         </Popover>
                                       </div>
-                                      <div className="pl-2 space-y-1">
+                                      <div className="pl-4 space-y-1">
                                         {sectionSlides.length > 0 ? (
                                           sectionSlides.map(slide => (
-                                            <div key={slide.id} className={`p-2 rounded-md cursor-pointer transition-colors ${activeSlideId === slide.id ? 'bg-purple-600/30' : 'hover:bg-white/10'}`} onClick={() => setActiveSlideId(slide.id)}>
+                                            <div 
+                                              key={slide.id} 
+                                              className={`p-2 rounded-md cursor-pointer transition-colors ${activeSlideId === slide.id ? 'bg-purple-600/30' : 'hover:bg-white/10'}`} 
+                                              onClick={() => setActiveSlideId(slide.id)}
+                                            >
                                               <p className="text-sm font-medium text-white truncate">{(slide.payloadJson as any)?.title || 'Untitled Slide'}</p>
                                             </div>
                                           ))

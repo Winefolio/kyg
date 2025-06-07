@@ -1,0 +1,83 @@
+Context & Why
+This task corrects a previous implementation that was both functionally broken and a visual step backward. By implementing a section-first workflow where any template can be added to any section, we fully empower the sommelier and create a flexible, scalable content creation system that aligns with our architectural goals.
+What Needs to Be Done
+In PackageEditor.tsx:
+Ensure the handleAddSlide function is correctly defined to accept sectionType.
+Restore the intended sidebar UI, with distinct "Intro," "Deep Dive," and "Ending" sections for each wine.
+Fix the popover logic: each section's "+" button should open a popover that lists all available slideTemplates, not a filtered list.
+Ensure the onClick handler for each template button in the popover calls handleAddSlide with the correct sectionType.
+How to Implement
+This is a single, surgical task for the AI agent, focused on one file.
+File to Modify: client/pages/PackageEditor.tsx
+Action: Locate the AnimatePresence block for the expanded wine card (around line 407 in your correct version) and replace its entire content with the following finalized JSX and logic.
+REPLACE THIS:
+// The previous broken block started with <motion.div initial={{ height: 0...
+// and contained the incorrect filtering logic.
+// Delete this entire block.
+Use code with caution.
+Tsx
+WITH THIS:
+<AnimatePresence>
+  {isExpanded && (
+    <motion.div 
+      initial={{ height: 0, opacity: 0 }} 
+      animate={{ height: "auto", opacity: 1 }} 
+      exit={{ height: 0, opacity: 0 }} 
+      className="pl-4 mt-2 border-l-2 border-white/10 ml-5 space-y-4 py-2"
+    >
+      {Object.entries(sectionDetails).map(([key, { title, icon }]) => {
+        const sectionSlides = wineSlides.filter(s => s.section_type === key);
+        return (
+          <div key={key}>
+            <div className="flex items-center justify-between mb-1">
+              <h4 className="text-sm font-semibold text-white/90 flex items-center">{icon}<span className="ml-2">{title}</span></h4>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-purple-300 hover:bg-purple-500/20 hover:text-purple-200">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-1 bg-gray-900/80 border-gray-700 backdrop-blur-md">
+                  <div className="space-y-1">
+                    {/* THE FIX: Map over ALL slideTemplates, not a filtered list */}
+                    {slideTemplates.map(template => (
+                      <Button
+                        key={template.id}
+                        variant="ghost"
+                        className="w-full justify-start font-normal h-8 text-white/80"
+                        onClick={() => handleAddSlide(wine.id, key as any, template)}
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4 text-purple-400" />
+                        {template.name}
+                      </Button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="pl-4 space-y-1">
+              {sectionSlides.length > 0 ? (
+                sectionSlides.map(slide => (
+                  <div 
+                    key={slide.id} 
+                    className={`p-2 rounded-md cursor-pointer transition-colors ${activeSlideId === slide.id ? 'bg-purple-600/30' : 'hover:bg-white/10'}`} 
+                    onClick={() => setActiveSlideId(slide.id)}
+                  >
+                    <p className="text-sm font-medium text-white truncate">{(slide.payloadJson as any)?.title || 'Untitled Slide'}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-white/50 italic px-2 py-1">No slides in this section.</p>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </motion.div>
+  )}
+</AnimatePresence>
+Use code with caution.
+Tsx
+This corrected block of code does two crucial things:
+It restores the beautiful, sectioned UI from your screenshot.
+It fixes the functional bug by removing the incorrect filter, ensuring that when you click any "+" button, you see the full list of available templates to add to that section.
