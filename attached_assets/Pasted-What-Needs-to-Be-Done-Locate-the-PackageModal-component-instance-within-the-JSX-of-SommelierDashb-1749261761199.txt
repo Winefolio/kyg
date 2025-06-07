@@ -1,0 +1,59 @@
+What Needs to Be Done
+Locate the <PackageModal> component instance within the JSX of SommelierDashboard.tsx.
+Modify its onSave prop to correctly call createPackageMutation.mutate(data).
+How to Implement
+File to Modify: client/pages/SommelierDashboard.tsx
+Locate the PackageModal component. It is near the end of the file, around line 980.
+Identify the onSave prop. The current code is likely missing the call to the mutation.
+Replace the entire onSave prop with the following corrected logic:
+// Find this part of the code in SommelierDashboard.tsx
+<PackageModal
+  mode={packageModalMode}
+  package={selectedPackage} // The name of the prop is 'package' in the modal definition
+  onClose={() => setPackageModalOpen(false)}
+  // --------------------------------------------------
+  // REPLACE THE ENTIRE onSave PROP WITH THIS BLOCK:
+  onSave={(data) => {
+    if (packageModalMode === "create") {
+      createPackageMutation.mutate(data);
+    } else if (packageModalMode === "edit" && selectedPackage) {
+      updatePackageMutation.mutate({ id: selectedPackage.id, data });
+    }
+  }}
+  // --------------------------------------------------
+/>
+
+// NOTE: The prop name in the PackageModal definition is `package`, not `packageData`.
+// I have corrected this in my analysis to match the code you provided.
+// The key is ensuring `createPackageMutation.mutate(data)` is called.
+Use code with caution.
+Tsx
+Secondary Fix (UX Improvement): Implement "Click-Off" Sidebar
+To address your other excellent point, here is the surgical fix for the sidebar in the editor.
+File to Modify: client/pages/PackageEditor.tsx
+Locate the main div in the return statement (around line 254).
+Insert the backdrop motion.div right after the main header div and before the div with className="flex...".
+// In client/pages/PackageEditor.tsx
+return (
+  <div className="min-h-screen bg-gradient-primary text-white">
+    {/* Header */}
+    <div className="sticky top-0 z-40 ...">
+      {/* ... existing header code ... */}
+    </div>
+
+    {/* --- ADD THIS BLOCK --- */}
+    <AnimatePresence>
+      {sidebarOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden"
+        />
+      )}
+    </AnimatePresence>
+    {/* --- END OF BLOCK TO ADD --- */}
+
+    <div className="flex h-[calc(100vh-57px)]">
+      {/* ... rest of the file ... */}
