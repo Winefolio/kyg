@@ -631,9 +631,14 @@ export default function TastingSession() {
                 <h2 className="text-white font-semibold text-sm truncate">
                   {slidesData?.package?.name || 'Wine Tasting'}
                 </h2>
-                <p className="text-white/60 text-xs">
-                  Slide {currentSlideIndex + 1} of {slides.length}
-                </p>
+                {currentSlide && packageData?.wines && (
+                  <p className="text-white/60 text-xs truncate">
+                    {(() => {
+                      const currentWine = packageData.wines.find((w: any) => w.id === currentSlide.packageWineId);
+                      return currentWine?.wineName || currentWine?.wine_name || `Slide ${currentSlideIndex + 1} of ${slides.length}`;
+                    })()}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -658,18 +663,6 @@ export default function TastingSession() {
               </div>
             </div>
           </div>
-          
-          {/* Current Wine Name */}
-          {currentSlide && packageData?.wines && (
-            <div className="px-4 py-2">
-              <p className="text-white/80 text-sm font-medium">
-                {(() => {
-                  const currentWine = packageData.wines.find((w: any) => w.id === currentSlide.packageWineId);
-                  return currentWine?.wineName || currentWine?.wine_name || '';
-                })()}
-              </p>
-            </div>
-          )}
           
           {/* Segmented Progress Bar */}
           <SegmentedProgressBar 
