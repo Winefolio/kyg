@@ -331,6 +331,29 @@ export default function TastingSession() {
   const renderSlideContent = (slide: Slide) => {
     const payload = slide.payloadJson as any;
 
+    // Helper function to get section badge styling
+    const getSectionBadge = (sectionType: string) => {
+      const sectionConfig = {
+        intro: { label: 'Introduction', color: 'bg-blue-500/20 text-blue-200 border-blue-400/30' },
+        deep_dive: { label: 'Deep Dive', color: 'bg-purple-500/20 text-purple-200 border-purple-400/30' },
+        ending: { label: 'Conclusion', color: 'bg-green-500/20 text-green-200 border-green-400/30' }
+      };
+      
+      const config = sectionConfig[sectionType as keyof typeof sectionConfig];
+      if (!config) return null;
+      
+      return (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border backdrop-blur-sm ${config.color} mb-4`}
+        >
+          {config.label}
+        </motion.div>
+      );
+    };
+
     if (slide.type === 'interlude') {
       return (
         <motion.div
@@ -350,6 +373,13 @@ export default function TastingSession() {
           )}
 
           <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-2xl flex-grow flex flex-col justify-center">
+            {/* Section Badge */}
+            {slide.sectionType && (
+              <div className="text-center mb-4">
+                {getSectionBadge(slide.sectionType)}
+              </div>
+            )}
+            
             {/* Only show title if it's different from wine name to avoid duplication */}
             {payload.title && payload.title !== payload.wine_name && (
               <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 sm:mb-4">
@@ -372,7 +402,21 @@ export default function TastingSession() {
     }
 
     if (slide.type === 'question') {
-      return renderQuestion(slide);
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full"
+        >
+          {/* Section Badge for Questions */}
+          {slide.sectionType && (
+            <div className="text-center mb-4">
+              {getSectionBadge(slide.sectionType)}
+            </div>
+          )}
+          {renderQuestion(slide)}
+        </motion.div>
+      );
     }
 
     // Handle wine transitions - use same style as section transitions
@@ -751,10 +795,17 @@ export default function TastingSession() {
                                   }`}>
                                     {isCompleted ? '✓' : slideIndex + 1}
                                   </div>
-                                  <span className="truncate">
-                                    {slide.type === 'interlude' ? 'Introduction' : 
-                                     (slide.payloadJson as any)?.title || `Question ${slideIndex + 1}`}
-                                  </span>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="truncate">
+                                      {slide.type === 'interlude' ? 'Introduction' : 
+                                       (slide.payloadJson as any)?.title || `Question ${slideIndex + 1}`}
+                                    </span>
+                                    {slide.sectionType && (
+                                      <span className="text-xs opacity-60 capitalize">
+                                        {slide.sectionType.replace('_', ' ')}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                                 {isCurrent && (
                                   <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse" />

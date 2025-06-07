@@ -30,10 +30,18 @@ export function ImageUpload({
   const compressImage = (file: File, maxWidth: number = 1200, quality: number = 0.8): Promise<string> => {
     return new Promise((resolve) => {
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext('2d');
       const img = new Image();
       
       img.onload = () => {
+        if (!ctx) {
+          // Fallback: return original file as data URL
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.readAsDataURL(file);
+          return;
+        }
+        
         // Calculate new dimensions while maintaining aspect ratio
         let { width, height } = img;
         
