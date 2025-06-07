@@ -7,6 +7,8 @@ import {
   type InsertSlide,
   type Session,
   type InsertSession,
+  type SessionWineSelection,
+  type InsertSessionWineSelection,
   type Participant,
   type InsertParticipant,
   type Response,
@@ -17,6 +19,7 @@ import {
   packageWines,
   slides,
   sessions,
+  sessionWineSelections,
   participants,
   responses,
   glossaryTerms,
@@ -89,6 +92,12 @@ export interface IStorage {
     sessionId: string,
     status: string,
   ): Promise<Session | undefined>;
+
+  // Session Wine Selections
+  createSessionWineSelections(sessionId: string, selections: InsertSessionWineSelection[]): Promise<SessionWineSelection[]>;
+  getSessionWineSelections(sessionId: string): Promise<(SessionWineSelection & { wine: PackageWine })[]>;
+  updateSessionWineSelections(sessionId: string, selections: InsertSessionWineSelection[]): Promise<SessionWineSelection[]>;
+  deleteSessionWineSelections(sessionId: string): Promise<void>;
 
   // Participants
   createParticipant(participant: InsertParticipant): Promise<Participant>;
@@ -1186,6 +1195,72 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSlide(id: string): Promise<void> {
     await db.delete(slides).where(eq(slides.id, id));
+  }
+
+  // Session Wine Selections - Host wine selection feature
+  async createSessionWineSelections(sessionId: string, selections: InsertSessionWineSelection[]): Promise<SessionWineSelection[]> {
+    // First delete existing selections for this session
+    await this.deleteSessionWineSelections(sessionId);
+    
+    // Insert new selections
+    const insertData = selections.map(selection => ({
+      ...selection,
+      sessionId
+    }));
+    
+    const newSelections = await db
+      .insert(sessionWineSelections)
+      .values(insertData)
+      .returning();
+    
+    return newSelections;
+  }
+
+  async getSessionWineSelections(sessionId: string): Promise<(SessionWineSelection & { wine: PackageWine })[]> {
+    const selections = await db
+      .select({
+        id: sessionWineSelections.id,
+        sessionId: sessionWineSelections.sessionId,
+        packageWineId: sessionWineSelections.packageWineId,
+        position: sessionWineSelections.position,
+        isIncluded: sessionWineSelections.isIncluded,
+        createdAt: sessionWineSelections.createdAt,
+        wine: {
+          id: packageWines.id,
+          packageId: packageWines.packageId,
+          wineName: packageWines.wineName,
+          wineDescription: packageWines.wineDescription,
+          wineImageUrl: packageWines.wineImageUrl,
+          wineType: packageWines.wineType,
+          vintage: packageWines.vintage,
+          region: packageWines.region,
+          producer: packageWines.producer,
+          grapeVarietals: packageWines.grapeVarietals,
+          alcoholContent: packageWines.alcoholContent,
+          position: packageWines.position,
+          expectedCharacteristics: packageWines.expectedCharacteristics,
+          createdAt: packageWines.createdAt
+        }
+      })
+      .from(sessionWineSelections)
+      .innerJoin(packageWines, eq(sessionWineSelections.packageWineId, packageWines.id))
+      .where(eq(sessionWineSelections.sessionId, sessionId))
+      .orderBy(sessionWineSelections.position);
+
+    return selections.map(selection => ({
+      ...selection,
+      wine: selection.wine as PackageWine
+    }));
+  }
+
+  async updateSessionWineSelections(sessionId: string, selections: InsertSessionWineSelection[]): Promise<SessionWineSelection[]> {
+    return this.createSessionWineSelections(sessionId, selections);
+  }
+
+  async deleteSessionWineSelections(sessionId: string): Promise<void> {
+    await db
+      .delete(sessionWineSelections)
+      .where(eq(sessionWineSelections.sessionId, sessionId));
   }
 
   // NEW: Get all packages with their associated wines for the dashboard

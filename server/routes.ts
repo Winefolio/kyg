@@ -48,8 +48,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isHost = participant?.isHost || false;
       }
 
-      // Get all wines for this package
-      const wines = await storage.getPackageWines(pkg.id);
+      // Check if this request is from a session that has wine selections
+      let wines = await storage.getPackageWines(pkg.id);
+      if (participantId) {
+        const participant = await storage.getParticipantById(participantId as string);
+        if (participant?.sessionId) {
+          // Check if this session has custom wine selections
+          const sessionWineSelections = await storage.getSessionWineSelections(participant.sessionId);
+          if (sessionWineSelections.length > 0) {
+            // Use session-specific wine selections, ordered by host preference
+            wines = sessionWineSelections
+              .filter(selection => selection.isIncluded)
+              .sort((a, b) => a.position - b.position)
+              .map(selection => selection.wine);
+          }
+        }
+      }
+
       let allSlides: any[] = [];
 
       // Get slides for each wine and combine them
@@ -249,6 +264,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: error.message });
       }
       res.status(500).json({ message: "Internal server error updating session status." });
+    }
+  });
+
+  // Session Wine Selection Routes
+  app.get("/api/sessions/:sessionId/wine-selections", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const selections = await storage.getSessionWineSelections(sessionId);
+      res.json(selections);
+    } catch (error) {
+      console.error("Error fetching session wine selections:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/sessions/:sessionId/wine-selections", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { selections } = req.body;
+      
+      const savedSelections = await storage.createSessionWineSelections(sessionId, selections);
+      res.json(savedSelections);
+    } catch (error) {
+      console.error("Error creating session wine selections:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.put("/api/sessions/:sessionId/wine-selections", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { selections } = req.body;
+      
+      const updatedSelections = await storage.updateSessionWineSelections(sessionId, selections);
+      res.json(updatedSelections);
+    } catch (error) {
+      console.error("Error updating session wine selections:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
