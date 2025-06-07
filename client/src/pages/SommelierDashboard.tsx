@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -164,27 +163,17 @@ export default function SommelierDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch unified dashboard data
-  const { data: dashboardData, isLoading: dashboardLoading } = useQuery<{
-    overview: {
-      totalPackages: number;
-      activePackages: number;
-      totalSessions: number;
-      activeSessions: number;
-      totalParticipants: number;
-      totalWines: number;
-      avgRate: number;
-    };
-    packages: Package[];
-    sessions: Session[];
-  }>({
-    queryKey: ["/api/dashboard-data"],
+  // Fetch packages
+  const { data: packages, isLoading: packagesLoading } = useQuery<Package[]>({
+    queryKey: ["/api/packages"],
     enabled: true,
   });
 
-  const packages = dashboardData?.packages || [];
-  const sessions = dashboardData?.sessions || [];
-  const overview = dashboardData?.overview;
+  // Fetch sessions
+  const { data: sessions, isLoading: sessionsLoading } = useQuery<Session[]>({
+    queryKey: ["/api/sessions"],
+    enabled: activeTab === "sessions",
+  });
 
   // Create package mutation
   const createPackageMutation = useMutation({
@@ -195,8 +184,8 @@ export default function SommelierDashboard() {
     onSuccess: (result) => {
       console.log("Package created successfully:", result);
       // Force immediate cache refresh and refetch
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard-data"] });
-      queryClient.refetchQueries({ queryKey: ["/api/dashboard-data"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      queryClient.refetchQueries({ queryKey: ["/api/packages"] });
       setPackageModalOpen(false);
       toast({
         title: "Package created successfully",
@@ -438,7 +427,7 @@ export default function SommelierDashboard() {
 
           {/* Packages Tab */}
           <TabsContent value="packages" className="mt-6">
-            {dashboardLoading ? (
+            {packagesLoading ? (
               <div className="flex justify-center py-12">
                 <motion.div
                   animate={{ rotate: 360 }}
@@ -712,7 +701,7 @@ export default function SommelierDashboard() {
           {/* Sessions Tab */}
           <TabsContent value="sessions" className="mt-6">
             <div className="space-y-6">
-              {dashboardLoading ? (
+              {sessionsLoading ? (
                 <div className="flex justify-center py-12">
                   <motion.div
                     animate={{ rotate: 360 }}
@@ -762,13 +751,13 @@ export default function SommelierDashboard() {
                           <div className="flex items-center justify-between">
                             <span>Participants:</span>
                             <span className="text-white">
-                              {(session as any).activeParticipants || 0}
+                              {session.participantCount}
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span>Created:</span>
                             <span className="text-white">
-                              {(session as any).updatedAt ? format(new Date((session as any).updatedAt), 'MMM d, yyyy') : 'N/A'}
+                              {new Date(session.createdAt).toLocaleDateString()}
                             </span>
                           </div>
                         </div>
@@ -824,7 +813,7 @@ export default function SommelierDashboard() {
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="mt-6">
             <div className="space-y-6">
-              {dashboardLoading ? (
+              {packagesLoading || sessionsLoading ? (
                 <div className="flex justify-center py-12">
                   <motion.div
                     animate={{ rotate: 360 }}
@@ -844,33 +833,33 @@ export default function SommelierDashboard() {
                     <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center col-span-2 lg:col-span-1">
                       <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-blue-400 mx-auto mb-2" />
                       <div className="text-xl md:text-2xl font-bold text-white">
-                        {overview?.totalPackages || 0}
+                        {packages?.length || 0}
                       </div>
                       <div className="text-white/70 text-xs md:text-sm">
                         Total Packages
                       </div>
                       <div className="text-green-400 text-xs mt-1">
-                        {overview?.activePackages || 0} active
+                        {packages?.filter(p => p.isActive).length || 0} active
                       </div>
                     </Card>
 
                     <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
                       <Users className="w-6 h-6 md:w-8 md:h-8 text-purple-400 mx-auto mb-2" />
                       <div className="text-xl md:text-2xl font-bold text-white">
-                        {overview?.totalSessions || 0}
+                        {sessions?.length || 0}
                       </div>
                       <div className="text-white/70 text-xs md:text-sm">
                         Sessions
                       </div>
                       <div className="text-green-400 text-xs mt-1">
-                        {overview?.activeSessions || 0} active
+                        {sessions?.filter(s => s.status === 'active').length || 0} active
                       </div>
                     </Card>
 
                     <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
                       <Activity className="w-6 h-6 md:w-8 md:h-8 text-pink-400 mx-auto mb-2" />
                       <div className="text-xl md:text-2xl font-bold text-white">
-                        {overview?.totalParticipants || 0}
+                        {sessions?.reduce((total, s) => total + s.participantCount, 0) || 0}
                       </div>
                       <div className="text-white/70 text-xs md:text-sm">
                         Participants
@@ -880,7 +869,13 @@ export default function SommelierDashboard() {
                     <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
                       <BarChart3 className="w-6 h-6 md:w-8 md:h-8 text-yellow-400 mx-auto mb-2" />
                       <div className="text-xl md:text-2xl font-bold text-white">
-                        {overview?.avgRate && !isNaN(overview.avgRate) ? overview.avgRate.toFixed(1) : "N/A"}
+                        {sessions && sessions.length > 0
+                          ? Math.round(
+                              (sessions.reduce((total, s) => total + s.participantCount, 0) /
+                                sessions.length) *
+                                10,
+                            ) / 10
+                          : 0}
                       </div>
                       <div className="text-white/70 text-xs md:text-sm">
                         Avg Rate
@@ -890,7 +885,7 @@ export default function SommelierDashboard() {
                     <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
                       <Wine className="w-6 h-6 md:w-8 md:h-8 text-red-400 mx-auto mb-2" />
                       <div className="text-xl md:text-2xl font-bold text-white">
-                        {overview?.totalWines || 0}
+                        {packages?.reduce((total, p) => total + (p.wines?.length || 0), 0) || 0}
                       </div>
                       <div className="text-white/70 text-xs md:text-sm">
                         Total Wines
@@ -1058,7 +1053,7 @@ function PackageModal({
   const [formData, setFormData] = useState({
     name: pkg?.name || "",
     description: pkg?.description || "",
-    imageUrl: (pkg as any)?.imageUrl || "",
+    imageUrl: pkg?.imageUrl || "",
     isActive: pkg?.isActive ?? true,
   });
 

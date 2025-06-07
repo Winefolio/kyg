@@ -428,16 +428,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dashboard-data", async (_req, res) => {
-    try {
-      const data = await storage.getDashboardData();
-      res.json(data);
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
   // Create package with server-generated code
   app.post("/api/packages", async (req, res) => {
     try {
