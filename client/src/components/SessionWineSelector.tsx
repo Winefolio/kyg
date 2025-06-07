@@ -41,6 +41,15 @@ export function SessionWineSelector({ sessionId, packageId, onSelectionChange }:
 
   // Initialize wine selections when data loads
   useEffect(() => {
+    console.log('SessionWineSelector Debug:', {
+      packageWinesLength: packageWines.length,
+      sessionSelectionsLength: sessionSelections.length,
+      packageId,
+      sessionId,
+      winesLoading,
+      selectionsLoading
+    });
+
     if (packageWines.length > 0) {
       if (sessionSelections.length > 0) {
         // Use existing session selections
@@ -50,6 +59,7 @@ export function SessionWineSelector({ sessionId, packageId, onSelectionChange }:
           isIncluded: selection.isIncluded
         }));
         setWineSelections(selections.sort((a, b) => a.position - b.position));
+        console.log('Using existing session selections:', selections);
       } else {
         // Initialize with all wines included in original order
         const initialSelections = packageWines
@@ -60,9 +70,10 @@ export function SessionWineSelector({ sessionId, packageId, onSelectionChange }:
             isIncluded: true
           }));
         setWineSelections(initialSelections);
+        console.log('Created initial selections:', initialSelections);
       }
     }
-  }, [packageWines, sessionSelections]);
+  }, [packageWines, sessionSelections, packageId, sessionId, winesLoading, selectionsLoading]);
 
   // Update parent component when selection changes
   useEffect(() => {

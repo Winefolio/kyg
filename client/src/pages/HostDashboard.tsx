@@ -400,14 +400,21 @@ export default function HostDashboard() {
 
           <TabsContent value="wines" className="space-y-6">
             {session?.packageId && (
-              <SessionWineSelector 
-                sessionId={session.id}
-                packageId={session.packageId}
-                onSelectionChange={(selectedCount) => {
-                  // Optional: Track selected wine count for UI feedback
-                  console.log(`Host selected ${selectedCount} wines for session`);
-                }}
-              />
+              <>
+                <div className="bg-blue-500/10 border border-blue-400/20 rounded-xl p-4">
+                  <div className="text-sm text-blue-200">
+                    <p>Debug: Session ID: {session.id}</p>
+                    <p>Debug: Package ID: {session.packageId}</p>
+                  </div>
+                </div>
+                <SessionWineSelector 
+                  sessionId={session.id}
+                  packageId={session.packageId}
+                  onSelectionChange={(selectedCount) => {
+                    console.log(`Host selected ${selectedCount} wines for session`);
+                  }}
+                />
+              </>
             )}
             {!session?.packageId && (
               <Card className="bg-gradient-card backdrop-blur-xl border border-white/20">
