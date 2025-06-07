@@ -1,0 +1,157 @@
+How to Implement:
+1. Modify Backend to Include Package Data
+File: server/routes.ts
+Action: In the /api/packages/:code/slides endpoint, modify the final res.json call to include the pkg object.
+Around Line 80:
+Current Code:
+res.json({ slides: allSlides, totalCount: allSlides.length, wines });
+Use code with caution.
+TypeScript
+New Code:
+res.json({ package: pkg, slides: allSlides, totalCount: allSlides.length, wines });
+Use code with caution.
+TypeScript
+2. Overhaul TastingSession.tsx
+File: client/src/pages/TastingSession.tsx
+Action: Refactor the component to consume the new data structure and fix the UI.
+Update the useQuery hook (around line 55):
+Change the generic type to reflect the new API response structure.
+Current: useQuery<{ slides: Slide[]; totalCount: number; wines: any[] }>
+New: useQuery<{ package: Package; slides: Slide[]; totalCount: number; wines: any[] }>
+Update the Header JSX (around line 620):
+Replace the placeholder text with the actual data from the query.
+Current Structure (Conceptual):
+<h2 className="text-white font-semibold text-sm">
+  BOOBIES
+</h2>
+<p className="text-white/60 text-xs">
+  BOOBIES
+</p>
+Use code with caution.
+Jsx
+New Structure:
+<h2 className="text-white font-semibold text-sm truncate">
+  {slidesData?.package?.name || 'Wine Tasting'}
+</h2>
+{currentSlide?.wineInfo && (
+    <p className="text-white/60 text-xs truncate">
+        {currentSlide.wineInfo.wineName}
+    </p>
+)}
+Use code with caution.
+Tsx
+(Note: You might need to adjust based on the exact variable names, but the principle is to use slidesData.package.name for the package and currentSlide.wineInfo.wineName for the wine.)
+Update the renderSlideContent function (around line 356):
+Modify the interlude case to have a more distinct, elegant, and centered layout. This ensures it feels like a proper transition.
+Current interlude return:
+// ... a complex block with image and text side-by-side
+Use code with caution.
+TypeScript
+New interlude return:
+if (slide.type === 'interlude') {
+  return (
+    <motion.div
+      key={slide.id + '-interlude'}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+      className="text-center space-y-4 sm:space-y-6 flex flex-col justify-center items-center h-full max-w-lg mx-auto"
+    >
+      {(payload.wine_image || payload.wineImageUrl) && (
+        <div className="flex-shrink-0">
+          <img
+            src={payload.wine_image || payload.wineImageUrl}
+            alt={payload.wine_name || payload.wineName || "Wine"}
+            className="w-32 h-48 sm:w-40 sm:h-60 mx-auto rounded-xl shadow-2xl object-cover border-4 border-white/10"
+          />
+        </div>
+      )}
+      <div className="space-y-2">
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
+          <DynamicTextRenderer text={payload.title} />
+        </h2>
+        {(payload.wine_name || payload.wineName) && (
+          <h3 className="text-lg sm:text-xl text-purple-300">
+            <DynamicTextRenderer text={payload.wine_name || payload.wineName} />
+          </h3>
+        )}
+        {payload.description && (
+          <p className="text-white/70 text-base sm:text-lg leading-relaxed max-w-md mx-auto">
+            <DynamicTextRenderer text={payload.description} />
+          </p>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+Use code with caution.
+Tsx
+3. Fix the Multiple Choice Bug
+File: client/src/components/questions/EnhancedMultipleChoice.tsx
+Action: Add a slideId prop and use it to create unique IDs for the form elements.
+Update the component props (around line 15):
+Current:
+interface EnhancedMultipleChoiceProps {
+  question: { /* ... */ };
+  value: { /* ... */ };
+  onChange: (value: { selected: string[]; notes?: string }) => void;
+}
+Use code with caution.
+TypeScript
+New:
+interface EnhancedMultipleChoiceProps {
+  slideId: string; // Add this prop
+  question: { /* ... */ };
+  value: { /* ... */ };
+  onChange: (value: { selected: string[]; notes?: string }) => void;
+}
+Use code with caution.
+TypeScript
+Update the component signature (around line 31):
+Current: export function EnhancedMultipleChoice({ question, value, onChange }: EnhancedMultipleChoiceProps) {
+New: export function EnhancedMultipleChoice({ slideId, question, value, onChange }: EnhancedMultipleChoiceProps) {
+Update the option rendering map function (around line 111):
+This is the critical fix. We need to make the IDs for the button and the div inside it unique. A simple way is to use the option's id.
+Current: key={option.id}
+New: key={
+s
+l
+i
+d
+e
+I
+d
+−
+slideId−
+{option.id}}
+4. Update the Parent Component TastingSession.tsx
+File: client/src/pages/TastingSession.tsx
+Action: Pass the new slideId prop to the EnhancedMultipleChoice component.
+Find the renderQuestion function (around line 305):
+Inside the 'multiple_choice' case:
+Current:
+return (
+  <EnhancedMultipleChoice
+    question={payload}
+    // ... other props
+  />
+);
+Use code with caution.
+Tsx
+New:
+return (
+  <EnhancedMultipleChoice
+    slideId={slide.id} // Add this line
+    question={payload}
+    // ... other props
+  />
+);
+Use code with caution.
+Tsx
+(Note: The user's provided code uses MultipleChoiceQuestion, but the UI in the screenshot and modern design principles suggest EnhancedMultipleChoice is the target. If the bug persists, apply a similar slideId prefixing strategy to the id and htmlFor attributes in MultipleChoiceQuestion.tsx.)
+Guidance for Target AI:
+You are fixing a user-facing session. The visual and functional correctness of this flow is paramount.
+The backend change is simple but foundational for the UI fix. Do it first.
+When modifying TastingSession.tsx, ensure you correctly access the nested package data: slidesData.package.name.
+The key to the multiple-choice bug is ensuring that rendered HTML elements have unique IDs. Prefixing with the slide ID is the most robust way to achieve this.
+After the changes, the screenshot's header text should be replaced with real data, and the multiple-choice options should work independently.

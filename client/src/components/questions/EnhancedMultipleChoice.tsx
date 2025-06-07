@@ -13,6 +13,7 @@ interface Option {
 }
 
 interface EnhancedMultipleChoiceProps {
+  slideId: string;
   question: {
     title: string;
     description?: string;
@@ -28,7 +29,7 @@ interface EnhancedMultipleChoiceProps {
   onChange: (value: { selected: string[]; notes?: string }) => void;
 }
 
-export function EnhancedMultipleChoice({ question, value, onChange }: EnhancedMultipleChoiceProps) {
+export function EnhancedMultipleChoice({ slideId, question, value, onChange }: EnhancedMultipleChoiceProps) {
   const [showNotes, setShowNotes] = useState(false);
   const [showAromaDiagram, setShowAromaDiagram] = useState(false);
   
@@ -113,7 +114,7 @@ export function EnhancedMultipleChoice({ question, value, onChange }: EnhancedMu
           
           return (
             <motion.button
-              key={option.id}
+              key={`${slideId}-${option.id}`}
               onClick={() => handleOptionToggle(option.id)}
               className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
                 isSelected

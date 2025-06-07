@@ -14,7 +14,7 @@ import { useHaptics } from "@/hooks/useHaptics";
 import { apiRequest } from "@/lib/queryClient";
 import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause, Award, Wine, ChevronDown } from "lucide-react";
 import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
-import type { Slide, Participant, Session } from "@shared/schema";
+import type { Slide, Participant, Session, Package } from "@shared/schema";
 
 export default function TastingSession() {
   const { sessionId, participantId } = useParams();
@@ -52,7 +52,7 @@ export default function TastingSession() {
   });
 
   // Get session slides and wine data - use dynamic package code from session
-  const { data: slidesData, isLoading } = useQuery<{ slides: Slide[]; totalCount: number; wines: any[] }>({
+  const { data: slidesData, isLoading } = useQuery<{ package: Package; slides: Slide[]; totalCount: number; wines: any[] }>({
     queryKey: [`/api/packages/${currentSession?.packageCode}/slides`, participantId],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/packages/${currentSession?.packageCode}/slides?participantId=${participantId}`, null);
@@ -357,42 +357,39 @@ export default function TastingSession() {
     if (slide.type === 'interlude') {
       return (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-4 sm:space-y-6 flex flex-col justify-center h-full"
+          key={slide.id + '-interlude'}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="text-center space-y-4 sm:space-y-6 flex flex-col justify-center items-center h-full max-w-lg mx-auto"
         >
-          {/* Wine Image */}
+          {/* Section Badge */}
+          {slide.section_type && (
+            <div className="text-center mb-4">
+              {getSectionBadge(slide.section_type)}
+            </div>
+          )}
+          
           {(payload.wine_image || payload.wineImageUrl) && (
             <div className="flex-shrink-0">
               <img
                 src={payload.wine_image || payload.wineImageUrl}
                 alt={payload.wine_name || payload.wineName || "Wine"}
-                className="w-40 h-56 sm:w-48 sm:h-64 mx-auto rounded-2xl shadow-2xl object-cover"
+                className="w-32 h-48 sm:w-40 sm:h-60 mx-auto rounded-xl shadow-2xl object-cover border-4 border-white/10"
               />
             </div>
           )}
-
-          <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-white/20 shadow-2xl flex-grow flex flex-col justify-center">
-            {/* Section Badge */}
-            {slide.section_type && (
-              <div className="text-center mb-4">
-                {getSectionBadge(slide.section_type)}
-              </div>
-            )}
-            
-            {/* Only show title if it's different from wine name to avoid duplication */}
-            {payload.title && payload.title !== payload.wine_name && (
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 sm:mb-4">
-                <DynamicTextRenderer text={payload.title} />
-              </h2>
-            )}
+          <div className="space-y-2">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
+              <DynamicTextRenderer text={payload.title} />
+            </h2>
             {(payload.wine_name || payload.wineName) && (
-              <h3 className="text-lg sm:text-xl text-purple-200 mb-3 sm:mb-4">
+              <h3 className="text-lg sm:text-xl text-purple-300">
                 <DynamicTextRenderer text={payload.wine_name || payload.wineName} />
               </h3>
             )}
             {payload.description && (
-              <p className="text-white/70 text-sm sm:text-base leading-relaxed">
+              <p className="text-white/70 text-base sm:text-lg leading-relaxed max-w-md mx-auto">
                 <DynamicTextRenderer text={payload.description} />
               </p>
             )}
@@ -629,15 +626,17 @@ export default function TastingSession() {
                 <Menu size={18} />
               </Button>
               <div>
-                <h2 className="text-white font-semibold text-sm">
-                  {currentSlide?.type === 'interlude' 
-                    ? (currentSlide.payloadJson as any).wine_name || "Wine Tasting"
-                    : `Question ${currentSlideIndex + 1}`
-                  }
+                <h2 className="text-white font-semibold text-sm truncate">
+                  {slidesData?.package?.name || 'Wine Tasting'}
                 </h2>
-                <p className="text-white/60 text-xs">
-                  {currentSlideIndex + 1} of {slides.length}
-                </p>
+                {currentSlide && packageData?.wines && (
+                  <p className="text-white/60 text-xs truncate">
+                    {(() => {
+                      const currentWine = packageData.wines.find((w: any) => w.id === currentSlide.packageWineId);
+                      return currentWine?.wineName || currentWine?.wine_name || `Slide ${currentSlideIndex + 1} of ${slides.length}`;
+                    })()}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex items-center space-x-2">

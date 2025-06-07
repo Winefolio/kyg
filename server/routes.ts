@@ -77,7 +77,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      res.json({ slides: allSlides, totalCount: allSlides.length, wines });
+      res.json({ package: pkg, slides: allSlides, totalCount: allSlides.length, wines });
     } catch (error) {
       res.status(500).json({ message: "Internal server error" });
     }
