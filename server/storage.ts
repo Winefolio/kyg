@@ -20,7 +20,6 @@ import {
   participants,
   responses,
   glossaryTerms,
-  wineResponseAnalytics,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, desc } from "drizzle-orm";
@@ -1149,12 +1148,6 @@ export class DatabaseStorage implements IStorage {
     };
     
     const [newWine] = await db.insert(packageWines).values(wineData).returning();
-    
-    // Store wine characteristics in analytics table if provided
-    if (wine.expectedCharacteristics && typeof wine.expectedCharacteristics === 'object') {
-      await this.storeWineCharacteristicsInternal(newWine.id, wine.expectedCharacteristics);
-    }
-    
     return newWine;
   }
 
@@ -1164,49 +1157,12 @@ export class DatabaseStorage implements IStorage {
       .set(data)
       .where(eq(packageWines.id, id))
       .returning();
-
-    // Update wine characteristics if provided
-    if (data.expectedCharacteristics && typeof data.expectedCharacteristics === 'object') {
-      await this.storeWineCharacteristicsInternal(id, data.expectedCharacteristics);
-    }
-
     return updatedWine;
   }
 
-  // Store wine characteristics in analytics table
-  private async storeWineCharacteristics(wineId: string, characteristics: Record<string, any>): Promise<void> {
-    try {
-      // Clear existing characteristics for this wine
-      await db.delete(wineResponseAnalytics).where(eq(wineResponseAnalytics.packageWineId, wineId));
-
-      // Insert new characteristics
-      const characteristicEntries = [];
-      for (const [name, value] of Object.entries(characteristics)) {
-        if (value !== undefined && value !== null && value !== '') {
-          characteristicEntries.push({
-            packageWineId: wineId,
-            characteristicName: name,
-            expectedValue: typeof value === 'object' ? JSON.stringify(value) : String(value),
-            averageUserValue: null,
-            accuracyScore: null,
-            responseCount: 0
-          });
-        }
-      }
-
-      if (characteristicEntries.length > 0) {
-        await db.insert(wineResponseAnalytics).values(characteristicEntries);
-        console.log(`Stored ${characteristicEntries.length} characteristics for wine ${wineId}`);
-      }
-    } catch (error) {
-      console.error(`Error storing wine characteristics for wine ${wineId}:`, error);
-    }
-  }
-
   async deletePackageWine(id: string): Promise<void> {
-    // First delete associated slides and analytics
+    // First delete associated slides
     await db.delete(slides).where(eq(slides.packageWineId, id));
-    await db.delete(wineResponseAnalytics).where(eq(wineResponseAnalytics.packageWineId, id));
     // Then delete the wine
     await db.delete(packageWines).where(eq(packageWines.id, id));
   }
