@@ -37,14 +37,7 @@ export function SlideConfigPanel({
 
     return (
         <div className="space-y-6">
-            {/* MASTER DEBUG - Shows all slide data */}
-            <div className="mb-4 p-3 bg-red-500/30 text-red-100 text-xs border border-red-500/50 rounded">
-                <div><strong>MASTER DEBUG:</strong></div>
-                <div>Slide ID: {slide.id}</div>
-                <div>Slide Type: "{slide.type}"</div>
-                <div>Slide Type Check: {slide.type === "question" ? "MATCHES question" : "DOES NOT MATCH question"}</div>
-                <div>Full Slide Object: {JSON.stringify(slide, null, 2)}</div>
-            </div>
+
 
             <Card className="bg-white/5 border-white/10">
                 <CardHeader>
@@ -105,15 +98,10 @@ export function SlideConfigPanel({
             </Card>
 
             {slide.type === "question" && (
-                <div>
-                    <div className="mb-4 p-2 bg-yellow-500/20 text-yellow-200 text-xs">
-                        Debug: Slide type: {slide.type}, Payload: {JSON.stringify(payload, null, 2)}
-                    </div>
-                    <QuestionConfigForm
-                        payload={payload}
-                        onPayloadChange={handlePayloadChange}
-                    />
-                </div>
+                <QuestionConfigForm
+                    payload={payload}
+                    onPayloadChange={handlePayloadChange}
+                />
             )}
 
             {slide.type !== "question" && (

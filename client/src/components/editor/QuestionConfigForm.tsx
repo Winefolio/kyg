@@ -44,18 +44,22 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
       <CardContent className="space-y-6">
         <div>
           <Label className="text-white/80">Question Type</Label>
-          <Select value={payload.question_type || 'multiple_choice'} onValueChange={(value) => handleFieldChange('question_type', value)}>
+          <Select value={payload.question_type || payload.type || 'multiple_choice'} onValueChange={(value) => {
+            handleFieldChange('question_type', value);
+            handleFieldChange('type', value); // Also update type field for backward compatibility
+          }}>
             <SelectTrigger className="bg-white/10 border-white/20 text-white"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
               <SelectItem value="scale">Scale Rating</SelectItem>
+              <SelectItem value="slider">Scale Rating</SelectItem>
               <SelectItem value="text">Text Input</SelectItem>
               <SelectItem value="boolean">Yes/No</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {payload.question_type === 'multiple_choice' && (
+        {(payload.question_type === 'multiple_choice' || payload.type === 'multiple_choice') && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <Label className="text-white/80">Answer Options</Label>
@@ -74,19 +78,77 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
           </div>
         )}
 
-        {payload.question_type === 'scale' && (
+        {(payload.question_type === 'scale' || payload.question_type === 'slider' || payload.type === 'scale' || payload.type === 'slider') && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div><Label className="text-white/80">Min Value</Label><Input type="number" value={payload.scale_min || 1} onChange={(e) => handleFieldChange('scale_min', parseInt(e.target.value))} className="bg-white/10 border-white/20 text-white" /></div>
-              <div><Label className="text-white/80">Max Value</Label><Input type="number" value={payload.scale_max || 10} onChange={(e) => handleFieldChange('scale_max', parseInt(e.target.value))} className="bg-white/10 border-white/20 text-white" /></div>
+              <div>
+                <Label className="text-white/80">Min Value</Label>
+                <Input 
+                  type="number" 
+                  value={payload.scale_min || payload.min || 1} 
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    handleFieldChange('scale_min', value);
+                    handleFieldChange('min', value); // Support both field names
+                  }} 
+                  className="bg-white/10 border-white/20 text-white" 
+                />
+              </div>
+              <div>
+                <Label className="text-white/80">Max Value</Label>
+                <Input 
+                  type="number" 
+                  value={payload.scale_max || payload.max || 10} 
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value);
+                    handleFieldChange('scale_max', value);
+                    handleFieldChange('max', value); // Support both field names
+                  }} 
+                  className="bg-white/10 border-white/20 text-white" 
+                />
+              </div>
             </div>
-            <div><Label className="text-white/80">Min Label</Label><Input value={payload.scale_min_label || ''} onChange={(e) => handleFieldChange('scale_min_label', e.target.value)} className="bg-white/10 border-white/20 text-white" placeholder="e.g., 'Low'" /></div>
-            <div><Label className="text-white/80">Max Label</Label><Input value={payload.scale_max_label || ''} onChange={(e) => handleFieldChange('scale_max_label', e.target.value)} className="bg-white/10 border-white/20 text-white" placeholder="e.g., 'High'" /></div>
+            <div>
+              <Label className="text-white/80">Step Size</Label>
+              <Input 
+                type="number" 
+                value={payload.step || 1} 
+                onChange={(e) => handleFieldChange('step', parseInt(e.target.value))} 
+                className="bg-white/10 border-white/20 text-white" 
+                placeholder="1"
+              />
+            </div>
+            <div>
+              <Label className="text-white/80">Min Label</Label>
+              <Input 
+                value={payload.scale_min_label || ''} 
+                onChange={(e) => handleFieldChange('scale_min_label', e.target.value)} 
+                className="bg-white/10 border-white/20 text-white" 
+                placeholder="e.g., 'Low'" 
+              />
+            </div>
+            <div>
+              <Label className="text-white/80">Max Label</Label>
+              <Input 
+                value={payload.scale_max_label || ''} 
+                onChange={(e) => handleFieldChange('scale_max_label', e.target.value)} 
+                className="bg-white/10 border-white/20 text-white" 
+                placeholder="e.g., 'High'" 
+              />
+            </div>
           </div>
         )}
 
-        {payload.question_type === 'text' && (
-           <div><Label className="text-white/80">Placeholder Text</Label><Input value={payload.placeholder || ''} onChange={(e) => handleFieldChange('placeholder', e.target.value)} className="bg-white/10 border-white/20 text-white" placeholder="e.g., Describe the aromas..." /></div>
+        {(payload.question_type === 'text' || payload.type === 'text') && (
+          <div>
+            <Label className="text-white/80">Placeholder Text</Label>
+            <Input 
+              value={payload.placeholder || ''} 
+              onChange={(e) => handleFieldChange('placeholder', e.target.value)} 
+              className="bg-white/10 border-white/20 text-white" 
+              placeholder="e.g., Describe the aromas..." 
+            />
+          </div>
         )}
 
       </CardContent>
