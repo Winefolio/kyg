@@ -98,7 +98,7 @@ export default function PackageEditor() {
 
   const updateWineMutation = useMutation({
     mutationFn: async ({ wineId, data }: { wineId: string; data: any }) => {
-      return apiRequest('PATCH', `/api/wines/${wineId}`, data);
+      return apiRequest('PATCH', `/api/packages/${editorData?.id}/wines/${wineId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
@@ -110,7 +110,7 @@ export default function PackageEditor() {
 
   const deleteWineMutation = useMutation({
     mutationFn: async (wineId: string) => {
-      return apiRequest('DELETE', `/api/wines/${wineId}`);
+      return apiRequest('DELETE', `/api/packages/${editorData?.id}/wines/${wineId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
@@ -150,15 +150,6 @@ export default function PackageEditor() {
   });
 
   // Helper functions
-  const handleWineSave = (wineData: any) => {
-    if (editingWine) {
-      // We are editing an existing wine
-      updateWineMutation.mutate({ wineId: editingWine.id, data: wineData });
-    } else {
-      // We are creating a new wine
-      createWineMutation.mutate(wineData);
-    }
-  };
 
   const toggleWineExpansion = (wineId: string) => {
     const newExpanded = new Set(expandedWines);
@@ -192,8 +183,6 @@ export default function PackageEditor() {
   const handleUpdateSlide = (slideId: string, updates: any) => {
     updateSlideMutation.mutate({ slideId, data: updates });
   };
-
-
 
   const updateSlidePayload = (updates: any) => {
     if (!activeSlide) return;
