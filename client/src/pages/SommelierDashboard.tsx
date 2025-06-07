@@ -182,7 +182,9 @@ export default function SommelierDashboard() {
     },
     onSuccess: (result) => {
       console.log("Package created successfully:", result);
+      // Force immediate cache refresh and refetch
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      queryClient.refetchQueries({ queryKey: ["/api/packages"] });
       setPackageModalOpen(false);
       toast({
         title: "Package created successfully",
@@ -1015,7 +1017,7 @@ export default function SommelierDashboard() {
               console.log("Creating wine with data:", wineData);
               createWineMutation.mutate(wineData);
             } else if (wineModalMode === "edit" && selectedWine) {
-              updateWineMutation.mutate({ id: selectedWine.id, data });
+              updateWineMutation.mutate({ id: selectedWine.id, data: data as WineForm });
             }
           }}
         />

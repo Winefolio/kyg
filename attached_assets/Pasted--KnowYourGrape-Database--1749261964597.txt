@@ -1,0 +1,130 @@
+-- =====================================================================
+-- KnowYourGrape Database Schema Upgrade
+--
+-- This script upgrades the database to support the multi-tenant
+-- sommelier dashboard and rich wine data features.
+-- It adds new tables and alters existing ones to match the current
+-- Drizzle schema (`shared/schema.ts`).
+-- =====================================================================
+
+BEGIN;
+
+-- -------------------------------------
+-- Step 1: Create New Tables
+-- -------------------------------------
+
+-- Create the 'sommeliers' table for multi-tenant support
+CREATE TABLE IF NOT EXISTS public.sommeliers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email varchar(255) NOT NULL UNIQUE,
+  display_name varchar(100) NOT NULL,
+  password_hash text NOT NULL,
+  profile_image_url text,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_sommeliers_email ON public.sommeliers(email);
+COMMENT ON TABLE public.sommeliers IS 'Stores information about sommelier users who create packages.';
+
+-- Create the 'wine_characteristics' table for defining trackable wine attributes
+CREATE TABLE IF NOT EXISTS public.wine_characteristics (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name varchar(100) NOT NULL UNIQUE,
+  category varchar(50) NOT NULL,
+  description text,
+  scale_type varchar(20) NOT NULL,
+  scale_min integer,
+  scale_max integer,
+  scale_labels jsonb,
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_wine_characteristics_category ON public.wine_characteristics(category);
+COMMENT ON TABLE public.wine_characteristics IS 'Defines the types of characteristics that can be rated for a wine.';
+
+-- Create the 'slide_templates' table for reusable question patterns
+CREATE TABLE IF NOT EXISTS public.slide_templates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  sommelier_id uuid REFERENCES public.sommeliers(id) ON DELETE SET NULL,
+  name varchar(100) NOT NULL,
+  description text,
+  type varchar(50) NOT NULL,
+  section_type varchar(20),
+  payload_template jsonb NOT NULL,
+  is_public boolean DEFAULT false,
+  usage_count integer DEFAULT 0,
+  created_at timestamp with time zone DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_slide_templates_type ON public.slide_templates(type);
+COMMENT ON TABLE public.slide_templates IS 'Stores reusable slide templates for sommeliers.';
+
+-- -------------------------------------
+-- Step 2: Alter Existing Tables
+-- -------------------------------------
+
+-- Add new columns to the 'packages' table
+ALTER TABLE public.packages
+  ADD COLUMN IF NOT EXISTS sommelier_id uuid REFERENCES public.sommeliers(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true,
+  ADD COLUMN IF NOT EXISTS is_public boolean DEFAULT false;
+
+COMMENT ON COLUMN public.packages.sommelier_id IS 'Foreign key linking the package to its creator.';
+COMMENT ON COLUMN public.packages.is_active IS 'Toggles whether the package is active and can be used for new sessions.';
+COMMENT ON COLUMN public.packages.is_public IS 'Toggles whether other sommeliers can view or clone this package.';
+
+
+-- Add new columns to the 'package_wines' table for rich data and analytics
+ALTER TABLE public.package_wines
+  ADD COLUMN IF NOT EXISTS wine_type varchar(50),
+  ADD COLUMN IF NOT EXISTS vintage integer,
+  ADD COLUMN IF NOT EXISTS region text,
+  ADD COLUMN IF NOT EXISTS producer text,
+  ADD COLUMN IF NOT EXISTS grape_varietals jsonb,
+  ADD COLUMN IF NOT EXISTS alcohol_content text,
+  ADD COLUMN IF NOT EXISTS expected_characteristics jsonb,
+  ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone DEFAULT now();
+
+COMMENT ON COLUMN public.package_wines.wine_type IS 'Type of wine (e.g., ''red'', ''white'', ''sparkling'').';
+COMMENT ON COLUMN public.package_wines.expected_characteristics IS 'JSON object storing the sommelier''s expert ratings for this wine.';
+
+-- -------------------------------------
+-- Step 3: Create Remaining New Tables (with dependencies on altered tables)
+-- -------------------------------------
+
+-- Create the 'wine_response_analytics' table
+CREATE TABLE IF NOT EXISTS public.wine_response_analytics (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  package_wine_id uuid NOT NULL REFERENCES public.package_wines(id) ON DELETE CASCADE,
+  characteristic_name varchar(100) NOT NULL,
+  expected_value text,
+  average_user_value text,
+  accuracy_score integer,
+  response_count integer DEFAULT 0,
+  last_updated timestamp with time zone DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_wine_analytics_wine_char ON public.wine_response_analytics(package_wine_id, characteristic_name);
+COMMENT ON TABLE public.wine_response_analytics IS 'Aggregates user responses against expert ratings for analytics.';
+
+
+-- -------------------------------------
+-- Step 4: Add New Constraints and Indexes
+-- -------------------------------------
+
+-- Add unique constraint for wine position within a package
+ALTER TABLE public.package_wines
+  ADD CONSTRAINT uq_package_wines_package_position UNIQUE (package_id, position);
+
+-- Add new indexes for 'package_wines'
+CREATE INDEX IF NOT EXISTS idx_package_wines_type ON public.package_wines(wine_type);
+CREATE INDEX IF NOT EXISTS idx_package_wines_vintage ON public.package_wines(vintage);
+
+-- Create the correct index for slides now that they are linked to package_wines
+-- This replaces the old index on (package_id, position).
+CREATE INDEX IF NOT EXISTS idx_slides_package_wine_position ON public.slides(package_wine_id, position);
+
+COMMIT;
+
+-- =====================================================================
+-- End of Schema Upgrade Script
+-- =====================================================================
