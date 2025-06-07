@@ -267,6 +267,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Package wines endpoint for wine selection
+  app.get("/api/packages/:packageId/wines", async (req, res) => {
+    try {
+      const { packageId } = req.params;
+      const wines = await storage.getPackageWines(packageId);
+      res.json(wines);
+    } catch (error) {
+      console.error("Error fetching package wines:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Session Wine Selection Routes
   app.get("/api/sessions/:sessionId/wine-selections", async (req, res) => {
     try {

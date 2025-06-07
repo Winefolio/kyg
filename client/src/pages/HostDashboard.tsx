@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { SessionWineSelector } from "@/components/SessionWineSelector";
 import type { Session, Participant, Slide, Response } from "@shared/schema";
 
 // Analytics data types
@@ -272,8 +273,9 @@ export default function HostDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-6xl mx-auto">
-          <TabsList className="grid w-full grid-cols-4 bg-white/10 backdrop-blur-xl">
+          <TabsList className="grid w-full grid-cols-5 bg-white/10 backdrop-blur-xl">
             <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20">Overview</TabsTrigger>
+            <TabsTrigger value="wines" className="text-white data-[state=active]:bg-white/20">Wine Selection</TabsTrigger>
             <TabsTrigger value="participants" className="text-white data-[state=active]:bg-white/20">Participants</TabsTrigger>
             <TabsTrigger value="analytics" className="text-white data-[state=active]:bg-white/20">Analytics</TabsTrigger>
             <TabsTrigger value="controls" className="text-white data-[state=active]:bg-white/20">Controls</TabsTrigger>
@@ -394,6 +396,30 @@ export default function HostDashboard() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="wines" className="space-y-6">
+            {session?.packageId && (
+              <SessionWineSelector 
+                sessionId={session.id}
+                packageId={session.packageId}
+                onSelectionChange={(selectedCount) => {
+                  // Optional: Track selected wine count for UI feedback
+                  console.log(`Host selected ${selectedCount} wines for session`);
+                }}
+              />
+            )}
+            {!session?.packageId && (
+              <Card className="bg-gradient-card backdrop-blur-xl border border-white/20">
+                <CardContent className="p-8 text-center">
+                  <Wine className="w-12 h-12 text-white/40 mx-auto mb-4" />
+                  <h3 className="text-white text-lg font-medium mb-2">No Package Selected</h3>
+                  <p className="text-white/60">
+                    This session doesn't have a wine package assigned. Contact your administrator.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="participants" className="space-y-6">

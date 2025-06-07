@@ -72,7 +72,11 @@ export default function TastingSession() {
   });
 
   if (sessionDetailsLoading || isLoading) {
-    return <LoadingOverlay />;
+    return (
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
+      </div>
+    );
   }
 
   if (!currentSession) {
