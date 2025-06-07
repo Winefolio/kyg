@@ -418,6 +418,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/wine-characteristics", async (_req, res) => {
+    try {
+      const characteristics = await storage.getWineCharacteristics();
+      res.json(characteristics);
+    } catch (error) {
+      console.error("Error fetching wine characteristics:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Create package with server-generated code
   app.post("/api/packages", async (req, res) => {
     try {

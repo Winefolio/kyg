@@ -20,6 +20,7 @@ import {
   participants,
   responses,
   glossaryTerms,
+  wineCharacteristics,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, desc } from "drizzle-orm";
@@ -129,6 +130,9 @@ export interface IStorage {
   // Glossary
   getGlossaryTerms(): Promise<GlossaryTerm[]>;
   createGlossaryTerm(term: InsertGlossaryTerm): Promise<GlossaryTerm>;
+
+  // Wine Characteristics
+  getWineCharacteristics(): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1087,6 +1091,10 @@ export class DatabaseStorage implements IStorage {
   async createGlossaryTerm(term: InsertGlossaryTerm): Promise<GlossaryTerm> {
     const result = await db.insert(glossaryTerms).values(term).returning();
     return result[0];
+  }
+
+  async getWineCharacteristics(): Promise<any[]> {
+    return await db.select().from(wineCharacteristics).where(eq(wineCharacteristics.isActive, true)).orderBy(wineCharacteristics.category, wineCharacteristics.name);
   }
 
   // Package management methods for sommelier dashboard
