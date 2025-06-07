@@ -47,7 +47,7 @@ export default function PackageEditor() {
     enabled: !!code,
   });
 
-  const { data: slideTemplates = [] } = useQuery({
+  const { data: slideTemplates = [] } = useQuery<any[]>({
     queryKey: ['/api/slide-templates'],
   });
 
@@ -137,7 +137,7 @@ export default function PackageEditor() {
       packageWineId: wineId,
       position: nextPosition,
       type: template.type,
-      sectionType: sectionType, // Use the passed-in sectionType
+      section_type: sectionType, // Use the passed-in sectionType with correct property name
       payloadJson: {
         title: template.name,
         description: template.description || '',
@@ -233,7 +233,7 @@ export default function PackageEditor() {
                             {isExpanded && (
                               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="pl-4 mt-2 border-l-2 border-white/10 ml-5 space-y-4 py-2">
                                 {Object.entries(sectionDetails).map(([key, { title, icon }]) => {
-                                  const sectionSlides = wineSlides.filter(s => s.sectionType === key);
+                                  const sectionSlides = wineSlides.filter(s => s.section_type === key);
                                   return (
                                     <div key={key}>
                                       <div className="flex items-center justify-between mb-1">
@@ -246,7 +246,7 @@ export default function PackageEditor() {
                                           </PopoverTrigger>
                                           <PopoverContent className="w-56 p-1 bg-gray-900/80 border-gray-700 backdrop-blur-md">
                                             <div className="space-y-1">
-                                              {slideTemplates.map((template: any) => (
+                                              {(slideTemplates as any[]).filter((template: any) => template.sectionType === key).map((template: any) => (
                                                 <Button
                                                   key={template.id}
                                                   variant="ghost"

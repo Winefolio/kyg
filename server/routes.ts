@@ -484,6 +484,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Slide templates endpoint
+  app.get("/api/slide-templates", async (req, res) => {
+    try {
+      // Return slide templates from our predefined list
+      const slideTemplates = [
+        { id: 'visual-assessment', name: 'Visual Assessment', type: 'question', sectionType: 'intro' },
+        { id: 'aroma-intensity', name: 'Aroma Intensity', type: 'question', sectionType: 'deep_dive' },
+        { id: 'tasting-notes', name: 'Tasting Notes', type: 'question', sectionType: 'deep_dive' },
+        { id: 'body-assessment', name: 'Body Assessment', type: 'question', sectionType: 'deep_dive' },
+        { id: 'tannin-level', name: 'Tannin Level', type: 'question', sectionType: 'deep_dive' },
+        { id: 'acidity-level', name: 'Acidity Level', type: 'question', sectionType: 'deep_dive' },
+        { id: 'finish-length', name: 'Finish Length', type: 'question', sectionType: 'ending' },
+        { id: 'overall-impression', name: 'Overall Impression', type: 'question', sectionType: 'ending' }
+      ];
+      res.json(slideTemplates);
+    } catch (error) {
+      console.error("Error fetching slide templates:", error);
+      res.status(500).json({ message: "Failed to fetch slide templates" });
+    }
+  });
+
   // Package management endpoints for sommelier dashboard
   app.get("/api/packages", async (req, res) => {
     try {
