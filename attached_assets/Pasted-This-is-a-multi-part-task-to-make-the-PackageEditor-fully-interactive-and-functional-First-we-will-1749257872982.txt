@@ -1,0 +1,95 @@
+This is a multi-part task to make the PackageEditor fully interactive and functional. First, we will fix the critical rendering bug that is causing the application to crash. Second, we will implement the backend mutations for creating, updating, and deleting wines. Finally, we will connect the UI, including the WineModal, to these mutations so that sommeliers can actually manage the contents of their packages.
+Context & Why
+The PackageEditor is the heart of the sommelier experience. Currently, it crashes upon use and its actions are not persisted. Fixing this is our highest priority to deliver a usable product. This task will transform the editor from a static display into a dynamic, data-driven tool.
+What Needs to Be Done
+Fix the component import in PackageEditor.tsx to resolve the Element type is invalid error.
+Add useMutation hooks for createWine, updateWine, and deleteWine inside PackageEditor.tsx.
+Implement the onSave handler for the WineModal to call the correct mutation.
+Wire up the "Add Wine" and "Edit" buttons to open the WineModal in the correct mode.
+How to Implement
+Part 1: Fix the Rendering Crash
+File to Modify: client/pages/PackageEditor.tsx
+Action: Locate the import statement for WineModal. It is likely incorrect. Ensure it is a named import:
+// Correct import statement
+import { WineModal } from '@/components/WineModal';
+Use code with caution.
+TypeScript
+Part 2: Implement Backend Mutations
+File to Modify: client/pages/PackageEditor.tsx
+Action: Inside the PackageEditor component function, define the necessary mutations using TanStack Query.
+// Add these mutations near your useQuery hook
+const createWineMutation = useMutation({
+  mutationFn: (wineData: any) => apiRequest('POST', `/api/packages/${editorData?.id}/wines`, wineData),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+    toast({ title: "Wine created successfully" });
+    setIsWineModalOpen(false);
+  },
+  onError: (error: any) => toast({ title: "Error creating wine", description: error.message, variant: "destructive" }),
+});
+
+const updateWineMutation = useMutation({
+  mutationFn: ({ wineId, data }: { wineId: string; data: any }) => apiRequest('PATCH', `/api/wines/${wineId}`, data),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+    toast({ title: "Wine updated successfully" });
+    setIsWineModalOpen(false);
+  },
+  onError: (error: any) => toast({ title: "Error updating wine", description: error.message, variant: "destructive" }),
+});
+
+const deleteWineMutation = useMutation({
+  mutationFn: (wineId: string) => apiRequest('DELETE', `/api/wines/${wineId}`),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+    toast({ title: "Wine deleted successfully" });
+  },
+  onError: (error: any) => toast({ title: "Error deleting wine", description: error.message, variant: "destructive" }),
+});
+Use code with caution.
+TypeScript
+Part 3: Connect the UI to the Mutations
+File to Modify: client/pages/PackageEditor.tsx
+Implement the handleWineSave function: This function will decide whether to call the create or update mutation.
+// Add this handler function inside the PackageEditor component
+const handleWineSave = (wineData: any) => {
+  if (editingWine) {
+    // We are editing an existing wine
+    updateWineMutation.mutate({ wineId: editingWine.id, data: wineData });
+  } else {
+    // We are creating a new wine
+    createWineMutation.mutate(wineData);
+  }
+};
+Use code with caution.
+TypeScript
+Update the WineModal props: Find the <WineModal ... /> component instance (likely around line 749) and pass the new handleWineSave function to its onSave prop.
+// Update the onSave prop
+<WineModal
+  // ... other props
+  onSave={handleWineSave}
+/>
+Use code with caution.
+Tsx
+Wire up the "Add Wine" and "Edit" buttons:
+Find the "Add Wine" button (around line 331) and ensure its onClick handler sets the state correctly to open the modal in "create" mode.
+// onClick for "Add Wine" button
+onClick={() => {
+  setEditingWine(null); // Ensure we are not in edit mode
+  setIsWineModalOpen(true);
+}}
+Use code with caution.
+Tsx
+Find the "Edit" button for each wine (around line 380) and ensure its onClick handler sets the state correctly to open the modal in "edit" mode.
+// onClick for wine "Edit" button
+onClick={() => {
+  setEditingWine(wine); // Set the wine to be edited
+  setIsWineModalOpen(true);
+}}
+Use code with caution.
+Tsx
+Guidance for the Target AI
+Execute these changes sequentially. Start by fixing the import bug in PackageEditor.tsx.
+Then, add the useMutation hooks as specified.
+Finally, implement the handler function and wire up the UI buttons and modal props.
+Do not deviate. This plan directly addresses the crash and the core functionality gap.

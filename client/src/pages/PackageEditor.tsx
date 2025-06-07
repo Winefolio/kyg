@@ -150,6 +150,16 @@ export default function PackageEditor() {
   });
 
   // Helper functions
+  const handleWineSave = (wineData: any) => {
+    if (editingWine) {
+      // We are editing an existing wine
+      updateWineMutation.mutate({ wineId: editingWine.id, data: wineData });
+    } else {
+      // We are creating a new wine
+      createWineMutation.mutate(wineData);
+    }
+  };
+
   const toggleWineExpansion = (wineId: string) => {
     const newExpanded = new Set(expandedWines);
     if (newExpanded.has(wineId)) {
@@ -183,13 +193,7 @@ export default function PackageEditor() {
     updateSlideMutation.mutate({ slideId, data: updates });
   };
 
-  const handleWineSave = (wineData: any) => {
-    if (editingWine) {
-      updateWineMutation.mutate({ wineId: editingWine.id, data: wineData });
-    } else {
-      createWineMutation.mutate(wineData);
-    }
-  };
+
 
   const updateSlidePayload = (updates: any) => {
     if (!activeSlide) return;
@@ -330,7 +334,10 @@ export default function PackageEditor() {
                   <div className="flex items-center space-x-2">
                     <Button
                       size="sm"
-                      onClick={() => setIsWineModalOpen(true)}
+                      onClick={() => {
+                        setEditingWine(null); // Ensure we are not in edit mode
+                        setIsWineModalOpen(true);
+                      }}
                       className="bg-purple-600 hover:bg-purple-700"
                     >
                       <PlusCircle className="mr-2 h-4 w-4" />
