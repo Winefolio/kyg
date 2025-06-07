@@ -55,6 +55,7 @@ export const packages = pgTable("packages", {
   code: varchar("code", { length: 10 }).notNull().unique(),
   name: text("name").notNull(),
   description: text("description"),
+  imageUrl: text("image_url"),
   isActive: boolean("is_active").default(true),
   isPublic: boolean("is_public").default(false), // Can be viewed/used by other sommeliers
   createdAt: timestamp("created_at").defaultNow(),
