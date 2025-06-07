@@ -163,17 +163,27 @@ export default function SommelierDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch packages
-  const { data: packages, isLoading: packagesLoading } = useQuery<Package[]>({
-    queryKey: ["/api/packages"],
+  // Fetch unified dashboard data
+  const { data: dashboardData, isLoading: dashboardLoading } = useQuery<{
+    overview: {
+      totalPackages: number;
+      activePackages: number;
+      totalSessions: number;
+      activeSessions: number;
+      totalParticipants: number;
+      totalWines: number;
+      avgRate: number;
+    };
+    packages: Package[];
+    sessions: Session[];
+  }>({
+    queryKey: ["/api/dashboard-data"],
     enabled: true,
   });
 
-  // Fetch sessions
-  const { data: sessions, isLoading: sessionsLoading } = useQuery<Session[]>({
-    queryKey: ["/api/sessions"],
-    enabled: activeTab === "sessions",
-  });
+  const packages = dashboardData?.packages || [];
+  const sessions = dashboardData?.sessions || [];
+  const overview = dashboardData?.overview;
 
   // Create package mutation
   const createPackageMutation = useMutation({
@@ -184,8 +194,8 @@ export default function SommelierDashboard() {
     onSuccess: (result) => {
       console.log("Package created successfully:", result);
       // Force immediate cache refresh and refetch
-      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
-      queryClient.refetchQueries({ queryKey: ["/api/packages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard-data"] });
+      queryClient.refetchQueries({ queryKey: ["/api/dashboard-data"] });
       setPackageModalOpen(false);
       toast({
         title: "Package created successfully",
@@ -427,7 +437,7 @@ export default function SommelierDashboard() {
 
           {/* Packages Tab */}
           <TabsContent value="packages" className="mt-6">
-            {packagesLoading ? (
+            {dashboardLoading ? (
               <div className="flex justify-center py-12">
                 <motion.div
                   animate={{ rotate: 360 }}
@@ -701,7 +711,7 @@ export default function SommelierDashboard() {
           {/* Sessions Tab */}
           <TabsContent value="sessions" className="mt-6">
             <div className="space-y-6">
-              {sessionsLoading ? (
+              {dashboardLoading ? (
                 <div className="flex justify-center py-12">
                   <motion.div
                     animate={{ rotate: 360 }}
@@ -813,7 +823,7 @@ export default function SommelierDashboard() {
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="mt-6">
             <div className="space-y-6">
-              {packagesLoading || sessionsLoading ? (
+              {dashboardLoading ? (
                 <div className="flex justify-center py-12">
                   <motion.div
                     animate={{ rotate: 360 }}
@@ -1053,7 +1063,7 @@ function PackageModal({
   const [formData, setFormData] = useState({
     name: pkg?.name || "",
     description: pkg?.description || "",
-    imageUrl: pkg?.imageUrl || "",
+    imageUrl: (pkg as any)?.imageUrl || "",
     isActive: pkg?.isActive ?? true,
   });
 
