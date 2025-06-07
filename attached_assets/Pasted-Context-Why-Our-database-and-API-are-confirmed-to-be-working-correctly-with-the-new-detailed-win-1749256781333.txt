@@ -1,0 +1,29 @@
+Context & Why
+Our database and API are confirmed to be working correctly with the new, detailed wine attributes. However, the UI does not yet provide a way for sommeliers to input this data. This task is the final step to connect the frontend form to the backend capabilities, unblocking a critical piece of the sommelier's workflow.
+What Needs to Be Done
+Add UI form controls to the "Details" tab for producer, region, wineType, and alcoholContent.
+Implement the "Characteristics" tab with dynamic controls for each wine characteristic defined in the wineCharacteristics constant.
+Ensure all new form controls correctly update the wineForm state.
+How to Implement
+File to Modify: client/src/components/WineModal.tsx
+Add Form Fields to the "Details" Tab:
+Locate the grid layout inside the <TabsContent value="details"> section (around line 370).
+Add the following components, ensuring they are wired to the wineForm state with value and onChange handlers:
+An <Input> for producer.
+An <Input> for region.
+An <Input> for alcoholContent.
+Implement the "Characteristics" Tab Editor:
+Go to the <TabsContent value="characteristics"> section (around line 538).
+Remove any placeholder content.
+Map over the wineCharacteristics constant. For each characteristic object, render a <Card> component.
+Inside each card, display the characteristic's name and then render the appropriate input control based on its scaleType:
+If scaleType === 'numeric', render an <Input type="number">.
+If scaleType === 'descriptive', render a <Select> component, populating the <SelectItem>s from the characteristic.options array.
+If scaleType === 'boolean', render a <Switch> component.
+The value of each input should be read from wineForm.expectedCharacteristics[characteristic.name].
+The onChange or onValueChange handler for each input must call the addCharacteristic helper function to update the wineForm state.
+Crucial Note for the AI
+Focus exclusively on the "Details" and "Characteristics" tabs in WineModal.tsx.
+Do NOT modify the "Question Order" tab. That work is already complete.
+Your task is to write the JSX code for the missing form fields. You must physically add the <Input>, <Select>, and <Switch> components as described above.
+Verify your changes by ensuring the wineForm state is updated correctly when interacting with the new controls.
