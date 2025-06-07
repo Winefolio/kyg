@@ -90,6 +90,15 @@ export default function PackageEditor() {
     onError: (error: any) => toast({ title: "Error deleting wine", description: error.message, variant: "destructive" }),
   });
 
+  const createSlideMutation = useMutation({
+    mutationFn: (slideData: any) => apiRequest('POST', '/api/slides', slideData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+      toast({ title: "Slide created successfully" });
+    },
+    onError: (error: any) => toast({ title: "Error creating slide", description: error.message, variant: "destructive" }),
+  });
+
   // --- HANDLER FUNCTIONS ---
   const handleWineSave = (wineData: Partial<any>) => {
     if (editingWine) {
@@ -106,6 +115,24 @@ export default function PackageEditor() {
       else newSet.add(wineId);
       return newSet;
     });
+  };
+
+  const handleAddSlide = (wineId: string, template: any) => {
+    const wineSlides = slides.filter(s => s.packageWineId === wineId);
+    const nextPosition = wineSlides.length > 0 ? Math.max(...wineSlides.map(s => s.position)) + 1 : 1;
+
+    const slideData = {
+      packageWineId: wineId,
+      position: nextPosition,
+      type: template.type,
+      sectionType: template.sectionType,
+      payloadJson: {
+        title: template.name, // Use template name as default title
+        description: template.description,
+        ...template.payloadTemplate,
+      },
+    };
+    createSlideMutation.mutate(slideData);
   };
 
   if (isLoading) return <div className="min-h-screen bg-gradient-primary text-white flex items-center justify-center">Loading Editor...</div>;
@@ -192,17 +219,47 @@ export default function PackageEditor() {
                           </div>
                           <AnimatePresence>
                             {isExpanded && (
-                              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-4 space-y-2">
-                                {wineSlides.map((slide, index) => (
-                                  <div key={slide.id} className={`p-3 rounded cursor-pointer transition-colors ${activeSlideId === slide.id ? 'bg-purple-600/20 border border-purple-400' : 'bg-white/5 hover:bg-white/10 border border-transparent'}`} onClick={() => setActiveSlideId(slide.id)}>
-                                    <div className="flex items-center justify-between">
+                              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="pt-2 pl-4 border-l-2 border-white/10 ml-5">
+                                {/* Slides List */}
+                                <div className="mt-2 space-y-1">
+                                  {wineSlides.map((slide, index) => (
+                                    <div
+                                      key={slide.id}
+                                      className={`p-2 rounded-md cursor-pointer transition-colors ${
+                                        activeSlideId === slide.id
+                                          ? 'bg-purple-600/20'
+                                          : 'hover:bg-white/10'
+                                      }`}
+                                      onClick={() => setActiveSlideId(slide.id)}
+                                    >
                                       <div className="flex items-center space-x-2">
-                                        <p className="text-sm font-medium text-white">{(slide.payloadJson as any)?.title || 'Untitled Slide'}</p>
+                                        <span className="text-xs text-white/40">#{index + 1}</span>
+                                        <p className="text-sm font-medium text-white truncate">
+                                          {(slide.payloadJson as any)?.title || 'Untitled Slide'}
+                                        </p>
                                       </div>
-                                      <span className="text-xs text-white/40">#{index + 1}</span>
                                     </div>
+                                  ))}
+                                </div>
+
+                                {/* Add Slide Templates */}
+                                <div className="mt-4 pt-2 border-t border-white/10">
+                                  <div className="space-y-2">
+                                    {SLIDE_TEMPLATES.map(template => (
+                                      <Button
+                                        key={template.name}
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs h-8 justify-start text-white/70 hover:text-white hover:bg-white/5"
+                                        onClick={() => handleAddSlide(wine.id, template)}
+                                        title={template.description}
+                                      >
+                                        <template.icon className="mr-2 h-3 w-3 flex-shrink-0 text-purple-400" />
+                                        <span className="truncate">Add {template.name}</span>
+                                      </Button>
+                                    ))}
                                   </div>
-                                ))}
+                                </div>
                               </motion.div>
                             )}
                           </AnimatePresence>

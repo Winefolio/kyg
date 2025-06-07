@@ -1,9 +1,13 @@
+import { Eye, Wind, Palette, Coffee, Droplets, Zap, Clock, Star } from 'lucide-react';
+
 export const SLIDE_TEMPLATES = [
   {
     id: 'visual-assessment',
     name: 'Visual Assessment',
     type: 'question',
     sectionType: 'intro',
+    icon: Eye,
+    description: 'Evaluate the wine\'s visual appearance',
     payloadTemplate: {
       question: 'What do you observe about this wine\'s appearance?',
       type: 'multiple_choice',
@@ -17,6 +21,8 @@ export const SLIDE_TEMPLATES = [
     name: 'Aroma Intensity',
     type: 'question',
     sectionType: 'deep_dive',
+    icon: Wind,
+    description: 'Rate the intensity of the wine\'s aroma',
     payloadTemplate: {
       question: 'Rate the intensity of the wine\'s aroma',
       type: 'slider',
@@ -31,6 +37,8 @@ export const SLIDE_TEMPLATES = [
     name: 'Tasting Notes',
     type: 'question',
     sectionType: 'deep_dive',
+    icon: Palette,
+    description: 'Describe the flavors you taste',
     payloadTemplate: {
       question: 'Describe the flavors you taste',
       type: 'text_input',
@@ -43,6 +51,8 @@ export const SLIDE_TEMPLATES = [
     name: 'Body Assessment',
     type: 'question',
     sectionType: 'deep_dive',
+    icon: Coffee,
+    description: 'Evaluate the wine\'s body weight',
     payloadTemplate: {
       question: 'How would you describe the body of this wine?',
       type: 'multiple_choice',
@@ -56,6 +66,8 @@ export const SLIDE_TEMPLATES = [
     name: 'Tannin Level',
     type: 'question',
     sectionType: 'deep_dive',
+    icon: Droplets,
+    description: 'Rate the tannin structure',
     payloadTemplate: {
       question: 'Rate the tannin level',
       type: 'slider',
@@ -70,6 +82,8 @@ export const SLIDE_TEMPLATES = [
     name: 'Acidity Level',
     type: 'question',
     sectionType: 'deep_dive',
+    icon: Zap,
+    description: 'Assess the wine\'s acidity',
     payloadTemplate: {
       question: 'Rate the acidity level',
       type: 'slider',
@@ -84,6 +98,8 @@ export const SLIDE_TEMPLATES = [
     name: 'Finish Length',
     type: 'question',
     sectionType: 'ending',
+    icon: Clock,
+    description: 'Evaluate how long flavors persist',
     payloadTemplate: {
       question: 'How would you describe the finish?',
       type: 'multiple_choice',
@@ -97,6 +113,8 @@ export const SLIDE_TEMPLATES = [
     name: 'Overall Impression',
     type: 'question',
     sectionType: 'ending',
+    icon: Star,
+    description: 'Rate your overall experience',
     payloadTemplate: {
       question: 'Rate your overall impression of this wine',
       type: 'slider',
