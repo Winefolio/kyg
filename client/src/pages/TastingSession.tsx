@@ -260,9 +260,8 @@ export default function TastingSession() {
         
         {/* Progress bar */}
         <div className="mt-3">
-          <SegmentedProgressBar 
-            current={currentSlideIndex + 1} 
-            total={slides.length}
+          <Progress 
+            value={((currentSlideIndex + 1) / slides.length) * 100}
             className="h-2"
           />
         </div>
