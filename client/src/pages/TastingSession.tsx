@@ -123,18 +123,64 @@ export default function TastingSession() {
   }
 
   const slides = slidesData.slides || [];
+  const wines = slidesData.wines || [];
   const currentSlide = slides[currentSlideIndex];
+  const currentWine = currentSlide ? wines.find(w => w.id === currentSlide.packageWineId) : null;
 
-  // Handle slide navigation
+  // Group slides by wine
+  const slidesByWine = slides.reduce((acc: Record<string, any[]>, slide) => {
+    const wineId = slide.packageWineId;
+    if (!acc[wineId]) {
+      acc[wineId] = [];
+    }
+    acc[wineId].push(slide);
+    return acc;
+  }, {});
+
+  // Calculate section progress
+  const sections = wines.map(wine => {
+    const wineSlides = slidesByWine[wine.id] || [];
+    const wineStartIndex = slides.findIndex(s => s.packageWineId === wine.id);
+    const wineEndIndex = wineStartIndex + wineSlides.length - 1;
+    const isActive = currentSlideIndex >= wineStartIndex && currentSlideIndex <= wineEndIndex;
+    const isCompleted = currentSlideIndex > wineEndIndex;
+    const progress = isCompleted ? 100 : isActive ? ((currentSlideIndex - wineStartIndex + 1) / wineSlides.length) * 100 : 0;
+    
+    return {
+      name: wine.wineName,
+      progress,
+      isActive,
+      isCompleted
+    };
+  });
+
+  // Navigation functions
   const goToNextSlide = async () => {
     if (currentSlideIndex < slides.length - 1) {
-      setIsNavigating(true);
-      triggerHaptic('success');
+      const nextSlide = slides[currentSlideIndex + 1];
+      const nextWine = wines.find(w => w.id === nextSlide.packageWineId);
       
-      setTimeout(() => {
-        setCurrentSlideIndex(currentSlideIndex + 1);
-        setIsNavigating(false);
-      }, 150);
+      // Check if we're transitioning to a new wine
+      if (currentWine && nextWine && currentWine.id !== nextWine.id) {
+        setIsTransitioningSection(true);
+        setTransitionSectionName(nextWine.wineName);
+        triggerHaptic('success');
+        
+        setTimeout(() => {
+          setCurrentSlideIndex(currentSlideIndex + 1);
+          setCompletedSlides(prev => [...prev, currentSlideIndex]);
+          setIsTransitioningSection(false);
+        }, 1500);
+      } else {
+        setIsNavigating(true);
+        triggerHaptic('success');
+        
+        setTimeout(() => {
+          setCurrentSlideIndex(currentSlideIndex + 1);
+          setCompletedSlides(prev => [...prev, currentSlideIndex]);
+          setIsNavigating(false);
+        }, 150);
+      }
     }
   };
 
@@ -145,9 +191,23 @@ export default function TastingSession() {
       
       setTimeout(() => {
         setCurrentSlideIndex(currentSlideIndex - 1);
+        setCompletedSlides(prev => prev.filter(i => i !== currentSlideIndex));
         setIsNavigating(false);
       }, 150);
     }
+  };
+
+  const jumpToSlide = (slideIndex: number) => {
+    if (slideIndex !== currentSlideIndex) {
+      setIsNavigating(true);
+      triggerHaptic('selection');
+      
+      setTimeout(() => {
+        setCurrentSlideIndex(slideIndex);
+        setIsNavigating(false);
+      }, 150);
+    }
+    setSidebarOpen(false);
   };
 
   // Handle answer changes
@@ -237,92 +297,328 @@ export default function TastingSession() {
     }
   };
 
+  // Section transition overlay
+  if (isTransitioningSection) {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center text-white"
+        >
+          <Wine className="w-20 h-20 mx-auto mb-6 text-purple-300 animate-pulse" />
+          <h2 className="text-3xl font-bold mb-2">Next Wine</h2>
+          <p className="text-xl text-purple-200">
+            <DynamicTextRenderer text={transitionSectionName} />
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-primary flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b border-white/10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Wine className="w-6 h-6 text-purple-300" />
-            <div className="text-white">
-              <h1 className="font-semibold">Wine Tasting</h1>
-              <p className="text-xs text-white/60">{slidesData.package.name}</p>
+    <>
+      <div className="min-h-screen bg-gradient-primary flex relative">
+        {/* Sidebar */}
+        <AnimatePresence>
+          {sidebarOpen && (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+                onClick={() => setSidebarOpen(false)}
+              />
+              
+              {/* Sidebar content */}
+              <motion.div
+                initial={{ x: -300, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: -300, opacity: 0 }}
+                transition={{ type: "spring", damping: 20, stiffness: 100 }}
+                className="fixed left-0 top-0 h-full w-80 bg-gradient-to-b from-purple-950/95 to-purple-900/95 backdrop-blur-xl border-r border-white/10 z-50 lg:relative lg:w-96"
+              >
+                <div className="flex flex-col h-full">
+                  {/* Sidebar header */}
+                  <div className="p-6 border-b border-white/10">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-bold text-white">Wine Tasting</h2>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSidebarOpen(false)}
+                        className="text-white hover:bg-white/10 lg:hidden"
+                      >
+                        <X className="w-5 h-5" />
+                      </Button>
+                    </div>
+                    
+                    {/* Overall progress */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-white/80">Overall Progress</span>
+                        <span className="text-white font-medium">
+                          {Math.round(((currentSlideIndex + 1) / slides.length) * 100)}%
+                        </span>
+                      </div>
+                      <Progress value={((currentSlideIndex + 1) / slides.length) * 100} className="h-2" />
+                    </div>
+
+                    {/* Sync status */}
+                    <div className="flex items-center justify-between mt-3 text-xs">
+                      <span className="text-white/60">Session Status</span>
+                      <div className="flex items-center space-x-1">
+                        {syncStatus === 'synced' ? (
+                          <>
+                            <CheckCircle className="w-3 h-3 text-green-400" />
+                            <span className="text-green-400">Synced</span>
+                          </>
+                        ) : syncStatus === 'syncing' ? (
+                          <>
+                            <div className="w-3 h-3 rounded-full border border-yellow-400 border-t-transparent animate-spin" />
+                            <span className="text-yellow-400">Syncing</span>
+                          </>
+                        ) : (
+                          <>
+                            <CloudOff className="w-3 h-3 text-red-400" />
+                            <span className="text-red-400">Offline</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Wine sections */}
+                  <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    {wines.map((wine, wineIndex) => {
+                      const wineSlides = slidesByWine[wine.id] || [];
+                      const wineStartIndex = slides.findIndex(s => s.packageWineId === wine.id);
+                      const isExpanded = expandedWines[wine.id];
+                      const section = sections[wineIndex];
+
+                      return (
+                        <motion.div
+                          key={wine.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: wineIndex * 0.1 }}
+                          className="space-y-3"
+                        >
+                          {/* Wine header */}
+                          <button
+                            onClick={() => setExpandedWines(prev => ({ ...prev, [wine.id]: !isExpanded }))}
+                            className="w-full flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/10"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-3 h-3 rounded-full ${
+                                section.isCompleted ? 'bg-green-400' : 
+                                section.isActive ? 'bg-purple-400' : 'bg-white/30'
+                              }`} />
+                              <div className="text-left">
+                                <h3 className="font-medium text-white">
+                                  <DynamicTextRenderer text={wine.wineName} />
+                                </h3>
+                                <p className="text-xs text-white/60">
+                                  <DynamicTextRenderer text={wine.wineDescription || ''} />
+                                </p>
+                              </div>
+                            </div>
+                            <ChevronDown className={`w-4 h-4 text-white/60 transition-transform ${
+                              isExpanded ? 'rotate-180' : ''
+                            }`} />
+                          </button>
+
+                          {/* Wine progress */}
+                          <div className="px-4">
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-white/60">
+                                {wineSlides.length} slides
+                              </span>
+                              <span className="text-white/80">
+                                {Math.round(section.progress)}%
+                              </span>
+                            </div>
+                            <Progress value={section.progress} className="h-1" />
+                          </div>
+
+                          {/* Slides list */}
+                          <AnimatePresence>
+                            {isExpanded && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: "auto" }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="space-y-2 overflow-hidden"
+                              >
+                                {wineSlides.map((slide, slideIndex) => {
+                                  const globalSlideIndex = wineStartIndex + slideIndex;
+                                  const isCompleted = completedSlides.includes(globalSlideIndex);
+                                  const isCurrent = globalSlideIndex === currentSlideIndex;
+
+                                  return (
+                                    <button
+                                      key={slide.id}
+                                      onClick={() => jumpToSlide(globalSlideIndex)}
+                                      className={`w-full flex items-center space-x-3 p-3 rounded-lg text-left transition-colors ${
+                                        isCurrent 
+                                          ? 'bg-purple-500/30 border border-purple-400/50' 
+                                          : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                                      }`}
+                                    >
+                                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                        isCompleted ? 'bg-green-400' : 
+                                        isCurrent ? 'bg-purple-400' : 'bg-white/30'
+                                      }`} />
+                                      <div className="flex-1 min-w-0">
+                                        <p className={`text-sm font-medium truncate ${
+                                          isCurrent ? 'text-purple-100' : 'text-white'
+                                        }`}>
+                                          {slide.type === 'interlude' 
+                                            ? (slide.payloadJson as any)?.title || 'Interlude'
+                                            : (slide.payloadJson as any)?.title || (slide.payloadJson as any)?.question || 'Question'
+                                          }
+                                        </p>
+                                        <p className="text-xs text-white/60 capitalize">
+                                          {slide.type.replace('_', ' ')}
+                                        </p>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* Main content area */}
+        <div className="flex-1 flex flex-col min-h-screen">
+          {/* Header */}
+          <div className="flex-shrink-0 p-4 border-b border-white/10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSidebarOpen(true)}
+                  className="text-white hover:bg-white/10"
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
+                <div className="text-white">
+                  <h1 className="font-semibold">
+                    <DynamicTextRenderer text={currentWine?.wineName || 'Wine Tasting'} />
+                  </h1>
+                  <p className="text-xs text-white/60">
+                    <DynamicTextRenderer text={slidesData.package.name} />
+                  </p>
+                </div>
+              </div>
+              
+              <div className="text-right text-white">
+                <p className="text-sm font-medium">{currentSlideIndex + 1} of {slides.length}</p>
+                <p className="text-xs text-white/60">
+                  {Math.round(((currentSlideIndex + 1) / slides.length) * 100)}% complete
+                </p>
+              </div>
+            </div>
+            
+            {/* Section progress bars */}
+            <div className="mt-4">
+              <SegmentedProgressBar 
+                sections={sections}
+                currentWineName={currentWine?.wineName}
+                currentOverallProgressInfo={`${currentSlideIndex + 1} of ${slides.length} slides`}
+                onSectionClick={(sectionName) => {
+                  const wine = wines.find(w => w.wineName === sectionName);
+                  if (wine) {
+                    const wineStartIndex = slides.findIndex(s => s.packageWineId === wine.id);
+                    if (wineStartIndex !== -1) {
+                      jumpToSlide(wineStartIndex);
+                    }
+                  }
+                }}
+              />
             </div>
           </div>
-          
-          <div className="text-right text-white">
-            <p className="text-sm font-medium">{currentSlideIndex + 1} of {slides.length}</p>
-            <p className="text-xs text-white/60">
-              {Math.round(((currentSlideIndex + 1) / slides.length) * 100)}% complete
-            </p>
-          </div>
-        </div>
-        
-        {/* Progress bar */}
-        <div className="mt-3">
-          <Progress 
-            value={((currentSlideIndex + 1) / slides.length) * 100}
-            className="h-2"
-          />
-        </div>
-      </div>
 
-      {/* Main content */}
-      <div className="flex-grow flex flex-col p-4">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentSlide?.id || currentSlideIndex}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
-            className="flex-grow flex flex-col justify-center"
-          >
-            {renderSlideContent()}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* Navigation */}
-      <div className="flex-shrink-0 p-4 border-t border-white/10">
-        <div className="flex justify-between items-center">
-          <Button
-            variant="ghost"
-            onClick={goToPreviousSlide}
-            disabled={currentSlideIndex === 0 || isNavigating}
-            className="text-white hover:bg-white/10 disabled:opacity-50"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Previous
-          </Button>
-
-          <div className="flex space-x-2">
-            {slides.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentSlideIndex(index)}
-                className={`w-2 h-2 rounded-full transition-colors ${
-                  index === currentSlideIndex 
-                    ? 'bg-purple-400' 
-                    : index < currentSlideIndex 
-                      ? 'bg-purple-600' 
-                      : 'bg-white/30'
-                }`}
-              />
-            ))}
+          {/* Main slide content */}
+          <div className="flex-1 flex flex-col p-3 pb-20">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentSlide?.id || currentSlideIndex}
+                initial={{ opacity: 0, x: isNavigating ? (currentSlideIndex > 0 ? 20 : -20) : 0, y: 20 }}
+                animate={{ opacity: 1, x: 0, y: 0 }}
+                exit={{ opacity: 0, x: isNavigating ? (currentSlideIndex < slides.length - 1 ? -20 : 20) : 0, y: -20 }}
+                transition={{ 
+                  duration: 0.4, 
+                  ease: "easeInOut",
+                  opacity: { duration: 0.3 },
+                  y: { duration: 0.4, ease: "easeOut" }
+                }}
+                className="flex-grow flex flex-col justify-center max-w-2xl mx-auto w-full"
+              >
+                {renderSlideContent()}
+              </motion.div>
+            </AnimatePresence>
           </div>
 
-          <Button
-            variant="ghost"
-            onClick={goToNextSlide}
-            disabled={currentSlideIndex >= slides.length - 1 || isNavigating}
-            className="text-white hover:bg-white/10 disabled:opacity-50"
-          >
-            Next
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
+          {/* Navigation footer */}
+          <div className="flex-shrink-0 p-4 border-t border-white/10 bg-gradient-to-t from-purple-950/20 to-transparent">
+            <div className="flex justify-between items-center max-w-2xl mx-auto">
+              <Button
+                variant="ghost"
+                onClick={goToPreviousSlide}
+                disabled={currentSlideIndex === 0 || isNavigating}
+                className="text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Previous
+              </Button>
+
+              {/* Slide indicators */}
+              <div className="flex space-x-2">
+                {slides.slice(Math.max(0, currentSlideIndex - 2), currentSlideIndex + 3).map((_, relativeIndex) => {
+                  const actualIndex = Math.max(0, currentSlideIndex - 2) + relativeIndex;
+                  return (
+                    <button
+                      key={actualIndex}
+                      onClick={() => jumpToSlide(actualIndex)}
+                      className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                        actualIndex === currentSlideIndex 
+                          ? 'bg-purple-400 scale-125' 
+                          : actualIndex < currentSlideIndex 
+                            ? 'bg-purple-600 hover:bg-purple-500' 
+                            : 'bg-white/30 hover:bg-white/50'
+                      }`}
+                      aria-label={`Go to slide ${actualIndex + 1}`}
+                    />
+                  );
+                })}
+              </div>
+
+              <Button
+                variant="ghost"
+                onClick={goToNextSlide}
+                disabled={currentSlideIndex >= slides.length - 1 || isNavigating}
+                className="text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {currentSlideIndex >= slides.length - 1 ? 'Complete' : 'Next'}
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
