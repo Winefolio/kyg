@@ -123,8 +123,11 @@ export default function TastingSession() {
     );
   }
 
-  const slides = slidesData.slides || [];
+  const allSlides = slidesData.slides || [];
   const wines = slidesData.wines || [];
+  
+  // Filter out transition slides from navigation (they auto-play between regular slides)
+  const slides = allSlides.filter(slide => slide.type !== 'transition');
   const currentSlide = slides[currentSlideIndex];
   const currentWine = currentSlide ? wines.find(w => w.id === currentSlide.packageWineId) : null;
 

@@ -20,7 +20,7 @@ interface Slide {
   id: string;
   packageWineId: string;
   position: number;
-  type: 'interlude' | 'question' | 'video_message' | 'audio_message' | 'media';
+  type: 'interlude' | 'question' | 'video_message' | 'audio_message' | 'media' | 'transition';
   sectionType: 'intro' | 'deep_dive' | 'ending';
   title: string;
   description: string;
@@ -43,6 +43,47 @@ interface SlideEditorProps {
 }
 
 const SLIDE_TEMPLATES = {
+  transition: [
+    {
+      name: "Wine Glass Fill Transition",
+      type: "transition",
+      sectionType: "deep_dive",
+      payloadTemplate: {
+        title: "Transitioning to next wine...",
+        description: "Get ready for the next tasting experience",
+        backgroundImage: "",
+        duration: 3000,
+        showContinueButton: false,
+        animation_type: "wine_glass_fill"
+      }
+    },
+    {
+      name: "Smooth Fade Transition",
+      type: "transition", 
+      sectionType: "deep_dive",
+      payloadTemplate: {
+        title: "Moving to the next section...",
+        description: "Take a moment to prepare your palate",
+        backgroundImage: "",
+        duration: 2000,
+        showContinueButton: true,
+        animation_type: "fade"
+      }
+    },
+    {
+      name: "Section Break",
+      type: "transition",
+      sectionType: "ending",
+      payloadTemplate: {
+        title: "Concluding our tasting journey",
+        description: "Thank you for participating in this wine experience",
+        backgroundImage: "",
+        duration: 2500,
+        showContinueButton: false,
+        animation_type: "slide"
+      }
+    }
+  ],
   question: [
     {
       name: "Aroma Assessment",
@@ -406,6 +447,7 @@ export function SlideEditor({ packageWineId, wineName, onClose }: SlideEditorPro
                         <SelectItem value="question">Question</SelectItem>
                         <SelectItem value="interlude">Interlude</SelectItem>
                         <SelectItem value="video_message">Video Message</SelectItem>
+                        <SelectItem value="transition">Transition Card</SelectItem>
                       </SelectContent>
                     </Select>
                     {selectedTemplate && (
@@ -640,6 +682,13 @@ function SlideEditForm({ slide, onSave, onCancel }: {
                 onChange={(payload) => setFormData(prev => ({ ...prev, payloadJson: payload }))}
               />
             )}
+
+            {slide.type === 'transition' && (
+              <TransitionSlideEditor
+                payload={formData.payloadJson}
+                onChange={(payload) => setFormData(prev => ({ ...prev, payloadJson: payload }))}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -867,6 +916,65 @@ function InterludeSlideEditor({ payload, onChange }: { payload: any; onChange: (
       <div className="flex items-center space-x-3">
         <Switch
           checked={payload.showContinueButton !== false}
+          onCheckedChange={(checked) => updatePayload({ showContinueButton: checked })}
+        />
+        <Label className="text-white">Show Continue Button</Label>
+      </div>
+    </div>
+  );
+}
+
+// Transition Slide Editor
+function TransitionSlideEditor({ payload, onChange }: { payload: any; onChange: (payload: any) => void }) {
+  const updatePayload = (updates: any) => {
+    onChange({ ...payload, ...updates });
+  };
+
+  return (
+    <div className="space-y-6">
+      <h4 className="text-white font-medium text-lg">Transition Settings</h4>
+      
+      <div>
+        <Label className="text-white">Background Image URL</Label>
+        <Input
+          value={payload.backgroundImage || ''}
+          onChange={(e) => updatePayload({ backgroundImage: e.target.value })}
+          className="bg-white/10 border-white/20 text-white mt-2"
+          placeholder="Enter background image URL"
+        />
+      </div>
+
+      <div>
+        <Label className="text-white">Duration (milliseconds)</Label>
+        <Input
+          type="number"
+          value={payload.duration || 2000}
+          onChange={(e) => updatePayload({ duration: parseInt(e.target.value) })}
+          className="bg-white/10 border-white/20 text-white mt-2"
+          placeholder="2000"
+        />
+      </div>
+
+      <div>
+        <Label className="text-white">Animation Type</Label>
+        <Select
+          value={payload.animation_type || 'wine_glass_fill'}
+          onValueChange={(value) => updatePayload({ animation_type: value })}
+        >
+          <SelectTrigger className="bg-white/10 border-white/20 text-white mt-2">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="wine_glass_fill">Wine Glass Fill</SelectItem>
+            <SelectItem value="fade">Fade</SelectItem>
+            <SelectItem value="slide">Slide</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex items-center space-x-3">
+        <Switch
+          checked={payload.showContinueButton || false}
           onCheckedChange={(checked) => updatePayload({ showContinueButton: checked })}
         />
         <Label className="text-white">Show Continue Button</Label>

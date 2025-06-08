@@ -227,6 +227,16 @@ export const mediaPayloadSchema = z.object({
 });
 export type MediaPayload = z.infer<typeof mediaPayloadSchema>;
 
+export const transitionPayloadSchema = z.object({
+  title: z.string(),
+  description: z.string().optional(),
+  backgroundImage: z.string().url().optional(),
+  duration: z.number().default(2000), // Duration in ms
+  showContinueButton: z.boolean().default(false),
+  animation_type: z.enum(['wine_glass_fill', 'fade', 'slide']).default('wine_glass_fill')
+});
+export type TransitionPayload = z.infer<typeof transitionPayloadSchema>;
+
 // Insert schemas
 export const insertPackageSchema = createInsertSchema(packages, {
   description: z.string().nullable().optional(),
