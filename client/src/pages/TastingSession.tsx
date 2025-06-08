@@ -15,6 +15,7 @@ import { useHaptics } from "@/hooks/useHaptics";
 import { apiRequest } from "@/lib/queryClient";
 import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause, Award, Wine, ChevronDown } from "lucide-react";
 import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
+import { WineTransition } from "@/components/WineTransition";
 import type { Slide, Participant, Session, Package } from "@shared/schema";
 
 export default function TastingSession() {
@@ -137,18 +138,45 @@ export default function TastingSession() {
     return acc;
   }, {});
 
-  // Calculate section progress
-  const sections = wines.map(wine => {
-    const wineSlides = slidesByWine[wine.id] || [];
-    const wineStartIndex = slides.findIndex(s => s.packageWineId === wine.id);
-    const wineEndIndex = wineStartIndex + wineSlides.length - 1;
-    const isActive = currentSlideIndex >= wineStartIndex && currentSlideIndex <= wineEndIndex;
-    const isCompleted = currentSlideIndex > wineEndIndex;
-    const progress = isCompleted ? 100 : isActive ? ((currentSlideIndex - wineStartIndex + 1) / wineSlides.length) * 100 : 0;
+  // Calculate section progress based on slide section types
+  const sectionNames = ['intro', 'deep dive', 'ending'];
+  const sections = sectionNames.map((sectionName, sectionIndex) => {
+    const sectionSlides = slides.filter(slide => {
+      const payload = slide.payloadJson as any;
+      const sectionType = payload?.section_type || slide.section_type;
+      if (sectionName === 'intro') return sectionType === 'intro';
+      if (sectionName === 'deep dive') return sectionType === 'tasting' || sectionType === 'deep_dive';
+      if (sectionName === 'ending') return sectionType === 'ending' || sectionType === 'conclusion';
+      return false;
+    });
+    
+    if (sectionSlides.length === 0) {
+      // Fallback: divide slides into three equal sections
+      const totalSlides = slides.length;
+      const slidesPerSection = Math.ceil(totalSlides / 3);
+      const startIndex = sectionIndex * slidesPerSection;
+      const endIndex = Math.min(startIndex + slidesPerSection, totalSlides);
+      const isActive = currentSlideIndex >= startIndex && currentSlideIndex < endIndex;
+      const isCompleted = currentSlideIndex >= endIndex;
+      const progress = isCompleted ? 100 : isActive ? ((currentSlideIndex - startIndex + 1) / slidesPerSection) * 100 : 0;
+      
+      return {
+        name: sectionName,
+        progress: Math.max(0, Math.min(100, progress)),
+        isActive,
+        isCompleted
+      };
+    }
+    
+    const firstSlideIndex = slides.findIndex(s => sectionSlides.includes(s));
+    const lastSlideIndex = slides.lastIndexOf(sectionSlides[sectionSlides.length - 1]);
+    const isActive = currentSlideIndex >= firstSlideIndex && currentSlideIndex <= lastSlideIndex;
+    const isCompleted = currentSlideIndex > lastSlideIndex;
+    const progress = isCompleted ? 100 : isActive ? ((currentSlideIndex - firstSlideIndex + 1) / sectionSlides.length) * 100 : 0;
     
     return {
-      name: wine.wineName,
-      progress,
+      name: sectionName,
+      progress: Math.max(0, Math.min(100, progress)),
       isActive,
       isCompleted
     };
@@ -214,6 +242,15 @@ export default function TastingSession() {
   const handleAnswerChange = (slideId: string, answer: any) => {
     setAnswers(prev => ({ ...prev, [slideId]: answer }));
     saveResponse(slideId, answer);
+  };
+
+  // Handle completion
+  const handleComplete = async () => {
+    triggerHaptic('success');
+    const progress = 100;
+    
+    // Navigate to completion page
+    setLocation(`/completion/${sessionId}/${participantId}?progress=${progress}`);
   };
 
   // Render current slide content
@@ -297,22 +334,31 @@ export default function TastingSession() {
     }
   };
 
-  // Section transition overlay
-  if (isTransitioningSection) {
+  // Wine transition overlay
+  if (isTransitioningSection && currentWine) {
+    const nextSlide = slides[currentSlideIndex + 1];
+    const nextWine = nextSlide ? wines.find(w => w.id === nextSlide.packageWineId) : null;
+    
     return (
-      <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center text-white"
-        >
-          <Wine className="w-20 h-20 mx-auto mb-6 text-purple-300 animate-pulse" />
-          <h2 className="text-3xl font-bold mb-2">Next Wine</h2>
-          <p className="text-xl text-purple-200">
-            <DynamicTextRenderer text={transitionSectionName} />
-          </p>
-        </motion.div>
-      </div>
+      <WineTransition
+        currentWine={{
+          wineName: currentWine.wineName,
+          wineDescription: currentWine.wineDescription || '',
+          wineImageUrl: currentWine.wineImageUrl || '',
+          position: wines.findIndex(w => w.id === currentWine.id) + 1
+        }}
+        nextWine={nextWine ? {
+          wineName: nextWine.wineName,
+          wineDescription: nextWine.wineDescription || '',
+          wineImageUrl: nextWine.wineImageUrl || '',
+          position: wines.findIndex(w => w.id === nextWine.id) + 1
+        } : undefined}
+        onContinue={() => {
+          setCurrentSlideIndex(currentSlideIndex + 1);
+          setCompletedSlides(prev => [...prev, currentSlideIndex]);
+          setIsTransitioningSection(false);
+        }}
+      />
     );
   }
 
@@ -608,8 +654,8 @@ export default function TastingSession() {
 
               <Button
                 variant="ghost"
-                onClick={goToNextSlide}
-                disabled={currentSlideIndex >= slides.length - 1 || isNavigating}
+                onClick={currentSlideIndex >= slides.length - 1 ? handleComplete : goToNextSlide}
+                disabled={isNavigating}
                 className="text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {currentSlideIndex >= slides.length - 1 ? 'Complete' : 'Next'}

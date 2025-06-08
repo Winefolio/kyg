@@ -105,7 +105,7 @@ export const wineResponseAnalytics = pgTable("wine_response_analytics", {
 }));
 
 // Define all allowed slide types
-const slideTypes = ['question', 'media', 'interlude', 'video_message', 'audio_message'] as const;
+const slideTypes = ['question', 'media', 'interlude', 'video_message', 'audio_message', 'transition'] as const;
 
 // Slides table - ALL content lives here, now linked to package wines
 export const slides = pgTable("slides", {
