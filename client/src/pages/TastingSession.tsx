@@ -88,15 +88,240 @@ export default function TastingSession() {
     );
   }
 
+  // Handle session status
+  if (currentSession.status === 'waiting') {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex flex-col items-center justify-center text-white p-8">
+        <div className="text-center">
+          <Clock className="w-16 h-16 mx-auto mb-4 text-purple-300 animate-pulse" />
+          <h2 className="text-2xl font-semibold mb-2">Waiting for Session to Start</h2>
+          <p className="text-purple-200">The host will begin the tasting shortly...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentSession.status === 'paused') {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex flex-col items-center justify-center text-white p-8">
+        <div className="text-center">
+          <Pause className="w-16 h-16 mx-auto mb-4 text-yellow-300" />
+          <h2 className="text-2xl font-semibold mb-2">Session Paused</h2>
+          <p className="text-purple-200">Please wait while the host resumes the session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!slidesData || !slidesData.slides || slidesData.slides.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex flex-col items-center justify-center text-white p-8">
+        <h2 className="text-2xl font-semibold mb-2">No Content Available</h2>
+        <p className="text-purple-200 text-center">This session doesn't have any slides configured yet.</p>
+      </div>
+    );
+  }
+
+  const slides = slidesData.slides || [];
+  const currentSlide = slides[currentSlideIndex];
+
+  // Handle slide navigation
+  const goToNextSlide = async () => {
+    if (currentSlideIndex < slides.length - 1) {
+      setIsNavigating(true);
+      triggerHaptic('success');
+      
+      setTimeout(() => {
+        setCurrentSlideIndex(currentSlideIndex + 1);
+        setIsNavigating(false);
+      }, 150);
+    }
+  };
+
+  const goToPreviousSlide = () => {
+    if (currentSlideIndex > 0) {
+      setIsNavigating(true);
+      triggerHaptic('selection');
+      
+      setTimeout(() => {
+        setCurrentSlideIndex(currentSlideIndex - 1);
+        setIsNavigating(false);
+      }, 150);
+    }
+  };
+
+  // Handle answer changes
+  const handleAnswerChange = (slideId: string, answer: any) => {
+    setAnswers(prev => ({ ...prev, [slideId]: answer }));
+    saveResponse(slideId, answer);
+  };
+
+  // Render current slide content
+  const renderSlideContent = () => {
+    if (!currentSlide) return null;
+
+    switch (currentSlide.type) {
+      case 'interlude':
+        return (
+          <motion.div
+            key={`interlude-${currentSlide.id}`}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl text-center"
+          >
+            <h2 className="text-2xl font-bold text-white mb-4">
+              <DynamicTextRenderer text={currentSlide.payloadJson.title} />
+            </h2>
+            {currentSlide.payloadJson.description && (
+              <p className="text-white/80 text-lg leading-relaxed">
+                <DynamicTextRenderer text={currentSlide.payloadJson.description} />
+              </p>
+            )}
+          </motion.div>
+        );
+
+      case 'question':
+        const questionData = currentSlide.payloadJson;
+        
+        if (questionData.questionType === 'multiple_choice') {
+          return (
+            <MultipleChoiceQuestion
+              question={{
+                title: questionData.title || questionData.question,
+                description: questionData.description || '',
+                category: questionData.category || 'Question',
+                options: questionData.options || [],
+                allow_multiple: questionData.allow_multiple || questionData.allowMultiple || false,
+                allow_notes: questionData.allow_notes || questionData.allowNotes || false
+              }}
+              value={answers[currentSlide.id] || { selected: [], notes: '' }}
+              onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+            />
+          );
+        }
+
+        if (questionData.questionType === 'scale') {
+          return (
+            <ScaleQuestion
+              question={{
+                title: questionData.title || questionData.question,
+                description: questionData.description || '',
+                category: questionData.category || 'Scale',
+                scale_min: questionData.scaleMin || questionData.scale_min || 1,
+                scale_max: questionData.scaleMax || questionData.scale_max || 10,
+                scale_labels: questionData.scaleLabels || questionData.scale_labels || ['Low', 'High']
+              }}
+              value={answers[currentSlide.id] || questionData.scaleMin || questionData.scale_min || 1}
+              onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+            />
+          );
+        }
+
+        return (
+          <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
+            <h3 className="text-lg font-semibold text-white mb-2">
+              <DynamicTextRenderer text={questionData.title || questionData.question || 'Question'} />
+            </h3>
+            <p className="text-white/70 text-sm">
+              <DynamicTextRenderer text={questionData.description || ''} />
+            </p>
+          </div>
+        );
+
+      default:
+        return (
+          <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl text-center">
+            <p className="text-white">Unknown slide type: {currentSlide.type}</p>
+          </div>
+        );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-primary flex flex-col">
-      <div className="flex-grow flex flex-col items-center justify-center p-3 pb-20">
-        <div className="w-full max-w-md mx-auto min-h-[50vh] flex flex-col justify-center">
-          <div className="text-center text-white">
-            <h1 className="text-2xl font-bold mb-4">Wine Tasting Session</h1>
-            <p>Session ID: {sessionId}</p>
-            <p>Participant ID: {participantId}</p>
+      {/* Header */}
+      <div className="flex-shrink-0 p-4 border-b border-white/10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Wine className="w-6 h-6 text-purple-300" />
+            <div className="text-white">
+              <h1 className="font-semibold">Wine Tasting</h1>
+              <p className="text-xs text-white/60">{slidesData.package.name}</p>
+            </div>
           </div>
+          
+          <div className="text-right text-white">
+            <p className="text-sm font-medium">{currentSlideIndex + 1} of {slides.length}</p>
+            <p className="text-xs text-white/60">
+              {Math.round(((currentSlideIndex + 1) / slides.length) * 100)}% complete
+            </p>
+          </div>
+        </div>
+        
+        {/* Progress bar */}
+        <div className="mt-3">
+          <SegmentedProgressBar 
+            current={currentSlideIndex + 1} 
+            total={slides.length}
+            className="h-2"
+          />
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-grow flex flex-col p-4">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentSlide?.id || currentSlideIndex}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
+            className="flex-grow flex flex-col justify-center"
+          >
+            {renderSlideContent()}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Navigation */}
+      <div className="flex-shrink-0 p-4 border-t border-white/10">
+        <div className="flex justify-between items-center">
+          <Button
+            variant="ghost"
+            onClick={goToPreviousSlide}
+            disabled={currentSlideIndex === 0 || isNavigating}
+            className="text-white hover:bg-white/10 disabled:opacity-50"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Previous
+          </Button>
+
+          <div className="flex space-x-2">
+            {slides.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentSlideIndex(index)}
+                className={`w-2 h-2 rounded-full transition-colors ${
+                  index === currentSlideIndex 
+                    ? 'bg-purple-400' 
+                    : index < currentSlideIndex 
+                      ? 'bg-purple-600' 
+                      : 'bg-white/30'
+                }`}
+              />
+            ))}
+          </div>
+
+          <Button
+            variant="ghost"
+            onClick={goToNextSlide}
+            disabled={currentSlideIndex >= slides.length - 1 || isNavigating}
+            className="text-white hover:bg-white/10 disabled:opacity-50"
+          >
+            Next
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
         </div>
       </div>
     </div>
