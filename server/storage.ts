@@ -1021,24 +1021,87 @@ export class DatabaseStorage implements IStorage {
     console.log("Initializing wine glossary terms...");
     
     const wineTerms = [
+      // General Wine Terminology
       {
-        term: "tannins",
-        variations: ["tannin", "tannic"],
-        definition: "Natural compounds found in grape skins, seeds, and stems that create a dry, astringent sensation in your mouth. They provide structure and aging potential to red wines.",
+        term: "sommelier",
+        variations: ["somm", "wine steward"],
+        definition: "A wine steward; a tour guide; or, some lucky schmuck who gets paid to drink and talk about wine.",
+        category: "General"
+      },
+      {
+        term: "acidity",
+        variations: ["acidic", "crisp", "bright", "zippy"],
+        definition: "How much the wine makes your mouth water. High acid = zippy, bright, refreshing. Low acid = smoother, softer. It's about the feeling—and whether you liked it.",
         category: "Structure"
       },
       {
         term: "body",
-        variations: ["full-bodied", "medium-bodied", "light-bodied"],
-        definition: "The weight and fullness of wine in your mouth, ranging from light (like skim milk) to full (like cream). Influenced by alcohol content, tannins, and flavor concentration.",
+        variations: ["full-bodied", "medium-bodied", "light-bodied", "weight"],
+        definition: "A wine's 'weight' on your palate. Light-bodied wines feel like water or juice; full-bodied wines feel more like whole milk or a smoothie.",
         category: "Structure"
       },
       {
-        term: "acidity",
-        variations: ["acidic", "crisp", "bright"],
-        definition: "The tartness or sharpness in wine that makes your mouth water. Good acidity provides freshness and helps wine pair well with food.",
+        term: "tannin",
+        variations: ["tannins", "tannic"],
+        definition: "That drying, grippy sensation in red wines—think about how fuzzy your teeth feel. Light tannins = like thin socks; heavy tannins = thick wool socks. Comes from grape skins, seeds, stems, and oak.",
         category: "Structure"
       },
+      {
+        term: "primary flavors",
+        variations: ["primary notes", "fruit flavors"],
+        definition: "The fruit, herbs, and floral notes straight from the grape. Red wines might show cherry, plum, or pepper; whites might show citrus, green apple, or tropical fruit. Fresh and upfront.",
+        category: "Flavor"
+      },
+      {
+        term: "secondary flavors",
+        variations: ["secondary notes", "winemaking flavors"],
+        definition: "Flavors from winemaking (not the grape). Think butter (from malolactic fermentation), yeasty notes (from lees), and oak spices like vanilla, clove, or toast.",
+        category: "Flavor"
+      },
+      {
+        term: "tertiary flavors",
+        variations: ["tertiary notes", "aged flavors"],
+        definition: "Flavors that come with age. Red wines shift to dried fruit, tobacco, and leather; whites to honey, nuts, or Sherry-like qualities. Earthy, savory, and complex.",
+        category: "Flavor"
+      },
+      // Fruit & Flavor Categories
+      {
+        term: "stone fruit",
+        variations: ["stone fruits"],
+        definition: "Peach, apricot, nectarine—fleshy fruits with a single pit.",
+        category: "Flavor"
+      },
+      {
+        term: "tree fruit",
+        variations: ["tree fruits", "orchard fruit"],
+        definition: "Apples, pears, quince—crisp, orchard-grown fruits.",
+        category: "Flavor"
+      },
+      {
+        term: "citrus fruit",
+        variations: ["citrus fruits", "citrus"],
+        definition: "Lemon, lime, grapefruit, orange—zesty and bright.",
+        category: "Flavor"
+      },
+      {
+        term: "tropical fruit",
+        variations: ["tropical fruits"],
+        definition: "Pineapple, mango, banana, passionfruit—ripe, exotic, sunshine-y.",
+        category: "Flavor"
+      },
+      {
+        term: "minerality",
+        variations: ["mineral", "flinty", "chalky", "stony"],
+        definition: "A sense of wet stone, chalk, flint, or saline. Not fruity, not spicy—more like licking a rock in the best way.",
+        category: "Flavor"
+      },
+      {
+        term: "vessel",
+        variations: ["fermentation vessel", "aging vessel"],
+        definition: "The container used for fermentation or aging—stainless steel (neutral), oak (adds spice and texture), or amphora/concrete (adds structure or subtle earthiness).",
+        category: "Production"
+      },
+      // Traditional wine terms to maintain compatibility
       {
         term: "finish",
         variations: ["aftertaste", "length"],
@@ -1074,12 +1137,6 @@ export class DatabaseStorage implements IStorage {
         variations: ["château", "domaine"],
         definition: "A winery that controls its own vineyards and winemaking process from grape to bottle, ensuring quality consistency.",
         category: "Production"
-      },
-      {
-        term: "minerality",
-        variations: ["mineral", "flinty"],
-        definition: "A taste characteristic often described as wet stones or chalk, typically attributed to the soil composition where grapes are grown.",
-        category: "Flavor"
       }
     ];
 

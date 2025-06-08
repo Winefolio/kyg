@@ -45,50 +45,119 @@ interface SlideEditorProps {
 const SLIDE_TEMPLATES = {
   question: [
     {
-      name: "Multiple Choice Question",
+      name: "Aroma Assessment",
       type: "question",
       sectionType: "deep_dive",
       payloadTemplate: {
         questionType: "multiple_choice",
-        question: "What aromas do you detect?",
-        description: "Select all the aromas you can identify",
+        question: "What primary flavors do you detect in the bouquet?",
+        description: "Select all the aromas you can identify. Consider both stone fruit and citrus fruit notes",
         options: [
-          { id: "1", text: "Dark fruits", description: "Blackberry, plum" },
-          { id: "2", text: "Vanilla and oak", description: "From barrel aging" },
-          { id: "3", text: "Spices", description: "Pepper, clove" },
-          { id: "4", text: "Floral notes", description: "Violet, rose petals" }
+          { id: "1", text: "Stone fruit", description: "Peach, apricot, nectarine" },
+          { id: "2", text: "Citrus fruit", description: "Lemon, lime, grapefruit" },
+          { id: "3", text: "Tropical fruit", description: "Pineapple, mango, passionfruit" },
+          { id: "4", text: "Tree fruit", description: "Apple, pear, quince" },
+          { id: "5", text: "Minerality", description: "Wet stone, chalk, flint" }
         ],
         allowMultiple: true,
+        timeLimit: 45,
+        points: 10
+      }
+    },
+    {
+      name: "Body Assessment",
+      type: "question",
+      sectionType: "deep_dive",
+      payloadTemplate: {
+        questionType: "scale",
+        question: "How would you describe the body of this wine?",
+        description: "Consider the wine's weight on your palate - from light-bodied to full-bodied",
+        scaleMin: 1,
+        scaleMax: 5,
+        scaleLabels: ["Light-bodied", "Full-bodied"],
         timeLimit: 30,
         points: 10
       }
     },
     {
-      name: "Scale Rating",
+      name: "Tannin Evaluation",
+      type: "question",
+      sectionType: "deep_dive",
+      payloadTemplate: {
+        questionType: "multiple_choice",
+        question: "How would you characterize the tannin structure?",
+        description: "Focus on the drying, grippy sensation and overall tannin intensity",
+        options: [
+          { id: "1", text: "Soft tannins", description: "Like thin socks - barely noticeable" },
+          { id: "2", text: "Medium tannins", description: "Balanced grip and texture" },
+          { id: "3", text: "Firm tannins", description: "Like thick wool socks - substantial presence" },
+          { id: "4", text: "No tannins detected", description: "Smooth, no drying sensation" }
+        ],
+        allowMultiple: false,
+        timeLimit: 30,
+        points: 10
+      }
+    },
+    {
+      name: "Acidity Analysis",
       type: "question",
       sectionType: "deep_dive",
       payloadTemplate: {
         questionType: "scale",
-        question: "Rate the aroma intensity",
-        description: "How strong are the aromas?",
+        question: "Rate the acidity level",
+        description: "How much does this wine make your mouth water? High acidity creates a zippy, bright sensation",
         scaleMin: 1,
         scaleMax: 10,
-        scaleLabels: ["Very Light", "Very Intense"],
+        scaleLabels: ["Low acidity", "High acidity"],
+        timeLimit: 25,
+        points: 10
+      }
+    },
+    {
+      name: "Flavor Profile",
+      type: "question",
+      sectionType: "deep_dive",
+      payloadTemplate: {
+        questionType: "multiple_choice",
+        question: "What secondary flavors from winemaking do you notice?",
+        description: "These flavors come from the vessel and winemaking process, not the grape itself",
+        options: [
+          { id: "1", text: "Oak influences", description: "Vanilla, spice, toast from barrel aging" },
+          { id: "2", text: "Yeasty notes", description: "Bread, biscuit from lees contact" },
+          { id: "3", text: "Butter notes", description: "From malolactic fermentation" },
+          { id: "4", text: "Stainless steel neutral", description: "Clean, no added flavors from vessel" }
+        ],
+        allowMultiple: true,
+        timeLimit: 40,
+        points: 15
+      }
+    },
+    {
+      name: "Finish Assessment",
+      type: "question",
+      sectionType: "ending",
+      payloadTemplate: {
+        questionType: "scale",
+        question: "How long is the finish?",
+        description: "Consider the lingering flavors and sensations after swallowing",
+        scaleMin: 1,
+        scaleMax: 5,
+        scaleLabels: ["Short finish", "Long finish"],
         timeLimit: 20,
         points: 10
       }
     },
     {
-      name: "Open Text Response",
+      name: "Open Tasting Notes",
       type: "question",
-      sectionType: "deep_dive",
+      sectionType: "ending",
       payloadTemplate: {
         questionType: "text",
-        question: "Describe your tasting notes",
-        description: "Share your detailed impressions",
+        question: "Share your complete tasting experience",
+        description: "Describe the tertiary flavors, overall complexity, and how the wine's terroir comes through",
         maxLength: 500,
-        timeLimit: 60,
-        points: 15
+        timeLimit: 90,
+        points: 20
       }
     }
   ],
