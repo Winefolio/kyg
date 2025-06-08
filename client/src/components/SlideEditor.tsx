@@ -351,6 +351,7 @@ export function SlideEditor({ packageWineId, wineName, onClose }: SlideEditorPro
       case 'audio_message': return Music;
       case 'interlude': return MessageSquare;
       case 'media': return Image;
+      case 'transition': return Clock;
       default: return MessageSquare;
     }
   };
