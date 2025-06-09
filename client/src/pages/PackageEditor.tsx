@@ -202,8 +202,8 @@ export default function PackageEditor() {
     if (!currentWineContext) return;
 
     const wineSlides = slides.filter(s => s.packageWineId === currentWineContext.wineId);
-    const sectionSlides = wineSlides.filter(s => s.section_type === currentWineContext.sectionType);
-    const nextPosition = (sectionSlides.length > 0 ? Math.max(...sectionSlides.map(s => s.position)) : 0) + 1;
+    // Position must be unique across ALL slides for this wine, not just the section
+    const nextPosition = (wineSlides.length > 0 ? Math.max(...wineSlides.map(s => s.position)) : 0) + 1;
 
     // Determine the correct slide type based on question format
     let slideType: 'question' | 'video_message' | 'audio_message' = 'question';
@@ -214,6 +214,7 @@ export default function PackageEditor() {
 
     if (question.format === 'video_message') {
       slideType = 'video_message';
+      console.log('🎥 Creating video_message slide with type:', slideType);
       // Structure payload for VideoMessagePayload format
       payloadJson = {
         title: question.config.title,
@@ -224,6 +225,7 @@ export default function PackageEditor() {
       };
     } else if (question.format === 'audio_message') {
       slideType = 'audio_message';
+      console.log('🎵 Creating audio_message slide with type:', slideType);
       // Structure payload for AudioMessagePayload format
       payloadJson = {
         title: question.config.title,

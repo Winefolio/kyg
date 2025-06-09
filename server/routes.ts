@@ -713,6 +713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/slides", async (req, res) => {
     try {
       const validatedData = insertSlideSchema.parse(req.body);
+      console.log(`📝 Creating slide with type: ${validatedData.type}`);
       const slide = await storage.createSlide(validatedData);
       res.json({ slide });
     } catch (error) {
