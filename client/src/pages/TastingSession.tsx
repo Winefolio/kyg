@@ -127,12 +127,10 @@ export default function TastingSession() {
   const wines = slidesData.wines || [];
   
   // Filter out transition slides from navigation (they auto-play between regular slides)
-  const slides = allSlides.filter(slide => slide.type !== 'transition');
-  const currentSlide = slides[currentSlideIndex];
-  const currentWine = currentSlide ? wines.find(w => w.id === currentSlide.packageWineId) : null;
-
-  // Group slides by wine
-  const slidesByWine = slides.reduce((acc: Record<string, any[]>, slide) => {
+  const rawSlides = allSlides.filter(slide => slide.type !== 'transition');
+  
+  // Group slides by wine and sort them properly within each wine
+  const slidesByWine = rawSlides.reduce((acc: Record<string, any[]>, slide) => {
     const wineId = slide.packageWineId;
     if (!acc[wineId]) {
       acc[wineId] = [];
@@ -141,27 +139,82 @@ export default function TastingSession() {
     return acc;
   }, {});
 
-  // Calculate section progress based on slide section types
+  // Sort each wine's slides to follow Intro → Deep Dive → Ending progression
+  const sortedSlidesByWine = Object.keys(slidesByWine).reduce((acc, wineId) => {
+    const wineSlides = slidesByWine[wineId];
+    
+    // Separate slides by section type
+    const introSlides = wineSlides.filter(slide => {
+      const sectionType = slide.section_type || slide.payloadJson?.section_type;
+      return sectionType === 'intro';
+    }).sort((a, b) => a.position - b.position);
+    
+    const deepDiveSlides = wineSlides.filter(slide => {
+      const sectionType = slide.section_type || slide.payloadJson?.section_type;
+      return sectionType === 'deep_dive' || sectionType === 'tasting';
+    }).sort((a, b) => a.position - b.position);
+    
+    const endingSlides = wineSlides.filter(slide => {
+      const sectionType = slide.section_type || slide.payloadJson?.section_type;
+      return sectionType === 'ending' || sectionType === 'conclusion';
+    }).sort((a, b) => a.position - b.position);
+    
+    // Handle slides without section_type - assign them based on position
+    const unassignedSlides = wineSlides.filter(slide => {
+      const sectionType = slide.section_type || slide.payloadJson?.section_type;
+      return !sectionType;
+    }).sort((a, b) => a.position - b.position);
+    
+    // If we have unassigned slides, distribute them evenly across sections
+    if (unassignedSlides.length > 0) {
+      const thirds = Math.ceil(unassignedSlides.length / 3);
+      introSlides.push(...unassignedSlides.slice(0, thirds));
+      deepDiveSlides.push(...unassignedSlides.slice(thirds, thirds * 2));
+      endingSlides.push(...unassignedSlides.slice(thirds * 2));
+    }
+    
+    // Combine in proper order: Intro → Deep Dive → Ending
+    acc[wineId] = [...introSlides, ...deepDiveSlides, ...endingSlides];
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  // Create final ordered slides array by wine position
+  const slides = wines
+    .sort((a, b) => a.position - b.position)
+    .flatMap(wine => sortedSlidesByWine[wine.id] || []);
+    
+  const currentSlide = slides[currentSlideIndex];
+  const currentWine = currentSlide ? wines.find(w => w.id === currentSlide.packageWineId) : null;
+
+  // Calculate section progress based on current wine's slides only
+  const currentWineSlides = currentWine ? sortedSlidesByWine[currentWine.id] || [] : [];
+  const currentWineStartIndex = currentWine ? slides.findIndex(s => s.packageWineId === currentWine.id) : 0;
+  const currentSlideInWine = currentSlideIndex - currentWineStartIndex;
+  
   const sectionNames = ['intro', 'deep dive', 'ending'];
-  const sections = sectionNames.map((sectionName, sectionIndex) => {
-    const sectionSlides = slides.filter(slide => {
-      const payload = slide.payloadJson as any;
-      const sectionType = payload?.section_type || slide.section_type;
+  const sections = sectionNames.map((sectionName) => {
+    // Find section slides within current wine
+    const sectionSlides = currentWineSlides.filter(slide => {
+      const sectionType = slide.section_type || slide.payloadJson?.section_type;
       if (sectionName === 'intro') return sectionType === 'intro';
-      if (sectionName === 'deep dive') return sectionType === 'tasting' || sectionType === 'deep_dive';
+      if (sectionName === 'deep dive') return sectionType === 'deep_dive' || sectionType === 'tasting';
       if (sectionName === 'ending') return sectionType === 'ending' || sectionType === 'conclusion';
       return false;
     });
     
     if (sectionSlides.length === 0) {
-      // Fallback: divide slides into three equal sections
-      const totalSlides = slides.length;
-      const slidesPerSection = Math.ceil(totalSlides / 3);
+      // Fallback: divide current wine's slides into three equal sections
+      const totalWineSlides = currentWineSlides.length;
+      const slidesPerSection = Math.ceil(totalWineSlides / 3);
+      let sectionIndex = 0;
+      if (sectionName === 'deep dive') sectionIndex = 1;
+      if (sectionName === 'ending') sectionIndex = 2;
+      
       const startIndex = sectionIndex * slidesPerSection;
-      const endIndex = Math.min(startIndex + slidesPerSection, totalSlides);
-      const isActive = currentSlideIndex >= startIndex && currentSlideIndex < endIndex;
-      const isCompleted = currentSlideIndex >= endIndex;
-      const progress = isCompleted ? 100 : isActive ? ((currentSlideIndex - startIndex + 1) / slidesPerSection) * 100 : 0;
+      const endIndex = Math.min(startIndex + slidesPerSection, totalWineSlides);
+      const isActive = currentSlideInWine >= startIndex && currentSlideInWine < endIndex;
+      const isCompleted = currentSlideInWine >= endIndex;
+      const progress = isCompleted ? 100 : isActive ? ((currentSlideInWine - startIndex + 1) / slidesPerSection) * 100 : 0;
       
       return {
         name: sectionName,
@@ -171,11 +224,12 @@ export default function TastingSession() {
       };
     }
     
-    const firstSlideIndex = slides.findIndex(s => sectionSlides.includes(s));
-    const lastSlideIndex = slides.lastIndexOf(sectionSlides[sectionSlides.length - 1]);
-    const isActive = currentSlideIndex >= firstSlideIndex && currentSlideIndex <= lastSlideIndex;
-    const isCompleted = currentSlideIndex > lastSlideIndex;
-    const progress = isCompleted ? 100 : isActive ? ((currentSlideIndex - firstSlideIndex + 1) / sectionSlides.length) * 100 : 0;
+    // Find section boundaries within current wine
+    const firstSlideIndex = currentWineSlides.findIndex(s => sectionSlides.includes(s));
+    const lastSlideIndex = currentWineSlides.findIndex(s => s === sectionSlides[sectionSlides.length - 1]);
+    const isActive = currentSlideInWine >= firstSlideIndex && currentSlideInWine <= lastSlideIndex;
+    const isCompleted = currentSlideInWine > lastSlideIndex;
+    const progress = isCompleted ? 100 : isActive ? ((currentSlideInWine - firstSlideIndex + 1) / sectionSlides.length) * 100 : 0;
     
     return {
       name: sectionName,

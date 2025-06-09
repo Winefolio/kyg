@@ -7,7 +7,9 @@
       "Bash(node test-templates.js)",
       "Bash(rg:*)",
       "Bash(npx drizzle-kit:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(psql:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   }
