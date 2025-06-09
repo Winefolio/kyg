@@ -16,6 +16,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause, Award, Wine, ChevronDown } from "lucide-react";
 import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
 import { WineTransition } from "@/components/WineTransition";
+import { SectionTransition } from "@/components/SectionTransition";
 import type { Slide, Participant, Session, Package } from "@shared/schema";
 
 export default function TastingSession() {
@@ -28,6 +29,12 @@ export default function TastingSession() {
   const [isTransitioningSection, setIsTransitioningSection] = useState(false);
   const [transitionSectionName, setTransitionSectionName] = useState("");
   const [isNavigating, setIsNavigating] = useState(false);
+  const [showSectionTransition, setShowSectionTransition] = useState(false);
+  const [sectionTransitionData, setSectionTransitionData] = useState<{
+    fromSection: string;
+    toSection: string;
+    wineName: string;
+  } | null>(null);
   const [expandedWines, setExpandedWines] = useState<Record<string, boolean>>({});
   const { saveResponse, syncStatus, initializeForSession, endSession } = useSessionPersistence();
   const { triggerHaptic } = useHaptics();
@@ -239,11 +246,19 @@ export default function TastingSession() {
     };
   });
 
+  // Helper function to get section for a slide
+  const getSlideSection = (slide: any) => {
+    return slide.section_type || slide.payloadJson?.section_type || 'intro';
+  };
+
   // Navigation functions
   const goToNextSlide = async () => {
     if (currentSlideIndex < slides.length - 1) {
       const nextSlide = slides[currentSlideIndex + 1];
       const nextWine = wines.find(w => w.id === nextSlide.packageWineId);
+      
+      const currentSection = getSlideSection(currentSlide);
+      const nextSection = getSlideSection(nextSlide);
       
       // Check if we're transitioning to a new wine
       if (currentWine && nextWine && currentWine.id !== nextWine.id) {
@@ -256,6 +271,16 @@ export default function TastingSession() {
           setCompletedSlides(prev => [...prev, currentSlideIndex]);
           setIsTransitioningSection(false);
         }, 1500);
+      } 
+      // Check if we're transitioning to a new section within the same wine
+      else if (currentWine && nextWine && currentWine.id === nextWine.id && currentSection !== nextSection) {
+        setSectionTransitionData({
+          fromSection: currentSection,
+          toSection: nextSection,
+          wineName: currentWine.wineName
+        });
+        setShowSectionTransition(true);
+        triggerHaptic('success');
       } else {
         setIsNavigating(true);
         triggerHaptic('success');
@@ -267,6 +292,13 @@ export default function TastingSession() {
         }, 150);
       }
     }
+  };
+
+  const handleSectionTransitionComplete = () => {
+    setShowSectionTransition(false);
+    setCurrentSlideIndex(currentSlideIndex + 1);
+    setCompletedSlides(prev => [...prev, currentSlideIndex]);
+    setSectionTransitionData(null);
   };
 
   const goToPreviousSlide = () => {
@@ -722,6 +754,18 @@ export default function TastingSession() {
           </div>
         </div>
       </div>
+
+      {/* Section Transition Overlay */}
+      {showSectionTransition && sectionTransitionData && (
+        <SectionTransition
+          isVisible={showSectionTransition}
+          fromSection={sectionTransitionData.fromSection}
+          toSection={sectionTransitionData.toSection}
+          wineName={sectionTransitionData.wineName}
+          onComplete={handleSectionTransitionComplete}
+          duration={2500}
+        />
+      )}
     </>
   );
 }
