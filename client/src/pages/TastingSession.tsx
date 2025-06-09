@@ -233,6 +233,18 @@ export default function TastingSession() {
     return slide.section_type || slide.payloadJson?.section_type || 'intro';
   };
 
+  // Helper function to check if current slide is the last slide of its section
+  const isLastSlideOfSection = (slideIndex: number, wineSlides: any[], currentSection: string) => {
+    const currentSlideInWine = slideIndex - (currentWine ? slides.findIndex(s => s.packageWineId === currentWine.id) : 0);
+    
+    // Find all slides in current section
+    const sectionSlides = wineSlides.filter(slide => getSlideSection(slide) === currentSection);
+    const lastSlideInSection = sectionSlides[sectionSlides.length - 1];
+    const lastSlideIndexInWine = wineSlides.findIndex(s => s.id === lastSlideInSection?.id);
+    
+    return currentSlideInWine === lastSlideIndexInWine;
+  };
+
   // Calculate section progress based on current wine's slides only
   const currentWineSlides = currentWine ? sortedSlidesByWine[currentWine.id] || [] : [];
   const currentWineStartIndex = currentWine ? slides.findIndex(s => s.packageWineId === currentWine.id) : 0;
@@ -275,8 +287,20 @@ export default function TastingSession() {
     const firstSlideIndex = currentWineSlides.findIndex(s => sectionSlides.includes(s));
     const lastSlideIndex = currentWineSlides.findIndex(s => s === sectionSlides[sectionSlides.length - 1]);
     const isActive = currentSlideInWine >= firstSlideIndex && currentSlideInWine <= lastSlideIndex;
-    const isCompleted = currentSlideInWine > lastSlideIndex;
-    const progress = isCompleted ? 100 : isActive ? ((currentSlideInWine - firstSlideIndex + 1) / sectionSlides.length) * 100 : 0;
+    
+    // Section is only completed when we've FINISHED the last slide (not just reached it)
+    const isCompleted = currentSlideInWine > lastSlideIndex || 
+      (currentSlideInWine === lastSlideIndex && completedSlides.includes(slides.findIndex(s => s.id === currentWineSlides[lastSlideIndex]?.id)));
+    
+    // Progress calculation: only show 100% when section is fully completed
+    let progress = 0;
+    if (isCompleted) {
+      progress = 100;
+    } else if (isActive) {
+      // Show incremental progress within the section, but never reach 100% until completed
+      const progressInSection = (currentSlideInWine - firstSlideIndex) / sectionSlides.length;
+      progress = Math.min(95, progressInSection * 100); // Cap at 95% until completion
+    }
     
     return {
       name: sectionName,
@@ -307,10 +331,13 @@ export default function TastingSession() {
           setCurrentSlideIndex(currentSlideIndex + 1);
           setCompletedSlides(prev => [...prev, currentSlideIndex]);
           setIsTransitioningSection(false);
-        }, 1500);
+        }, 2500); // Extended to 2.5 seconds for proper animation loading
       } 
       // Check if we're transitioning to a new section within the same wine
-      else if (currentWine && nextWine && currentWine.id === nextWine.id && currentSection !== nextSection) {
+      // ONLY trigger section transition when completing the LAST slide of current section
+      else if (currentWine && nextWine && currentWine.id === nextWine.id && 
+               currentSection !== nextSection && 
+               isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection)) {
         setSectionTransitionData({
           fromSection: currentSection,
           toSection: nextSection,
