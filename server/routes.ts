@@ -22,6 +22,8 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  console.log("🚀 Starting route registration...");
+  
   // Validate package code
   app.get("/api/packages/:code", async (req, res) => {
     try {
@@ -915,6 +917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Media upload endpoints
+  console.log("📁 Registering media upload endpoints...");
   app.post("/api/upload/media", upload.single('file'), async (req, res) => {
     try {
       // Check if Supabase is configured
@@ -985,6 +988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  console.log("✅ All routes registered successfully!");
   const httpServer = createServer(app);
   return httpServer;
 }
