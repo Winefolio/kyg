@@ -115,6 +115,7 @@ export const slides = pgTable("slides", {
   type: varchar("type", { length: 50 }).$type<typeof slideTypes[number]>().notNull(),
   section_type: varchar("section_type", { length: 20 }),
   payloadJson: jsonb("payload_json").notNull(),
+  genericQuestions: jsonb("generic_questions"), // New generic questions format
   createdAt: timestamp("created_at").defaultNow()
 }, (table) => ({
   packageWinePositionIdx: index("idx_slides_package_wine_position").on(table.packageWineId, table.position)
@@ -258,7 +259,35 @@ export const insertPackageWineSchema = createInsertSchema(packageWines, {
 export const insertSlideSchema = createInsertSchema(slides, {
   type: z.enum(slideTypes),
   section_type: z.enum(['intro', 'deep_dive', 'ending']).optional().nullable(),
-  payloadJson: z.any() // Accept any JSON payload, validation happens in application logic
+  payloadJson: z.any(), // Accept any JSON payload, validation happens in application logic
+  genericQuestions: z.object({
+    format: z.enum(['multiple_choice', 'scale', 'text', 'boolean', 'ranking', 'matrix', 'video_message', 'audio_message']),
+    config: z.object({
+      title: z.string(),
+      description: z.string().optional()
+    }).passthrough(), // Allow additional format-specific fields
+    metadata: z.object({
+      tags: z.array(z.string()).optional(),
+      category: z.enum(['appearance', 'aroma', 'taste', 'structure', 'overall', 'general']).optional(),
+      difficulty: z.enum(['beginner', 'intermediate', 'advanced', 'expert']).optional(),
+      estimatedTime: z.number().optional(),
+      pointValue: z.number().optional(),
+      expertNote: z.string().optional(),
+      glossaryTerms: z.array(z.string()).optional(),
+      relatedCharacteristics: z.array(z.string()).optional()
+    }).optional(),
+    validation: z.object({
+      required: z.boolean().optional(),
+      customValidation: z.object({
+        rule: z.string(),
+        message: z.string()
+      }).optional(),
+      dependencies: z.array(z.object({
+        questionId: z.string(),
+        condition: z.string()
+      })).optional()
+    }).optional()
+  }).optional()
 }).omit({
   id: true,
   createdAt: true
@@ -332,3 +361,100 @@ export type Response = typeof responses.$inferSelect;
 export type InsertResponse = z.infer<typeof insertResponseSchema>;
 export type GlossaryTerm = typeof glossaryTerms.$inferSelect;
 export type InsertGlossaryTerm = z.infer<typeof insertGlossaryTermSchema>;
+
+// Generic Questions Types
+export type QuestionFormat = 'multiple_choice' | 'scale' | 'text' | 'boolean' | 'ranking' | 'matrix' | 'video_message' | 'audio_message';
+
+export interface GenericQuestion {
+  format: QuestionFormat;
+  config: QuestionConfig;
+  metadata?: QuestionMetadata;
+  validation?: ValidationRules;
+}
+
+export interface QuestionConfig {
+  title: string;
+  description?: string;
+  [key: string]: any; // Format-specific fields
+}
+
+export interface MultipleChoiceConfig extends QuestionConfig {
+  options: Array<{
+    id: string;
+    text: string;
+    value: string;
+    description?: string;
+    imageUrl?: string;
+  }>;
+  allowMultiple: boolean;
+  allowOther?: boolean;
+  otherLabel?: string;
+  randomizeOptions?: boolean;
+  minSelections?: number;
+  maxSelections?: number;
+}
+
+export interface ScaleConfig extends QuestionConfig {
+  scaleMin: number;
+  scaleMax: number;
+  scaleLabels: [string, string]; // [min label, max label]
+  step?: number;
+  showNumbers?: boolean;
+  showLabels?: boolean;
+  defaultValue?: number;
+  visualStyle?: 'slider' | 'buttons' | 'stars';
+}
+
+export interface TextConfig extends QuestionConfig {
+  placeholder?: string;
+  minLength?: number;
+  maxLength?: number;
+  rows?: number; // for textarea
+  inputType?: 'text' | 'textarea' | 'email' | 'number';
+  pattern?: string; // regex validation
+}
+
+export interface BooleanConfig extends QuestionConfig {
+  trueLabel?: string;  // default: "Yes"
+  falseLabel?: string; // default: "No"
+  defaultValue?: boolean;
+  visualStyle?: 'buttons' | 'toggle' | 'checkbox';
+}
+
+export interface VideoMessageConfig extends QuestionConfig {
+  videoUrl: string;
+  duration?: number;
+  thumbnailUrl?: string;
+  autoplay?: boolean;
+  controls?: boolean;
+}
+
+export interface AudioMessageConfig extends QuestionConfig {
+  audioUrl: string;
+  duration?: number;
+  autoplay?: boolean;
+  waveformData?: string;
+}
+
+export interface QuestionMetadata {
+  tags?: string[];
+  category?: 'appearance' | 'aroma' | 'taste' | 'structure' | 'overall' | 'general';
+  difficulty?: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  estimatedTime?: number; // seconds
+  pointValue?: number;
+  expertNote?: string;
+  glossaryTerms?: string[]; // auto-highlighted terms
+  relatedCharacteristics?: string[]; // wine characteristic IDs
+}
+
+export interface ValidationRules {
+  required?: boolean;
+  customValidation?: {
+    rule: string; // JS expression
+    message: string;
+  };
+  dependencies?: Array<{
+    questionId: string;
+    condition: string; // JS expression
+  }>;
+}

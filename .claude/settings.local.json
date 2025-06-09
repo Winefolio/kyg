@@ -9,7 +9,15 @@
       "Bash(npx drizzle-kit:*)",
       "Bash(echo:*)",
       "Bash(psql:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm start)",
+      "Bash(npm run build:*)",
+      "Bash(npm run db:push:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm install:*)",
+      "Bash(pkill:*)",
+      "Bash(true)"
     ],
     "deny": []
   }

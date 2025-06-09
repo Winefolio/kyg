@@ -139,6 +139,43 @@ Performance: To prevent re-rendering on every keystroke, wrap the state update t
 
 ---
 
+# Recent Major Implementation: Media Upload System
+
+## Video and Audio Message Slides (✅ Completed)
+
+Successfully implemented a comprehensive media upload system for sommeliers to include personal video and audio messages in their wine tasting experiences.
+
+### Key Components Added:
+- **Video/Audio Slide Types**: Added `video_message` and `audio_message` to slide types in schema
+- **Media Upload Infrastructure**: 
+  - Supabase Storage integration for media files (`server/supabase-storage.ts`)
+  - Universal MediaUpload component with drag & drop (`client/src/components/ui/media-upload.tsx`)
+  - Server-side upload endpoints (`/api/upload/media`)
+- **Media Players**: 
+  - Custom VideoPlayer with wine-themed controls (`client/src/components/ui/video-player.tsx`)
+  - AudioPlayer with waveform visualization (`client/src/components/ui/audio-player.tsx`)
+- **Content Creation**:
+  - Updated QuickQuestionBuilder to include video/audio message options
+  - Added 6 media message templates to question template library
+  - Live preview support for media slides in editor
+- **Slide Rendering**: 
+  - VideoMessageSlide and AudioMessageSlide components for TastingSession
+  - Integrated into TastingSession renderSlideContent function
+
+### Technical Architecture:
+- **Storage**: Uses Supabase Storage for media files (not Supabase SDK for database)
+- **Database**: PostgreSQL connection via `postgres` library + Drizzle ORM (existing pattern)
+- **Validation**: File type, size limits, and progress tracking
+- **UI**: Consistent with existing wine-themed design language
+
+### Usage:
+Sommeliers can now add personal video welcomes, wine introduction videos, tasting technique demonstrations, audio stories about vineyards, and encouragement messages throughout their tasting packages.
+
+### Environment Setup:
+- **Required**: `DATABASE_URL` for PostgreSQL connection
+- **Optional**: `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE` for media uploads
+- **Graceful Degradation**: If Supabase variables are not set, the server starts normally but media upload features are disabled with user-friendly error messages
+
 # Current Development Focus (Updated)
 
 Based on the "Know Your Grape" project brief, our immediate priorities are:

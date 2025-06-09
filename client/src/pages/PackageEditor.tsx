@@ -7,17 +7,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { SLIDE_TEMPLATES } from '@/lib/wineTemplates';
 import { 
   ArrowLeft, Save, PlusCircle, Edit3, Trash2, Wine, HelpCircle, 
-  Video, Eye, Settings, ChevronRight, ChevronDown, Menu, X, Monitor, Smartphone, Plus
+  Video, Eye, Settings, ChevronRight, ChevronDown, Menu, X, Monitor, Smartphone, Plus, Sparkles
 } from 'lucide-react';
-import type { Package, PackageWine, Slide } from "@shared/schema";
+import type { Package, PackageWine, Slide, GenericQuestion } from "@shared/schema";
 import { WineModal } from '@/components/WineModal';
 import { SlidePreview } from '@/components/SlidePreview';
 import { SlideConfigPanel } from '@/components/editor/SlideConfigPanel';
+import { QuickQuestionBuilder } from '@/components/editor/QuickQuestionBuilder';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 // Section details for organizing slides
@@ -42,6 +44,13 @@ export default function PackageEditor() {
   const [editingWine, setEditingWine] = useState<PackageWine | null>(null);
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
   const [expandedWines, setExpandedWines] = useState<Set<string>>(new Set());
+  const [quickBuilderOpen, setQuickBuilderOpen] = useState(false);
+  const [currentWineContext, setCurrentWineContext] = useState<{
+    wineId: string;
+    wineName: string;
+    wineType: string;
+    sectionType: 'intro' | 'deep_dive' | 'ending';
+  } | null>(null);
 
   const { data: editorData, isLoading, error } = useQuery<EditorData>({
     queryKey: [`/api/packages/${code}/editor`],
@@ -176,6 +185,43 @@ export default function PackageEditor() {
     deleteSlideMutation.mutate(slideId);
   };
 
+  const handleQuickAddQuestion = (wineId: string, sectionType: 'intro' | 'deep_dive' | 'ending') => {
+    const wine = wines.find(w => w.id === wineId);
+    if (wine) {
+      setCurrentWineContext({
+        wineId,
+        wineName: wine.wineName,
+        wineType: wine.wineType || 'red',
+        sectionType
+      });
+      setQuickBuilderOpen(true);
+    }
+  };
+
+  const handleQuestionSave = (question: GenericQuestion) => {
+    if (!currentWineContext) return;
+
+    const wineSlides = slides.filter(s => s.packageWineId === currentWineContext.wineId);
+    const sectionSlides = wineSlides.filter(s => s.section_type === currentWineContext.sectionType);
+    const nextPosition = (sectionSlides.length > 0 ? Math.max(...sectionSlides.map(s => s.position)) : 0) + 1;
+
+    const slideData = {
+      packageWineId: currentWineContext.wineId,
+      position: nextPosition,
+      type: 'question' as const,
+      section_type: currentWineContext.sectionType,
+      payloadJson: {
+        ...question.config,
+        question_type: question.format
+      },
+      genericQuestions: question
+    };
+
+    createSlideMutation.mutate(slideData);
+    setQuickBuilderOpen(false);
+    setCurrentWineContext(null);
+  };
+
   if (isLoading) return <div className="min-h-screen bg-gradient-primary text-white flex items-center justify-center">Loading Editor...</div>;
   if (error || !editorData) return <div className="min-h-screen bg-gradient-primary text-white flex items-center justify-center">Error loading package data.</div>;
 
@@ -227,8 +273,13 @@ export default function PackageEditor() {
               <div className="p-4">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-lg font-semibold text-white">Content Structure</h2>
-                  <Button size="sm" onClick={() => { setEditingWine(null); setIsWineModalOpen(true); }} className="bg-purple-600 hover:bg-purple-700">
-                    <PlusCircle className="mr-2 h-4 w-4" />Add Wine
+                  <Button 
+                    size="sm" 
+                    onClick={() => { setEditingWine(null); setIsWineModalOpen(true); }} 
+                    className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-lg shadow-purple-900/25 hover:shadow-xl hover:shadow-purple-900/40 transition-all duration-200 hover:scale-105"
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Add Wine
                   </Button>
                 </div>
                 <div className="space-y-4">
@@ -236,25 +287,41 @@ export default function PackageEditor() {
                     const wineSlides = slides.filter(s => s.packageWineId === wine.id);
                     const isExpanded = expandedWines.has(wine.id);
                     return (
-                      <Card key={wine.id} className="bg-white/5 border-white/10">
-                        <div className="p-4">
+                      <Card key={wine.id} className="bg-gradient-to-br from-white/8 to-white/4 border-white/20 backdrop-blur-sm shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-black/30 transition-all duration-300">
+                        <div className="p-5">
                           <div className="flex items-center justify-between">
-                            <Button variant="ghost" onClick={() => toggleWineExpansion(wine.id)} className="flex-1 justify-start text-left p-0 h-auto">
-                              <div className="flex items-center space-x-2">
-                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                <Wine className="h-4 w-4 text-purple-400" />
+                            <Button variant="ghost" onClick={() => toggleWineExpansion(wine.id)} className="flex-1 justify-start text-left p-0 h-auto hover:bg-white/5 rounded-lg transition-colors">
+                              <div className="flex items-center space-x-3">
+                                <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-0' : '-rotate-90'}`}>
+                                  <ChevronDown className="h-4 w-4 text-white/70" />
+                                </div>
+                                <div className="p-2 bg-purple-600/20 rounded-lg">
+                                  <Wine className="h-4 w-4 text-purple-300" />
+                                </div>
                                 <div>
-                                  <p className="font-medium text-white">{wine.wineName}</p>
-                                  <p className="text-xs text-white/60">{wineSlides.length} slides</p>
+                                  <p className="font-semibold text-white">{wine.wineName}</p>
+                                  <p className="text-xs text-white/60 font-medium">{wineSlides.length} slides</p>
                                 </div>
                               </div>
                             </Button>
                             <div className="flex space-x-1">
-                              <Button size="sm" variant="ghost" onClick={() => { setEditingWine(wine); setIsWineModalOpen(true); }}>
-                                <Edit3 className="h-3 w-3" />
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                onClick={() => { setEditingWine(wine); setIsWineModalOpen(true); }}
+                                className="h-8 w-8 p-0 hover:bg-blue-500/20 hover:text-blue-300 transition-colors"
+                                title="Edit wine"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => deleteWineMutation.mutate(wine.id)} className="text-red-400 hover:text-red-300">
-                                <Trash2 className="h-3 w-3" />
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                onClick={() => deleteWineMutation.mutate(wine.id)} 
+                                className="h-8 w-8 p-0 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors"
+                                title="Delete wine"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </div>
                           </div>
@@ -266,45 +333,79 @@ export default function PackageEditor() {
                                   const sectionSlides = wineSlides.filter(s => s.section_type === key);
                                   return (
                                     <div key={key}>
-                                      <div className="flex items-center justify-between mb-1">
-                                        <h4 className="text-sm font-semibold text-white/90 flex items-center">{icon}<span className="ml-2">{title}</span></h4>
-                                        <Popover>
-                                          <PopoverTrigger asChild><Button size="icon" variant="ghost" className="h-6 w-6 text-purple-300 hover:bg-purple-500/20 hover:text-purple-200"><Plus className="h-4 w-4" /></Button></PopoverTrigger>
-                                          <PopoverContent className="w-56 p-1 bg-gray-900/80 border-gray-700 backdrop-blur-md">
-                                            <div className="space-y-1">
-                                              {slideTemplates.map((template: any) => (
-                                                <Button key={template.id} variant="ghost" className="w-full justify-start font-normal h-8 text-white/80" onClick={() => handleAddSlide(wine.id, template, key as any)}>
-                                                  <PlusCircle className="mr-2 h-4 w-4 text-purple-400" />{template.name}
-                                                </Button>
-                                              ))}
-                                            </div>
-                                          </PopoverContent>
-                                        </Popover>
+                                      <div className="mb-3">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <h4 className="text-sm font-semibold text-white/90 flex items-center">
+                                            {icon}<span className="ml-2">{title}</span>
+                                          </h4>
+                                        </div>
+                                        
+                                        {/* Modern Create Question Button */}
+                                        <Button 
+                                          onClick={() => handleQuickAddQuestion(wine.id, key as any)}
+                                          className="w-full h-8 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white text-xs font-medium shadow-lg shadow-purple-900/25 transition-all duration-200 hover:scale-[1.02] hover:shadow-xl hover:shadow-purple-900/40"
+                                        >
+                                          <Sparkles className="w-3.5 h-3.5 mr-2" />
+                                          Create a Question
+                                        </Button>
                                       </div>
-                                      <div className="pl-4 space-y-1">
+                                      <div className="pl-3 space-y-1.5">
                                         {sectionSlides.length > 0 ? (
                                           sectionSlides.map(slide => (
-                                            <div key={slide.id} className={`p-2 rounded-md cursor-pointer transition-colors ${activeSlideId === slide.id ? 'bg-purple-600/30' : 'hover:bg-white/10'}`} onClick={() => setActiveSlideId(slide.id)}>
-                                              <p className="text-sm font-medium text-white truncate">{(slide.payloadJson as any)?.title || 'Untitled Slide'}</p>
+                                            <div 
+                                              key={slide.id} 
+                                              className={`group p-2.5 rounded-lg cursor-pointer transition-all duration-200 border border-transparent ${
+                                                activeSlideId === slide.id 
+                                                  ? 'bg-gradient-to-r from-purple-600/40 to-purple-700/30 border-purple-500/50 shadow-lg shadow-purple-900/25' 
+                                                  : 'hover:bg-white/8 hover:border-white/10 hover:shadow-md'
+                                              }`} 
+                                              onClick={() => setActiveSlideId(slide.id)}
+                                            >
+                                              <div className="flex items-center">
+                                                <div className={`w-1.5 h-1.5 rounded-full mr-2.5 transition-colors ${
+                                                  activeSlideId === slide.id ? 'bg-purple-300' : 'bg-white/40 group-hover:bg-white/60'
+                                                }`} />
+                                                <p className="text-sm font-medium text-white truncate">
+                                                  {(slide.payloadJson as any)?.title || 'Untitled Slide'}
+                                                </p>
+                                              </div>
                                             </div>
                                           ))
-                                        ) : <p className="text-xs text-white/50 italic px-2 py-1">No slides in this section.</p>}
+                                        ) : (
+                                          <div className="px-3 py-2 text-xs text-white/50 italic bg-white/5 rounded-lg border border-dashed border-white/20">
+                                            No slides in this section
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   );
                                 })}
 
-                                {/* --- TEMPLATE LIST UI (EXPLORER FLOW) --- */}
-                                <div className="mt-4 pt-4 border-t border-white/10">
-                                  <h4 className="text-sm font-semibold text-white/90 mb-2">Add from Full Library</h4>
-                                  <div className="space-y-1">
-                                    {SLIDE_TEMPLATES.map(template => (
-                                      <Button key={template.name} size="sm" variant="ghost" className="w-full text-sm h-9 justify-start text-white/70 hover:text-white hover:bg-white/5" onClick={() => handleAddSlide(wine.id, template)} title={template.description}>
-                                        {template.icon && <template.icon className="mr-2 h-4 w-4 flex-shrink-0 text-purple-400" />}
-                                        <span className="truncate">Add {template.name}</span>
-                                      </Button>
-                                    ))}
-                                  </div>
+                                {/* --- MODERN TEMPLATE DROPDOWN --- */}
+                                <div className="mt-6 pt-4 border-t border-white/10">
+                                  <h4 className="text-sm font-semibold text-white/90 mb-3">Add from Template Library</h4>
+                                  <Select onValueChange={(templateName) => {
+                                    const template = SLIDE_TEMPLATES.find(t => t.name === templateName);
+                                    if (template) handleAddSlide(wine.id, template);
+                                  }}>
+                                    <SelectTrigger className="w-full bg-white/5 border-white/20 text-white hover:bg-white/10 transition-colors">
+                                      <SelectValue placeholder="Choose a template..." />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-gray-900/95 border-gray-700 backdrop-blur-xl">
+                                      {SLIDE_TEMPLATES.map(template => (
+                                        <SelectItem 
+                                          key={template.name} 
+                                          value={template.name}
+                                          className="text-white hover:bg-purple-600/20 focus:bg-purple-600/20 cursor-pointer"
+                                        >
+                                          <div className="flex items-center">
+                                            {template.icon && <template.icon className="mr-2 h-4 w-4 text-purple-400" />}
+                                            <span>{template.name}</span>
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                 </div>
                               </motion.div>
                             )}
@@ -348,6 +449,20 @@ export default function PackageEditor() {
           onSave={handleWineSave}
         />
       )}
+
+      <QuickQuestionBuilder
+        open={quickBuilderOpen}
+        onClose={() => {
+          setQuickBuilderOpen(false);
+          setCurrentWineContext(null);
+        }}
+        onSave={handleQuestionSave}
+        wineContext={currentWineContext ? {
+          wineName: currentWineContext.wineName,
+          wineType: currentWineContext.wineType
+        } : undefined}
+        sectionType={currentWineContext?.sectionType}
+      />
     </div>
   );
 }

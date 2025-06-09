@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
 import { storage } from "./storage";
+import { uploadMediaFile, deleteMediaFile, getMediaType, isSupabaseConfigured } from "./supabase-storage";
 import { 
   insertSessionSchema,
   insertParticipantSchema,
@@ -10,6 +12,14 @@ import {
   type InsertSession
 } from "@shared/schema";
 import { z } from "zod";
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 200 * 1024 * 1024, // 200MB max file size
+  },
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Validate package code
@@ -902,6 +912,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching analytics:", error);
       res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
+  // Media upload endpoints
+  app.post("/api/upload/media", upload.single('file'), async (req, res) => {
+    try {
+      // Check if Supabase is configured
+      if (!isSupabaseConfigured()) {
+        return res.status(503).json({ 
+          message: "Media upload is not available. Supabase Storage is not configured." 
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "No file provided" });
+      }
+
+      const { originalname, buffer, mimetype } = req.file;
+      const { entityId } = req.body; // slide ID, wine ID, or package ID
+
+      if (!entityId) {
+        return res.status(400).json({ message: "Entity ID is required" });
+      }
+
+      // Validate file type
+      const mediaType = getMediaType(mimetype);
+      if (!mediaType) {
+        return res.status(400).json({ 
+          message: `Unsupported file type: ${mimetype}. Supported types: images, audio (MP3, WAV, M4A), video (MP4, WebM, MOV)` 
+        });
+      }
+
+      // Upload to Supabase Storage
+      const publicUrl = await uploadMediaFile(buffer, originalname, mimetype, entityId);
+
+      res.json({
+        url: publicUrl,
+        mediaType,
+        fileName: originalname,
+        fileSize: buffer.length
+      });
+    } catch (error) {
+      console.error("Error uploading media:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to upload media" 
+      });
+    }
+  });
+
+  app.delete("/api/upload/media", async (req, res) => {
+    try {
+      // Check if Supabase is configured
+      if (!isSupabaseConfigured()) {
+        return res.status(503).json({ 
+          message: "Media deletion is not available. Supabase Storage is not configured." 
+        });
+      }
+
+      const { fileUrl } = req.body;
+      
+      if (!fileUrl) {
+        return res.status(400).json({ message: "File URL is required" });
+      }
+
+      await deleteMediaFile(fileUrl);
+      res.json({ message: "File deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting media:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to delete media" 
+      });
     }
   });
 

@@ -17,7 +17,9 @@ import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircl
 import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
 import { WineTransition } from "@/components/WineTransition";
 import { SectionTransition } from "@/components/SectionTransition";
-import type { Slide, Participant, Session, Package } from "@shared/schema";
+import { VideoMessageSlide } from "@/components/slides/VideoMessageSlide";
+import { AudioMessageSlide } from "@/components/slides/AudioMessageSlide";
+import type { Slide, Participant, Session, Package, VideoMessagePayload, AudioMessagePayload } from "@shared/schema";
 
 export default function TastingSession() {
   const { sessionId, participantId } = useParams();
@@ -228,7 +230,19 @@ export default function TastingSession() {
     const lastSlideInSection = sectionSlides[sectionSlides.length - 1];
     const lastSlideIndexInWine = wineSlides.findIndex(s => s.id === lastSlideInSection?.id);
     
-    return currentSlideInWine === lastSlideIndexInWine;
+    const isLast = currentSlideInWine === lastSlideIndexInWine;
+    
+    // Debug logging for section detection
+    console.log(`🔍 Section boundary check for "${currentSection}":`, {
+      slideIndex,
+      currentSlideInWine,
+      sectionSlides: sectionSlides.length,
+      lastSlideIndexInWine,
+      isLastSlide: isLast,
+      sectionSlideIds: sectionSlides.map(s => ({ id: s.id, section: getSlideSection(s) }))
+    });
+    
+    return isLast;
   };
 
   // Calculate section progress based on current wine's slides only
@@ -326,6 +340,15 @@ export default function TastingSession() {
       else if (currentWine && nextWine && currentWine.id === nextWine.id && 
                currentSection !== nextSection && 
                isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection)) {
+        
+        // Debug logging for section transitions
+        console.log('🎯 SECTION TRANSITION DETECTED:');
+        console.log(`   From: ${currentSection} → To: ${nextSection}`);
+        console.log(`   Wine: ${currentWine.wineName}`);
+        console.log(`   Current slide index: ${currentSlideIndex}`);
+        console.log(`   Current slide in wine: ${currentSlideIndex - currentWineStartIndex}`);
+        console.log(`   Is last slide of section: ${isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection)}`);
+        
         setSectionTransitionData({
           fromSection: currentSection,
           toSection: nextSection,
@@ -390,6 +413,9 @@ export default function TastingSession() {
     triggerHaptic('success');
     const progress = 100;
     
+    // End the session properly
+    endSession();
+    
     // Navigate to completion page
     setLocation(`/completion/${sessionId}/${participantId}?progress=${progress}`);
   };
@@ -418,7 +444,126 @@ export default function TastingSession() {
           </motion.div>
         );
 
+      case 'video_message':
+        return (
+          <VideoMessageSlide
+            payload={currentSlide.payloadJson as VideoMessagePayload}
+            key={`video-${currentSlide.id}`}
+          />
+        );
+
+      case 'audio_message':
+        return (
+          <AudioMessageSlide
+            payload={currentSlide.payloadJson as AudioMessagePayload}
+            key={`audio-${currentSlide.id}`}
+          />
+        );
+
       case 'question':
+        // Check for new generic_questions format first
+        if (currentSlide.genericQuestions) {
+          const gq = currentSlide.genericQuestions;
+          
+          switch (gq.format) {
+            case 'multiple_choice':
+              return (
+                <MultipleChoiceQuestion
+                  question={{
+                    title: gq.config.title,
+                    description: gq.config.description || '',
+                    category: gq.metadata?.category || 'Question',
+                    options: gq.config.options || [],
+                    allow_multiple: gq.config.allowMultiple || false,
+                    allow_notes: gq.config.allowNotes || false
+                  }}
+                  value={answers[currentSlide.id] || { selected: [], notes: '' }}
+                  onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+                />
+              );
+            
+            case 'scale':
+              return (
+                <ScaleQuestion
+                  question={{
+                    title: gq.config.title,
+                    description: gq.config.description || '',
+                    category: gq.metadata?.category || 'Scale',
+                    scale_min: gq.config.scaleMin || 1,
+                    scale_max: gq.config.scaleMax || 10,
+                    scale_labels: gq.config.scaleLabels || ['Low', 'High']
+                  }}
+                  value={answers[currentSlide.id] || gq.config.scaleMin || 1}
+                  onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+                />
+              );
+            
+            case 'text':
+              return (
+                <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
+                  <h3 className="text-lg font-semibold text-white mb-4">
+                    <DynamicTextRenderer text={gq.config.title} />
+                  </h3>
+                  {gq.config.description && (
+                    <p className="text-white/70 text-sm mb-4">
+                      <DynamicTextRenderer text={gq.config.description} />
+                    </p>
+                  )}
+                  <textarea
+                    className="w-full bg-white/10 border border-white/20 rounded-lg p-3 text-white placeholder-white/60 resize-none"
+                    rows={gq.config.rows || 3}
+                    placeholder={gq.config.placeholder || 'Enter your response...'}
+                    value={answers[currentSlide.id] || ''}
+                    onChange={(e) => handleAnswerChange(currentSlide.id, e.target.value)}
+                  />
+                </div>
+              );
+            
+            case 'boolean':
+              return (
+                <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
+                  <h3 className="text-lg font-semibold text-white mb-4">
+                    <DynamicTextRenderer text={gq.config.title} />
+                  </h3>
+                  {gq.config.description && (
+                    <p className="text-white/70 text-sm mb-6">
+                      <DynamicTextRenderer text={gq.config.description} />
+                    </p>
+                  )}
+                  <div className="flex gap-4 justify-center">
+                    <Button
+                      variant={answers[currentSlide.id] === true ? "default" : "outline"}
+                      onClick={() => handleAnswerChange(currentSlide.id, true)}
+                      className="flex-1 max-w-32"
+                    >
+                      {gq.config.trueLabel || 'Yes'}
+                    </Button>
+                    <Button
+                      variant={answers[currentSlide.id] === false ? "default" : "outline"}
+                      onClick={() => handleAnswerChange(currentSlide.id, false)}
+                      className="flex-1 max-w-32"
+                    >
+                      {gq.config.falseLabel || 'No'}
+                    </Button>
+                  </div>
+                </div>
+              );
+            
+            default:
+              return (
+                <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
+                  <h3 className="text-lg font-semibold text-white mb-2">
+                    <DynamicTextRenderer text={gq.config.title} />
+                  </h3>
+                  <p className="text-white/70 text-sm">
+                    Unsupported question format: {gq.format}
+                  </p>
+                </div>
+              );
+          }
+        }
+
+        // Fallback to legacy payloadJson format
         const questionData = currentSlide.payloadJson;
         
         if (questionData.questionType === 'multiple_choice' || questionData.question_type === 'multiple_choice') {
