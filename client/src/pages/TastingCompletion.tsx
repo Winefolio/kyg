@@ -105,10 +105,11 @@ export default function TastingCompletion() {
   });
 
   // Get enhanced participant analytics
-  const { data: analytics, isLoading: analyticsLoading } = useQuery<ParticipantAnalytics>({
+  const { data: analytics, isLoading: analyticsLoading, error: analyticsError } = useQuery<ParticipantAnalytics>({
     queryKey: [`/api/sessions/${sessionId}/participant-analytics/${participantId}`],
     enabled: !!sessionId && !!participantId,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 3,
   });
 
   // Get participant responses for backward compatibility
@@ -145,6 +146,20 @@ export default function TastingCompletion() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-400 mx-auto mb-4"></div>
           <p className="text-white text-lg">Analyzing your wine tasting experience...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (analyticsError) {
+    console.error("Analytics error:", analyticsError);
+    return (
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
+        <div className="text-center text-white">
+          <h2 className="text-2xl font-semibold mb-2">Unable to load analytics</h2>
+          <p className="text-purple-200">Error: {analyticsError?.message || "Unknown error"}</p>
+          <p className="text-purple-200 mt-2">Session ID: {sessionId}</p>
+          <p className="text-purple-200">Participant ID: {participantId}</p>
         </div>
       </div>
     );
