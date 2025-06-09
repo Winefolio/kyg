@@ -146,7 +146,7 @@ export default function TastingSession() {
     return acc;
   }, {});
 
-  // Separate package-level intro slides from wine-specific slides
+  // Handle package intro slide separately to avoid breaking wine slide counts
   let packageIntroSlides: any[] = [];
   const wineSpecificSlidesByWine: Record<string, any[]> = {};
   
@@ -154,27 +154,21 @@ export default function TastingSession() {
     const wineSlides = slidesByWine[wineId];
     const wine = wines.find(w => w.id === wineId);
     console.log(`Processing wine: ${wine?.wineName} with ${wineSlides.length} slides`);
-    const isFirstWine = wine?.position === 1;
     
     // Sort slides by position
     const sortedWineSlides = wineSlides.sort((a, b) => a.position - b.position);
     
-    if (isFirstWine) {
-      // For first wine, identify package intro slides (usually the first slide with generic content)
+    // DON'T extract package intro - treat all slides as wine-specific for consistent section math
+    wineSpecificSlidesByWine[wineId] = sortedWineSlides;
+    
+    // Mark package welcome slide if it exists, but keep it in wine flow
+    if (wine?.position === 1 && sortedWineSlides[0]) {
       const firstSlide = sortedWineSlides[0];
-      if (firstSlide && (
-        firstSlide.payloadJson?.title?.includes('Welcome') || 
-        firstSlide.payloadJson?.title?.includes('Your Wine Tasting') ||
-        firstSlide.position === 1
-      )) {
-        packageIntroSlides.push(firstSlide);
-        firstSlide._computedSection = 'package_intro';
-        wineSpecificSlidesByWine[wineId] = sortedWineSlides.slice(1); // Rest of slides
-      } else {
-        wineSpecificSlidesByWine[wineId] = sortedWineSlides;
+      if (firstSlide.payloadJson?.title?.includes('Welcome') || 
+          firstSlide.payloadJson?.title?.includes('Your Wine Tasting')) {
+        firstSlide._isPackageIntro = true;
+        console.log(`Marked slide as package intro: ${firstSlide.payloadJson?.title}`);
       }
-    } else {
-      wineSpecificSlidesByWine[wineId] = sortedWineSlides;
     }
   });
 
@@ -221,13 +215,10 @@ export default function TastingSession() {
     return acc;
   }, {} as Record<string, any[]>);
 
-  // Create final ordered slides array: Package intro first, then wines in order
-  const slides = [
-    ...packageIntroSlides, // Package welcome slide appears first
-    ...wines
-      .sort((a, b) => a.position - b.position)
-      .flatMap(wine => sortedSlidesByWine[wine.id] || [])
-  ];
+  // Create final ordered slides array: All wine slides in order (package intro handled within wine flow)
+  const slides = wines
+    .sort((a, b) => a.position - b.position)
+    .flatMap(wine => sortedSlidesByWine[wine.id] || []);
     
   const currentSlide = slides[currentSlideIndex];
   const currentWine = currentSlide ? wines.find(w => w.id === currentSlide.packageWineId) : null;
