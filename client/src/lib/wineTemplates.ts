@@ -9,13 +9,18 @@ export const SLIDE_TEMPLATES = [
     icon: Eye,
     description: "Evaluate the wine's appearance.",
     payloadTemplate: {
-      question_type: 'multiple_choice',
+      questionType: 'multiple_choice',
+      question: "How would you describe the wine's clarity and appearance?",
+      description: "Look at the wine against a white background and assess its visual clarity.",
       options: [
-        { text: 'Clear', value: 'clear' },
-        { text: 'Hazy', value: 'hazy' },
-        { text: 'Brilliant', value: 'brilliant' },
-        { text: 'Cloudy', value: 'cloudy' }
-      ]
+        { id: '1', text: 'Clear', value: 'clear', description: 'Transparent with no visible particles' },
+        { id: '2', text: 'Hazy', value: 'hazy', description: 'Slightly cloudy with some particles' },
+        { id: '3', text: 'Brilliant', value: 'brilliant', description: 'Crystal clear and sparkling' },
+        { id: '4', text: 'Cloudy', value: 'cloudy', description: 'Noticeably murky or opaque' }
+      ],
+      allowMultiple: false,
+      timeLimit: 30,
+      points: 10
     }
   },
   {
@@ -26,11 +31,14 @@ export const SLIDE_TEMPLATES = [
     icon: Wind,
     description: "Rate the wine's aroma intensity.",
     payloadTemplate: {
-      question_type: 'scale',
-      scale_min: 1,
-      scale_max: 10,
-      scale_min_label: 'Subtle',
-      scale_max_label: 'Powerful'
+      questionType: 'scale',
+      question: "How intense are the wine's aromas?",
+      description: "Swirl the glass and take a deep smell. Rate from subtle to powerful.",
+      scaleMin: 1,
+      scaleMax: 10,
+      scaleLabels: ['Subtle', 'Powerful'],
+      timeLimit: 45,
+      points: 15
     }
   },
   {
@@ -41,8 +49,13 @@ export const SLIDE_TEMPLATES = [
     icon: Palette,
     description: 'Describe the primary flavors.',
     payloadTemplate: {
-      question_type: 'text',
-      placeholder: 'e.g., dark fruit, vanilla, spice...'
+      questionType: 'text',
+      question: "What primary flavors do you taste in this wine?",
+      description: "Take a sip and describe the dominant flavors you experience. Be specific about fruit, spice, oak, or other notes.",
+      placeholder: 'e.g., dark fruit, vanilla, spice, leather, earth...',
+      maxLength: 500,
+      timeLimit: 60,
+      points: 20
     }
   },
   {
@@ -53,12 +66,17 @@ export const SLIDE_TEMPLATES = [
     icon: Droplets,
     description: 'Determine the weight of the wine on your palate.',
     payloadTemplate: {
-      question_type: 'multiple_choice',
+      questionType: 'multiple_choice',
+      question: "How would you describe the body or weight of this wine?",
+      description: "Think about how the wine feels in your mouth - like the difference between skim milk (light) and cream (full).",
       options: [
-        { text: 'Light', value: 'light' },
-        { text: 'Medium', value: 'medium' },
-        { text: 'Full', value: 'full' }
-      ]
+        { id: '1', text: 'Light', value: 'light', description: 'Like water or skim milk - delicate and less weighty' },
+        { id: '2', text: 'Medium', value: 'medium', description: 'Like whole milk - balanced weight and texture' },
+        { id: '3', text: 'Full', value: 'full', description: 'Like cream - rich, heavy, and substantial on the palate' }
+      ],
+      allowMultiple: false,
+      timeLimit: 30,
+      points: 15
     }
   },
   {
@@ -69,11 +87,14 @@ export const SLIDE_TEMPLATES = [
     icon: Zap,
     description: "Rate the wine's tannin level.",
     payloadTemplate: {
-      question_type: 'scale',
-      scale_min: 1,
-      scale_max: 10,
-      scale_min_label: 'Soft',
-      scale_max_label: 'Grippy'
+      questionType: 'scale',
+      question: "How would you rate the tannin level in this wine?",
+      description: "Tannins create a drying, grippy sensation on your gums and tongue. Think of the difference between black tea (high tannins) and herbal tea (low tannins).",
+      scaleMin: 1,
+      scaleMax: 10,
+      scaleLabels: ['Soft', 'Grippy'],
+      timeLimit: 40,
+      points: 15
     }
   },
   {
@@ -84,11 +105,14 @@ export const SLIDE_TEMPLATES = [
     icon: Zap,
     description: "Rate the wine's acidity.",
     payloadTemplate: {
-      question_type: 'scale',
-      scale_min: 1,
-      scale_max: 10,
-      scale_min_label: 'Low',
-      scale_max_label: 'High'
+      questionType: 'scale',
+      question: "How would you rate the acidity level of this wine?",
+      description: "Acidity makes your mouth water and creates a bright, crisp sensation. Think lemon juice (high acidity) vs. milk (low acidity).",
+      scaleMin: 1,
+      scaleMax: 10,
+      scaleLabels: ['Low', 'High'],
+      timeLimit: 35,
+      points: 15
     }
   },
   {
@@ -99,12 +123,17 @@ export const SLIDE_TEMPLATES = [
     icon: Clock,
     description: 'How long do the flavors linger?',
     payloadTemplate: {
-      question_type: 'multiple_choice',
+      questionType: 'multiple_choice',
+      question: "How long do the wine's flavors linger after swallowing?",
+      description: "The finish is how long you can taste the wine after it's gone. Count the seconds of flavor persistence.",
       options: [
-        { text: 'Short', value: 'short' },
-        { text: 'Medium', value: 'medium' },
-        { text: 'Long', value: 'long' }
-      ]
+        { id: '1', text: 'Short', value: 'short', description: 'Flavors disappear within 5-10 seconds' },
+        { id: '2', text: 'Medium', value: 'medium', description: 'Flavors linger for 10-30 seconds' },
+        { id: '3', text: 'Long', value: 'long', description: 'Flavors persist for 30+ seconds' }
+      ],
+      allowMultiple: false,
+      timeLimit: 45,
+      points: 15
     }
   },
   {
@@ -115,11 +144,14 @@ export const SLIDE_TEMPLATES = [
     icon: Star,
     description: 'Give your final rating for this wine.',
     payloadTemplate: {
-      question_type: 'scale',
-      scale_min: 1,
-      scale_max: 10,
-      scale_min_label: 'Poor',
-      scale_max_label: 'Excellent'
+      questionType: 'scale',
+      question: "What is your overall impression of this wine?",
+      description: "Consider all aspects - aroma, taste, balance, complexity, and personal enjoyment. Rate your overall experience.",
+      scaleMin: 1,
+      scaleMax: 10,
+      scaleLabels: ['Poor', 'Excellent'],
+      timeLimit: 30,
+      points: 25
     }
   }
 ];

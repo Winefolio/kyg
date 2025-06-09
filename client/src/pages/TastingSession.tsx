@@ -283,7 +283,7 @@ export default function TastingSession() {
       case 'question':
         const questionData = currentSlide.payloadJson;
         
-        if (questionData.questionType === 'multiple_choice') {
+        if (questionData.questionType === 'multiple_choice' || questionData.question_type === 'multiple_choice') {
           return (
             <MultipleChoiceQuestion
               question={{
@@ -300,18 +300,18 @@ export default function TastingSession() {
           );
         }
 
-        if (questionData.questionType === 'scale') {
+        if (questionData.questionType === 'scale' || questionData.question_type === 'scale') {
           return (
             <ScaleQuestion
               question={{
                 title: questionData.title || questionData.question,
                 description: questionData.description || '',
                 category: questionData.category || 'Scale',
-                scale_min: questionData.scaleMin || questionData.scale_min || 1,
-                scale_max: questionData.scaleMax || questionData.scale_max || 10,
-                scale_labels: questionData.scaleLabels || questionData.scale_labels || ['Low', 'High']
+                scale_min: questionData.scale_min || questionData.scaleMin || 1,
+                scale_max: questionData.scale_max || questionData.scaleMax || 10,
+                scale_labels: questionData.scale_labels || questionData.scaleLabels || ['Low', 'High']
               }}
-              value={answers[currentSlide.id] || questionData.scaleMin || questionData.scale_min || 1}
+              value={answers[currentSlide.id] || questionData.scale_min || questionData.scaleMin || 1}
               onChange={(value) => handleAnswerChange(currentSlide.id, value)}
             />
           );

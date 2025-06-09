@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { SLIDE_TEMPLATES } from '@/lib/wineTemplates';
 
 interface Slide {
   id: string;
@@ -42,208 +43,7 @@ interface SlideEditorProps {
   onClose: () => void;
 }
 
-const SLIDE_TEMPLATES = {
-  transition: [
-    {
-      name: "Wine Glass Fill Transition",
-      type: "transition",
-      sectionType: "deep_dive",
-      payloadTemplate: {
-        title: "Transitioning to next wine...",
-        description: "Get ready for the next tasting experience",
-        backgroundImage: "",
-        duration: 3000,
-        showContinueButton: false,
-        animation_type: "wine_glass_fill"
-      }
-    },
-    {
-      name: "Smooth Fade Transition",
-      type: "transition", 
-      sectionType: "deep_dive",
-      payloadTemplate: {
-        title: "Moving to the next section...",
-        description: "Take a moment to prepare your palate",
-        backgroundImage: "",
-        duration: 2000,
-        showContinueButton: true,
-        animation_type: "fade"
-      }
-    },
-    {
-      name: "Section Break",
-      type: "transition",
-      sectionType: "ending",
-      payloadTemplate: {
-        title: "Concluding our tasting journey",
-        description: "Thank you for participating in this wine experience",
-        backgroundImage: "",
-        duration: 2500,
-        showContinueButton: false,
-        animation_type: "slide"
-      }
-    }
-  ],
-  question: [
-    {
-      name: "Aroma Assessment",
-      type: "question",
-      sectionType: "deep_dive",
-      payloadTemplate: {
-        questionType: "multiple_choice",
-        question: "What primary flavors do you detect in the bouquet?",
-        description: "Select all the aromas you can identify. Consider both stone fruit and citrus fruit notes",
-        options: [
-          { id: "1", text: "Stone fruit", description: "Peach, apricot, nectarine" },
-          { id: "2", text: "Citrus fruit", description: "Lemon, lime, grapefruit" },
-          { id: "3", text: "Tropical fruit", description: "Pineapple, mango, passionfruit" },
-          { id: "4", text: "Tree fruit", description: "Apple, pear, quince" },
-          { id: "5", text: "Minerality", description: "Wet stone, chalk, flint" }
-        ],
-        allowMultiple: true,
-        timeLimit: 45,
-        points: 10
-      }
-    },
-    {
-      name: "Body Assessment",
-      type: "question",
-      sectionType: "deep_dive",
-      payloadTemplate: {
-        questionType: "scale",
-        question: "How would you describe the body of this wine?",
-        description: "Consider the wine's weight on your palate - from light-bodied to full-bodied",
-        scaleMin: 1,
-        scaleMax: 5,
-        scaleLabels: ["Light-bodied", "Full-bodied"],
-        timeLimit: 30,
-        points: 10
-      }
-    },
-    {
-      name: "Tannin Evaluation",
-      type: "question",
-      sectionType: "deep_dive",
-      payloadTemplate: {
-        questionType: "multiple_choice",
-        question: "How would you characterize the tannin structure?",
-        description: "Focus on the drying, grippy sensation and overall tannin intensity",
-        options: [
-          { id: "1", text: "Soft tannins", description: "Like thin socks - barely noticeable" },
-          { id: "2", text: "Medium tannins", description: "Balanced grip and texture" },
-          { id: "3", text: "Firm tannins", description: "Like thick wool socks - substantial presence" },
-          { id: "4", text: "No tannins detected", description: "Smooth, no drying sensation" }
-        ],
-        allowMultiple: false,
-        timeLimit: 30,
-        points: 10
-      }
-    },
-    {
-      name: "Acidity Analysis",
-      type: "question",
-      sectionType: "deep_dive",
-      payloadTemplate: {
-        questionType: "scale",
-        question: "Rate the acidity level",
-        description: "How much does this wine make your mouth water? High acidity creates a zippy, bright sensation",
-        scaleMin: 1,
-        scaleMax: 10,
-        scaleLabels: ["Low acidity", "High acidity"],
-        timeLimit: 25,
-        points: 10
-      }
-    },
-    {
-      name: "Flavor Profile",
-      type: "question",
-      sectionType: "deep_dive",
-      payloadTemplate: {
-        questionType: "multiple_choice",
-        question: "What secondary flavors from winemaking do you notice?",
-        description: "These flavors come from the vessel and winemaking process, not the grape itself",
-        options: [
-          { id: "1", text: "Oak influences", description: "Vanilla, spice, toast from barrel aging" },
-          { id: "2", text: "Yeasty notes", description: "Bread, biscuit from lees contact" },
-          { id: "3", text: "Butter notes", description: "From malolactic fermentation" },
-          { id: "4", text: "Stainless steel neutral", description: "Clean, no added flavors from vessel" }
-        ],
-        allowMultiple: true,
-        timeLimit: 40,
-        points: 15
-      }
-    },
-    {
-      name: "Finish Assessment",
-      type: "question",
-      sectionType: "ending",
-      payloadTemplate: {
-        questionType: "scale",
-        question: "How long is the finish?",
-        description: "Consider the lingering flavors and sensations after swallowing",
-        scaleMin: 1,
-        scaleMax: 5,
-        scaleLabels: ["Short finish", "Long finish"],
-        timeLimit: 20,
-        points: 10
-      }
-    },
-    {
-      name: "Open Tasting Notes",
-      type: "question",
-      sectionType: "ending",
-      payloadTemplate: {
-        questionType: "text",
-        question: "Share your complete tasting experience",
-        description: "Describe the tertiary flavors, overall complexity, and how the wine's terroir comes through",
-        maxLength: 500,
-        timeLimit: 90,
-        points: 20
-      }
-    }
-  ],
-  interlude: [
-    {
-      name: "Welcome Slide",
-      type: "interlude",
-      sectionType: "intro",
-      payloadTemplate: {
-        title: "Welcome to Wine Tasting",
-        description: "Get ready to explore this exceptional wine",
-        backgroundImage: "",
-        duration: 5,
-        showContinueButton: true
-      }
-    },
-    {
-      name: "Transition Slide",
-      type: "interlude",
-      sectionType: "deep_dive",
-      payloadTemplate: {
-        title: "Now let's taste...",
-        description: "Take a moment to swirl and smell",
-        backgroundImage: "",
-        duration: 3,
-        showContinueButton: true
-      }
-    }
-  ],
-  video_message: [
-    {
-      name: "Sommelier Video",
-      type: "video_message",
-      sectionType: "ending",
-      payloadTemplate: {
-        title: "Expert Insights",
-        description: "Sommelier's professional tasting notes",
-        videoUrl: "",
-        posterUrl: "",
-        autoplay: false,
-        showControls: true
-      }
-    }
-  ]
-};
+// Templates now imported from wineTemplates.ts
 
 export function SlideEditor({ packageWineId, wineName, onClose }: SlideEditorProps) {
   const [slides, setSlides] = useState<Slide[]>([]);
@@ -454,9 +254,9 @@ export function SlideEditor({ packageWineId, wineName, onClose }: SlideEditorPro
                     {selectedTemplate && (
                       <Button
                         onClick={() => {
-                          const templates = SLIDE_TEMPLATES[selectedTemplate as keyof typeof SLIDE_TEMPLATES];
-                          if (templates && templates.length > 0) {
-                            addSlideFromTemplate(selectedTemplate, templates[0]);
+                          const template = SLIDE_TEMPLATES.find(t => t.type === selectedTemplate);
+                          if (template) {
+                            addSlideFromTemplate(selectedTemplate, template);
                             setSelectedTemplate('');
                           }
                         }}
@@ -550,28 +350,26 @@ export function SlideEditor({ packageWineId, wineName, onClose }: SlideEditorPro
               <div className="w-1/3 border-l border-white/10 p-8 overflow-y-auto">
                 <h3 className="text-white font-bold text-xl mb-6">Template Library</h3>
                 
-                {Object.entries(SLIDE_TEMPLATES).map(([category, templates]) => (
-                  <div key={category} className="mb-8">
-                    <h4 className="text-white font-medium mb-4 capitalize">{category.replace('_', ' ')} Templates</h4>
-                    <div className="space-y-3">
-                      {templates.map((template, index) => (
-                        <Card 
-                          key={index}
-                          className="bg-white/5 border-white/10 p-4 hover:bg-white/10 transition-colors cursor-pointer"
-                          onClick={() => addSlideFromTemplate(category, template)}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <h5 className="text-white font-medium text-sm">{template.name}</h5>
-                            <Plus className="w-4 h-4 text-white/60" />
-                          </div>
-                          <p className="text-white/60 text-xs">
-                            {template.payloadTemplate.description || template.payloadTemplate.question || 'Click to add this template'}
-                          </p>
-                        </Card>
-                      ))}
-                    </div>
+                <div className="mb-8">
+                  <h4 className="text-white font-medium mb-4">Question Templates</h4>
+                  <div className="space-y-3">
+                    {SLIDE_TEMPLATES.map((template) => (
+                      <Card 
+                        key={template.id}
+                        className="bg-white/5 border-white/10 p-4 hover:bg-white/10 transition-colors cursor-pointer"
+                        onClick={() => addSlideFromTemplate(template.type, template)}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-white font-medium text-sm">{template.name}</h5>
+                          <Plus className="w-4 h-4 text-white/60" />
+                        </div>
+                        <p className="text-white/60 text-xs">
+                          {template.payloadTemplate.description || template.payloadTemplate.question || 'Click to add this template'}
+                        </p>
+                      </Card>
+                    ))}
                   </div>
-                ))}
+                </div>
               </div>
             </>
           )}
@@ -779,24 +577,54 @@ function QuestionSlideEditor({ payload, onChange }: { payload: any; onChange: (p
       )}
 
       {payload.questionType === 'scale' && (
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label className="text-white">Min Value</Label>
-            <Input
-              type="number"
-              value={payload.scaleMin || 1}
-              onChange={(e) => updatePayload({ scaleMin: parseInt(e.target.value) })}
-              className="bg-white/10 border-white/20 text-white mt-2"
-            />
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-white">Min Value</Label>
+              <Input
+                type="number"
+                value={payload.scaleMin || 1}
+                onChange={(e) => updatePayload({ scaleMin: parseInt(e.target.value) })}
+                className="bg-white/10 border-white/20 text-white mt-2"
+              />
+            </div>
+            <div>
+              <Label className="text-white">Max Value</Label>
+              <Input
+                type="number"
+                value={payload.scaleMax || 10}
+                onChange={(e) => updatePayload({ scaleMax: parseInt(e.target.value) })}
+                className="bg-white/10 border-white/20 text-white mt-2"
+              />
+            </div>
           </div>
-          <div>
-            <Label className="text-white">Max Value</Label>
-            <Input
-              type="number"
-              value={payload.scaleMax || 10}
-              onChange={(e) => updatePayload({ scaleMax: parseInt(e.target.value) })}
-              className="bg-white/10 border-white/20 text-white mt-2"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-white">Min Label</Label>
+              <Input
+                value={payload.scaleLabels?.[0] || ''}
+                onChange={(e) => {
+                  const newLabels = [...(payload.scaleLabels || ['', ''])];
+                  newLabels[0] = e.target.value;
+                  updatePayload({ scaleLabels: newLabels });
+                }}
+                className="bg-white/10 border-white/20 text-white mt-2"
+                placeholder="e.g., Low, Soft, Poor"
+              />
+            </div>
+            <div>
+              <Label className="text-white">Max Label</Label>
+              <Input
+                value={payload.scaleLabels?.[1] || ''}
+                onChange={(e) => {
+                  const newLabels = [...(payload.scaleLabels || ['', ''])];
+                  newLabels[1] = e.target.value;
+                  updatePayload({ scaleLabels: newLabels });
+                }}
+                className="bg-white/10 border-white/20 text-white mt-2"
+                placeholder="e.g., High, Grippy, Excellent"
+              />
+            </div>
           </div>
         </div>
       )}

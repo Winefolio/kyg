@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(node test-templates.js)",
+      "Bash(rg:*)",
+      "Bash(npx drizzle-kit:*)",
+      "Bash(echo:*)"
+    ],
+    "deny": []
+  }
+}

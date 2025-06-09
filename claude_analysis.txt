@@ -1,0 +1,56 @@
+Detailed Analysis of the "Blank Slide" Bug
+Clarifications from Lead Developer (Synthesized)
+On the Core Problem: When using the "Add Slide" functionality in the PackageEditor, a new slide record is successfully created in the database. However, this new slide renders as a "blank" or incomplete slide in the live TastingSession. For example, a slide created from an "Acidity Level" template only displays the title "Acidity Level" but is missing its description, scale, and other interactive elements.
+On the Exception: The only slide type that appears to be working correctly is the "Aroma Assessment" question. All other newly created slides exhibit the "blank slide" issue.
+On the Editor UI: The PackageEditor's form for the "Acidity Level" slide (and others) is also incomplete. It correctly shows the slide title and description fields, but it lacks the specific form inputs needed to configure the question itself (e.g., fields for setting the min/max of a scale, or adding options for a multiple-choice question).
+Deep-Dive Analysis
+This is not a data seeding issue or a runtime flow issue. This is a component and data-mapping failure within the PackageEditor itself. The problem has two layers:
+Layer 1: Incomplete Slide Creation (The Root Cause)
+Your previous diagnosis was spot-on. The function responsible for adding a slide from a template (addSlideFromTemplate in SlideEditor.tsx) is not copying the full payloadTemplate from the template object.
+Evidence: The PackageEditor screenshot shows a form with fields for "Slide Title," "Description," and "Section," but it's missing the "Question Settings" that should appear for a question type slide. This confirms that the payloadJson being created for the "Acidity Level" slide is minimal, likely containing only { title: "Acidity Level", description: "" }.
+Why Aroma Assessment Works: The "Aroma Assessment" slide is likely one of the original, hardcoded slides from server/storage.ts. Its payloadJson in the database is already complete and correct. Any newly created slide fails because the creation process is flawed.
+Layer 2: Incomplete Editor Form Rendering (The Symptom)
+The editor form itself is not dynamically rendering the correct configuration fields based on the slide's content.
+Evidence: The screenshot of the "Acidity Level" editor shows a "Question Settings" card, but it's empty except for the "Question Type" dropdown. It should be displaying form inputs for scaleMin, scaleMax, and scaleLabels because it's a scale-based question.
+Analysis: Inside SlideEditor.tsx, the SlideEditForm component contains a section for type-specific settings. It has conditional logic like:
+{slide.type === 'question' && (
+  <QuestionSlideEditor
+    payload={formData.payloadJson}
+    onChange={(payload) => setFormData(prev => ({ ...prev, payloadJson: payload }))}
+  />
+)}
+Use code with caution.
+Jsx
+The problem lies within the QuestionSlideEditor sub-component. It is likely missing the nested conditional logic required to render different forms for different questionType values (e.g., multiple_choice vs. scale). It probably only has the UI for multiple_choice, which is why the "Aroma Assessment" slide (which is a multiple choice) might appear editable, while the "Acidity Level" (a scale question) shows an empty form.
+Connecting the Dots: The Full Failure Cascade
+Action: Sommelier clicks "Add Acidity Level" in the PackageEditor sidebar.
+Failure Point 1 (Creation): addSlideFromTemplate is called. It creates a new slide object with a minimal payloadJson like { "title": "Acidity Level" }. The crucial details from the template (like question_type: "scale", scale_min: 1, etc.) are discarded.
+Result 1 (Database): A new slide record is inserted into Supabase with this incomplete payloadJson.
+Failure Point 2 (Editing): When the sommelier clicks on this new "Acidity Level" slide in the editor, the SlideEditForm renders. However, because the payloadJson lacks question_type: "scale", the QuestionSlideEditor has no information to know it should display the scale configuration inputs. It renders a generic, empty "Question Settings" form.
+Failure Point 3 (Participant View): A participant in a TastingSession reaches this slide. The frontend fetches the slide with its incomplete payloadJson. The renderSlideContent function in TastingSession.tsx sees type: "question" but cannot find the necessary questionType or other data inside the payload, so it can only render the title. This results in the blank slide seen in the second screenshot.
+Revised Action Plan for AI Assistant
+This plan is now highly specific and directly addresses the verified issues.
+Priority 1: Fix the Slide Creation Logic (The Root Cause)
+Objective: Ensure that when a slide is created from a template, its entire payloadTemplate is copied into the new slide's payloadJson.
+File to Modify: client/src/components/SlideEditor.tsx.
+Specific Task:
+Locate the addSlideFromTemplate function.
+Identify where the newSlide object is constructed before being passed to createSlideMutation.mutate().
+Modify the payloadJson property assignment to perform a deep copy of the template's payload.
+Change this: payloadJson: { title: template.name }
+To this: payloadJson: JSON.parse(JSON.stringify(template.payloadTemplate)) or { ...template.payloadTemplate } for a shallow copy if sufficient. A deep copy is safer.
+Verify the title and description fields on the main slide record are also being populated correctly from the template payload for display in the sidebar.
+Priority 2: Fix the Editor Form Rendering (The Symptom)
+Objective: Make the SlideEditor's "Question Settings" section dynamically render the correct form fields based on the selected questionType.
+File to Modify: client/src/components/SlideEditor.tsx.
+Specific Task:
+Locate the QuestionSlideEditor sub-component function.
+Inside this function, add conditional rendering logic (a switch statement or if/else blocks) based on payload.questionType.
+For payload.questionType === 'multiple_choice': Render the existing UI for adding/removing options and toggling allow_multiple.
+For payload.questionType === 'scale': Render new form fields:
+An <Input type="number"> for scaleMin.
+An <Input type="number"> for scaleMax.
+Two <Input type="text"> fields for the two strings in scaleLabels.
+For payload.questionType === 'text': Render an <Input type="number"> for maxLength.
+Ensure that the onChange handlers for these new fields correctly update the payloadJson state.
+By fixing Priority 1, you ensure that newly created slides have the correct data. By fixing Priority 2, you ensure that the editor can actually display and modify that data. This will resolve the entire "blank slide" issue from creation to rendering.
