@@ -49,9 +49,24 @@ export default function TastingSession() {
     }
   }, [sessionId, participantId, initializeForSession]);
 
-  // Get session details including status
+  // Get session details including status - handle both session ID and package code
   const { data: currentSession, isLoading: sessionDetailsLoading } = useQuery<Session & { packageCode?: string }>({
     queryKey: [`/api/sessions/${sessionId}`],
+    queryFn: async () => {
+      // First try as session ID
+      try {
+        const response = await apiRequest('GET', `/api/sessions/${sessionId}`, null);
+        return response.json();
+      } catch (error: any) {
+        // If 404, try looking up by package code
+        if (error.message.includes('404')) {
+          console.log(`Session ${sessionId} not found, trying as package code...`);
+          const response = await apiRequest('GET', `/api/sessions/by-package/${sessionId}`, null);
+          return response.json();
+        }
+        throw error;
+      }
+    },
     enabled: !!sessionId,
     refetchInterval: 3000, // Refetch every 3 seconds to check status
   });
@@ -416,8 +431,9 @@ export default function TastingSession() {
     // End the session properly
     endSession();
     
-    // Navigate to completion page
-    setLocation(`/completion/${sessionId}/${participantId}?progress=${progress}`);
+    // Navigate to completion page using the actual session ID from currentSession
+    const actualSessionId = currentSession?.id || sessionId;
+    setLocation(`/completion/${actualSessionId}/${participantId}?progress=${progress}`);
   };
 
   // Render current slide content

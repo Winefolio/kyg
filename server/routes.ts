@@ -174,6 +174,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get session by package code
+  app.get("/api/sessions/by-package/:packageCode", async (req, res) => {
+    try {
+      const { packageCode } = req.params;
+      
+      // Find package by code
+      const pkg = await storage.getPackageByCode(packageCode.toUpperCase());
+      if (!pkg) {
+        return res.status(404).json({ message: "Package not found" });
+      }
+
+      // Find the most recent active session for this package
+      const allSessions = await storage.getAllSessions();
+      const packageSessions = allSessions.filter(session => session.packageId === pkg.id);
+      
+      if (packageSessions.length === 0) {
+        return res.status(404).json({ message: "No sessions found for this package" });
+      }
+
+      // Return the most recent session (you could also filter by status if needed)
+      const latestSession = packageSessions.sort((a, b) => 
+        new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()
+      )[0];
+
+      // Add package code to the response
+      const sessionWithPackageCode = {
+        ...latestSession,
+        packageCode: pkg.code
+      };
+
+      res.json(sessionWithPackageCode);
+    } catch (error) {
+      console.error("Error getting session by package code:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Join session as participant
   app.post("/api/sessions/:sessionIdOrShortCode/participants", async (req, res) => {
     try {
