@@ -17,6 +17,7 @@ import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircl
 import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
 import { WineTransition } from "@/components/WineTransition";
 import { SectionTransition } from "@/components/SectionTransition";
+import { TastingProgressHeatmap } from "@/components/TastingProgressHeatmap";
 import type { Slide, Participant, Session, Package } from "@shared/schema";
 
 export default function TastingSession() {
