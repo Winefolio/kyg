@@ -416,8 +416,11 @@ export default function TastingSession() {
     // End the session properly
     endSession();
     
+    // Use the actual session ID from currentSession data, not the URL parameter
+    const actualSessionId = currentSession?.id || sessionId;
+    
     // Navigate to completion page
-    setLocation(`/completion/${sessionId}/${participantId}?progress=${progress}`);
+    setLocation(`/completion/${actualSessionId}/${participantId}?progress=${progress}`);
   };
 
   // Render current slide content
