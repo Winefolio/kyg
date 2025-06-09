@@ -27,7 +27,6 @@ function Router() {
       <Route path="/tasting/:sessionId/:participantId" component={TastingSession} />
       <Route path="/completion/:sessionId/:participantId" component={TastingCompletion} />
       <Route path="/host/:sessionId/:participantId" component={HostDashboard} />
-      <Route path="/analytics-test" component={AnalyticsTest} />
       <Route component={NotFound} />
     </Switch>
   );
