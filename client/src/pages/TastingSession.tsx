@@ -223,6 +223,16 @@ export default function TastingSession() {
   const currentSlide = slides[currentSlideIndex];
   const currentWine = currentSlide ? wines.find(w => w.id === currentSlide.packageWineId) : null;
 
+  // Helper function to get section for a slide (defined early to avoid hoisting issues)
+  const getSlideSection = (slide: any) => {
+    // Use computed section if available (from our smart assignment)
+    if (slide._computedSection) {
+      return slide._computedSection;
+    }
+    // Fallback to database section_type
+    return slide.section_type || slide.payloadJson?.section_type || 'intro';
+  };
+
   // Calculate section progress based on current wine's slides only
   const currentWineSlides = currentWine ? sortedSlidesByWine[currentWine.id] || [] : [];
   const currentWineStartIndex = currentWine ? slides.findIndex(s => s.packageWineId === currentWine.id) : 0;
@@ -276,15 +286,7 @@ export default function TastingSession() {
     };
   });
 
-  // Helper function to get section for a slide
-  const getSlideSection = (slide: any) => {
-    // Use computed section if available (from our smart assignment)
-    if (slide._computedSection) {
-      return slide._computedSection;
-    }
-    // Fallback to database section_type
-    return slide.section_type || slide.payloadJson?.section_type || 'intro';
-  };
+
 
   // Navigation functions
   const goToNextSlide = async () => {
