@@ -198,7 +198,7 @@ export default function TastingSession() {
       return sectionType === 'ending' || sectionType === 'conclusion';
     }).sort((a, b) => a.position - b.position);
     
-    console.log(`Wine ${wine?.wineName}: Intro: ${introSlides.length}, Deep Dive: ${deepDiveSlides.length}, Ending: ${endingSlides.length}`);
+
     
     // Combine in proper order: Intro → Deep Dive → Ending
     acc[wineId] = [...introSlides, ...deepDiveSlides, ...endingSlides];
