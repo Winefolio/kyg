@@ -13,7 +13,7 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import { useHaptics } from "@/hooks/useHaptics";
 import { apiRequest } from "@/lib/queryClient";
-import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause, Award, Wine, ChevronDown } from "lucide-react";
+import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause, Award, Wine, ChevronDown, BarChart3 } from "lucide-react";
 import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
 import { WineTransition } from "@/components/WineTransition";
 import { SectionTransition } from "@/components/SectionTransition";
@@ -37,6 +37,7 @@ export default function TastingSession() {
     wineName: string;
   } | null>(null);
   const [expandedWines, setExpandedWines] = useState<Record<string, boolean>>({});
+  const [showHeatmap, setShowHeatmap] = useState(false);
   const { saveResponse, syncStatus, initializeForSession, endSession } = useSessionPersistence();
   const { triggerHaptic } = useHaptics();
   const queryClient = useQueryClient();
@@ -712,11 +713,22 @@ export default function TastingSession() {
                 </div>
               </div>
               
-              <div className="text-right text-white">
-                <p className="text-sm font-medium">{currentSlideIndex + 1} of {slides.length}</p>
-                <p className="text-xs text-white/60">
-                  {Math.round(((currentSlideIndex + 1) / slides.length) * 100)}% complete
-                </p>
+              <div className="flex items-center space-x-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowHeatmap(!showHeatmap)}
+                  className="text-white hover:bg-white/10"
+                  title="View Progress Heatmap"
+                >
+                  <BarChart3 className="w-5 h-5" />
+                </Button>
+                <div className="text-right text-white">
+                  <p className="text-sm font-medium">{currentSlideIndex + 1} of {slides.length}</p>
+                  <p className="text-xs text-white/60">
+                    {Math.round(((currentSlideIndex + 1) / slides.length) * 100)}% complete
+                  </p>
+                </div>
               </div>
             </div>
             
@@ -739,24 +751,41 @@ export default function TastingSession() {
             </div>
           </div>
 
-          {/* Main slide content */}
+          {/* Main content - either slide content or heatmap */}
           <div className="flex-1 flex flex-col p-3 pb-20">
             <AnimatePresence mode="wait">
-              <motion.div
-                key={currentSlide?.id || currentSlideIndex}
-                initial={{ opacity: 0, x: isNavigating ? (currentSlideIndex > 0 ? 20 : -20) : 0, y: 20 }}
-                animate={{ opacity: 1, x: 0, y: 0 }}
-                exit={{ opacity: 0, x: isNavigating ? (currentSlideIndex < slides.length - 1 ? -20 : 20) : 0, y: -20 }}
-                transition={{ 
-                  duration: 0.4, 
-                  ease: "easeInOut",
-                  opacity: { duration: 0.3 },
-                  y: { duration: 0.4, ease: "easeOut" }
-                }}
-                className="flex-grow flex flex-col justify-center max-w-2xl mx-auto w-full"
-              >
-                {renderSlideContent()}
-              </motion.div>
+              {showHeatmap ? (
+                <motion.div
+                  key="heatmap"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.4, ease: "easeInOut" }}
+                  className="flex-grow flex flex-col max-w-4xl mx-auto w-full"
+                >
+                  <TastingProgressHeatmap
+                    participantId={participantId!}
+                    sessionId={sessionId!}
+                    className="h-full"
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key={currentSlide?.id || currentSlideIndex}
+                  initial={{ opacity: 0, x: isNavigating ? (currentSlideIndex > 0 ? 20 : -20) : 0, y: 20 }}
+                  animate={{ opacity: 1, x: 0, y: 0 }}
+                  exit={{ opacity: 0, x: isNavigating ? (currentSlideIndex < slides.length - 1 ? -20 : 20) : 0, y: -20 }}
+                  transition={{ 
+                    duration: 0.4, 
+                    ease: "easeInOut",
+                    opacity: { duration: 0.3 },
+                    y: { duration: 0.4, ease: "easeOut" }
+                  }}
+                  className="flex-grow flex flex-col justify-center max-w-2xl mx-auto w-full"
+                >
+                  {renderSlideContent()}
+                </motion.div>
+              )}
             </AnimatePresence>
           </div>
 
