@@ -153,7 +153,7 @@ export default function TastingSession() {
   Object.keys(slidesByWine).forEach(wineId => {
     const wineSlides = slidesByWine[wineId];
     const wine = wines.find(w => w.id === wineId);
-    console.log(`Processing wine: ${wine?.wineName} with ${wineSlides.length} slides`);
+
     
     // Sort slides by position
     const sortedWineSlides = wineSlides.sort((a, b) => a.position - b.position);
@@ -167,12 +167,12 @@ export default function TastingSession() {
       if (firstSlide.payloadJson?.title?.includes('Welcome') || 
           firstSlide.payloadJson?.title?.includes('Your Wine Tasting')) {
         firstSlide._isPackageIntro = true;
-        console.log(`Marked slide as package intro: ${firstSlide.payloadJson?.title}`);
+
       }
     }
   });
 
-  // Sort each wine's slides to follow Intro → Deep Dive → Ending progression
+  // Sort each wine's slides using database section_type (now properly organized)
   const sortedSlidesByWine = Object.keys(wineSpecificSlidesByWine).reduce((acc, wineId) => {
     const wineSlides = wineSpecificSlidesByWine[wineId];
     const wine = wines.find(w => w.id === wineId);
@@ -182,33 +182,23 @@ export default function TastingSession() {
       return acc;
     }
     
-    // SMART SECTION ASSIGNMENT: Override database section_type with position-based logic
-    const totalSlides = wineSlides.length;
+    // Separate slides by database section_type
+    const introSlides = wineSlides.filter(slide => {
+      const sectionType = slide.section_type || slide.payloadJson?.section_type;
+      return sectionType === 'intro';
+    }).sort((a, b) => a.position - b.position);
     
-    // Calculate section boundaries ensuring all slides are covered
-    const introCount = Math.floor(totalSlides * 0.4); // First 40%
-    const deepDiveCount = Math.floor(totalSlides * 0.4); // Next 40%
-    const endingCount = totalSlides - introCount - deepDiveCount; // Remaining slides (ensures no gaps)
+    const deepDiveSlides = wineSlides.filter(slide => {
+      const sectionType = slide.section_type || slide.payloadJson?.section_type;
+      return sectionType === 'deep_dive' || sectionType === 'tasting';
+    }).sort((a, b) => a.position - b.position);
     
-    console.log(`Wine ${wine?.wineName}: ${totalSlides} total slides - Intro: ${introCount}, Deep Dive: ${deepDiveCount}, Ending: ${endingCount}`);
+    const endingSlides = wineSlides.filter(slide => {
+      const sectionType = slide.section_type || slide.payloadJson?.section_type;
+      return sectionType === 'ending' || sectionType === 'conclusion';
+    }).sort((a, b) => a.position - b.position);
     
-    const introSlides = wineSlides.slice(0, introCount);
-    const deepDiveSlides = wineSlides.slice(introCount, introCount + deepDiveCount);
-    const endingSlides = wineSlides.slice(introCount + deepDiveCount, totalSlides);
-    
-    // Override section_type for proper flow detection
-    introSlides.forEach((slide, index) => {
-      slide._computedSection = 'intro';
-      console.log(`→ Slide ${index + 1}: "${slide.payloadJson?.title}" → INTRO`);
-    });
-    deepDiveSlides.forEach((slide, index) => {
-      slide._computedSection = 'deep_dive';
-      console.log(`→ Slide ${introCount + index + 1}: "${slide.payloadJson?.title}" → DEEP_DIVE`);
-    });
-    endingSlides.forEach((slide, index) => {
-      slide._computedSection = 'ending';
-      console.log(`→ Slide ${introCount + deepDiveCount + index + 1}: "${slide.payloadJson?.title}" → ENDING`);
-    });
+    console.log(`Wine ${wine?.wineName}: Intro: ${introSlides.length}, Deep Dive: ${deepDiveSlides.length}, Ending: ${endingSlides.length}`);
     
     // Combine in proper order: Intro → Deep Dive → Ending
     acc[wineId] = [...introSlides, ...deepDiveSlides, ...endingSlides];
@@ -225,11 +215,7 @@ export default function TastingSession() {
 
   // Helper function to get section for a slide (defined early to avoid hoisting issues)
   const getSlideSection = (slide: any) => {
-    // Use computed section if available (from our smart assignment)
-    if (slide._computedSection) {
-      return slide._computedSection;
-    }
-    // Fallback to database section_type
+    // Use database section_type (now properly organized)
     return slide.section_type || slide.payloadJson?.section_type || 'intro';
   };
 
@@ -321,10 +307,7 @@ export default function TastingSession() {
       const currentSection = getSlideSection(currentSlide);
       const nextSection = getSlideSection(nextSlide);
       
-      console.log(`Navigation: Current slide ${currentSlideIndex} (${currentSection}) → Next slide ${currentSlideIndex + 1} (${nextSection})`);
-      console.log(`Current wine: ${currentWine?.wineName}, Next wine: ${nextWine?.wineName}`);
-      console.log(`Same wine: ${currentWine?.id === nextWine?.id}, Section change: ${currentSection !== nextSection}`);
-      console.log(`Is last slide of section: ${isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection)}`);
+
       
       // Check if we're transitioning to a new wine
       if (currentWine && nextWine && currentWine.id !== nextWine.id) {
