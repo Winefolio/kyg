@@ -17,7 +17,11 @@
       "Bash(npm run check:*)",
       "Bash(npm install:*)",
       "Bash(pkill:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(kill:*)",
+      "Bash(node:*)",
+      "Bash(npx tsx:*)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }

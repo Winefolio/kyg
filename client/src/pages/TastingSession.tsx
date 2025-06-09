@@ -549,6 +549,34 @@ export default function TastingSession() {
                 </div>
               );
             
+            case 'video_message':
+              return (
+                <VideoMessageSlide
+                  payload={{
+                    title: gq.config.title,
+                    description: gq.config.description,
+                    video_url: (gq.config as any).videoUrl,
+                    autoplay: (gq.config as any).autoplay || false,
+                    show_controls: (gq.config as any).controls !== false
+                  } as VideoMessagePayload}
+                  key={`video-legacy-${currentSlide.id}`}
+                />
+              );
+            
+            case 'audio_message':
+              return (
+                <AudioMessageSlide
+                  payload={{
+                    title: gq.config.title,
+                    description: gq.config.description,
+                    audio_url: (gq.config as any).audioUrl,
+                    autoplay: (gq.config as any).autoplay || false,
+                    show_controls: true
+                  } as AudioMessagePayload}
+                  key={`audio-legacy-${currentSlide.id}`}
+                />
+              );
+            
             default:
               return (
                 <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
@@ -596,6 +624,36 @@ export default function TastingSession() {
               }}
               value={answers[currentSlide.id] || questionData.scale_min || questionData.scaleMin || 1}
               onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+            />
+          );
+        }
+
+        if (questionData.questionType === 'video_message' || questionData.question_type === 'video_message') {
+          return (
+            <VideoMessageSlide
+              payload={{
+                title: questionData.title || questionData.question || '',
+                description: questionData.description || '',
+                video_url: questionData.videoUrl || questionData.video_url || '',
+                autoplay: questionData.autoplay || false,
+                show_controls: questionData.controls !== false
+              } as VideoMessagePayload}
+              key={`video-legacy-${currentSlide.id}`}
+            />
+          );
+        }
+
+        if (questionData.questionType === 'audio_message' || questionData.question_type === 'audio_message') {
+          return (
+            <AudioMessageSlide
+              payload={{
+                title: questionData.title || questionData.question || '',
+                description: questionData.description || '',
+                audio_url: questionData.audioUrl || questionData.audio_url || '',
+                autoplay: questionData.autoplay || false,
+                show_controls: true
+              } as AudioMessagePayload}
+              key={`audio-legacy-${currentSlide.id}`}
             />
           );
         }

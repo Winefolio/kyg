@@ -205,15 +205,41 @@ export default function PackageEditor() {
     const sectionSlides = wineSlides.filter(s => s.section_type === currentWineContext.sectionType);
     const nextPosition = (sectionSlides.length > 0 ? Math.max(...sectionSlides.map(s => s.position)) : 0) + 1;
 
+    // Determine the correct slide type based on question format
+    let slideType: 'question' | 'video_message' | 'audio_message' = 'question';
+    let payloadJson: any = {
+      ...question.config,
+      question_type: question.format
+    };
+
+    if (question.format === 'video_message') {
+      slideType = 'video_message';
+      // Structure payload for VideoMessagePayload format
+      payloadJson = {
+        title: question.config.title,
+        description: question.config.description,
+        video_url: (question.config as any).videoUrl,
+        autoplay: (question.config as any).autoplay || false,
+        show_controls: (question.config as any).controls !== false
+      };
+    } else if (question.format === 'audio_message') {
+      slideType = 'audio_message';
+      // Structure payload for AudioMessagePayload format
+      payloadJson = {
+        title: question.config.title,
+        description: question.config.description,
+        audio_url: (question.config as any).audioUrl,
+        autoplay: (question.config as any).autoplay || false,
+        show_controls: true
+      };
+    }
+
     const slideData = {
       packageWineId: currentWineContext.wineId,
       position: nextPosition,
-      type: 'question' as const,
+      type: slideType,
       section_type: currentWineContext.sectionType,
-      payloadJson: {
-        ...question.config,
-        question_type: question.format
-      },
+      payloadJson,
       genericQuestions: question
     };
 
