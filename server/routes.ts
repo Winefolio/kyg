@@ -400,18 +400,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get participant analytics for heatmap
-  app.get("/api/participants/:participantId/analytics", async (req, res) => {
-    try {
-      const { participantId } = req.params;
-      const analytics = await storage.getParticipantAnalytics(participantId);
-      res.json(analytics);
-    } catch (error) {
-      console.error("Error fetching participant analytics:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
   // Get slide responses (for host)
   app.get("/api/slides/:slideId/responses", async (req, res) => {
     try {
