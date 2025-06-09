@@ -108,8 +108,8 @@ export default function TastingCompletion() {
   const { data: analytics, isLoading: analyticsLoading, error: analyticsError } = useQuery<ParticipantAnalytics>({
     queryKey: [`/api/sessions/${sessionId}/participant-analytics/${participantId}`],
     enabled: !!sessionId && !!participantId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 3,
+    retry: 1,
+    refetchOnWindowFocus: false,
   });
 
   // Get participant responses for backward compatibility
