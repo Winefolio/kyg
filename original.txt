@@ -1,0 +1,146 @@
+KnowYourGrape — Re-platform & MVP Build
+
+1 Why we’re rebuilding
+
+Pain-point Evidence
+
+Data loss when a participant is inactive or loses
+connection
+
+User reports; session rows
+incomplete
+
+Unappealing UI (pale colours, no micro-interactions) Feedback from first pilot
+Over-complex / inconsistent DB in Lovable +
+Supabase
+
+90 + tables, many unused; queries
+fail
+
+Host flow clunky – host must use separate device Demo friction
+Package access limited to long, pre-generated URLs Harder than QR or code entry
+Responsiveness (touch, haptics, latency) feels dated Mobile testers abandoned forms
+2 What the new MVP must do
+ID Functional requirement
+F-1 Package gateway – user lands on tasting.knowyourgrape.com, scans a QR or types a
+Package ID → app resolves package + starts session.
+F-2 Session resume – answers autosave every slide; reopening the package with same
+email/name resumes at last question.
+F-3 Host toggle – single checkbox turns current device into host view; host-only slides
+(video, audio, interlude text) load inline.
+F-4 Question slides (v2) – refreshed components:
+• Single-select / Multi-select
+• Text input (mobile-optimised)
+• Slider
++ optional info icon (e.g., “What is stone fruit?” tooltip).
+F-5 Media slides (v2) – audio and video players (dark glass UI, larger tap targets).
+F-6 Interlude slide – markdown/text card for host guidance or pauses.
+F-7 Final screen – modern summary & CTA.
+F-8 Responsive & tactile – 60 fps on modern phones, subtle haptic feedback on
+choice/submit, full dark palette with gradients.
+
+F-9 Restructured DB – concise Supabase schema that makes adding a package a one-
+table insert + join rows (see §4).
+
+F-
+10
+
+No time-out failures under standard 30-minute tasting.
+
+F-
+11
+
+Admin workflow – team continues editing data in Airtable; nightly one-way ETL syncs
+to Supabase.
+
+F-
+12
+
+Re-use code – start from existing repos; keep working parts, prune dead files, no
+green-field rewrite.
+Nice-to-haves (build only if time allows): PWA install banner, subtle vibration on slide
+transition, “dark/light” theme switch.
+
+3 User journey (group tasting)
+1. Scan QR or enter code
+2. Input name & (opt.) email → checkbox “I’m the host”
+3. Experience slides (questions + host media)
+4. Answers autosave, back/next permitted
+5. Final screen, “Thanks! Share your tasting summary”
+(Solo-tasting, e-commerce, full brand redesign = Phase 2)
+
+4 Target architecture
+pgsql
+CopyEdit
+Next.js 14 (App Router) Supabase (Postgres | Auth | Storage)
+┌───────────────────────┐ JWT ┌───────────────────────────────┐
+│ React + Tailwind 3 │◀───────▶│ 6 core tables (clean) │
+│ Framer-motion haptics │ │ packages | slides │
+│ Storybook component │ │ sessions | participants │
+│ Vercel CI/CD │ │ responses | media storage │
+└───────────────────────┘ └───────────────────────────────┘
+▲ ▲
+Airtable CSV nightly ETL (Node script) │
+└──────────────────────────────────┘
+
+DB blueprint
+scss
+CopyEdit
+packages(id, code, name, description)
+slides(id, package_id, position, type, payload_json)
+sessions(id, package_id, started_at, completed_at)
+participants(id, session_id, email, display_name, is_host, progress_ptr)
+responses(id, participant_id, slide_id, answer_json)
+All host media files live in Supabase Storage; slide payload holds URL + poster.
+
+5 Workstreams & Deliverables
+Stream Key tasks Delivered artefacts
+
+A. Code audit & merge • Analyse Old Functional + Lovable
+
+repos
+• Decide “keep / refactor / drop” per
+component
+
+Merged Next.js repo in
+GitHub
+
+B. DB refactor & ETL • Design schema
+• SQL migrations
+• Node ETL (Airtable→Supabase)
+nightly cron
+
+schema.sql, ETL script,
+ERD diagram
+
+C. Slide engine v2 • Build revised slide components incl.
+
+info-icon tooltips
+• Host-media conditional load
+
+Storybook library, unit
+tests
+
+D. Session logic • Autosave & resume
+• Progress pointer
+• 30-min inactivity tolerance
+
+E2E Cypress tests pass
+
+E. Responsiveness &
+UX polish
+
+• Tailwind tokens, gradients
+• Haptic feedback (vibrate())
+• Mobile QA on iOS Safari & Android
+Chrome
+
+Lighthouse ≥ 90 mobile
+
+F. CI/CD & docs • Vercel preview envs
+
+• GitHub Actions: lint, test, deploy
+• README + 1-hr hand-off
+
+Green pipeline, hand-off
+video

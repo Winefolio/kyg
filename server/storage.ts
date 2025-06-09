@@ -1027,12 +1027,17 @@ export class DatabaseStorage implements IStorage {
     }
 
     const participant = await this.getParticipantById(participantId);
-    if (!participant || participant.sessionId !== sessionId) {
+    if (!participant) {
+      throw new Error("Participant not found");
+    }
+    
+    // CRITICAL FIX: Compare against resolved session.id, not input sessionId
+    if (participant.sessionId !== session.id) {
       throw new Error("Participant not found");
     }
 
     // 2. Get aggregated session data for group comparisons
-    const sessionAnalytics = await this.getAggregatedSessionAnalytics(sessionId);
+    const sessionAnalytics = await this.getAggregatedSessionAnalytics(session.id);
 
     // 3. Get participant's individual responses
     const participantResponses = await this.getResponsesByParticipantId(participantId);
