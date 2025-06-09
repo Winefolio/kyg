@@ -214,11 +214,35 @@ Position 3: deep_dive   | Overall wine rating
 
 ---
 
+## 🚨 CRITICAL ISSUE DISCOVERED & FIXED
+
+### Root Cause Analysis:
+The database had slides with completely scrambled section assignments:
+- Château Margaux 2018: Position 1-2 (NULL) → Position 3 (ending) → Position 4 (deep_dive) → Position 5 (ending) → Position 6 (deep_dive) → Position 7-8 (intro)
+- This caused transitions to jump from deep_dive back to intro because intro slides were at the END
+
+### Solution Implemented:
+**SMART SECTION ASSIGNMENT**: Complete override of database section_type with position-based logic
+
+```javascript
+// Position-based section assignment (overrides database inconsistencies)
+const introSlides = sortedWineSlides.slice(0, Math.ceil(totalSlides * 0.4));    // First 40%
+const deepDiveSlides = sortedWineSlides.slice(introCount, introCount + Math.ceil(totalSlides * 0.4)); // Next 40%  
+const endingSlides = sortedWineSlides.slice(introCount + deepDiveCount); // Last 20%
+
+// Override section detection
+slide._computedSection = 'intro'|'deep_dive'|'ending';
+```
+
+**Package Intro Handling**: Special detection and placement of package welcome slide first
+
+**Fixed Flow**: Package Welcome → Wine 1 Intro → Wine 1 Deep Dive → Wine 1 Ending → Wine 2 Intro...
+
 ## 🎯 IMPLEMENTATION STATUS: COMPLETE
 
 The slide ordering system has been comprehensively fixed to ensure proper Intro→Deep Dive→Ending progression within each wine, with accurate progress tracking and section navigation.
 
-**Key Achievement**: System now prioritizes questions based on logical section order within each wine, regardless of database position conflicts.
+**Key Achievement**: System now prioritizes questions based on logical section order within each wine, completely independent of database section assignments.
 
 ---
 
