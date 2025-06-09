@@ -120,6 +120,7 @@ export interface IStorage {
 
   // Analytics
   getAggregatedSessionAnalytics(sessionId: string): Promise<any>;
+  getParticipantAnalytics(sessionId: string, participantId: string): Promise<any>;
 
   // Package management for sommelier dashboard
   getAllPackages(): Promise<Package[]>;
@@ -1015,6 +1016,341 @@ export class DatabaseStorage implements IStorage {
       totalQuestions,
       slidesAnalytics,
     };
+  }
+
+  // Participant-specific analytics for enhanced completion experience
+  async getParticipantAnalytics(sessionId: string, participantId: string): Promise<any> {
+    // 1. Validate session and participant existence
+    const session = await this.getSessionById(sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    const participant = await this.getParticipantById(participantId);
+    if (!participant || participant.sessionId !== sessionId) {
+      throw new Error("Participant not found");
+    }
+
+    // 2. Get aggregated session data for group comparisons
+    const sessionAnalytics = await this.getAggregatedSessionAnalytics(sessionId);
+
+    // 3. Get participant's individual responses
+    const participantResponses = await this.getResponsesByParticipantId(participantId);
+
+    // 4. Get package and wine data
+    const packageWines = await this.getPackageWines(session.packageId!);
+    let allSlides: Slide[] = [];
+    
+    for (const wine of packageWines) {
+      const wineSlides = await this.getSlidesByPackageWineId(wine.id);
+      allSlides = allSlides.concat(wineSlides);
+    }
+
+    const questionSlides = allSlides.filter(slide => slide.type === "question");
+
+    // 5. Calculate participant-specific metrics
+    const personalSummary = {
+      questionsAnswered: participantResponses.length,
+      completionPercentage: Math.round((participantResponses.length / questionSlides.length) * 100),
+      winesExplored: packageWines.length,
+      notesWritten: participantResponses.filter(r => {
+        const answer = r.answerJson as any;
+        return answer && answer.notes && answer.notes.trim().length > 0;
+      }).length,
+      sessionDuration: participant.lastActive && session.startedAt 
+        ? Math.round((new Date(participant.lastActive).getTime() - new Date(session.startedAt).getTime()) / 60000)
+        : 0
+    };
+
+    // 6. Generate wine-by-wine breakdown with comparisons
+    const wineBreakdowns = packageWines.map(wine => {
+      const wineSlides = allSlides.filter(slide => slide.packageWineId === wine.id && slide.type === "question");
+      const wineResponses = participantResponses.filter(response => 
+        wineSlides.some(slide => slide.id === response.slideId)
+      );
+
+      const questionAnalysis = wineSlides.map(slide => {
+        const participantResponse = participantResponses.find(r => r.slideId === slide.id);
+        const slideAnalytics = sessionAnalytics.slidesAnalytics.find((s: any) => s.slideId === slide.id);
+        const slidePayload = slide.payloadJson as any;
+
+        let comparison = null;
+        if (participantResponse && slideAnalytics) {
+          if (slidePayload.question_type === "scale") {
+            const userAnswer = typeof participantResponse.answerJson === "number" 
+              ? participantResponse.answerJson 
+              : (participantResponse.answerJson as any)?.value || 0;
+            
+            comparison = {
+              yourAnswer: userAnswer,
+              groupAverage: slideAnalytics.aggregatedData.averageScore || 0,
+              differenceFromGroup: userAnswer - (slideAnalytics.aggregatedData.averageScore || 0),
+              alignment: Math.abs(userAnswer - (slideAnalytics.aggregatedData.averageScore || 0)) <= 1 ? "close" : "different"
+            };
+          } else if (slidePayload.question_type === "multiple_choice") {
+            const userSelections = (participantResponse.answerJson as any)?.selected || [];
+            const mostPopular = slideAnalytics.aggregatedData.optionsSummary
+              ?.sort((a: any, b: any) => b.percentage - a.percentage)[0];
+            
+            comparison = {
+              yourAnswer: Array.isArray(userSelections) ? userSelections : [userSelections],
+              mostPopular: mostPopular?.optionText || "N/A",
+              alignment: Array.isArray(userSelections) && userSelections.includes(mostPopular?.optionId) ? "agrees" : "unique"
+            };
+          }
+        }
+
+        return {
+          question: slidePayload.title || "Question",
+          questionType: slidePayload.question_type,
+          answered: !!participantResponse,
+          comparison,
+          insight: this.generateQuestionInsight(comparison, slidePayload)
+        };
+      });
+
+      return {
+        wineId: wine.id,
+        wineName: wine.wineName,
+        wineDescription: wine.wineDescription,
+        wineImageUrl: wine.wineImageUrl,
+        questionsAnswered: wineResponses.length,
+        totalQuestions: wineSlides.length,
+        questionAnalysis
+      };
+    });
+
+    // 7. Generate tasting personality based on answer patterns
+    const tastingPersonality = this.generateTastingPersonality(participantResponses, questionSlides);
+
+    // 8. Calculate achievements
+    const achievements = this.calculateAchievements(participantResponses, questionSlides, sessionAnalytics);
+
+    // 9. Generate insights and recommendations
+    const insights = this.generatePersonalInsights(participantResponses, sessionAnalytics, wineBreakdowns);
+
+    return {
+      participantId,
+      sessionId,
+      personalSummary,
+      wineBreakdowns,
+      tastingPersonality,
+      achievements,
+      insights,
+      recommendations: this.generateWineRecommendations(tastingPersonality, participantResponses)
+    };
+  }
+
+  // Helper method to generate question-specific insights
+  private generateQuestionInsight(comparison: any, slidePayload: any): string {
+    if (!comparison) return "No comparison data available";
+
+    if (slidePayload.question_type === "scale") {
+      const diff = Math.abs(comparison.differenceFromGroup);
+      if (diff <= 0.5) return "You aligned closely with the group average";
+      if (diff <= 1.5) return comparison.differenceFromGroup > 0 
+        ? "You rated this higher than most" 
+        : "You rated this lower than most";
+      return comparison.differenceFromGroup > 0 
+        ? "You detected much stronger intensity than others" 
+        : "You found this more subtle than most participants";
+    }
+
+    if (slidePayload.question_type === "multiple_choice") {
+      return comparison.alignment === "agrees" 
+        ? "You agreed with the majority choice" 
+        : "You had a unique perspective compared to others";
+    }
+
+    return "Response recorded";
+  }
+
+  // Helper method to generate tasting personality
+  private generateTastingPersonality(responses: Response[], slides: Slide[]): any {
+    // Analyze answer patterns to determine personality type
+    const scaleResponses = responses.filter(r => {
+      const slide = slides.find(s => s.id === r.slideId);
+      return slide && (slide.payloadJson as any).question_type === "scale";
+    });
+
+    if (scaleResponses.length === 0) {
+      return {
+        type: "Emerging Taster",
+        description: "Just beginning your wine journey",
+        characteristics: ["Open to learning", "Developing palate"]
+      };
+    }
+
+    const averageRating = scaleResponses.reduce((sum, r) => {
+      const value = typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5;
+      return sum + value;
+    }, 0) / scaleResponses.length;
+
+    const hasNotes = responses.some(r => (r.answerJson as any)?.notes?.trim().length > 0);
+
+    if (averageRating >= 7.5) {
+      return {
+        type: "Bold Explorer",
+        description: "You appreciate intense, full-bodied wines with strong characteristics",
+        characteristics: ["Seeks bold flavors", "Appreciates intensity", "Confident palate"]
+      };
+    } else if (averageRating <= 4.5) {
+      return {
+        type: "Subtle Sophisticate", 
+        description: "You prefer elegant, nuanced wines with delicate complexity",
+        characteristics: ["Values subtlety", "Appreciates nuance", "Refined taste"]
+      };
+    } else if (hasNotes) {
+      return {
+        type: "Detail Detective",
+        description: "You pay close attention to wine characteristics and love to analyze",
+        characteristics: ["Analytical approach", "Detailed observations", "Thorough taster"]
+      };
+    } else {
+      return {
+        type: "Balanced Appreciator",
+        description: "You enjoy a wide range of wine styles with balanced preferences",
+        characteristics: ["Open-minded", "Balanced palate", "Versatile preferences"]
+      };
+    }
+  }
+
+  // Helper method to calculate achievements
+  private calculateAchievements(responses: Response[], slides: Slide[], sessionAnalytics: any): any[] {
+    const achievements = [];
+
+    // Completion achievements
+    if (responses.length === slides.length) {
+      achievements.push({
+        id: "perfect_completion",
+        name: "Perfect Completion",
+        description: "Answered every question in the tasting",
+        icon: "🎯",
+        rarity: "common"
+      });
+    }
+
+    // Notes achievement
+    const notesCount = responses.filter(r => (r.answerJson as any)?.notes?.trim().length > 0).length;
+    if (notesCount >= 3) {
+      achievements.push({
+        id: "detailed_notes",
+        name: "Detail Master", 
+        description: "Added personal notes to multiple questions",
+        icon: "📝",
+        rarity: "rare"
+      });
+    }
+
+    // Accuracy achievements (would need expert answer comparison)
+    // For now, placeholder logic based on group alignment
+    const scaleResponses = responses.filter(r => {
+      const slide = slides.find(s => s.id === r.slideId);
+      return slide && (slide.payloadJson as any).question_type === "scale";
+    });
+
+    let alignmentCount = 0;
+    scaleResponses.forEach(response => {
+      const slideAnalytics = sessionAnalytics.slidesAnalytics.find((s: any) => s.slideId === response.slideId);
+      if (slideAnalytics) {
+        const userAnswer = typeof response.answerJson === "number" ? response.answerJson : (response.answerJson as any)?.value || 0;
+        const groupAverage = slideAnalytics.aggregatedData.averageScore || 0;
+        if (Math.abs(userAnswer - groupAverage) <= 1) {
+          alignmentCount++;
+        }
+      }
+    });
+
+    if (alignmentCount >= scaleResponses.length * 0.8) {
+      achievements.push({
+        id: "group_harmony",
+        name: "Consensus Builder",
+        description: "Your assessments aligned closely with the group",
+        icon: "🤝",
+        rarity: "uncommon"
+      });
+    }
+
+    return achievements;
+  }
+
+  // Helper method to generate personal insights
+  private generatePersonalInsights(responses: Response[], sessionAnalytics: any, wineBreakdowns: any[]): string[] {
+    const insights = [];
+
+    // Tannin sensitivity insight
+    const tanninResponses = responses.filter(r => {
+      const slideAnalytics = sessionAnalytics.slidesAnalytics.find((s: any) => s.slideId === r.slideId);
+      return slideAnalytics && slideAnalytics.slideTitle.toLowerCase().includes("tannin");
+    });
+
+    if (tanninResponses.length > 0) {
+      const avgTanninRating = tanninResponses.reduce((sum, r) => {
+        const value = typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5;
+        return sum + value;
+      }, 0) / tanninResponses.length;
+
+      if (avgTanninRating >= 7) {
+        insights.push("You have a keen sensitivity to tannins and appreciate structure in wine");
+      } else if (avgTanninRating <= 4) {
+        insights.push("You prefer wines with softer, more approachable tannins");
+      }
+    }
+
+    // Notes quality insight
+    const notesCount = responses.filter(r => (r.answerJson as any)?.notes?.trim().length > 0).length;
+    if (notesCount >= responses.length * 0.5) {
+      insights.push("Your detailed note-taking shows excellent attention to wine characteristics");
+    }
+
+    // Consistency insight
+    const scaleResponses = responses.filter(r => {
+      const slideAnalytics = sessionAnalytics.slidesAnalytics.find((s: any) => s.slideId === r.slideId);
+      return slideAnalytics && slideAnalytics.questionType === "scale";
+    });
+
+    if (scaleResponses.length >= 3) {
+      const values = scaleResponses.map(r => typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5);
+      const avg = values.reduce((a, b) => a + b, 0) / values.length;
+      const variance = values.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / values.length;
+      
+      if (variance < 2) {
+        insights.push("You have a consistent tasting approach across different characteristics");
+      } else {
+        insights.push("You appreciate diverse wine characteristics and show varied preferences");
+      }
+    }
+
+    return insights.slice(0, 3); // Return top 3 insights
+  }
+
+  // Helper method to generate wine recommendations
+  private generateWineRecommendations(personality: any, responses: Response[]): string[] {
+    const recommendations = [];
+
+    switch (personality.type) {
+      case "Bold Explorer":
+        recommendations.push("Try robust Cabernet Sauvignon from Napa Valley");
+        recommendations.push("Explore powerful Barolo from Piedmont, Italy");
+        recommendations.push("Sample rich Châteauneuf-du-Pape from Rhône Valley");
+        break;
+      case "Subtle Sophisticate":
+        recommendations.push("Discover elegant Pinot Noir from Burgundy");
+        recommendations.push("Try delicate Riesling from Mosel, Germany");
+        recommendations.push("Explore refined Chablis for mineral complexity");
+        break;
+      case "Detail Detective":
+        recommendations.push("Join a structured wine education course");
+        recommendations.push("Try vertical tastings to compare vintages");
+        recommendations.push("Explore single-vineyard wines for terroir comparison");
+        break;
+      default:
+        recommendations.push("Continue exploring different wine regions");
+        recommendations.push("Try wines from various grape varieties");
+        recommendations.push("Join wine tastings to expand your palate");
+    }
+
+    return recommendations;
   }
 
   private async initializeGlossaryTerms() {

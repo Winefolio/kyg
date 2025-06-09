@@ -467,6 +467,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get participant-specific analytics for completion experience
+  app.get("/api/sessions/:sessionId/participant-analytics/:participantId", async (req, res) => {
+    try {
+      const { sessionId, participantId } = req.params;
+      const participantAnalytics = await storage.getParticipantAnalytics(sessionId, participantId);
+      res.json(participantAnalytics);
+    } catch (error) {
+      console.error("Error fetching participant analytics:", error);
+      if (error instanceof Error && error.message === 'Session not found') {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      if (error instanceof Error && error.message === 'Participant not found') {
+        return res.status(404).json({ message: "Participant not found" });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Get participant by ID
   app.get("/api/participants/:participantId", async (req, res) => {
     try {
