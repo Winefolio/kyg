@@ -528,7 +528,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer = createServer(app);
   // Profile endpoints
   app.get("/api/profile", async (req, res) => {
     try {
@@ -986,5 +985,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const httpServer = createServer(app);
   return httpServer;
 }
