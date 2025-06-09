@@ -153,6 +153,7 @@ export default function TastingSession() {
   Object.keys(slidesByWine).forEach(wineId => {
     const wineSlides = slidesByWine[wineId];
     const wine = wines.find(w => w.id === wineId);
+    console.log(`Processing wine: ${wine?.wineName} with ${wineSlides.length} slides`);
     const isFirstWine = wine?.position === 1;
     
     // Sort slides by position
@@ -180,6 +181,7 @@ export default function TastingSession() {
   // Sort each wine's slides to follow Intro → Deep Dive → Ending progression
   const sortedSlidesByWine = Object.keys(wineSpecificSlidesByWine).reduce((acc, wineId) => {
     const wineSlides = wineSpecificSlidesByWine[wineId];
+    const wine = wines.find(w => w.id === wineId);
     
     if (wineSlides.length === 0) {
       acc[wineId] = [];
@@ -188,23 +190,30 @@ export default function TastingSession() {
     
     // SMART SECTION ASSIGNMENT: Override database section_type with position-based logic
     const totalSlides = wineSlides.length;
-    const introCount = Math.ceil(totalSlides * 0.4); // First 40%
-    const deepDiveCount = Math.ceil(totalSlides * 0.4); // Next 40%
-    // Remaining slides are ending (last 20%)
+    
+    // Calculate section boundaries ensuring all slides are covered
+    const introCount = Math.floor(totalSlides * 0.4); // First 40%
+    const deepDiveCount = Math.floor(totalSlides * 0.4); // Next 40%
+    const endingCount = totalSlides - introCount - deepDiveCount; // Remaining slides (ensures no gaps)
+    
+    console.log(`Wine ${wine?.wineName}: ${totalSlides} total slides - Intro: ${introCount}, Deep Dive: ${deepDiveCount}, Ending: ${endingCount}`);
     
     const introSlides = wineSlides.slice(0, introCount);
     const deepDiveSlides = wineSlides.slice(introCount, introCount + deepDiveCount);
-    const endingSlides = wineSlides.slice(introCount + deepDiveCount);
+    const endingSlides = wineSlides.slice(introCount + deepDiveCount, totalSlides);
     
     // Override section_type for proper flow detection
-    introSlides.forEach(slide => {
+    introSlides.forEach((slide, index) => {
       slide._computedSection = 'intro';
+      console.log(`→ Slide ${index + 1}: "${slide.payloadJson?.title}" → INTRO`);
     });
-    deepDiveSlides.forEach(slide => {
+    deepDiveSlides.forEach((slide, index) => {
       slide._computedSection = 'deep_dive';
+      console.log(`→ Slide ${introCount + index + 1}: "${slide.payloadJson?.title}" → DEEP_DIVE`);
     });
-    endingSlides.forEach(slide => {
+    endingSlides.forEach((slide, index) => {
       slide._computedSection = 'ending';
+      console.log(`→ Slide ${introCount + deepDiveCount + index + 1}: "${slide.payloadJson?.title}" → ENDING`);
     });
     
     // Combine in proper order: Intro → Deep Dive → Ending
@@ -320,6 +329,11 @@ export default function TastingSession() {
       
       const currentSection = getSlideSection(currentSlide);
       const nextSection = getSlideSection(nextSlide);
+      
+      console.log(`Navigation: Current slide ${currentSlideIndex} (${currentSection}) → Next slide ${currentSlideIndex + 1} (${nextSection})`);
+      console.log(`Current wine: ${currentWine?.wineName}, Next wine: ${nextWine?.wineName}`);
+      console.log(`Same wine: ${currentWine?.id === nextWine?.id}, Section change: ${currentSection !== nextSection}`);
+      console.log(`Is last slide of section: ${isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection)}`);
       
       // Check if we're transitioning to a new wine
       if (currentWine && nextWine && currentWine.id !== nextWine.id) {
