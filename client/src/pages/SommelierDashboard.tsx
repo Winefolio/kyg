@@ -1120,7 +1120,6 @@ function PackageModal({
   const [formData, setFormData] = useState({
     name: pkg?.name || "",
     description: pkg?.description || "",
-    imageUrl: pkg?.imageUrl || "",
     isActive: pkg?.isActive ?? true,
   });
 

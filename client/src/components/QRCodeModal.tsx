@@ -142,16 +142,16 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-gray-400 text-sm">Session ID</span>
+                <span className="text-gray-400 text-sm">Session Code</span>
                 <Badge variant="outline" className="font-mono text-xs border-gray-600 text-gray-300">
-                  {session.id.slice(0, 8).toUpperCase()}
+                  {sessionCode}
                 </Badge>
               </div>
               
               <div className="flex items-center justify-between">
                 <span className="text-gray-400 text-sm">Package</span>
                 <span className="text-white text-sm font-medium">
-                  {session.packageCode || 'Wine Package'}
+                  {session.packageName || session.packageCode}
                 </span>
               </div>
 
