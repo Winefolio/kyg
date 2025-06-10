@@ -794,7 +794,7 @@ export default function SommelierDashboard() {
                             <span>Participants:</span>
                             <button
                               onClick={() => toggleParticipants(session.id)}
-                              className="text-white hover:text-purple-300 transition-colors flex items-center gap-1"
+                              className="text-white hover:text-purple-300 transition-all duration-200 flex items-center gap-1 px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 border border-white/20"
                             >
                               <span>{session.participantCount}</span>
                               <ChevronUp 
@@ -814,16 +814,38 @@ export default function SommelierDashboard() {
 
                         {/* Expandable Participants List */}
                         {expandedParticipants.has(session.id) && (
-                          <div className="mb-4 p-3 bg-white/5 rounded-lg border border-white/10">
-                            <h4 className="text-white text-sm font-medium mb-2">Participants</h4>
-                            <div className="space-y-1 max-h-32 overflow-y-auto">
-                              {sessionParticipants[session.id]?.map((participant) => (
-                                <div key={participant.id} className="flex justify-between text-xs">
-                                  <span className="text-white/80">{participant.displayName}</span>
-                                  <span className="text-white/60">{participant.email}</span>
-                                </div>
-                              )) || (
-                                <div className="text-white/60 text-xs">Loading participants...</div>
+                          <div className="mb-4 p-3 bg-white/8 rounded-lg border border-white/20 backdrop-blur-sm">
+                            <h4 className="text-white text-sm font-medium mb-3 flex items-center gap-2">
+                              <Users className="w-4 h-4" />
+                              Participants
+                            </h4>
+                            <div className="space-y-2 max-h-32 overflow-y-auto">
+                              {sessionParticipants[session.id]?.length > 0 ? (
+                                // Sort participants - host first, then others
+                                [...sessionParticipants[session.id]]
+                                  .sort((a, b) => (b.isHost ? 1 : 0) - (a.isHost ? 1 : 0))
+                                  .map((participant) => (
+                                    <div 
+                                      key={participant.id} 
+                                      className={`flex justify-between items-center text-xs p-2 rounded-md ${
+                                        participant.isHost 
+                                          ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/30' 
+                                          : 'bg-white/5 hover:bg-white/10'
+                                      } transition-colors`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-white/90 font-medium">{participant.displayName}</span>
+                                        {participant.isHost && (
+                                          <span className="px-1.5 py-0.5 bg-purple-500/30 text-purple-300 text-xs rounded-full font-medium">
+                                            HOST
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-white/60">{participant.email}</span>
+                                    </div>
+                                  ))
+                              ) : (
+                                <div className="text-white/60 text-xs p-2 text-center">Loading participants...</div>
                               )}
                             </div>
                           </div>
@@ -1183,13 +1205,7 @@ function PackageModal({
             />
           </div>
 
-          <ImageUpload
-            label="Package Image"
-            value={formData.imageUrl}
-            onChange={(imageUrl) => setFormData({ ...formData, imageUrl })}
-            disabled={mode === "view"}
-            placeholder="Upload an image for the package"
-          />
+
 
           <div className="flex items-center space-x-2">
             <Switch

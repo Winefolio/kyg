@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Copy, ExternalLink, QrCode, Users, Calendar, Clock } from 'lucide-react';
+import { Copy, ExternalLink, QrCode, Users, Calendar, Clock, ChevronUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
 
 interface QRCodeModalProps {
   session: {
@@ -29,11 +30,40 @@ interface QRCodeModalProps {
 export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+  const [expandedParticipants, setExpandedParticipants] = useState(false);
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
 
   // Generate the session join URL
   const baseUrl = window.location.origin;
   const sessionUrl = `${baseUrl}/join`;
   const sessionCode = session.short_code || session.packageCode;
+
+  // Fetch participants when expanded
+  const toggleParticipants = async () => {
+    if (expandedParticipants) {
+      setExpandedParticipants(false);
+    } else {
+      setExpandedParticipants(true);
+      if (participants.length === 0) {
+        setLoadingParticipants(true);
+        try {
+          const response = await apiRequest('GET', `/api/sessions/${session.id}/participants`, null);
+          const participantData = await response.json();
+          setParticipants(participantData);
+        } catch (error) {
+          console.error('Failed to fetch participants:', error);
+          toast({
+            title: "Error fetching participants",
+            description: "Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setLoadingParticipants(false);
+        }
+      }
+    }
+  };
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -167,12 +197,63 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
 
               <div className="flex items-center justify-between">
                 <span className="text-gray-400 text-sm">Participants</span>
-                <span className="text-white text-sm">
-                  {session.participantCount} / 50
-                </span>
+                <button
+                  onClick={toggleParticipants}
+                  className="text-white hover:text-purple-300 transition-all duration-200 flex items-center gap-1 px-2 py-1 rounded-md bg-gray-700/50 hover:bg-gray-600/50 border border-gray-600/50"
+                >
+                  <span>{session.participantCount}</span>
+                  <ChevronUp 
+                    className={`w-3 h-3 transition-transform duration-200 ${
+                      expandedParticipants ? 'rotate-180' : ''
+                    }`} 
+                  />
+                </button>
               </div>
             </CardContent>
           </Card>
+
+          {/* Expandable Participants List */}
+          {expandedParticipants && (
+            <Card className="bg-gray-800 border-gray-700">
+              <CardContent className="p-4">
+                <h4 className="text-white text-sm font-medium mb-3 flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Participants
+                </h4>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {loadingParticipants ? (
+                    <div className="text-gray-400 text-xs p-2 text-center">Loading participants...</div>
+                  ) : participants.length > 0 ? (
+                    // Sort participants - host first, then others
+                    [...participants]
+                      .sort((a, b) => (b.isHost ? 1 : 0) - (a.isHost ? 1 : 0))
+                      .map((participant) => (
+                        <div 
+                          key={participant.id} 
+                          className={`flex justify-between items-center text-xs p-2 rounded-md ${
+                            participant.isHost 
+                              ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/30 border border-purple-400/40' 
+                              : 'bg-gray-700/50 hover:bg-gray-600/50'
+                          } transition-colors`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-white/90 font-medium">{participant.displayName}</span>
+                            {participant.isHost && (
+                              <span className="px-1.5 py-0.5 bg-purple-500/40 text-purple-300 text-xs rounded-full font-medium">
+                                HOST
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-gray-400">{participant.email}</span>
+                        </div>
+                      ))
+                  ) : (
+                    <div className="text-gray-400 text-xs p-2 text-center">No participants yet</div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* QR Code */}
           <div className="bg-white p-6 rounded-lg flex justify-center">
