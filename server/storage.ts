@@ -1536,7 +1536,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllSessions(): Promise<Session[]> {
-    return await db.select().from(sessions).orderBy(sessions.id);
+    // Enhanced query to include package details and participant count
+    const result = await db
+      .select({
+        id: sessions.id,
+        packageId: sessions.packageId,
+        short_code: sessions.short_code,
+        status: sessions.status,
+        startedAt: sessions.startedAt,
+        completedAt: sessions.completedAt,
+        activeParticipants: sessions.activeParticipants,
+        updatedAt: sessions.updatedAt,
+        // Include package information
+        packageName: packages.name,
+        packageCode: packages.code,
+      })
+      .from(sessions)
+      .leftJoin(packages, eq(sessions.packageId, packages.id))
+      .orderBy(desc(sessions.updatedAt)); // Most recent first
+
+    // Get participant counts for each session
+    const sessionsWithCounts = await Promise.all(
+      result.map(async (session) => {
+        const participants = await this.getParticipantsBySessionId(session.id);
+        return {
+          ...session,
+          participantCount: participants.length,
+        } as any;
+      })
+    );
+
+    return sessionsWithCounts;
   }
 
   // Wine management methods for sommelier dashboard

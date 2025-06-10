@@ -130,11 +130,15 @@ interface Slide {
 
 interface Session {
   id: string;
+  packageId: string;
   packageCode: string;
-  code: string;
-  participantCount: number;
+  packageName: string;
+  short_code: string;
   status: string;
-  createdAt: string;
+  participantCount: number;
+  startedAt: string;
+  completedAt: string | null;
+  updatedAt: string;
 }
 
 type TabType = "packages" | "sessions" | "analytics";
@@ -160,8 +164,44 @@ export default function SommelierDashboard() {
   const [slideEditorOpen, setSlideEditorOpen] = useState(false);
   const [selectedWineForSlides, setSelectedWineForSlides] =
     useState<PackageWine | null>(null);
+  const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
+  const [sessionParticipants, setSessionParticipants] = useState<Record<string, any[]>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Function to toggle participant dropdown and fetch participants
+  const toggleParticipants = async (sessionId: string) => {
+    if (expandedParticipants.has(sessionId)) {
+      // Collapse the dropdown
+      setExpandedParticipants(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(sessionId);
+        return newSet;
+      });
+    } else {
+      // Expand and fetch participants
+      setExpandedParticipants(prev => new Set(prev).add(sessionId));
+      
+      // Fetch participants if not already cached
+      if (!sessionParticipants[sessionId]) {
+        try {
+          const response = await apiRequest('GET', `/api/sessions/${sessionId}/participants`, null);
+          const participants = await response.json();
+          setSessionParticipants(prev => ({
+            ...prev,
+            [sessionId]: participants
+          }));
+        } catch (error) {
+          console.error('Failed to fetch participants:', error);
+          toast({
+            title: "Error fetching participants",
+            description: "Please try again.",
+            variant: "destructive",
+          });
+        }
+      }
+    }
+  };
 
   // Fetch packages
   const { data: packages, isLoading: packagesLoading } = useQuery<Package[]>({
@@ -727,13 +767,15 @@ export default function SommelierDashboard() {
                           <div className="flex items-center space-x-2">
                             <QrCode className="w-5 h-5 text-purple-400" />
                             <span className="text-white font-semibold">
-                              {session.code}
+                              {session.short_code || session.packageCode}
                             </span>
                           </div>
                           <Badge
                             className={`${
                               session.status === "active"
                                 ? "bg-green-500/20 text-green-400"
+                                : session.status === "completed"
+                                ? "bg-blue-500/20 text-blue-400"
                                 : "bg-gray-500/20 text-gray-400"
                             }`}
                           >
@@ -744,23 +786,48 @@ export default function SommelierDashboard() {
                         <div className="space-y-2 text-sm text-white/70 mb-4">
                           <div className="flex items-center justify-between">
                             <span>Package:</span>
-                            <span className="text-white">
-                              {session.packageCode}
+                            <span className="text-white font-medium">
+                              {session.packageName || session.packageCode}
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
                             <span>Participants:</span>
-                            <span className="text-white">
-                              {session.participantCount}
-                            </span>
+                            <button
+                              onClick={() => toggleParticipants(session.id)}
+                              className="text-white hover:text-purple-300 transition-colors flex items-center gap-1"
+                            >
+                              <span>{session.participantCount}</span>
+                              <ChevronUp 
+                                className={`w-3 h-3 transition-transform duration-200 ${
+                                  expandedParticipants.has(session.id) ? 'rotate-180' : ''
+                                }`} 
+                              />
+                            </button>
                           </div>
                           <div className="flex items-center justify-between">
                             <span>Created:</span>
                             <span className="text-white">
-                              {new Date(session.createdAt).toLocaleDateString()}
+                              {new Date(session.startedAt || session.updatedAt).toLocaleDateString()}
                             </span>
                           </div>
                         </div>
+
+                        {/* Expandable Participants List */}
+                        {expandedParticipants.has(session.id) && (
+                          <div className="mb-4 p-3 bg-white/5 rounded-lg border border-white/10">
+                            <h4 className="text-white text-sm font-medium mb-2">Participants</h4>
+                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                              {sessionParticipants[session.id]?.map((participant) => (
+                                <div key={participant.id} className="flex justify-between text-xs">
+                                  <span className="text-white/80">{participant.displayName}</span>
+                                  <span className="text-white/60">{participant.email}</span>
+                                </div>
+                              )) || (
+                                <div className="text-white/60 text-xs">Loading participants...</div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         <div className="flex space-x-2">
                           <Button

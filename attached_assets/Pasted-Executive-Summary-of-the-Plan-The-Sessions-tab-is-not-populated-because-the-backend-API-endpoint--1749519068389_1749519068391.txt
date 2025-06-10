@@ -1,0 +1,129 @@
+Executive Summary of the Plan
+The "Sessions" tab is not populated because the backend API endpoint (/api/sessions) currently sends a list of sessions without joining it with the packages table. This means crucial information like the Package Name is missing.
+Our plan involves three main steps:
+Enhance the Backend: Modify the database query to include package details for each session.
+Update the Dashboard UI: Adjust the frontend code in SommelierDashboard.tsx to display this new, complete information.
+Correct the QR Code Modal: Ensure the QRCodeModal component also receives and displays the accurate package name.
+Step 1: Enhance the Backend API (The Core Fix)
+The root of the problem lies in server/storage.ts. The getAllSessions function only queries the sessions table. We need to modify it to join with the packages table to retrieve the package name.
+File to Edit: server/storage.ts
+Action:
+Modify the getAllSessions method to perform a leftJoin and include the package name in the result.
+// server/storage.ts
+
+// ... other code
+
+  async getAllSessions(): Promise<Session[]> {
+    // This is the new, enhanced query.
+    const result = await db
+      .select({
+        id: sessions.id,
+        packageId: sessions.packageId,
+        short_code: sessions.shortCode,
+        status: sessions.status,
+        startedAt: sessions.startedAt,
+        completedAt: sessions.completedAt,
+        activeParticipants: sessions.activeParticipants,
+        updatedAt: sessions.updatedAt,
+        // We add the package name and code directly to the session object
+        packageName: packages.name, 
+        packageCode: packages.code,
+      })
+      .from(sessions)
+      .leftJoin(packages, eq(sessions.packageId, packages.id))
+      .orderBy(desc(sessions.createdAt)); // Order by most recent
+
+    // The 'as any' is a practical type assertion because Drizzle's return type
+    // from a join can be complex. We are confident in the structure we've selected.
+    return result as any;
+  }
+
+// ... other code
+Use code with caution.
+TypeScript
+What this change does:
+It modifies the database query to fetch not just session data, but also the name and code from the associated package.
+It renames packages.name to packageName for clarity on the frontend.
+It orders the sessions by creation date, so the newest ones appear first, which is a better user experience.
+Step 2: Update the Sommelier Dashboard Frontend
+Now that the backend provides the necessary data, we'll update the SommelierDashboard.tsx component to use it.
+File to Edit: client/src/pages/SommelierDashboard.tsx
+Actions:
+Update the Session interface to include the new packageName field. This gives you proper TypeScript type-safety.
+// client/src/pages/SommelierDashboard.tsx (around line 138)
+
+interface Session {
+  id: string;
+  packageCode: string;
+  packageName: string; // <-- Add this line
+  code: string;
+  participantCount: number;
+  status: string;
+  createdAt: string;
+}
+Use code with caution.
+TypeScript
+Modify the rendering logic within the session card to display the packageName instead of the packageCode. We'll keep the code as a fallback.
+// client/src/pages/SommelierDashboard.tsx (around line 745)
+
+<div className="space-y-2 text-sm text-white/70 mb-4">
+  <div className="flex items-center justify-between">
+    <span>Package:</span>
+    <span className="text-white font-medium"> {/* <-- Changed from text-white */}
+      {session.packageName || session.packageCode} {/* <-- Use packageName */}
+    </span>
+  </div>
+  <div className="flex items-center justify-between">
+    <span>Participants:</span>
+    <span className="text-white">
+      {session.participantCount}
+    </span>
+  </div>
+  <div className="flex items-center justify-between">
+    <span>Created:</span>
+    <span className="text-white">
+      {new Date(session.createdAt).toLocaleDateString()}
+    </span>
+  </div>
+</div>
+Use code with caution.
+Tsx
+Step 3: Correct the QR Code Modal Display
+Finally, let's ensure the pop-up QR code modal also displays the correct information.
+File to Edit: client/src/components/QRCodeModal.tsx
+Actions:
+Update the QRCodeModalProps interface to expect the packageName.
+// client/src/components/QRCodeModal.tsx (around line 12)
+
+interface QRCodeModalProps {
+  session: {
+    id: string;
+    packageCode: string;
+    packageName?: string; // <-- Add this optional field
+    code: string;
+    status: string;
+    participantCount: number;
+    createdAt: string;
+  };
+  isOpen: boolean;
+  onClose: () => void;
+}
+Use code with caution.
+TypeScript
+Update the JSX to display the packageName.
+// client/src/components/QRCodeModal.tsx (around line 149)
+
+<div className="flex items-center justify-between">
+  <span className="text-gray-400 text-sm">Package</span>
+  <span className="text-white text-sm font-medium">
+    {session.packageName || session.packageCode || 'Wine Package'} {/* <-- Use packageName */}
+  </span>
+</div>
+Use code with caution.
+Tsx
+Conclusion
+By making these three targeted changes, you will have a fully functional and data-accurate "Sessions" tab.
+The backend will provide all the necessary data in a single, efficient API call.
+The dashboard will correctly display the list of live/completed sessions with their package name, participant count, and creation date.
+The QR Code modal will pop up with accurate, session-specific information.
+This approach resolves the issues you described and sets a solid foundation for any future enhancements to the Sommelier Dashboard. Let me know if you have any other questions
