@@ -1013,7 +1013,7 @@ export default function SommelierDashboard() {
                             <div className="flex items-center justify-between">
                               <div className="min-w-0 flex-1">
                                 <div className="text-white font-medium text-sm truncate">
-                                  Session {session.code}
+                                  Session {session.short_code || session.packageCode}
                                 </div>
                                 <div className="text-white/60 text-xs">
                                   {session.participantCount} participants

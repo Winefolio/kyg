@@ -682,6 +682,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/sessions/:sessionId/participants", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const participants = await storage.getParticipantsBySessionId(sessionId);
+      res.json(participants);
+    } catch (error) {
+      console.error("Error fetching session participants:", error);
+      res.status(500).json({ message: "Failed to fetch session participants" });
+    }
+  });
+
   // Wine management endpoints for packages
   app.get("/api/packages/:packageId/wines", async (req, res) => {
     try {

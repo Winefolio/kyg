@@ -12,11 +12,15 @@ import { useToast } from '@/hooks/use-toast';
 interface QRCodeModalProps {
   session: {
     id: string;
+    packageId: string;
     packageCode: string;
-    code: string;
+    packageName: string;
+    short_code: string;
     status: string;
     participantCount: number;
-    createdAt: string;
+    startedAt: string;
+    completedAt: string | null;
+    updatedAt: string;
   };
   isOpen: boolean;
   onClose: () => void;
@@ -29,7 +33,7 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
   // Generate the session join URL
   const baseUrl = window.location.origin;
   const sessionUrl = `${baseUrl}/join`;
-  const sessionCode = session.code;
+  const sessionCode = session.short_code || session.packageCode;
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -99,7 +103,8 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
               <div id="qr-code"></div>
             </div>
             <div class="session-info">
-              <div class="session-id">SESSION: ${session.id.slice(0, 8).toUpperCase()}</div>
+              <div class="session-id">SESSION: ${sessionCode}</div>
+              <p>Package: ${session.packageName || session.packageCode}</p>
               <p>Scan QR code or visit:<br><strong>${sessionUrl}</strong></p>
             </div>
             <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
