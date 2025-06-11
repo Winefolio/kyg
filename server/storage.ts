@@ -1872,7 +1872,7 @@ export class DatabaseStorage implements IStorage {
     });
     
     // Process each wine in a transaction
-    for (const [wineId, wineUpdates] of updatesByWine) {
+    for (const [wineId, wineUpdates] of Array.from(updatesByWine.entries())) {
       await db.transaction(async (tx) => {
         // Get all current slides for this wine
         const currentSlides = await tx
