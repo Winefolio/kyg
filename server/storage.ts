@@ -2025,17 +2025,16 @@ export class DatabaseStorage implements IStorage {
         const newSlideId = crypto.randomUUID();
         const newPosition = replaceExisting ? sourceSlide.position : startingPosition + i;
 
-        const newSlideData: InsertSlide = {
-          id: newSlideId,
+        const newSlideData = {
           packageWineId: targetWineId,
           type: sourceSlide.type,
-          payloadJson: sourceSlide.payloadJson,
+          payloadJson: sourceSlide.payloadJson || {},
           position: newPosition,
-          section_type: sourceSlide.section_type as "intro" | "deep_dive" | "ending" | null
+          section_type: sourceSlide.section_type
         };
 
         const [createdSlide] = await db.insert(slides)
-          .values([newSlideData])
+          .values(newSlideData)
           .returning();
 
         duplicatedSlides.push(createdSlide);
