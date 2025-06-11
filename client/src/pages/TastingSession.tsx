@@ -615,27 +615,6 @@ export default function TastingSession() {
             
             case 'text':
               return (
-                <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
-                  <h3 className="text-lg font-semibold text-white mb-4">
-                    <DynamicTextRenderer text={gq.config.title} />
-                  </h3>
-                  {gq.config.description && (
-                    <p className="text-white/70 text-sm mb-4">
-                      <DynamicTextRenderer text={gq.config.description} />
-                    </p>
-                  )}
-                  <textarea
-                    className="w-full bg-white/10 border border-white/20 rounded-lg p-3 text-white placeholder-white/60 resize-none"
-                    rows={gq.config.rows || 3}
-                    placeholder={gq.config.placeholder || 'Enter your response...'}
-                    value={answers[currentSlide.id] || ''}
-                    onChange={(e) => handleAnswerChange(currentSlide.id, e.target.value)}
-                  />
-                </div>
-              );
-            
-            case 'text':
-              return (
                 <TextQuestion
                   question={{
                     title: gq.config.title,
@@ -813,15 +792,87 @@ export default function TastingSession() {
           );
         }
 
+        // Enhanced fallback detection for questions that don't match standard patterns
+        console.log('Question fallback triggered for slide:', currentSlide.id, 'questionData:', questionData);
+        
+        // Try to detect boolean questions by content analysis
+        const title = questionData.title || questionData.question || '';
+        const isLikelyBoolean = title.toLowerCase().includes('yes') || 
+                              title.toLowerCase().includes('no') || 
+                              title.toLowerCase().includes('true') || 
+                              title.toLowerCase().includes('false') ||
+                              (questionData.options && questionData.options.length === 2);
+        
+        if (isLikelyBoolean) {
+          return (
+            <BooleanQuestion
+              question={{
+                title: title,
+                description: questionData.description || '',
+                category: questionData.category || 'Yes/No',
+                trueLabel: questionData.trueLabel || questionData.true_label || 'Yes',
+                falseLabel: questionData.falseLabel || questionData.false_label || 'No',
+                trueIcon: questionData.trueIcon !== false,
+                falseIcon: questionData.falseIcon !== false
+              }}
+              value={answers[currentSlide.id] ?? null}
+              onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+            />
+          );
+        }
+        
+        // Try to detect multiple choice by options array
+        if (questionData.options && Array.isArray(questionData.options) && questionData.options.length > 2) {
+          return (
+            <MultipleChoiceQuestion
+              question={{
+                title: title,
+                description: questionData.description || '',
+                category: questionData.category || 'Multiple Choice',
+                options: questionData.options,
+                allow_multiple: questionData.allow_multiple || questionData.allowMultiple || false,
+                allow_notes: questionData.allow_notes || questionData.allowNotes || false
+              }}
+              value={answers[currentSlide.id] || { selected: [], notes: '' }}
+              onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+            />
+          );
+        }
+        
+        // Try to detect scale questions
+        if (questionData.scale_min !== undefined || questionData.scaleMin !== undefined ||
+            questionData.scale_max !== undefined || questionData.scaleMax !== undefined) {
+          return (
+            <ScaleQuestion
+              question={{
+                title: title,
+                description: questionData.description || '',
+                category: questionData.category || 'Scale',
+                scale_min: questionData.scale_min || questionData.scaleMin || 1,
+                scale_max: questionData.scale_max || questionData.scaleMax || 10,
+                scale_labels: questionData.scale_labels || questionData.scaleLabels || ['Low', 'High']
+              }}
+              value={answers[currentSlide.id] || questionData.scale_min || questionData.scaleMin || 1}
+              onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+            />
+          );
+        }
+        
+        // Fallback to text question for any unidentified question
         return (
-          <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
-            <h3 className="text-lg font-semibold text-white mb-2">
-              <DynamicTextRenderer text={questionData.title || questionData.question || 'Question'} />
-            </h3>
-            <p className="text-white/70 text-sm">
-              <DynamicTextRenderer text={questionData.description || ''} />
-            </p>
-          </div>
+          <TextQuestion
+            question={{
+              title: title,
+              description: questionData.description || '',
+              placeholder: questionData.placeholder || 'Enter your response...',
+              maxLength: questionData.maxLength || questionData.max_length || 500,
+              minLength: questionData.minLength || questionData.min_length,
+              rows: questionData.rows || 4,
+              category: questionData.category || 'Response'
+            }}
+            value={answers[currentSlide.id] || ''}
+            onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+          />
         );
 
       default:
