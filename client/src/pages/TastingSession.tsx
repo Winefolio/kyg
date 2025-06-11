@@ -444,20 +444,70 @@ export default function TastingSession() {
 
     switch (currentSlide.type) {
       case 'interlude':
+        const isPackageIntro = currentSlide.payloadJson.is_package_intro;
+        const isWineIntro = currentSlide.payloadJson.is_wine_intro;
+        const wineImage = currentSlide.payloadJson.wine_image || currentSlide.payloadJson.wine_image_url;
+        
         return (
           <motion.div
             key={`interlude-${currentSlide.id}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl text-center"
+            className="bg-gradient-card backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl text-center"
           >
-            <h2 className="text-2xl font-bold text-white mb-4">
+            {isPackageIntro && (
+              <div className="mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                  <Wine className="w-8 h-8 text-white" />
+                </div>
+              </div>
+            )}
+            
+            {isWineIntro && wineImage && (
+              <div className="mb-6">
+                <img 
+                  src={wineImage} 
+                  alt={currentSlide.payloadJson.wine_name || "Wine"} 
+                  className="w-32 h-32 mx-auto rounded-lg object-cover shadow-lg"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            
+            <h2 className="text-3xl font-bold text-white mb-4">
               <DynamicTextRenderer text={currentSlide.payloadJson.title} />
             </h2>
+            
             {currentSlide.payloadJson.description && (
-              <p className="text-white/80 text-lg leading-relaxed">
+              <p className="text-white/80 text-lg leading-relaxed mb-6 max-w-2xl mx-auto">
                 <DynamicTextRenderer text={currentSlide.payloadJson.description} />
               </p>
+            )}
+            
+            {isWineIntro && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 text-sm">
+                {currentSlide.payloadJson.wine_type && (
+                  <div className="bg-white/10 rounded-lg p-3">
+                    <p className="text-white/60 mb-1">Type</p>
+                    <p className="text-white font-medium">{currentSlide.payloadJson.wine_type}</p>
+                  </div>
+                )}
+                {currentSlide.payloadJson.wine_region && (
+                  <div className="bg-white/10 rounded-lg p-3">
+                    <p className="text-white/60 mb-1">Region</p>
+                    <p className="text-white font-medium">{currentSlide.payloadJson.wine_region}</p>
+                  </div>
+                )}
+                {currentSlide.payloadJson.wine_vintage && (
+                  <div className="bg-white/10 rounded-lg p-3">
+                    <p className="text-white/60 mb-1">Vintage</p>
+                    <p className="text-white font-medium">{currentSlide.payloadJson.wine_vintage}</p>
+                  </div>
+                )}
+              </div>
             )}
           </motion.div>
         );
