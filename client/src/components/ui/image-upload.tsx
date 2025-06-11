@@ -31,7 +31,7 @@ export function ImageUpload({
     return new Promise((resolve) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      const img = new Image();
+      const img = document.createElement('img');
       
       img.onload = () => {
         if (!ctx) {
@@ -64,18 +64,58 @@ export function ImageUpload({
   };
 
   const handleFileSelect = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
+    // Support all major image formats including HEIC, AVIF, WebP, etc.
+    const supportedTypes = [
+      'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif',
+      'image/bmp', 'image/tiff', 'image/svg+xml', 'image/avif', 'image/heic', 'image/heif'
+    ];
+    
+    if (!supportedTypes.includes(file.type)) {
+      console.error('Unsupported file type:', file.type);
+      return;
+    }
+
+    // Check file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      console.error('File too large. Maximum size is 10MB.');
       return;
     }
 
     setIsUploading(true);
     try {
-      // Compress large images for better performance
-      const compressedDataUrl = await compressImage(file);
-      onChange(compressedDataUrl);
+      // Upload to Supabase storage if available, otherwise use local compression
+      if (window.location.hostname !== 'localhost') {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', 'image');
+        
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          onChange(result.url);
+        } else {
+          throw new Error('Upload failed');
+        }
+      } else {
+        // Local development: use compression for better performance
+        const compressedDataUrl = await compressImage(file);
+        onChange(compressedDataUrl);
+      }
       setIsUploading(false);
     } catch (error) {
       console.error('Error uploading image:', error);
+      // Fallback to local compression if upload fails
+      try {
+        const compressedDataUrl = await compressImage(file);
+        onChange(compressedDataUrl);
+      } catch (compressionError) {
+        console.error('Compression also failed:', compressionError);
+      }
       setIsUploading(false);
     }
   };

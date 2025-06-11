@@ -40,9 +40,13 @@ export const FILE_SIZE_LIMITS = {
   video: 200 * 1024 * 1024, // 200MB
 };
 
-// Allowed file types
+// Allowed file types - comprehensive image format support
 export const ALLOWED_FILE_TYPES = {
-  image: ['image/jpeg', 'image/png', 'image/webp'],
+  image: [
+    'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 
+    'image/bmp', 'image/tiff', 'image/svg+xml', 'image/avif', 'image/heic', 
+    'image/heif'
+  ],
   audio: ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/m4a'],
   video: ['video/mp4', 'video/webm', 'video/quicktime'],
 };

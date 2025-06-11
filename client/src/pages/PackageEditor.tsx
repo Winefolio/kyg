@@ -889,7 +889,7 @@ export default function PackageEditor() {
                     <span className="text-white/80 font-medium">{currentWine?.wineName}</span>
                     <ChevronRight className="w-4 h-4" />
                     <span className="text-white/80 font-medium">
-                      {sectionDetails[activeSlide.section_type || 'deep_dive'].icon} {sectionDetails[activeSlide.section_type || 'deep_dive'].title}
+                      {sectionDetails[activeSlide.section_type as keyof typeof sectionDetails]?.icon || sectionDetails.deep_dive.icon} {sectionDetails[activeSlide.section_type as keyof typeof sectionDetails]?.title || sectionDetails.deep_dive.title}
                     </span>
                     <ChevronRight className="w-4 h-4" />
                     <span className="text-purple-300 font-medium">Slide {slideNumber} of {totalSlidesInWine}</span>

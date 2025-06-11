@@ -45,13 +45,16 @@ export async function reorderSlidesForWine(
       return [];
     }
     
-    // Step 4: Assign safe temporary positions using negative numbers
-    // This completely avoids conflicts with existing positive positions
-    const tempOffset = -1000000;
+    // Step 4: Use deterministic temporary positions to avoid all conflicts
+    // Use the slide ID hash to ensure unique temporary positions
+    const tempBase = 900000; // High number to avoid conflicts
     
+    // Step 5: Move to unique temporary positions first using slide ID for uniqueness
     for (let i = 0; i < slidesToUpdate.length; i++) {
       const slide = slidesToUpdate[i];
-      const tempPosition = tempOffset - i;
+      // Use slide ID hash + index to ensure absolute uniqueness
+      const slideHash = slide.id.split('-')[0]; // Use first part of UUID
+      const tempPosition = tempBase + parseInt(slideHash.slice(-3), 16) + i * 1000;
       
       console.log(`   Moving slide ${slide.id} to temp position ${tempPosition}`);
       await tx
@@ -60,7 +63,7 @@ export async function reorderSlidesForWine(
         .where(eq(slides.id, slide.id));
     }
     
-    // Step 5: Now assign final positions
+    // Step 6: Now assign final positions in order
     for (const slide of slidesToUpdate) {
       console.log(`   Setting slide ${slide.id} final position: ${slide.currentPosition} → ${slide.newPosition}`);
       await tx
