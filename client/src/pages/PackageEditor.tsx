@@ -696,10 +696,10 @@ export default function PackageEditor() {
                   </Button>
                 </div>
                 {/* Package Introduction - Non-editable Overview */}
-                {data && (
+                {editorData && (
                   <PackageIntroCard 
-                    packageName={data.name}
-                    description={data.description || "Explore exceptional wines in this curated tasting experience"}
+                    packageName={editorData.name}
+                    description={editorData.description || "Explore exceptional wines in this curated tasting experience"}
                     wineCount={wines.length}
                   />
                 )}
