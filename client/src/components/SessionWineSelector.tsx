@@ -164,45 +164,45 @@ export function SessionWineSelector({ sessionId, packageId, onSelectionChange }:
   const totalCount = wineSelections.length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <Card className="bg-gradient-card backdrop-blur-xl border border-white/20 shadow-2xl">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+        <CardHeader className="pb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start space-x-4">
               <motion.div 
-                className="p-3 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl"
+                className="p-3 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl flex-shrink-0"
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 400 }}
               >
                 <Wine className="w-6 h-6 text-purple-400" />
               </motion.div>
-              <div>
-                <CardTitle className="text-white text-xl">Wine Selection</CardTitle>
-                <CardDescription className="text-purple-200">
+              <div className="space-y-2">
+                <CardTitle className="text-white text-2xl font-semibold tracking-tight">Selection</CardTitle>
+                <CardDescription className="text-purple-200 text-base leading-relaxed">
                   Customize your tasting journey
                 </CardDescription>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4 flex-shrink-0">
               <Badge 
                 variant="secondary" 
                 className={`
-                  px-4 py-1.5 text-sm font-medium transition-all duration-300
+                  px-5 py-2.5 text-base font-semibold transition-all duration-300 border
                   ${selectedCount === 0 
                     ? 'bg-red-500/20 text-red-300 border-red-400/30' 
                     : 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-100 border-purple-400/30'
                   }
                 `}
               >
-                <span className="text-lg font-bold">{selectedCount}</span>
-                <span className="mx-1.5 text-purple-300/50">/</span>
-                <span className="text-sm">{totalCount} wines</span>
+                <span className="text-xl font-bold">{selectedCount}</span>
+                <span className="mx-2 text-purple-300/50">/</span>
+                <span className="text-base">{totalCount} wines</span>
               </Badge>
             </div>
           </div>
         </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6 pt-0">
         {/* Instructions */}
         <div className="bg-blue-500/10 border border-blue-400/20 rounded-xl p-4">
           <div className="flex items-start gap-3">
@@ -252,54 +252,64 @@ export function SessionWineSelector({ sessionId, packageId, onSelectionChange }:
                         <GripVertical className="w-4 h-4 text-white/40" />
                       </div>
 
-                      {/* Wine Image - Smaller */}
-                      <div className="relative w-12 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-white/5">
-                        {item.wine.wineImageUrl ? (
+                      {/* Wine Image - Enhanced with proper loading */}
+                      <div className="relative w-16 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-white/5 to-white/10 border border-white/10">
+                        {item.wine.wineImageUrl && item.wine.wineImageUrl.trim() !== '' ? (
                           <img
                             src={item.wine.wineImageUrl}
-                            alt={item.wine.wineName}
-                            className="w-full h-full object-cover"
+                            alt={`${item.wine.wineName} wine bottle`}
+                            className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                            onError={(e) => {
+                              // Fallback to default wine icon if image fails to load
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              target.nextElementSibling?.classList.remove('hidden');
+                            }}
                           />
-                        ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-purple-600/20 to-pink-600/20 flex items-center justify-center">
-                            <Wine className="w-6 h-6 text-white/30" />
-                          </div>
-                        )}
+                        ) : null}
+                        <div className={`
+                          w-full h-full bg-gradient-to-br from-purple-600/20 to-pink-600/20 flex items-center justify-center
+                          ${item.wine.wineImageUrl && item.wine.wineImageUrl.trim() !== '' ? 'hidden' : ''}
+                        `}>
+                          <Wine className="w-6 h-6 text-white/40" />
+                        </div>
                       </div>
 
-                      {/* Wine Content - Compact */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0 pr-4">
-                            <h4 className="text-white font-semibold text-lg truncate">
-                              {item.wine.wineName}
-                            </h4>
-                            {item.wine.producer && (
-                              <p className="text-purple-200 text-sm truncate">
-                                {item.wine.producer}
-                              </p>
-                            )}
-                            <div className="flex items-center gap-2 mt-1">
+                      {/* Wine Content - Enhanced with better spacing */}
+                      <div className="flex-1 min-w-0 px-4">
+                        <div className="flex items-center justify-between h-full">
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <div className="space-y-1">
+                              <h4 className="text-white font-semibold text-lg leading-tight truncate">
+                                {item.wine.wineName}
+                              </h4>
+                              {item.wine.producer && (
+                                <p className="text-purple-200 text-sm leading-tight truncate">
+                                  {item.wine.producer}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
                               {item.wine.wineType && (
-                                <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/20 text-xs">
+                                <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/20 text-xs px-2 py-1">
                                   {item.wine.wineType}
                                 </Badge>
                               )}
                               {item.wine.vintage && (
-                                <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/20 text-xs">
+                                <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/20 text-xs px-2 py-1">
                                   {item.wine.vintage}
                                 </Badge>
                               )}
                             </div>
                           </div>
 
-                          {/* Position Badge & Controls */}
-                          <div className="flex items-center gap-3 flex-shrink-0">
+                          {/* Position Badge & Controls - Better aligned */}
+                          <div className="flex items-center gap-4 flex-shrink-0 ml-4">
                             <div className={`
-                              w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+                              w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-lg transition-all duration-200
                               ${item.isIncluded 
-                                ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white' 
-                                : 'bg-white/20 text-white/60'
+                                ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white scale-100' 
+                                : 'bg-white/20 text-white/60 scale-90'
                               }
                             `}>
                               {index + 1}
@@ -308,7 +318,7 @@ export function SessionWineSelector({ sessionId, packageId, onSelectionChange }:
                             <Switch
                               checked={item.isIncluded}
                               onCheckedChange={() => handleToggleWine(item.wine.id)}
-                              className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-purple-500 data-[state=checked]:to-pink-500"
+                              className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-purple-500 data-[state=checked]:to-pink-500 scale-110"
                             />
                           </div>
                         </div>
@@ -408,19 +418,26 @@ export function SessionWineSelector({ sessionId, packageId, onSelectionChange }:
                       className="flex-shrink-0"
                     >
                       <div className="relative group">
-                        {item.wine.wineImageUrl ? (
-                          <div className="w-20 h-24 rounded-lg overflow-hidden shadow-lg ring-2 ring-purple-400/30">
+                        <div className="w-20 h-24 rounded-lg overflow-hidden shadow-lg ring-2 ring-purple-400/30 bg-gradient-to-br from-purple-600/30 to-pink-600/30">
+                          {item.wine.wineImageUrl && item.wine.wineImageUrl.trim() !== '' ? (
                             <img
                               src={item.wine.wineImageUrl}
-                              alt={item.wine.wineName}
+                              alt={`${item.wine.wineName} wine bottle`}
                               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.nextElementSibling?.classList.remove('hidden');
+                              }}
                             />
-                          </div>
-                        ) : (
-                          <div className="w-20 h-24 rounded-lg bg-gradient-to-br from-purple-600/30 to-pink-600/30 flex items-center justify-center shadow-lg ring-2 ring-purple-400/30">
+                          ) : null}
+                          <div className={`
+                            w-full h-full flex items-center justify-center absolute inset-0
+                            ${item.wine.wineImageUrl && item.wine.wineImageUrl.trim() !== '' ? 'hidden' : ''}
+                          `}>
                             <Wine className="w-8 h-8 text-white/40" />
                           </div>
-                        )}
+                        </div>
                         <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg">
                           {index + 1}
                         </div>

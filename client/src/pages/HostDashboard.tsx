@@ -290,12 +290,12 @@ export default function HostDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-6xl mx-auto">
-          <TabsList className="grid w-full grid-cols-5 bg-white/10 backdrop-blur-xl">
-            <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20">Overview</TabsTrigger>
-            <TabsTrigger value="wines" className="text-white data-[state=active]:bg-white/20">Wine Selection</TabsTrigger>
-            <TabsTrigger value="participants" className="text-white data-[state=active]:bg-white/20">Participants</TabsTrigger>
-            <TabsTrigger value="analytics" className="text-white data-[state=active]:bg-white/20">Analytics</TabsTrigger>
-            <TabsTrigger value="controls" className="text-white data-[state=active]:bg-white/20">Controls</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-5 bg-white/10 backdrop-blur-xl rounded-2xl p-1 mb-8">
+            <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all">Overview</TabsTrigger>
+            <TabsTrigger value="wines" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all">Selection</TabsTrigger>
+            <TabsTrigger value="participants" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all">Participants</TabsTrigger>
+            <TabsTrigger value="analytics" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all">Analytics</TabsTrigger>
+            <TabsTrigger value="controls" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all">Controls</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
