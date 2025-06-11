@@ -99,23 +99,55 @@ export default function PackageEditor() {
       return result.wine;
     },
     onSuccess: async (newWine: PackageWine) => {
-      // Auto-create welcome slide for new wine
-      const welcomeSlideData = {
+      // Check if this is the first wine - create package intro slide
+      const wines = editorData?.wines || [];
+      const isFirstWine = wines.length === 0;
+      
+      if (isFirstWine) {
+        // Create package introduction slide (position 1)
+        const packageIntroData = {
+          packageWineId: newWine.id,
+          position: 1,
+          type: 'interlude',
+          section_type: 'intro',
+          payloadJson: {
+            title: `Welcome to ${editorData?.name || 'Your Wine Tasting'}`,
+            description: 'You are about to embark on a journey through exceptional wines. Each wine has been carefully selected to showcase unique characteristics and flavors.',
+            is_package_intro: true,
+            package_name: editorData?.name || 'Wine Tasting Package',
+            background_image: "https://images.unsplash.com/photo-1547595628-c61a29f496f0?w=800&h=600&fit=crop"
+          }
+        };
+        
+        try {
+          await apiRequest('POST', '/api/slides', packageIntroData);
+        } catch (error) {
+          console.error('Failed to create package intro slide:', error);
+        }
+      }
+      
+      // Auto-create wine introduction slide
+      const wineIntroPosition = isFirstWine ? 2 : 1; // Position 2 if package intro exists, otherwise 1
+      const wineIntroData = {
         packageWineId: newWine.id,
-        position: 1, // Position 1 for welcome slides
+        position: wineIntroPosition,
         type: 'interlude',
         section_type: 'intro',
         payloadJson: {
-          title: `Welcome to ${newWine.wineName}`,
-          description: 'Get ready for an amazing tasting experience',
+          title: `Meet ${newWine.wineName}`,
+          description: newWine.wineDescription || `Discover the unique characteristics of this exceptional wine.`,
           wine_name: newWine.wineName,
           wine_image: newWine.wineImageUrl || '',
-          is_welcome: true // Mark as welcome slide
+          wine_type: newWine.wineType,
+          wine_region: newWine.region,
+          wine_vintage: newWine.vintage,
+          is_welcome: true,
+          is_wine_intro: true
         }
       };
       
       try {
-        await apiRequest('POST', '/api/slides', welcomeSlideData);
+        await apiRequest('POST', '/api/slides', wineIntroData);
         toast({ 
           title: "🍷 Wine created with welcome slide", 
           description: `${newWine.wineName} is ready for content`

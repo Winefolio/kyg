@@ -429,24 +429,62 @@ export class DatabaseStorage implements IStorage {
       },
     ];
 
-    // Create slides for all wines
+    // Create package introduction slide for the first wine (acts as package intro)
+    const firstWine = [chateauMargaux, chateauLatour, chateauYquem, brunello, chianti, opusOne, screamingEagle][0];
+    
+    // Create package introduction slide (position 1)
+    await this.createSlide({
+      packageWineId: firstWine.id,
+      position: 1,
+      type: "interlude",
+      section_type: "intro",
+      payloadJson: {
+        title: "Welcome to Your Wine Tasting Experience",
+        description: "You're about to embark on a journey through exceptional wines. Each wine has been carefully selected to showcase unique characteristics and flavors.",
+        is_package_intro: true,
+        package_name: "Premium Wine Tasting Collection",
+        background_image: "https://images.unsplash.com/photo-1547595628-c61a29f496f0?w=800&h=600&fit=crop"
+      },
+    });
+
+    // Create slides for all wines with proper positioning
+    let globalPosition = 2; // Start after package intro
+    
     for (const wine of [chateauMargaux, chateauLatour, chateauYquem, brunello, chianti, opusOne, screamingEagle]) {
-      for (const slideTemplate of slideTemplates) {
-        // Add wine context to slide payload
+      // Create wine introduction slide first
+      await this.createSlide({
+        packageWineId: wine.id,
+        position: globalPosition++,
+        type: "interlude",
+        section_type: "intro",
+        payloadJson: {
+          title: `Meet ${wine.wineName}`,
+          description: wine.wineDescription || `Discover the unique characteristics of this exceptional ${wine.wineType} wine.`,
+          wine_name: wine.wineName,
+          wine_image: wine.wineImageUrl,
+          wine_type: wine.wineType,
+          wine_region: wine.region,
+          wine_vintage: wine.vintage,
+          is_welcome: true,
+          is_wine_intro: true
+        },
+      });
+
+      // Create remaining slides for this wine
+      for (const slideTemplate of slideTemplates.slice(1)) { // Skip the first template since we created wine intro
         let payloadJson = { ...slideTemplate.payloadJson };
         
-        // For interlude slides, add wine image and name
-        if (slideTemplate.type === "interlude") {
-          payloadJson = {
-            ...payloadJson,
-            wine_name: wine.wineName,
-            wine_image: wine.wineImageUrl
-          } as any; // Type assertion for dynamic payload extension
-        }
+        // Add wine context to all slides
+        payloadJson = {
+          ...payloadJson,
+          wine_name: wine.wineName,
+          wine_image: wine.wineImageUrl,
+          wine_type: wine.wineType
+        } as any;
 
         await this.createSlide({
           packageWineId: wine.id,
-          position: slideTemplate.position,
+          position: globalPosition++,
           type: slideTemplate.type as "question" | "media" | "interlude" | "video_message" | "audio_message",
           section_type: slideTemplate.section_type as "intro" | "deep_dive" | "ending" | null,
           payloadJson: payloadJson,
