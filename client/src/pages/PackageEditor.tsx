@@ -14,7 +14,7 @@ import { SLIDE_TEMPLATES } from '@/lib/wineTemplates';
 import { 
   ArrowLeft, Save, PlusCircle, Edit3, Trash2, Wine, HelpCircle, 
   Video, Eye, Settings, ChevronRight, ChevronDown, Menu, X, Monitor, Smartphone, Plus, Sparkles, GripVertical,
-  ArrowUp, ArrowDown
+  ArrowUp, ArrowDown, Package as PackageIcon
 } from 'lucide-react';
 import type { Package, PackageWine, Slide, GenericQuestion } from "@shared/schema";
 import { WineModal } from '@/components/WineModal';
@@ -101,35 +101,25 @@ export default function PackageEditor() {
       return result.wine;
     },
     onSuccess: async (newWine: PackageWine) => {
-      // Check if this is the first wine - create package intro slide
+      // Check if this is the first wine
       const wines = editorData?.wines || [];
       const isFirstWine = wines.length === 0;
       
-      if (isFirstWine) {
-        // Create package introduction slide (position 1)
-        const packageIntroData = {
-          packageWineId: newWine.id,
-          position: 1,
-          type: 'interlude',
-          section_type: 'intro',
-          payloadJson: {
-            title: `Welcome to ${editorData?.name || 'Your Wine Tasting'}`,
-            description: 'You are about to embark on a journey through exceptional wines. Each wine has been carefully selected to showcase unique characteristics and flavors.',
-            is_package_intro: true,
-            package_name: editorData?.name || 'Wine Tasting Package',
-            background_image: "https://images.unsplash.com/photo-1547595628-c61a29f496f0?w=800&h=600&fit=crop"
-          }
-        };
-        
+      if (isFirstWine && editorData?.id) {
+        // Ensure package intro exists
         try {
-          await apiRequest('POST', '/api/slides', packageIntroData);
+          await apiRequest('POST', `/api/packages/${editorData.id}/intro`, {
+            title: `Welcome to ${editorData.name || 'Your Wine Tasting'}`,
+            description: 'You are about to embark on a journey through exceptional wines. Each wine has been carefully selected to showcase unique characteristics and flavors.',
+            imageUrl: editorData.imageUrl
+          });
         } catch (error) {
           console.error('Failed to create package intro slide:', error);
         }
       }
       
       // Auto-create wine introduction slide
-      const wineIntroPosition = isFirstWine ? 2 : 1; // Position 2 if package intro exists, otherwise 1
+      const wineIntroPosition = 1; // Local position within wine
       const wineIntroData = {
         packageWineId: newWine.id,
         position: wineIntroPosition,
@@ -704,10 +694,64 @@ export default function PackageEditor() {
                   />
                 )}
 
+                {/* Package Introduction Section */}
+                {editorData && localSlides.some(s => (s.payloadJson as any)?.is_package_intro) && (
+                  <Card className="mb-4 bg-gradient-to-br from-purple-600/20 to-purple-700/10 border-purple-500/30 backdrop-blur-sm shadow-xl shadow-purple-900/20">
+                    <div className="p-5">
+                      <div className="flex items-center space-x-3 mb-3">
+                        <div className="p-2 bg-purple-600/30 rounded-lg">
+                          <PackageIcon className="h-4 w-4 text-purple-300" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-white">Package Introduction</p>
+                          <p className="text-xs text-white/60">{editorData.name}</p>
+                        </div>
+                      </div>
+                      {localSlides
+                        .filter(s => (s.payloadJson as any)?.is_package_intro)
+                        .map(slide => (
+                          <div 
+                            key={slide.id}
+                            onClick={() => setActiveSlideId(slide.id)}
+                            className={`p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+                              activeSlideId === slide.id 
+                                ? 'bg-purple-600/30 border border-purple-500/50' 
+                                : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-white/90">
+                                {(slide.payloadJson as any)?.title || 'Welcome to Your Tasting'}
+                              </span>
+                              <Badge variant="outline" className="text-xs border-purple-500/50 text-purple-300">
+                                Intro
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </Card>
+                )}
+
                 <div className="space-y-4">
                   {wines.map(wine => {
-                    const wineSlides = localSlides.filter(s => s.packageWineId === wine.id);
+                    // Filter out package intro slides from wine slides
+                    const wineSlides = localSlides.filter(s => 
+                      s.packageWineId === wine.id && 
+                      !(s.payloadJson as any)?.is_package_intro
+                    );
                     const isExpanded = expandedWines.has(wine.id);
+                    
+                    // Check if this wine only has the package intro slide
+                    const allSlidesForWine = localSlides.filter(s => s.packageWineId === wine.id);
+                    const hasOnlyPackageIntro = allSlidesForWine.length === 1 && 
+                      (allSlidesForWine[0].payloadJson as any)?.is_package_intro;
+                    
+                    // Don't show wines that only have the package intro
+                    if (hasOnlyPackageIntro) {
+                      return null;
+                    }
+                    
                     return (
                       <Card key={wine.id} className="bg-gradient-to-br from-white/8 to-white/4 border-white/20 backdrop-blur-sm shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-black/30 transition-all duration-300">
                         <div className="p-5">

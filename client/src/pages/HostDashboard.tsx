@@ -484,9 +484,16 @@ export default function HostDashboard() {
                               </div>
                             </div>
                             <Progress value={progress} className="h-2" />
-                            <p className="text-purple-200 text-xs mt-1">
-                              Step {participant.progressPtr || 0} of {totalSlidesForThisParticipant}
-                            </p>
+                            <div className="flex justify-between items-center">
+                              <p className="text-purple-200 text-xs mt-1">
+                                Step {participant.progressPtr || 0} of {totalSlidesForThisParticipant}
+                              </p>
+                              {participant.progressPtr && participant.progressPtr > 0 && slides[participant.progressPtr - 1] && (
+                                <p className="text-purple-300 text-xs mt-1">
+                                  {(slides[participant.progressPtr - 1] as any).wineInfo?.wineName || 'Introduction'}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );

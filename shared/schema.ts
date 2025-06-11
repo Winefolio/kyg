@@ -112,13 +112,16 @@ export const slides = pgTable("slides", {
   id: uuid("id").primaryKey().defaultRandom(),
   packageWineId: uuid("package_wine_id").notNull().references(() => packageWines.id, { onDelete: "cascade" }),
   position: integer("position").notNull(),
+  globalPosition: integer("global_position").notNull().default(0),
   type: varchar("type", { length: 50 }).$type<typeof slideTypes[number]>().notNull(),
   section_type: varchar("section_type", { length: 20 }),
   payloadJson: jsonb("payload_json").notNull(),
   genericQuestions: jsonb("generic_questions"), // New generic questions format
   createdAt: timestamp("created_at").defaultNow()
 }, (table) => ({
-  packageWinePositionIdx: index("idx_slides_package_wine_position").on(table.packageWineId, table.position)
+  packageWinePositionIdx: index("idx_slides_package_wine_position").on(table.packageWineId, table.position),
+  globalPositionIdx: index("idx_slides_global_position").on(table.packageWineId, table.globalPosition),
+  packageWineIdx: index("idx_slides_package_wine_id").on(table.packageWineId)
 }));
 
 // Sessions table

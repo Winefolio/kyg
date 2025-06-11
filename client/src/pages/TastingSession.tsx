@@ -456,7 +456,9 @@ export default function TastingSession() {
   // Handle answer changes
   const handleAnswerChange = (slideId: string, answer: any) => {
     setAnswers(prev => ({ ...prev, [slideId]: answer }));
-    saveResponse(slideId, answer);
+    if (participantId) {
+      saveResponse(participantId, slideId, answer);
+    }
   };
 
   // Handle completion

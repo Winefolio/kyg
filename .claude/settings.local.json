@@ -22,7 +22,11 @@
       "Bash(node:*)",
       "Bash(npx tsx:*)",
       "Bash(curl:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(ls:*)",
+      "Bash(# Delete existing question slides from the other 3 wines\npsql $DATABASE_URL -c \"DELETE FROM slides WHERE package_wine_id IN ('8515e452-d837-44ea-803c-9dc1704736ff', 'bf8eac9b-01a6-48f9-99da-ae74173c77aa', 'f4bf7d87-57ad-4ae3-a07f-97ba327634ef') AND type = 'question';\")",
+      "Bash(chmod:*)",
+      "Bash(./add_missing_slides.sh:*)"
     ],
     "deny": []
   }

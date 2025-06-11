@@ -116,6 +116,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allSlides = allSlides.concat(slidesWithWineContext);
       }
 
+      // Sort all slides by global position to ensure correct order
+      allSlides.sort((a, b) => (a.globalPosition || 0) - (b.globalPosition || 0));
+
       // Filter host-only slides if not host
       if (!isHost) {
         allSlides = allSlides.filter((slide) => {
@@ -408,22 +411,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update participant progress and lastActive
       const currentSlide = await storage.getSlideById(validatedData.slideId!);
       if (currentSlide) {
-        const currentProgress = participant.progressPtr || 0;
-        
-        // Only update progress if the current slide's position is further than current progress
-        if (currentSlide.position > currentProgress) {
-          await storage.updateParticipantProgress(
-            participant.id,
-            currentSlide.position
-          );
-          console.log(`Updated progress for participant ${participant.id} to slide position ${currentSlide.position}`);
-        } else {
-          // If re-answering a previous slide, still update lastActive but maintain current progress
-          await storage.updateParticipantProgress(
-            participant.id,
-            currentProgress
-          );
-          console.log(`Participant ${participant.id} re-answered slide or answered out of order. Progress pointer maintained at ${currentProgress}. Last active updated.`);
+        // Get all slides for this participant's package to find the index
+        const session = await storage.getSessionById(participant.sessionId!);
+        if (session && session.packageId) {
+          const pkg = await storage.getPackageById(session.packageId);
+          if (pkg) {
+            const packageWines = await storage.getPackageWines(pkg.id);
+            let allSlides: any[] = [];
+            
+            // Get all slides in order
+            for (const wine of packageWines) {
+              const wineSlides = await storage.getSlidesByPackageWineId(wine.id);
+              allSlides = allSlides.concat(wineSlides);
+            }
+            
+            // Sort by global position
+            allSlides.sort((a, b) => (a.globalPosition || 0) - (b.globalPosition || 0));
+            
+            // Filter host-only slides if participant is not host
+            if (!participant.isHost) {
+              allSlides = allSlides.filter(slide => !(slide.payloadJson as any)?.for_host);
+            }
+            
+            // Find current slide index (1-based for progress)
+            const slideIndex = allSlides.findIndex(s => s.id === currentSlide.id) + 1;
+            
+            if (slideIndex > 0) {
+              const currentProgress = participant.progressPtr || 0;
+              
+              // Only update progress if moving forward
+              if (slideIndex > currentProgress) {
+                await storage.updateParticipantProgress(
+                  participant.id,
+                  slideIndex
+                );
+                console.log(`Updated progress for participant ${participant.id} to slide ${slideIndex} of ${allSlides.length}`);
+              } else {
+                // Still update lastActive even if not moving forward
+                await storage.updateParticipantProgress(
+                  participant.id,
+                  currentProgress
+                );
+                console.log(`Participant ${participant.id} on slide ${slideIndex}. Progress maintained at ${currentProgress}.`);
+              }
+            }
+          }
         }
       }
       
@@ -684,6 +716,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create or update package intro slide
+  app.post("/api/packages/:packageId/intro", async (req, res) => {
+    try {
+      const { packageId } = req.params;
+      const { title, description, imageUrl } = req.body;
+
+      // Get package details
+      const pkg = await storage.getPackageById(packageId);
+      if (!pkg) {
+        return res.status(404).json({ message: "Package not found" });
+      }
+
+      // Get the first wine in the package to attach the intro slide
+      const wines = await storage.getPackageWines(packageId);
+      if (!wines || wines.length === 0) {
+        return res.status(400).json({ message: "Package must have at least one wine before adding intro" });
+      }
+
+      // Check if package intro already exists
+      const existingSlides = await storage.getSlidesByPackageWineId(wines[0].id);
+      const existingIntro = existingSlides.find(s => (s.payloadJson as any)?.is_package_intro === true);
+
+      if (existingIntro) {
+        // Update existing intro
+        const updatedSlide = await storage.updateSlide(existingIntro.id, {
+          payloadJson: {
+            ...(existingIntro.payloadJson as any),
+            title: title || `Welcome to ${pkg.name}`,
+            description: description || 'You are about to embark on a journey through exceptional wines.',
+            package_name: pkg.name,
+            package_image: imageUrl || pkg.imageUrl || (existingIntro.payloadJson as any).package_image,
+            background_image: imageUrl || pkg.imageUrl || (existingIntro.payloadJson as any).background_image,
+            is_package_intro: true
+          }
+        });
+        res.json({ slide: updatedSlide, action: 'updated' });
+      } else {
+        // Create new intro slide at position 0 (before wine intro)
+        const introSlide = await storage.createSlide({
+          packageWineId: wines[0].id,
+          position: 0, // Always first
+          type: 'interlude',
+          section_type: 'intro',
+          payloadJson: {
+            title: title || `Welcome to ${pkg.name}`,
+            description: description || 'You are about to embark on a journey through exceptional wines.',
+            is_package_intro: true,
+            package_name: pkg.name,
+            package_image: imageUrl || pkg.imageUrl,
+            background_image: imageUrl || pkg.imageUrl || "https://images.unsplash.com/photo-1547595628-c61a29f496f0?w=800&h=600&fit=crop"
+          }
+        });
+        res.json({ slide: introSlide, action: 'created' });
+      }
+    } catch (error) {
+      console.error("Error managing package intro:", error);
+      res.status(500).json({ message: "Failed to manage package intro" });
+    }
+  });
+
   // Profile endpoints
   app.get("/api/profile", async (req, res) => {
     try {
@@ -772,7 +864,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Package management endpoints for sommelier dashboard
   app.get("/api/packages", async (req, res) => {
     try {
-      const packages = await storage.getAllPackages();
+      const packages = await storage.getAllPackagesWithWines();
       res.json(packages);
     } catch (error) {
       console.error("Error fetching packages:", error);

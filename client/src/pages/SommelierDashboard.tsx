@@ -69,6 +69,7 @@ interface Package {
   name: string;
   code: string;
   description: string;
+  imageUrl?: string;
   isActive: boolean;
   createdAt: string;
   wines: PackageWine[];

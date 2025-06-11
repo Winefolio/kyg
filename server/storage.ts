@@ -26,7 +26,7 @@ import {
   wineCharacteristics,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc, gte, lt } from "drizzle-orm";
 import crypto from "crypto";
 
 // Utility function to generate unique short codes
@@ -67,6 +67,7 @@ async function generateUniqueShortCode(length: number = 6): Promise<string> {
 export interface IStorage {
   // Packages
   getPackageByCode(code: string): Promise<Package | undefined>;
+  getPackageById(id: string): Promise<Package | undefined>;
   createPackage(pkg: InsertPackage): Promise<Package>;
   generateUniqueShortCode(length: number): Promise<string>;
 
@@ -508,6 +509,15 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getPackageById(id: string): Promise<Package | undefined> {
+    const result = await db
+      .select()
+      .from(packages)
+      .where(eq(packages.id, id))
+      .limit(1);
+    return result[0];
+  }
+
   async generateUniqueShortCode(length: number = 6): Promise<string> {
     const characters = "ABCDEFGHIJKLMNPQRSTUVWXYZ123456789"; // Removed O, 0 to avoid confusion
     let attempts = 0;
@@ -646,7 +656,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(slides)
       .where(eq(slides.packageWineId, packageWineId))
-      .orderBy(slides.position);
+      .orderBy(slides.globalPosition);
     return result;
   }
 
@@ -660,7 +670,58 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSlide(slide: InsertSlide): Promise<Slide> {
-    // Auto-assign position if not provided to prevent conflicts
+    // Get the wine to determine global position
+    const wine = await db
+      .select()
+      .from(packageWines)
+      .where(eq(packageWines.id, slide.packageWineId))
+      .limit(1);
+    
+    if (!wine[0]) {
+      throw new Error('Wine not found');
+    }
+
+    // Calculate global position based on wine position
+    let targetGlobalPosition: number;
+    
+    // Special handling for package intro (position 0)
+    if (slide.payloadJson?.is_package_intro) {
+      targetGlobalPosition = 0;
+    } else {
+      // Calculate base position for this wine
+      const wineBasePosition = wine[0].position * 1000;
+      
+      // Add section offset
+      let sectionOffset = 0;
+      const sectionType = slide.section_type || 'intro'; // Default to intro if not specified
+      
+      if (sectionType === 'intro') {
+        sectionOffset = slide.payloadJson?.is_wine_intro ? 10 : 50; // Wine intro at 10, other intros after
+      } else if (sectionType === 'deep_dive' || sectionType === 'tasting') {
+        sectionOffset = 100;
+      } else if (sectionType === 'ending' || sectionType === 'conclusion') {
+        sectionOffset = 200;
+      }
+      
+      // Find the next available position in this section
+      const existingSlides = await db
+        .select({ globalPosition: slides.globalPosition })
+        .from(slides)
+        .where(
+          and(
+            eq(slides.packageWineId, slide.packageWineId),
+            gte(slides.globalPosition, wineBasePosition + sectionOffset),
+            lt(slides.globalPosition, wineBasePosition + sectionOffset + 100)
+          )
+        )
+        .orderBy(desc(slides.globalPosition))
+        .limit(1);
+      
+      const lastPositionInSection = existingSlides[0]?.globalPosition || (wineBasePosition + sectionOffset);
+      targetGlobalPosition = lastPositionInSection + 10; // Use 10 as gap
+    }
+
+    // Auto-assign local position if not provided
     let targetPosition = slide.position;
     if (!targetPosition) {
       const existingSlides = await db.select({ position: slides.position })
@@ -672,32 +733,20 @@ export class DatabaseStorage implements IStorage {
       targetPosition = (existingSlides[0]?.position || 0) + 1;
     }
 
-    // Handle position conflicts by incrementing until available
-    let attempts = 0;
-    while (attempts < 10) {
-      try {
-        const result = await db
-          .insert(slides)
-          .values({
-            packageWineId: slide.packageWineId,
-            position: targetPosition,
-            type: slide.type,
-            section_type: slide.section_type,
-            payloadJson: slide.payloadJson,
-          })
-          .returning();
-        return result[0];
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('duplicate key')) {
-          targetPosition += 1;
-          attempts += 1;
-        } else {
-          throw error;
-        }
-      }
-    }
+    const result = await db
+      .insert(slides)
+      .values({
+        packageWineId: slide.packageWineId,
+        position: targetPosition,
+        globalPosition: targetGlobalPosition,
+        type: slide.type,
+        section_type: slide.section_type,
+        payloadJson: slide.payloadJson,
+        genericQuestions: slide.genericQuestions,
+      })
+      .returning();
     
-    throw new Error(`Could not find available position for slide after ${attempts} attempts`);
+    return result[0];
   }
 
   // Session methods
@@ -968,14 +1017,18 @@ export class DatabaseStorage implements IStorage {
     const sessionParticipants =
       await this.getParticipantsBySessionId(sessionId);
 
-    // 4. Fetch all package wines and their slides for this package
+    // 4. Fetch all package wines and their slides for this package (optimized)
     const packageWines = await this.getPackageWines(session.packageId!);
-    let sessionSlides: Slide[] = [];
+    const wineIds = packageWines.map(w => w.id);
     
-    for (const wine of packageWines) {
-      const wineSlides = await this.getSlidesByPackageWineId(wine.id);
-      sessionSlides = sessionSlides.concat(wineSlides);
-    }
+    // Get all slides for all wines in one query
+    const sessionSlides = wineIds.length > 0 
+      ? await db
+          .select()
+          .from(slides)
+          .where(inArray(slides.packageWineId, wineIds))
+          .orderBy(slides.globalPosition)
+      : [];
 
     // 5. Fetch all responses for all participants in this session (optimized single query)
     const participantIds = sessionParticipants
