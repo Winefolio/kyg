@@ -144,6 +144,9 @@ export interface IStorage {
 
   // Wine Characteristics
   getWineCharacteristics(): Promise<any[]>;
+  
+  // Batch operations
+  batchUpdateSlidePositions(updates: { slideId: string; position: number; packageWineId?: string }[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1804,6 +1807,69 @@ export class DatabaseStorage implements IStorage {
           .where(eq(slides.id, update.slideId))
       ));
     });
+  }
+  
+  // NEW: Batch update slide positions with proper constraint handling
+  async batchUpdateSlidePositions(updates: { slideId: string; position: number; packageWineId?: string }[]) {
+    if (updates.length === 0) return;
+    
+    // Group by wine to handle constraints
+    const updatesByWine = new Map<string, typeof updates>();
+    
+    // First get all slides to know their wine IDs
+    const slideData = await Promise.all(
+      updates.map(u => this.getSlideById(u.slideId))
+    );
+    
+    // Group updates
+    updates.forEach((update, index) => {
+      const slide = slideData[index];
+      if (slide) {
+        const targetWineId = update.packageWineId || slide.packageWineId;
+        if (!updatesByWine.has(targetWineId)) {
+          updatesByWine.set(targetWineId, []);
+        }
+        updatesByWine.get(targetWineId)!.push(update);
+      }
+    });
+    
+    // Process each wine in a transaction
+    for (const [wineId, wineUpdates] of updatesByWine) {
+      await db.transaction(async (tx) => {
+        // Get all current slides for this wine
+        const currentSlides = await tx
+          .select()
+          .from(slides)
+          .where(eq(slides.packageWineId, wineId));
+        
+        // Find max position
+        const maxPosition = Math.max(...currentSlides.map(s => s.position), 0);
+        const tempOffset = Math.max(maxPosition + 10000, 100000);
+        
+        // Sort updates by target position
+        const sortedUpdates = [...wineUpdates].sort((a, b) => a.position - b.position);
+        
+        // First pass: move to temp positions
+        for (let i = 0; i < sortedUpdates.length; i++) {
+          const update = sortedUpdates[i];
+          await tx
+            .update(slides)
+            .set({ position: tempOffset + i })
+            .where(eq(slides.id, update.slideId));
+        }
+        
+        // Second pass: move to final positions
+        for (const update of sortedUpdates) {
+          await tx
+            .update(slides)
+            .set({ 
+              position: update.position,
+              ...(update.packageWineId && { packageWineId: update.packageWineId })
+            })
+            .where(eq(slides.id, update.slideId));
+        }
+      });
+    }
   }
 }
 

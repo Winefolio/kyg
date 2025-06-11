@@ -21,7 +21,8 @@
       "Bash(kill:*)",
       "Bash(node:*)",
       "Bash(npx tsx:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }
