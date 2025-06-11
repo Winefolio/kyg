@@ -183,23 +183,25 @@ export default function PackageEditor() {
     mutationFn: (updates: { slideId: string; position: number; packageWineId?: string }[]) => 
       apiRequest('PUT', '/api/slides/reorder', { updates }),
     onSuccess: () => {
-      setHasUnsavedChanges(false);
-      setIsSavingOrder(false);
       toast({ 
-        title: "✅ Slide order saved successfully", 
-        description: "Your changes have been saved to the database",
+        title: "Slide order updated", 
+        description: "Changes saved successfully",
       });
-      // Refresh data after successful save
+      // Refresh data to ensure consistency
       dataLoadedRef.current = false;
       queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
     },
     onError: (error: any) => {
-      setIsSavingOrder(false);
       toast({ 
-        title: "❌ Error saving slide order", 
+        title: "Error updating slide order", 
         description: error.message || "Please try again", 
         variant: "destructive" 
       });
+      // Revert local changes on error
+      if (editorData) {
+        setLocalSlides([...editorData.slides]);
+        setSlides([...editorData.slides]);
+      }
     },
   });
 
@@ -387,11 +389,16 @@ export default function PackageEditor() {
     // Also update slides state for activeSlide reference
     setSlides(newLocalSlides);
     
-    // Don't send to server immediately - wait for save button
-    toast({ 
-      title: "Slide order changed", 
-      description: "Click 'Save Order' to persist your changes",
-    });
+    // Immediately save the changes to database - much more reliable than complex state management
+    if (updates.length > 0) {
+      console.log('🔄 Immediately saving slide order changes:', updates);
+      
+      // Reset unsaved changes flag since we're saving immediately
+      setHasUnsavedChanges(false);
+      
+      // Save to database right away
+      reorderSlidesMutation.mutate(updates);
+    }
   };
 
   // Save all slide order changes
