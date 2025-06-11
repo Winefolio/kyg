@@ -273,14 +273,14 @@ export default function TastingSession() {
   const currentWineStartIndex = currentWine ? slides.findIndex(s => s.packageWineId === currentWine.id) : 0;
   const currentSlideInWine = currentSlideIndex - currentWineStartIndex;
   
-  const sectionNames = ['intro', 'deep dive', 'ending'];
+  const sectionNames = ['Introduction', 'Deep Dive', 'Final Thoughts'];
   const sections = sectionNames.map((sectionName) => {
     // Find section slides within current wine using computed sections
     const sectionSlides = currentWineSlides.filter(slide => {
       const computedSection = getSlideSection(slide);
-      if (sectionName === 'intro') return computedSection === 'intro';
-      if (sectionName === 'deep dive') return computedSection === 'deep_dive' || computedSection === 'tasting';
-      if (sectionName === 'ending') return computedSection === 'ending' || computedSection === 'conclusion';
+      if (sectionName === 'Introduction') return computedSection === 'intro';
+      if (sectionName === 'Deep Dive') return computedSection === 'deep_dive' || computedSection === 'tasting';
+      if (sectionName === 'Final Thoughts') return computedSection === 'ending' || computedSection === 'conclusion';
       return false;
     });
     
@@ -289,8 +289,8 @@ export default function TastingSession() {
       const totalWineSlides = currentWineSlides.length;
       const slidesPerSection = Math.ceil(totalWineSlides / 3);
       let sectionIndex = 0;
-      if (sectionName === 'deep dive') sectionIndex = 1;
-      if (sectionName === 'ending') sectionIndex = 2;
+      if (sectionName === 'Deep Dive') sectionIndex = 1;
+      if (sectionName === 'Final Thoughts') sectionIndex = 2;
       
       const startIndex = sectionIndex * slidesPerSection;
       const endIndex = Math.min(startIndex + slidesPerSection, totalWineSlides);

@@ -21,15 +21,18 @@ export function SectionTransition({
   const getSectionInfo = (section: string) => {
     switch (section) {
       case 'intro':
+      case 'Introduction':
         return {
           icon: Eye,
-          title: 'First Impressions',
+          title: 'Introduction',
           subtitle: 'Visual & Aroma Assessment',
           color: 'from-blue-500 to-cyan-400',
           bgColor: 'bg-blue-500/10',
           description: 'Exploring the wine\'s appearance and initial aromas'
         };
-      case 'deep dive':
+      case 'deep_dive':
+      case 'tasting':
+      case 'Deep Dive':
         return {
           icon: Target,
           title: 'Deep Dive',
@@ -39,9 +42,11 @@ export function SectionTransition({
           description: 'Analyzing flavors, body, tannins, and complexity'
         };
       case 'ending':
+      case 'conclusion':
+      case 'Final Thoughts':
         return {
           icon: CheckCircle,
-          title: 'Final Assessment',
+          title: 'Final Thoughts',
           subtitle: 'Finish & Overall Rating',
           color: 'from-emerald-500 to-green-400',
           bgColor: 'bg-emerald-500/10',
