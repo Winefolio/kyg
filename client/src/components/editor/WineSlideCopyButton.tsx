@@ -47,21 +47,20 @@ export function WineSlideCopyButton({
 
     setIsLoading(true);
     try {
-      const response = await apiRequest(`/api/wines/${sourceWine.id}/duplicate-slides`, {
-        method: 'POST',
-        body: {
-          targetWineId: selectedTargetWine.id,
-          replaceExisting
-        }
+      const response = await apiRequest('POST', `/api/wines/${sourceWine.id}/duplicate-slides`, {
+        targetWineId: selectedTargetWine.id,
+        replaceExisting
       });
 
-      if (response.success) {
+      const data = await response.json();
+      
+      if (data.success) {
         toast({
           title: "Slides Copied Successfully",
-          description: `${response.duplicatedCount} slides copied to ${selectedTargetWine.wineName}`,
+          description: `${data.duplicatedCount} slides copied to ${selectedTargetWine.wineName}`,
         });
         
-        onCopyComplete(selectedTargetWine.id, response.duplicatedCount);
+        onCopyComplete(selectedTargetWine.id, data.duplicatedCount);
       }
     } catch (error) {
       console.error('Error copying slides:', error);
