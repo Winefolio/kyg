@@ -92,67 +92,70 @@ export function SlideConfigPanel({
                 </div>
             )}
 
-            <Card className="bg-white/5 border-white/10">
-                <CardHeader>
-                    <CardTitle className="text-lg text-white">
-                        General Slide Settings
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <Label htmlFor="slide-title" className="text-white/80">
-                            Slide Title
-                        </Label>
-                        <Input
-                            id="slide-title"
-                            value={localPayload.title || ""}
-                            onChange={(e) =>
-                                handleFieldChange("title", e.target.value)
-                            }
-                            className="bg-white/10 border-white/20 text-white"
-                            placeholder="Enter slide title"
-                        />
-                    </div>
-                    <div>
-                        <Label
-                            htmlFor="slide-description"
-                            className="text-white/80"
-                        >
-                            Description
-                        </Label>
-                        <Textarea
-                            id="slide-description"
-                            value={localPayload.description || ""}
-                            onChange={(e) =>
-                                handleFieldChange("description", e.target.value)
-                            }
-                            className="bg-white/10 border-white/20 text-white"
-                            placeholder="Enter slide description (optional)"
-                            rows={3}
-                        />
-                    </div>
-                    <div>
-                        <Label htmlFor="section-type" className="text-white/80">Section</Label>
-                        <Select
-                            value={slide.section_type || 'deep_dive'}
-                            onValueChange={(value: string) => {
-                                setIsSaving(true);
-                                onUpdate(slide.id, { section_type: value });
-                                setTimeout(() => setIsSaving(false), 500);
-                            }}
-                        >
-                            <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="intro">🎬 Intro</SelectItem>
-                                <SelectItem value="deep_dive">🤔 Deep Dive</SelectItem>
-                                <SelectItem value="ending">🏁 Ending</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </CardContent>
-            </Card>
+            {/* Only show general settings for non-package intro slides */}
+            {!(localPayload as any)?.is_package_intro && (
+                <Card className="bg-white/5 border-white/10">
+                    <CardHeader>
+                        <CardTitle className="text-lg text-white">
+                            General Slide Settings
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <Label htmlFor="slide-title" className="text-white/80">
+                                Slide Title
+                            </Label>
+                            <Input
+                                id="slide-title"
+                                value={localPayload.title || ""}
+                                onChange={(e) =>
+                                    handleFieldChange("title", e.target.value)
+                                }
+                                className="bg-white/10 border-white/20 text-white"
+                                placeholder="Enter slide title"
+                            />
+                        </div>
+                        <div>
+                            <Label
+                                htmlFor="slide-description"
+                                className="text-white/80"
+                            >
+                                Description
+                            </Label>
+                            <Textarea
+                                id="slide-description"
+                                value={localPayload.description || ""}
+                                onChange={(e) =>
+                                    handleFieldChange("description", e.target.value)
+                                }
+                                className="bg-white/10 border-white/20 text-white"
+                                placeholder="Enter slide description (optional)"
+                                rows={3}
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="section-type" className="text-white/80">Section</Label>
+                            <Select
+                                value={slide.section_type || 'deep_dive'}
+                                onValueChange={(value: string) => {
+                                    setIsSaving(true);
+                                    onUpdate(slide.id, { section_type: value });
+                                    setTimeout(() => setIsSaving(false), 500);
+                                }}
+                            >
+                                <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="intro">🎬 Intro</SelectItem>
+                                    <SelectItem value="deep_dive">🤔 Deep Dive</SelectItem>
+                                    <SelectItem value="ending">🏁 Ending</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {slide.type === "question" && (
                 <QuestionConfigForm

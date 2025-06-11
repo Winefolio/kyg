@@ -121,7 +121,22 @@ export function InterludeConfigForm({
                 )}
               </div>
 
-              <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white">
+              <Button 
+                type="button" 
+                onClick={handleSubmit((data) => {
+                  // Update package intro slide with proper field mapping
+                  const currentPayload = slide.payloadJson as any || {};
+                  onSave({
+                    ...currentPayload,
+                    title: data.title,
+                    description: data.description,
+                    package_image: data.wine_image_url,
+                    background_image: data.wine_image_url,
+                    wine_image_url: data.wine_image_url
+                  });
+                })}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+              >
                 <Save className="w-4 h-4 mr-2" />
                 Update Package Introduction
               </Button>
