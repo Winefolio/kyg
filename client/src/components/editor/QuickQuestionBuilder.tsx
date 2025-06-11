@@ -253,15 +253,15 @@ export function QuickQuestionBuilder({
           key={type.format}
           className={`p-6 cursor-pointer transition-all ${
             type.available 
-              ? 'hover:border-purple-400 hover:shadow-lg' 
-              : 'opacity-50 cursor-not-allowed'
+              ? 'hover:border-purple-400 hover:shadow-lg bg-white' 
+              : 'opacity-50 cursor-not-allowed bg-white'
           }`}
           onClick={() => type.available && handleSelectType(type.format)}
         >
           <div className="flex flex-col items-center text-center space-y-2">
             <div className="text-purple-400">{type.icon}</div>
-            <h3 className="font-semibold">{type.title}</h3>
-            <p className="text-sm text-gray-500">{type.description}</p>
+            <h3 className="font-semibold text-gray-900">{type.title}</h3>
+            <p className="text-sm text-gray-600">{type.description}</p>
             {!type.available && (
               <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
             )}

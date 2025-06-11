@@ -269,7 +269,7 @@ export default function PackageEditor() {
     // Clone the payload template and replace placeholders
     let payloadJson = {
       ...template.payloadTemplate,
-      title: template.payloadTemplate?.title || template.name,
+      title: template.payloadTemplate?.title || template.payloadTemplate?.question || template.name,
       description: template.payloadTemplate?.description || template.description || ''
     };
 

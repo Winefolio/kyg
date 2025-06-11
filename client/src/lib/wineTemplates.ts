@@ -24,7 +24,8 @@ export const SLIDE_TEMPLATES = [
     icon: Eye,
     description: "Evaluate the wine's appearance.",
     payloadTemplate: {
-      questionType: 'multiple_choice',
+      question_type: 'multiple_choice',
+      title: "How would you describe the wine's clarity and appearance?",
       question: "How would you describe the wine's clarity and appearance?",
       description: "Look at the wine against a white background and assess its visual clarity.",
       options: [
@@ -34,6 +35,7 @@ export const SLIDE_TEMPLATES = [
         { id: '4', text: 'Cloudy', value: 'cloudy', description: 'Noticeably murky or opaque' }
       ],
       allowMultiple: false,
+      allow_multiple: false,
       timeLimit: 30,
       points: 10
     }
@@ -46,11 +48,15 @@ export const SLIDE_TEMPLATES = [
     icon: Wind,
     description: "Rate the wine's aroma intensity.",
     payloadTemplate: {
-      questionType: 'scale',
+      question_type: 'scale',
+      title: "How intense are the wine's aromas?",
       question: "How intense are the wine's aromas?",
       description: "Swirl the glass and take a deep smell. Rate from subtle to powerful.",
+      scale_min: 1,
+      scale_max: 10,
       scaleMin: 1,
       scaleMax: 10,
+      scale_labels: ['Subtle', 'Powerful'],
       scaleLabels: ['Subtle', 'Powerful'],
       timeLimit: 45,
       points: 15
@@ -64,7 +70,8 @@ export const SLIDE_TEMPLATES = [
     icon: Palette,
     description: 'Describe the primary flavors.',
     payloadTemplate: {
-      questionType: 'text',
+      question_type: 'text',
+      title: "What primary flavors do you taste in this wine?",
       question: "What primary flavors do you taste in this wine?",
       description: "Take a sip and describe the dominant flavors you experience. Be specific about fruit, spice, oak, or other notes.",
       placeholder: 'e.g., dark fruit, vanilla, spice, leather, earth...',
@@ -81,7 +88,8 @@ export const SLIDE_TEMPLATES = [
     icon: Droplets,
     description: 'Determine the weight of the wine on your palate.',
     payloadTemplate: {
-      questionType: 'multiple_choice',
+      question_type: 'multiple_choice',
+      title: "How would you describe the body or weight of this wine?",
       question: "How would you describe the body or weight of this wine?",
       description: "Think about how the wine feels in your mouth - like the difference between skim milk (light) and cream (full).",
       options: [
@@ -90,6 +98,7 @@ export const SLIDE_TEMPLATES = [
         { id: '3', text: 'Full', value: 'full', description: 'Like cream - rich, heavy, and substantial on the palate' }
       ],
       allowMultiple: false,
+      allow_multiple: false,
       timeLimit: 30,
       points: 15
     }
@@ -102,11 +111,15 @@ export const SLIDE_TEMPLATES = [
     icon: Zap,
     description: "Rate the wine's tannin level.",
     payloadTemplate: {
-      questionType: 'scale',
+      question_type: 'scale',
+      title: "How would you rate the tannin level in this wine?",
       question: "How would you rate the tannin level in this wine?",
       description: "Tannins create a drying, grippy sensation on your gums and tongue. Think of the difference between black tea (high tannins) and herbal tea (low tannins).",
+      scale_min: 1,
+      scale_max: 10,
       scaleMin: 1,
       scaleMax: 10,
+      scale_labels: ['Soft', 'Grippy'],
       scaleLabels: ['Soft', 'Grippy'],
       timeLimit: 40,
       points: 15
@@ -120,11 +133,15 @@ export const SLIDE_TEMPLATES = [
     icon: Zap,
     description: "Rate the wine's acidity.",
     payloadTemplate: {
-      questionType: 'scale',
+      question_type: 'scale',
+      title: "How would you rate the acidity level of this wine?",
       question: "How would you rate the acidity level of this wine?",
       description: "Acidity makes your mouth water and creates a bright, crisp sensation. Think lemon juice (high acidity) vs. milk (low acidity).",
+      scale_min: 1,
+      scale_max: 10,
       scaleMin: 1,
       scaleMax: 10,
+      scale_labels: ['Low', 'High'],
       scaleLabels: ['Low', 'High'],
       timeLimit: 35,
       points: 15
@@ -138,7 +155,8 @@ export const SLIDE_TEMPLATES = [
     icon: Clock,
     description: 'How long do the flavors linger?',
     payloadTemplate: {
-      questionType: 'multiple_choice',
+      question_type: 'multiple_choice',
+      title: "How long do the wine's flavors linger after swallowing?",
       question: "How long do the wine's flavors linger after swallowing?",
       description: "The finish is how long you can taste the wine after it's gone. Count the seconds of flavor persistence.",
       options: [
@@ -147,6 +165,7 @@ export const SLIDE_TEMPLATES = [
         { id: '3', text: 'Long', value: 'long', description: 'Flavors persist for 30+ seconds' }
       ],
       allowMultiple: false,
+      allow_multiple: false,
       timeLimit: 45,
       points: 15
     }
@@ -159,11 +178,15 @@ export const SLIDE_TEMPLATES = [
     icon: Star,
     description: 'Give your final rating for this wine.',
     payloadTemplate: {
-      questionType: 'scale',
+      question_type: 'scale',
+      title: "What is your overall impression of this wine?",
       question: "What is your overall impression of this wine?",
       description: "Consider all aspects - aroma, taste, balance, complexity, and personal enjoyment. Rate your overall experience.",
+      scale_min: 1,
+      scale_max: 10,
       scaleMin: 1,
       scaleMax: 10,
+      scale_labels: ['Poor', 'Excellent'],
       scaleLabels: ['Poor', 'Excellent'],
       timeLimit: 30,
       points: 25
