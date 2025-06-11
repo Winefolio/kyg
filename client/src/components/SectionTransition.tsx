@@ -1,5 +1,5 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Eye, Target, CheckCircle, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from "framer-motion";
+import { Clock, Eye, Target, CheckCircle, ArrowRight } from "lucide-react";
 
 interface SectionTransitionProps {
   isVisible: boolean;
@@ -10,56 +10,56 @@ interface SectionTransitionProps {
   duration?: number;
 }
 
-export function SectionTransition({ 
-  isVisible, 
-  fromSection, 
-  toSection, 
-  wineName, 
-  onComplete, 
-  duration = 3000 
+export function SectionTransition({
+  isVisible,
+  fromSection,
+  toSection,
+  wineName,
+  onComplete,
+  duration = 5,
 }: SectionTransitionProps) {
   const getSectionInfo = (section: string) => {
     switch (section) {
-      case 'intro':
-      case 'Introduction':
+      case "intro":
+      case "Introduction":
         return {
           icon: Eye,
-          title: 'Introduction',
-          subtitle: 'Visual & Aroma Assessment',
-          color: 'from-blue-500 to-cyan-400',
-          bgColor: 'bg-blue-500/10',
-          description: 'Exploring the wine\'s appearance and initial aromas'
+          title: "Introduction",
+          subtitle: "Visual & Aroma Assessment",
+          color: "from-blue-500 to-cyan-400",
+          bgColor: "bg-blue-500/10",
+          description: "Exploring the wine's appearance and initial aromas",
         };
-      case 'deep_dive':
-      case 'tasting':
-      case 'Deep Dive':
+      case "deep_dive":
+      case "tasting":
+      case "Deep Dive":
         return {
           icon: Target,
-          title: 'Deep Dive',
-          subtitle: 'Taste & Structure Analysis',
-          color: 'from-purple-500 to-pink-400',
-          bgColor: 'bg-purple-500/10',
-          description: 'Analyzing flavors, body, tannins, and complexity'
+          title: "Deep Dive",
+          subtitle: "Taste & Structure Analysis",
+          color: "from-purple-500 to-pink-400",
+          bgColor: "bg-purple-500/10",
+          description: "Analyzing flavors, body, tannins, and complexity",
         };
-      case 'ending':
-      case 'conclusion':
-      case 'Final Thoughts':
+      case "ending":
+      case "conclusion":
+      case "Final Thoughts":
         return {
           icon: CheckCircle,
-          title: 'Final Thoughts',
-          subtitle: 'Finish & Overall Rating',
-          color: 'from-emerald-500 to-green-400',
-          bgColor: 'bg-emerald-500/10',
-          description: 'Evaluating the finish and final impressions'
+          title: "Final Thoughts",
+          subtitle: "Finish & Overall Rating",
+          color: "from-emerald-500 to-green-400",
+          bgColor: "bg-emerald-500/10",
+          description: "Evaluating the finish and final impressions",
         };
       default:
         return {
           icon: Clock,
           title: section,
-          subtitle: '',
-          color: 'from-gray-500 to-gray-400',
-          bgColor: 'bg-gray-500/10',
-          description: ''
+          subtitle: "",
+          color: "from-gray-500 to-gray-400",
+          bgColor: "bg-gray-500/10",
+          description: "",
         };
     }
   };
@@ -106,14 +106,18 @@ export function SectionTransition({
                 transition={{ delay: 0.4, duration: 0.6 }}
                 className="text-center"
               >
-                <div className={`w-20 h-20 mx-auto mb-4 rounded-full ${fromInfo.bgColor} border border-white/20 flex items-center justify-center backdrop-blur-sm`}>
+                <div
+                  className={`w-20 h-20 mx-auto mb-4 rounded-full ${fromInfo.bgColor} border border-white/20 flex items-center justify-center backdrop-blur-sm`}
+                >
                   <FromIcon className="w-8 h-8 text-white" />
                 </div>
-                <h3 className="text-lg font-semibold text-white/90">{fromInfo.title}</h3>
+                <h3 className="text-lg font-semibold text-white/90">
+                  {fromInfo.title}
+                </h3>
                 <p className="text-sm text-white/60">{fromInfo.subtitle}</p>
                 <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: '100%' }}
+                  animate={{ width: "100%" }}
                   transition={{ delay: 0.8, duration: 0.8 }}
                   className="h-1 bg-gradient-to-r from-white/40 to-transparent rounded-full mt-2"
                 />
@@ -128,7 +132,11 @@ export function SectionTransition({
               >
                 <motion.div
                   animate={{ x: [0, 10, 0] }}
-                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                  transition={{
+                    repeat: Infinity,
+                    duration: 2,
+                    ease: "easeInOut",
+                  }}
                 >
                   <ArrowRight className="w-8 h-8 text-white/80" />
                 </motion.div>
@@ -155,11 +163,13 @@ export function SectionTransition({
                 >
                   <ToIcon className="w-8 h-8 text-white" />
                 </motion.div>
-                <h3 className="text-lg font-semibold text-white">{toInfo.title}</h3>
+                <h3 className="text-lg font-semibold text-white">
+                  {toInfo.title}
+                </h3>
                 <p className="text-sm text-white/70">{toInfo.subtitle}</p>
                 <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: '100%' }}
+                  animate={{ width: "100%" }}
                   transition={{ delay: 1.4, duration: 0.8 }}
                   className={`h-1 bg-gradient-to-r ${toInfo.color} rounded-full mt-2 shadow-lg`}
                 />
@@ -193,8 +203,12 @@ export function SectionTransition({
                     animate={{ scale: 1 }}
                     transition={{ delay: 2 + i * 0.1, duration: 0.3 }}
                     className={`w-2 h-2 rounded-full ${
-                      i === 0 ? 'bg-blue-400' : i === 1 ? 'bg-purple-400' : 'bg-emerald-400'
-                    } ${i === ['intro', 'deep dive', 'ending'].indexOf(toSection) ? 'ring-2 ring-white/40' : 'opacity-40'}`}
+                      i === 0
+                        ? "bg-blue-400"
+                        : i === 1
+                          ? "bg-purple-400"
+                          : "bg-emerald-400"
+                    } ${i === ["intro", "deep dive", "ending"].indexOf(toSection) ? "ring-2 ring-white/40" : "opacity-40"}`}
                   />
                 ))}
               </div>
@@ -213,7 +227,10 @@ export function SectionTransition({
 
           {/* Decorative Elements */}
           <div className="absolute top-1/4 left-1/4 w-32 h-32 rounded-full bg-purple-500/10 blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-40 h-40 rounded-full bg-blue-500/10 blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+          <div
+            className="absolute bottom-1/4 right-1/4 w-40 h-40 rounded-full bg-blue-500/10 blur-3xl animate-pulse"
+            style={{ animationDelay: "1s" }}
+          />
         </motion.div>
       )}
     </AnimatePresence>

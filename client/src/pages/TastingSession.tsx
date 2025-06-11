@@ -348,31 +348,34 @@ export default function TastingSession() {
       
       // Check if we're transitioning to a new wine
       if (currentWine && nextWine && currentWine.id !== nextWine.id) {
-        const nextWinePosition = wines.findIndex(w => w.id === nextWine.id) + 1;
-        const isFirstWine = nextWinePosition === 1;
-        
-        // Show wine introduction for 2nd, 3rd, etc. wines (not first wine)
-        if (!isFirstWine) {
-          setWineIntroductionData({
-            wine: {
-              wineName: nextWine.wineName,
-              wineDescription: nextWine.wineDescription,
-              wineImageUrl: nextWine.wineImageUrl,
-              position: nextWinePosition
-            },
-            isFirstWine
-          });
-          setShowingWineIntroduction(true);
-        }
-        
         setIsTransitioningSection(true);
         setTransitionSectionName(nextWine.wineName);
         triggerHaptic('success');
         
+        // Show wine transition for 2.5 seconds, then check if wine introduction needed
         setTimeout(() => {
-          setCurrentSlideIndex(currentSlideIndex + 1);
-          setCompletedSlides(prev => [...prev, currentSlideIndex]);
+          const nextWinePosition = wines.findIndex(w => w.id === nextWine.id) + 1;
+          const isFirstWine = nextWinePosition === 1;
+          
           setIsTransitioningSection(false);
+          
+          // Show wine introduction for 2nd, 3rd, etc. wines (not first wine)
+          if (!isFirstWine) {
+            setWineIntroductionData({
+              wine: {
+                wineName: nextWine.wineName,
+                wineDescription: nextWine.wineDescription,
+                wineImageUrl: nextWine.wineImageUrl,
+                position: nextWinePosition
+              },
+              isFirstWine
+            });
+            setShowingWineIntroduction(true);
+          } else {
+            // For first wine, just advance directly
+            setCurrentSlideIndex(currentSlideIndex + 1);
+            setCompletedSlides(prev => [...prev, currentSlideIndex]);
+          }
         }, 2500);
       } 
       // Check if we're transitioning to a new section within the same wine
@@ -419,6 +422,9 @@ export default function TastingSession() {
   const handleWineIntroductionComplete = () => {
     setShowingWineIntroduction(false);
     setWineIntroductionData(null);
+    // Advance to next slide after wine introduction
+    setCurrentSlideIndex(currentSlideIndex + 1);
+    setCompletedSlides(prev => [...prev, currentSlideIndex]);
   };
 
   const goToPreviousSlide = () => {
