@@ -735,6 +735,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Duplicate slides from one wine to another
+  app.post("/api/wines/:wineId/duplicate-slides", async (req: Request, res: Response) => {
+    try {
+      const { wineId } = req.params;
+      const { targetWineId, replaceExisting } = req.body;
+
+      if (!targetWineId) {
+        return res.status(400).json({ error: "Target wine ID is required" });
+      }
+
+      if (wineId === targetWineId) {
+        return res.status(400).json({ error: "Source and target wines cannot be the same" });
+      }
+
+      const result = await storage.duplicateWineSlides(
+        wineId, 
+        targetWineId, 
+        replaceExisting || false
+      );
+
+      res.json({
+        success: true,
+        duplicatedCount: result.count,
+        targetWineId,
+        message: `Successfully duplicated ${result.count} slides`
+      });
+    } catch (error) {
+      console.error("Error duplicating wine slides:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to duplicate slides" 
+      });
+    }
+  });
+
   // Package management endpoints for sommelier dashboard
   app.get("/api/packages", async (req, res) => {
     try {

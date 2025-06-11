@@ -147,6 +147,9 @@ export interface IStorage {
   
   // Batch operations
   batchUpdateSlidePositions(updates: { slideId: string; position: number; packageWineId?: string }[]): Promise<void>;
+  
+  // Slide duplication
+  duplicateWineSlides(sourceWineId: string, targetWineId: string, replaceExisting: boolean): Promise<{ count: number; slides: Slide[] }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1966,6 +1969,88 @@ export class DatabaseStorage implements IStorage {
             .where(eq(slides.id, update.slideId));
         }
       });
+    }
+  }
+
+  async duplicateWineSlides(sourceWineId: string, targetWineId: string, replaceExisting: boolean): Promise<{ count: number; slides: Slide[] }> {
+    try {
+      // 1. Validate both wines exist and are in the same package
+      const [sourceWine, targetWine] = await Promise.all([
+        db.select().from(packageWines).where(eq(packageWines.id, sourceWineId)).limit(1),
+        db.select().from(packageWines).where(eq(packageWines.id, targetWineId)).limit(1)
+      ]);
+
+      if (sourceWine.length === 0 || targetWine.length === 0) {
+        throw new Error('Source or target wine not found');
+      }
+
+      if (sourceWine[0].packageId !== targetWine[0].packageId) {
+        throw new Error('Wines must be in the same package');
+      }
+
+      // 2. Fetch source slides
+      const sourceSlides = await db.select()
+        .from(slides)
+        .where(eq(slides.packageWineId, sourceWineId))
+        .orderBy(slides.position);
+
+      if (sourceSlides.length === 0) {
+        return { count: 0, slides: [] };
+      }
+
+      // 3. Handle target wine slides if replacing
+      if (replaceExisting) {
+        await db.delete(slides).where(eq(slides.packageWineId, targetWineId));
+      }
+
+      // 4. Calculate starting position for new slides
+      let startingPosition = 1;
+      if (!replaceExisting) {
+        const existingSlides = await db.select()
+          .from(slides)
+          .where(eq(slides.packageWineId, targetWineId))
+          .orderBy(desc(slides.position))
+          .limit(1);
+        
+        if (existingSlides.length > 0) {
+          startingPosition = existingSlides[0].position + 1;
+        }
+      }
+
+      // 5. Create duplicated slides
+      const duplicatedSlides: Slide[] = [];
+      
+      for (let i = 0; i < sourceSlides.length; i++) {
+        const sourceSlide = sourceSlides[i];
+        const newSlideId = crypto.randomUUID();
+        const newPosition = replaceExisting ? sourceSlide.position : startingPosition + i;
+
+        const newSlideData: InsertSlide = {
+          id: newSlideId,
+          packageWineId: targetWineId,
+          type: sourceSlide.type,
+          payloadJson: sourceSlide.payloadJson,
+          position: newPosition,
+          section_type: sourceSlide.section_type as "intro" | "deep_dive" | "ending" | null
+        };
+
+        const [createdSlide] = await db.insert(slides)
+          .values([newSlideData])
+          .returning();
+
+        duplicatedSlides.push(createdSlide);
+      }
+
+      console.log(`✅ Duplicated ${duplicatedSlides.length} slides from wine ${sourceWineId} to wine ${targetWineId}`);
+      
+      return {
+        count: duplicatedSlides.length,
+        slides: duplicatedSlides
+      };
+
+    } catch (error) {
+      console.error('❌ Error duplicating wine slides:', error);
+      throw error;
     }
   }
 }
