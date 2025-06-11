@@ -2025,42 +2025,75 @@ export class DatabaseStorage implements IStorage {
         await db.delete(slides).where(eq(slides.packageWineId, targetWineId));
       }
 
-      // 4. Calculate starting position for new slides
-      let startingPosition = 1;
-      if (!replaceExisting) {
-        const existingSlides = await db.select()
-          .from(slides)
-          .where(eq(slides.packageWineId, targetWineId))
-          .orderBy(desc(slides.position))
-          .limit(1);
-        
-        if (existingSlides.length > 0) {
-          startingPosition = existingSlides[0].position + 1;
-        }
-      }
-
-      // 5. Create duplicated slides
+      // 4. Use database transaction to ensure data consistency
       const duplicatedSlides: Slide[] = [];
       
-      for (let i = 0; i < slidesToCopy.length; i++) {
-        const sourceSlide = slidesToCopy[i];
-        const newSlideId = crypto.randomUUID();
-        const newPosition = replaceExisting ? sourceSlide.position : startingPosition + i;
+      await db.transaction(async (tx) => {
+        // Get all existing slides for target wine within transaction
+        const existingSlides = await tx.select()
+          .from(slides)
+          .where(eq(slides.packageWineId, targetWineId))
+          .orderBy(slides.position);
 
-        const newSlideData = {
-          packageWineId: targetWineId,
-          type: sourceSlide.type,
-          payloadJson: sourceSlide.payloadJson || {},
-          position: newPosition,
-          section_type: sourceSlide.section_type
-        };
+        let startingPosition = 1;
+        if (!replaceExisting && existingSlides.length > 0) {
+          // Find the highest position and start from there
+          const maxPosition = Math.max(...existingSlides.map(s => s.position));
+          startingPosition = maxPosition + 10; // Leave gap to avoid conflicts
+        }
 
-        const [createdSlide] = await db.insert(slides)
-          .values(newSlideData)
-          .returning();
+        // 5. Create duplicated slides within transaction
+        for (let i = 0; i < slidesToCopy.length; i++) {
+          const sourceSlide = slidesToCopy[i];
+          let newPosition: number;
 
-        duplicatedSlides.push(createdSlide);
-      }
+          if (replaceExisting) {
+            // For replace mode, try to use original position, but ensure no conflicts
+            newPosition = sourceSlide.position;
+            const conflict = existingSlides.find(s => s.position === newPosition);
+            if (conflict) {
+              // If position conflicts, use sequential numbering
+              newPosition = startingPosition + i;
+            }
+          } else {
+            // For append mode, use sequential positions starting from safe position
+            newPosition = startingPosition + (i * 10); // Use gaps of 10 for future insertions
+          }
+
+          const newSlideData = {
+            packageWineId: targetWineId,
+            type: sourceSlide.type,
+            payloadJson: sourceSlide.payloadJson || {},
+            position: newPosition,
+            section_type: sourceSlide.section_type
+          };
+
+          try {
+            const [createdSlide] = await tx.insert(slides)
+              .values(newSlideData)
+              .returning();
+
+            duplicatedSlides.push(createdSlide);
+          } catch (error) {
+            // If position conflict still occurs, use a unique timestamp-based position
+            if (error instanceof Error && error.message.includes('duplicate key')) {
+              const fallbackPosition = Date.now() % 1000000; // Use timestamp as fallback
+              const fallbackSlideData = {
+                ...newSlideData,
+                position: fallbackPosition
+              };
+              
+              const [createdSlide] = await tx.insert(slides)
+                .values(fallbackSlideData)
+                .returning();
+
+              duplicatedSlides.push(createdSlide);
+            } else {
+              throw error;
+            }
+          }
+        }
+      });
 
       console.log(`✅ Duplicated ${duplicatedSlides.length} slides from wine ${sourceWineId} to wine ${targetWineId}`);
       
