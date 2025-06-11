@@ -661,7 +661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create package with server-generated code
   app.post("/api/packages", async (req, res) => {
     try {
-      const { name, description } = req.body; // Only destructure name and description
+      const { name, description, imageUrl } = req.body;
 
       if (!name) {
         return res.status(400).json({ message: "Package name is required" });
@@ -674,6 +674,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         code: uniqueCode,
         name,
         description,
+        imageUrl: imageUrl || "", // Include image URL if provided
       });
 
       res.status(201).json(pkg); // Use 201 Created for successful creation
@@ -1223,11 +1224,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // For production uploads with Supabase
-      const { entityId } = req.body; // slide ID, wine ID, or package ID
+      const { entityId, entityType } = req.body; // slide ID, wine ID, or package ID
 
-      if (!entityId) {
+      // For package creation, we might not have an entity ID yet
+      if (!entityId && entityType !== 'package-temp') {
         return res.status(400).json({ message: "Entity ID is required" });
       }
+
+      // Use temporary ID for package uploads during creation
+      const uploadEntityId = entityId || `package-temp-${Date.now()}`;
 
       // Validate file type
       const mediaType = getMediaType(mimetype);
@@ -1238,7 +1243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Upload to Supabase Storage
-      const publicUrl = await uploadMediaFile(buffer, originalname, mimetype, entityId);
+      const publicUrl = await uploadMediaFile(buffer, originalname, mimetype, uploadEntityId);
 
       res.json({
         url: publicUrl,

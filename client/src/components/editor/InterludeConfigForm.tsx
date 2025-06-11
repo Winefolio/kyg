@@ -26,19 +26,111 @@ export function InterludeConfigForm({
   slide: Slide; 
   onSave: (updatedPayload: any) => void;
 }) {
+  const isPackageIntro = (slide.payloadJson as any)?.is_package_intro === true;
+  const isWineIntro = (slide.payloadJson as any)?.is_wine_intro === true;
+  
   const { control, handleSubmit, watch } = useForm<InterludeFormData>({
     defaultValues: {
       title: (slide.payloadJson as any)?.title || '',
       description: (slide.payloadJson as any)?.description || '',
       wine_name: (slide.payloadJson as any)?.wine_name || '',
-      wine_image_url: (slide.payloadJson as any)?.wine_image_url || '',
+      wine_image_url: (slide.payloadJson as any)?.wine_image_url || (slide.payloadJson as any)?.wine_image || (slide.payloadJson as any)?.package_image || (slide.payloadJson as any)?.background_image || '',
       duration: (slide.payloadJson as any)?.duration || 30,
       showContinueButton: (slide.payloadJson as any)?.showContinueButton ?? true,
-      backgroundImage: (slide.payloadJson as any)?.backgroundImage || '',
+      backgroundImage: (slide.payloadJson as any)?.backgroundImage || (slide.payloadJson as any)?.package_image || (slide.payloadJson as any)?.background_image || '',
     },
   });
 
   const watchedImageUrl = watch('wine_image_url');
+
+  // Special handling for package intro slides
+  if (isPackageIntro) {
+    return (
+      <div className="space-y-6">
+        <Card className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 border-purple-500/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg text-white flex items-center gap-2">
+              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+              Package Introduction Configuration
+            </CardTitle>
+            <p className="text-sm text-purple-200/70">This slide welcomes participants to your wine package</p>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit(onSave)} className="space-y-4">
+              <div>
+                <Label htmlFor="title" className="text-white">Package Welcome Title</Label>
+                <Controller
+                  name="title"
+                  control={control}
+                  render={({ field }) => (
+                    <Input 
+                      id="title" 
+                      {...field} 
+                      className="bg-gray-700 border-gray-600 text-white"
+                      placeholder="Welcome to [Package Name]"
+                    />
+                  )}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="description" className="text-white">Package Description</Label>
+                <Controller
+                  name="description"
+                  control={control}
+                  render={({ field }) => (
+                    <Textarea 
+                      id="description" 
+                      {...field} 
+                      className="bg-gray-700 border-gray-600 text-white resize-none"
+                      rows={3}
+                      placeholder="Describe the wine tasting experience participants will enjoy..."
+                    />
+                  )}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="wine_image_url" className="text-white flex items-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  Package Image URL
+                </Label>
+                <Controller
+                  name="wine_image_url"
+                  control={control}
+                  render={({ field }) => (
+                    <Input 
+                      id="wine_image_url" 
+                      {...field} 
+                      className="bg-gray-700 border-gray-600 text-white"
+                      placeholder="https://example.com/package-image.jpg"
+                    />
+                  )}
+                />
+                {watchedImageUrl && (
+                  <div className="mt-2">
+                    <img 
+                      src={watchedImageUrl} 
+                      alt="Package preview" 
+                      className="w-32 h-32 object-cover rounded-lg border border-gray-600"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white">
+                <Save className="w-4 h-4 mr-2" />
+                Update Package Introduction
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -46,7 +138,7 @@ export function InterludeConfigForm({
         <CardHeader className="pb-3">
           <CardTitle className="text-lg text-white flex items-center gap-2">
             <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-            Interlude Slide Configuration
+            {isWineIntro ? 'Wine Introduction Configuration' : 'Interlude Slide Configuration'}
           </CardTitle>
         </CardHeader>
         <CardContent>
