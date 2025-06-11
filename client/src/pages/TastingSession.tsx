@@ -818,6 +818,7 @@ export default function TastingSession() {
           wineImageUrl: nextWine.wineImageUrl || '',
           position: wines.findIndex(w => w.id === nextWine.id) + 1
         } : undefined}
+        sectionType={currentSlide?.section_type}
         onContinue={() => {
           setCurrentSlideIndex(currentSlideIndex + 1);
           setCompletedSlides(prev => [...prev, currentSlideIndex]);
