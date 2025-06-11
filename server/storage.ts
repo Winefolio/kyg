@@ -660,17 +660,44 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSlide(slide: InsertSlide): Promise<Slide> {
-    const result = await db
-      .insert(slides)
-      .values({
-        packageWineId: slide.packageWineId,
-        position: slide.position,
-        type: slide.type,
-        section_type: slide.section_type,
-        payloadJson: slide.payloadJson,
-      })
-      .returning();
-    return result[0];
+    // Auto-assign position if not provided to prevent conflicts
+    let targetPosition = slide.position;
+    if (!targetPosition) {
+      const existingSlides = await db.select({ position: slides.position })
+        .from(slides)
+        .where(eq(slides.packageWineId, slide.packageWineId))
+        .orderBy(desc(slides.position))
+        .limit(1);
+      
+      targetPosition = (existingSlides[0]?.position || 0) + 1;
+    }
+
+    // Handle position conflicts by incrementing until available
+    let attempts = 0;
+    while (attempts < 10) {
+      try {
+        const result = await db
+          .insert(slides)
+          .values({
+            packageWineId: slide.packageWineId,
+            position: targetPosition,
+            type: slide.type,
+            section_type: slide.section_type,
+            payloadJson: slide.payloadJson,
+          })
+          .returning();
+        return result[0];
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('duplicate key')) {
+          targetPosition += 1;
+          attempts += 1;
+        } else {
+          throw error;
+        }
+      }
+    }
+    
+    throw new Error(`Could not find available position for slide after ${attempts} attempts`);
   }
 
   // Session methods
