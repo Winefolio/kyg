@@ -18,6 +18,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause, Award, Wine, ChevronDown } from "lucide-react";
 import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
 import { WineTransition } from "@/components/WineTransition";
+import { WineIntroduction } from "@/components/WineIntroduction";
 import { SectionTransition } from "@/components/SectionTransition";
 import { VideoMessageSlide } from "@/components/slides/VideoMessageSlide";
 import { AudioMessageSlide } from "@/components/slides/AudioMessageSlide";
@@ -40,6 +41,11 @@ export default function TastingSession() {
     wineName: string;
   } | null>(null);
   const [expandedWines, setExpandedWines] = useState<Record<string, boolean>>({});
+  const [showingWineIntroduction, setShowingWineIntroduction] = useState(false);
+  const [wineIntroductionData, setWineIntroductionData] = useState<{
+    wine: any;
+    isFirstWine: boolean;
+  } | null>(null);
   const { saveResponse, syncStatus, initializeForSession, endSession } = useSessionPersistence();
   const { triggerHaptic } = useHaptics();
   const queryClient = useQueryClient();
@@ -342,6 +348,23 @@ export default function TastingSession() {
       
       // Check if we're transitioning to a new wine
       if (currentWine && nextWine && currentWine.id !== nextWine.id) {
+        const nextWinePosition = wines.findIndex(w => w.id === nextWine.id) + 1;
+        const isFirstWine = nextWinePosition === 1;
+        
+        // Show wine introduction for 2nd, 3rd, etc. wines (not first wine)
+        if (!isFirstWine) {
+          setWineIntroductionData({
+            wine: {
+              wineName: nextWine.wineName,
+              wineDescription: nextWine.wineDescription,
+              wineImageUrl: nextWine.wineImageUrl,
+              position: nextWinePosition
+            },
+            isFirstWine
+          });
+          setShowingWineIntroduction(true);
+        }
+        
         setIsTransitioningSection(true);
         setTransitionSectionName(nextWine.wineName);
         triggerHaptic('success');
@@ -350,7 +373,7 @@ export default function TastingSession() {
           setCurrentSlideIndex(currentSlideIndex + 1);
           setCompletedSlides(prev => [...prev, currentSlideIndex]);
           setIsTransitioningSection(false);
-        }, 2500); // Extended to 2.5 seconds for proper animation loading
+        }, 2500);
       } 
       // Check if we're transitioning to a new section within the same wine
       // ONLY trigger section transition when completing the LAST slide of current section
@@ -391,6 +414,11 @@ export default function TastingSession() {
     setCurrentSlideIndex(currentSlideIndex + 1);
     setCompletedSlides(prev => [...prev, currentSlideIndex]);
     setSectionTransitionData(null);
+  };
+
+  const handleWineIntroductionComplete = () => {
+    setShowingWineIntroduction(false);
+    setWineIntroductionData(null);
   };
 
   const goToPreviousSlide = () => {
@@ -798,6 +826,17 @@ export default function TastingSession() {
         );
     }
   };
+
+  // Wine introduction for 2nd, 3rd, etc. wines
+  if (showingWineIntroduction && wineIntroductionData) {
+    return (
+      <WineIntroduction
+        wine={wineIntroductionData.wine}
+        isFirstWine={wineIntroductionData.isFirstWine}
+        onContinue={handleWineIntroductionComplete}
+      />
+    );
+  }
 
   // Wine transition overlay
   if (isTransitioningSection && currentWine) {
