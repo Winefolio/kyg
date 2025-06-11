@@ -329,7 +329,7 @@ export default function PackageEditor() {
     }
     
     const sectionTargetIndex = direction === 'up' ? sectionIndex - 1 : sectionIndex + 1;
-    const targetSlide = sectionSlides[targetIndex];
+    const targetSlide = sectionSlides[sectionTargetIndex];
     
     // Check if target is a welcome slide at position 1
     const targetIsWelcome = targetSlide.type === 'interlude' && 
