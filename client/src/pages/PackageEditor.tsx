@@ -93,7 +93,11 @@ export default function PackageEditor() {
 
   // --- MUTATIONS ---
   const createWineMutation = useMutation({
-    mutationFn: (wineData: any) => apiRequest('POST', `/api/wines`, wineData),
+    mutationFn: async (wineData: any) => {
+      const response = await apiRequest('POST', `/api/wines`, wineData);
+      const result = await response.json();
+      return result.wine;
+    },
     onSuccess: async (newWine: PackageWine) => {
       // Auto-create welcome slide for new wine
       const welcomeSlideData = {

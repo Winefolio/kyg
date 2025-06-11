@@ -14,12 +14,31 @@ import {
 import { z } from "zod";
 import { reorderSlidesForWine } from './slide-reorder-fix';
 
-// Configure multer for file uploads
+// Configure multer for file uploads with comprehensive image support
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 200 * 1024 * 1024, // 200MB max file size
   },
+  fileFilter: (req, file, cb) => {
+    // Support all major image formats
+    const allowedImageTypes = [
+      'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif',
+      'image/bmp', 'image/tiff', 'image/svg+xml', 'image/avif', 'image/heic', 'image/heif'
+    ];
+    
+    // For image uploads, check size limit (10MB)
+    if (file.mimetype.startsWith('image/')) {
+      if (allowedImageTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error(`Unsupported image format: ${file.mimetype}`));
+      }
+    } else {
+      // For other media types, use existing logic
+      cb(null, true);
+    }
+  }
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1166,22 +1185,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Media upload endpoints
-  console.log("📁 Registering media upload endpoints...");
-  app.post("/api/upload/media", upload.single('file'), async (req, res) => {
+  // Comprehensive media upload endpoint supporting all image formats up to 10MB
+  console.log("📁 Registering comprehensive media upload endpoints...");
+  
+  app.post("/api/upload", upload.single('file'), async (req, res) => {
     try {
-      // Check if Supabase is configured
-      if (!isSupabaseConfigured()) {
-        return res.status(503).json({ 
-          message: "Media upload is not available. Supabase Storage is not configured." 
-        });
-      }
-
       if (!req.file) {
         return res.status(400).json({ message: "No file provided" });
       }
 
-      const { originalname, buffer, mimetype } = req.file;
+      const { mimetype, buffer, originalname, size } = req.file;
+      
+      // Enhanced validation for image uploads (10MB limit)
+      if (mimetype.startsWith('image/')) {
+        const maxImageSize = 10 * 1024 * 1024; // 10MB for images
+        if (size > maxImageSize) {
+          return res.status(400).json({ 
+            message: "Image file too large. Maximum size is 10MB.",
+            maxSize: maxImageSize,
+            fileSize: size
+          });
+        }
+      }
+
+      // Check if Supabase is configured for production uploads
+      if (!isSupabaseConfigured()) {
+        // For local development, return a base64 data URL
+        const base64 = buffer.toString('base64');
+        const dataUrl = `data:${mimetype};base64,${base64}`;
+        return res.json({ 
+          url: dataUrl,
+          message: "File processed locally (Supabase not configured)",
+          filename: originalname,
+          size: size,
+          type: mimetype
+        });
+      }
+
+      // For production uploads with Supabase
       const { entityId } = req.body; // slide ID, wine ID, or package ID
 
       if (!entityId) {
@@ -1192,7 +1233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mediaType = getMediaType(mimetype);
       if (!mediaType) {
         return res.status(400).json({ 
-          message: `Unsupported file type: ${mimetype}. Supported types: images, audio (MP3, WAV, M4A), video (MP4, WebM, MOV)` 
+          message: `Unsupported file type: ${mimetype}. Supported types: images (JPEG, PNG, WebP, GIF, AVIF, HEIC, etc.), audio (MP3, WAV, M4A), video (MP4, WebM, MOV)` 
         });
       }
 
