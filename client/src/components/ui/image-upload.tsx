@@ -201,6 +201,9 @@ export function ImageUpload({
             <p className="text-white/60 mb-4">
               {isUploading ? 'Uploading...' : 'Drag and drop an image here, or click to select'}
             </p>
+            <p className="text-xs text-white/40 mb-4">
+              Supports: JPEG, PNG, WebP, GIF, AVIF, HEIC, SVG, BMP, TIFF (up to 10MB)
+            </p>
             <Button
               type="button"
               variant="outline"
@@ -217,7 +220,7 @@ export function ImageUpload({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/jpg,image/png,image/webp,image/gif,image/bmp,image/tiff,image/svg+xml,image/avif,image/heic,image/heif"
           onChange={handleFileChange}
           className="hidden"
           disabled={disabled}
