@@ -21,6 +21,7 @@ import { WineModal } from '@/components/WineModal';
 import { SlidePreview } from '@/components/SlidePreview';
 import { SlideConfigPanel } from '@/components/editor/SlideConfigPanel';
 import { QuickQuestionBuilder } from '@/components/editor/QuickQuestionBuilder';
+import { SimpleCopyButton } from '@/components/editor/SimpleCopyButton';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -761,6 +762,22 @@ export default function PackageEditor() {
                               </div>
                             </Button>
                             <div className="flex space-x-1">
+                              {wineSlides.length > 0 && (
+                                <SimpleCopyButton
+                                  sourceWine={{ ...wine, slideCount: wineSlides.length }}
+                                  availableWines={wines.filter(w => w.id !== wine.id).map(w => ({
+                                    ...w,
+                                    slideCount: localSlides.filter(s => s.packageWineId === w.id).length
+                                  }))}
+                                  onCopyComplete={(targetWineId, count) => {
+                                    toast({
+                                      title: "Slides Copied",
+                                      description: `${count} slides copied successfully`,
+                                    });
+                                    queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+                                  }}
+                                />
+                              )}
                               <Button 
                                 size="sm" 
                                 variant="ghost" 
