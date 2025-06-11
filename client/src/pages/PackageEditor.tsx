@@ -91,7 +91,11 @@ export default function PackageEditor() {
     }
   }, [editorData]);
 
-  const activeSlide = localSlides.find(s => s.id === activeSlideId);
+  // Filter out package intro slides from being selectable as active slides
+  const activeSlide = localSlides.find(s => 
+    s.id === activeSlideId && 
+    !(s.payloadJson && (s.payloadJson as any).is_package_intro === true)
+  );
 
   // --- MUTATIONS ---
   const createWineMutation = useMutation({
@@ -105,31 +109,8 @@ export default function PackageEditor() {
       const wines = editorData?.wines || [];
       const isFirstWine = wines.length === 0;
       
-      if (isFirstWine) {
-        // Create package introduction slide (position 1)
-        const packageIntroData = {
-          packageWineId: newWine.id,
-          position: 1,
-          type: 'interlude',
-          section_type: 'intro',
-          payloadJson: {
-            title: `Welcome to ${editorData?.name || 'Your Wine Tasting'}`,
-            description: 'You are about to embark on a journey through exceptional wines. Each wine has been carefully selected to showcase unique characteristics and flavors.',
-            is_package_intro: true,
-            package_name: editorData?.name || 'Wine Tasting Package',
-            background_image: "https://images.unsplash.com/photo-1547595628-c61a29f496f0?w=800&h=600&fit=crop"
-          }
-        };
-        
-        try {
-          await apiRequest('POST', '/api/slides', packageIntroData);
-        } catch (error) {
-          console.error('Failed to create package intro slide:', error);
-        }
-      }
-      
-      // Auto-create wine introduction slide
-      const wineIntroPosition = isFirstWine ? 2 : 1; // Position 2 if package intro exists, otherwise 1
+      // Auto-create wine introduction slide (no package intro slide needed)
+      const wineIntroPosition = 1;
       const wineIntroData = {
         packageWineId: newWine.id,
         position: wineIntroPosition,
@@ -706,7 +687,11 @@ export default function PackageEditor() {
 
                 <div className="space-y-4">
                   {wines.map(wine => {
-                    const wineSlides = localSlides.filter(s => s.packageWineId === wine.id);
+                    // Filter out package intro slides from wine sections
+                    const wineSlides = localSlides.filter(s => 
+                      s.packageWineId === wine.id && 
+                      !(s.payloadJson && (s.payloadJson as any).is_package_intro === true)
+                    );
                     const isExpanded = expandedWines.has(wine.id);
                     return (
                       <Card key={wine.id} className="bg-gradient-to-br from-white/8 to-white/4 border-white/20 backdrop-blur-sm shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-black/30 transition-all duration-300">
