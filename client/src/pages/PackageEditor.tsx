@@ -762,22 +762,6 @@ export default function PackageEditor() {
                               </div>
                             </Button>
                             <div className="flex space-x-1">
-                              {wineSlides.length > 0 && (
-                                <SimpleCopyButton
-                                  sourceWine={{ ...wine, slideCount: wineSlides.length }}
-                                  availableWines={wines.filter(w => w.id !== wine.id).map(w => ({
-                                    ...w,
-                                    slideCount: localSlides.filter(s => s.packageWineId === w.id).length
-                                  }))}
-                                  onCopyComplete={(targetWineId, count) => {
-                                    toast({
-                                      title: "Slides Copied",
-                                      description: `${count} slides copied successfully`,
-                                    });
-                                    queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
-                                  }}
-                                />
-                              )}
                               <Button 
                                 size="sm" 
                                 variant="ghost" 
@@ -798,6 +782,48 @@ export default function PackageEditor() {
                               </Button>
                             </div>
                           </div>
+                          
+                          {/* Copy Button Row - Separate line below wine header */}
+                          {wineSlides.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-white/10 flex justify-end">
+                              <SimpleCopyButton
+                                sourceWine={{ ...wine, slideCount: wineSlides.length }}
+                                availableWines={wines.filter(w => w.id !== wine.id).map(w => ({
+                                  ...w,
+                                  slideCount: localSlides.filter(s => s.packageWineId === w.id).length
+                                }))}
+                                onCopyComplete={async (targetWineId, count) => {
+                                  // Force immediate refresh of editor data
+                                  await queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+                                  
+                                  // Refetch and update local state immediately
+                                  try {
+                                    const response = await fetch(`/api/packages/${code}/editor`);
+                                    const freshData = await response.json();
+                                    
+                                    // Update all relevant state with fresh data
+                                    setLocalSlides(freshData.slides || []);
+                                    setSlides(freshData.slides || []);
+                                    
+                                    // Also update query cache
+                                    queryClient.setQueryData([`/api/packages/${code}/editor`], freshData);
+                                    
+                                    toast({
+                                      title: "Slides Copied Successfully", 
+                                      description: `${count} non-intro slides copied to wine`,
+                                    });
+                                  } catch (error) {
+                                    console.error('Error refreshing editor data:', error);
+                                    toast({
+                                      title: "Slides Copied",
+                                      description: `${count} slides copied, please refresh page if not visible`,
+                                      variant: "default"
+                                    });
+                                  }
+                                }}
+                              />
+                            </div>
+                          )}
                           <AnimatePresence>
                             {isExpanded && (
                               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="pl-4 mt-2 border-l-2 border-white/10 ml-5 space-y-4 py-2">

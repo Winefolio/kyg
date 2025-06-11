@@ -752,7 +752,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await storage.duplicateWineSlides(
         wineId, 
         targetWineId, 
-        replaceExisting || false
+        Boolean(replaceExisting)
       );
 
       res.json({

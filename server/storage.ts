@@ -1988,13 +1988,35 @@ export class DatabaseStorage implements IStorage {
         throw new Error('Wines must be in the same package');
       }
 
-      // 2. Fetch source slides
+      // 2. Fetch source slides (EXCLUDE intro slides - only copy deep dive, ending, etc.)
       const sourceSlides = await db.select()
         .from(slides)
         .where(eq(slides.packageWineId, sourceWineId))
         .orderBy(slides.position);
 
-      if (sourceSlides.length === 0) {
+      // Filter out intro slides and welcome slides - only copy deep dive, ending, conclusion slides
+      const slidesToCopy = sourceSlides.filter(slide => {
+        const sectionType = slide.section_type;
+        const payloadJson = slide.payloadJson as any;
+        
+        // Skip intro section slides
+        if (sectionType === 'intro') return false;
+        
+        // Skip welcome slides (usually marked with is_welcome or title contains "welcome")
+        if (payloadJson?.is_welcome || 
+            payloadJson?.title?.toLowerCase().includes('welcome') ||
+            payloadJson?.title?.toLowerCase().includes('introduction')) {
+          return false;
+        }
+        
+        // Only include deep dive, ending, conclusion, tasting slides
+        return sectionType === 'deep_dive' || 
+               sectionType === 'tasting' || 
+               sectionType === 'ending' || 
+               sectionType === 'conclusion';
+      });
+
+      if (slidesToCopy.length === 0) {
         return { count: 0, slides: [] };
       }
 
@@ -2020,8 +2042,8 @@ export class DatabaseStorage implements IStorage {
       // 5. Create duplicated slides
       const duplicatedSlides: Slide[] = [];
       
-      for (let i = 0; i < sourceSlides.length; i++) {
-        const sourceSlide = sourceSlides[i];
+      for (let i = 0; i < slidesToCopy.length; i++) {
+        const sourceSlide = slidesToCopy[i];
         const newSlideId = crypto.randomUUID();
         const newPosition = replaceExisting ? sourceSlide.position : startingPosition + i;
 

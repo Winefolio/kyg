@@ -61,7 +61,7 @@ export function SimpleCopyButton({
       if (response.ok && result.success) {
         toast({
           title: "Slides Copied Successfully",
-          description: `${result.duplicatedCount} slides copied to ${selectedTargetWine.wineName}`,
+          description: `${result.duplicatedCount} non-intro slides copied to ${selectedTargetWine.wineName}`,
         });
         
         onCopyComplete(selectedTargetWine.id, result.duplicatedCount);
