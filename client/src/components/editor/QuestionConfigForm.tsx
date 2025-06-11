@@ -1,5 +1,5 @@
 // client/src/components/editor/QuestionConfigForm.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch'; // Added missing import
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2, PlusCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface QuestionConfigFormProps {
   payload: any;
@@ -14,6 +15,20 @@ interface QuestionConfigFormProps {
 }
 
 export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigFormProps) {
+  const questionType = payload.question_type || payload.type || 'multiple_choice';
+
+  // Initialize options when changing to multiple choice
+  useEffect(() => {
+    if (questionType === 'multiple_choice' && (!payload.options || payload.options.length === 0)) {
+      onPayloadChange({
+        ...payload,
+        options: [
+          { value: 'option1', text: 'Option 1', description: '' },
+          { value: 'option2', text: 'Option 2', description: '' }
+        ]
+      });
+    }
+  }, [questionType]);
 
   const handleFieldChange = (field: string, value: any) => {
     onPayloadChange({ ...payload, [field]: value });
@@ -62,7 +77,12 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
         {(payload.question_type === 'multiple_choice' || payload.type === 'multiple_choice') && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-                <Label className="text-white/80">Answer Options</Label>
+                <div className="flex items-center space-x-2">
+                    <Label className="text-white/80">Answer Options</Label>
+                    <Badge variant="secondary" className="bg-purple-600/20 text-purple-300">
+                        {payload.options?.length || 0} options
+                    </Badge>
+                </div>
                 <div className="flex items-center space-x-2">
                     <Label htmlFor="allow_multiple" className="text-xs text-white/70">Allow Multiple</Label>
                     <Switch id="allow_multiple" checked={payload.allow_multiple || false} onCheckedChange={(checked) => handleFieldChange('allow_multiple', checked)} />

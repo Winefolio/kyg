@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,8 @@ import { apiRequest } from '@/lib/queryClient';
 import { SLIDE_TEMPLATES } from '@/lib/wineTemplates';
 import { 
   ArrowLeft, Save, PlusCircle, Edit3, Trash2, Wine, HelpCircle, 
-  Video, Eye, Settings, ChevronRight, ChevronDown, Menu, X, Monitor, Smartphone, Plus, Sparkles
+  Video, Eye, Settings, ChevronRight, ChevronDown, Menu, X, Monitor, Smartphone, Plus, Sparkles, GripVertical,
+  ArrowUp, ArrowDown
 } from 'lucide-react';
 import type { Package, PackageWine, Slide, GenericQuestion } from "@shared/schema";
 import { WineModal } from '@/components/WineModal';
@@ -38,6 +39,8 @@ export default function PackageEditor() {
 
   const [wines, setWines] = useState<PackageWine[]>([]);
   const [slides, setSlides] = useState<Slide[]>([]);
+  const [localSlides, setLocalSlides] = useState<Slide[]>([]);
+  const [hasLocalChanges, setHasLocalChanges] = useState(false);
   const [activeSlideId, setActiveSlideId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isWineModalOpen, setIsWineModalOpen] = useState(false);
@@ -62,12 +65,13 @@ export default function PackageEditor() {
   });
 
   useEffect(() => {
-    if (editorData) {
+    if (editorData && !hasLocalChanges) {
       const sortedWines = [...(editorData.wines || [])].sort((a, b) => a.position - b.position);
       const sortedSlides = [...(editorData.slides || [])].sort((a, b) => a.position - b.position);
 
       setWines(sortedWines);
       setSlides(sortedSlides);
+      setLocalSlides(sortedSlides); // Set localSlides for UI rendering
 
       if (sortedWines.length > 0) {
         const firstWineId = sortedWines[0].id;
@@ -78,16 +82,37 @@ export default function PackageEditor() {
         }
       }
     }
-  }, [editorData]);
+  }, [editorData, hasLocalChanges]);
 
-  const activeSlide = slides.find(s => s.id === activeSlideId);
+  const activeSlide = localSlides.find(s => s.id === activeSlideId);
 
   // --- MUTATIONS ---
   const createWineMutation = useMutation({
     mutationFn: (wineData: any) => apiRequest('POST', `/api/wines`, wineData),
-    onSuccess: () => {
+    onSuccess: async (newWine: PackageWine) => {
+      // Auto-create welcome slide for new wine
+      const welcomeSlideData = {
+        packageWineId: newWine.id,
+        position: 1,
+        type: 'interlude',
+        section_type: 'intro',
+        payloadJson: {
+          title: `Welcome to ${newWine.wineName}`,
+          description: 'Get ready for an amazing tasting experience',
+          wine_name: newWine.wineName,
+          wine_image: newWine.wineImageUrl || ''
+        }
+      };
+      
+      try {
+        await apiRequest('POST', '/api/slides', welcomeSlideData);
+        toast({ title: "Wine created with welcome slide" });
+      } catch (error) {
+        console.error('Failed to create welcome slide:', error);
+        toast({ title: "Wine created successfully", description: "Note: Welcome slide creation failed" });
+      }
+      
       queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
-      toast({ title: "Wine created successfully" });
       setIsWineModalOpen(false);
     },
     onError: (error: any) => toast({ title: "Error creating wine", description: error.message, variant: "destructive" }),
@@ -140,6 +165,32 @@ export default function PackageEditor() {
     onError: (error: any) => toast({ title: "Error deleting slide", description: error.message, variant: "destructive" }),
   });
 
+  const reorderSlidesMutation = useMutation({
+    mutationFn: (updates: { slideId: string; position: number; packageWineId?: string }[]) => 
+      apiRequest('PUT', '/api/slides/reorder', { updates }),
+    onSuccess: () => {
+      // Don't invalidate query immediately to preserve local state
+      setHasLocalChanges(false); // Reset flag after successful save
+      toast({ title: "Slides reordered successfully" });
+    },
+    onError: (error: any) => {
+      // On error, revert to server state
+      setHasLocalChanges(false);
+      queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+      toast({ title: "Error reordering slides", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // --- HELPER FUNCTIONS ---
+  const getNextPositionForSection = (wineId: string, sectionType: string): number => {
+    const sectionSlides = localSlides.filter(
+      s => s.packageWineId === wineId && s.section_type === sectionType
+    );
+    return sectionSlides.length > 0 
+      ? Math.max(...sectionSlides.map(s => s.position)) + 1 
+      : 1;
+  };
+
   // --- HANDLER FUNCTIONS ---
   const handleWineSave = (wineData: Partial<any>) => {
     if (editingWine) {
@@ -159,20 +210,30 @@ export default function PackageEditor() {
   };
 
   const handleAddSlide = (wineId: string, template: any, sectionType?: 'intro' | 'deep_dive' | 'ending') => {
-    const wineSlides = slides.filter(s => s.packageWineId === wineId);
-    const nextPosition = (wineSlides.length > 0 ? Math.max(...wineSlides.map(s => s.position)) : 0) + 1;
+    const targetSection = sectionType || template.sectionType || 'deep_dive';
+    const nextPosition = getNextPositionForSection(wineId, targetSection);
+    const wine = wines.find(w => w.id === wineId);
+
+    // Clone the payload template and replace placeholders
+    let payloadJson = {
+      ...template.payloadTemplate,
+      title: template.payloadTemplate?.title || template.name,
+      description: template.payloadTemplate?.description || template.description || ''
+    };
+
+    // Replace wine name placeholder in welcome slides
+    if (template.id === 'welcome-slide' && wine) {
+      payloadJson.title = payloadJson.title.replace('{Wine Name}', wine.wineName);
+      payloadJson.wine_name = wine.wineName;
+      payloadJson.wine_image = wine.wineImageUrl || '';
+    }
 
     const slideData = {
       packageWineId: wineId,
       position: nextPosition,
       type: template.type,
-      // Use the provided sectionType, or default from the template, or fallback to 'deep_dive'
-      section_type: sectionType || template.sectionType || 'deep_dive',
-      payloadJson: {
-        title: template.name,
-        description: template.description || '',
-        ...(template.payloadTemplate || {}),
-      },
+      section_type: targetSection,
+      payloadJson,
     };
     createSlideMutation.mutate(slideData);
   };
@@ -182,7 +243,108 @@ export default function PackageEditor() {
   };
 
   const handleSlideDelete = (slideId: string) => {
+    const slide = localSlides.find(s => s.id === slideId);
+    if (!slide) return;
+    
+    // Check if this is a welcome slide
+    const isWelcomeSlide = slide.type === 'interlude' && 
+      slide.section_type === 'intro' &&
+      (slide.payloadJson as any)?.title?.toLowerCase().includes('welcome');
+    
+    if (isWelcomeSlide) {
+      // Check if this is the only welcome slide for this wine
+      const wineWelcomeSlides = localSlides.filter(s => 
+        s.packageWineId === slide.packageWineId &&
+        s.type === 'interlude' &&
+        s.section_type === 'intro' &&
+        (s.payloadJson as any)?.title?.toLowerCase().includes('welcome')
+      );
+      
+      if (wineWelcomeSlides.length === 1) {
+        toast({ 
+          title: "Cannot delete welcome slide", 
+          description: "Each wine must have at least one welcome slide",
+          variant: "destructive" 
+        });
+        return;
+      }
+    }
+    
     deleteSlideMutation.mutate(slideId);
+  };
+
+  const handleSlideReorder = (slideId: string, direction: 'up' | 'down') => {
+    const slide = localSlides.find(s => s.id === slideId);
+    if (!slide) return;
+    
+    // Check if this is a welcome slide in intro section
+    const isWelcomeSlide = slide.type === 'interlude' && 
+      slide.section_type === 'intro' &&
+      (slide.payloadJson as any)?.title?.toLowerCase().includes('welcome');
+    
+    // Prevent moving welcome slide down from position 1
+    if (isWelcomeSlide && direction === 'down' && slide.position === 1) {
+      toast({ 
+        title: "Cannot move welcome slide", 
+        description: "Welcome slides must remain at the beginning of the intro section",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    // Get slides in the same wine AND section, sorted by position
+    const sectionSlides = localSlides
+      .filter(s => s.packageWineId === slide.packageWineId && s.section_type === slide.section_type)
+      .sort((a, b) => a.position - b.position);
+    
+    const currentIndex = sectionSlides.findIndex(s => s.id === slideId);
+    if ((direction === 'up' && currentIndex === 0) || 
+        (direction === 'down' && currentIndex === sectionSlides.length - 1)) {
+      return;
+    }
+    
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    const targetSlide = sectionSlides[targetIndex];
+    
+    // Check if target is a welcome slide at position 1
+    const targetIsWelcome = targetSlide.type === 'interlude' && 
+      targetSlide.section_type === 'intro' &&
+      (targetSlide.payloadJson as any)?.title?.toLowerCase().includes('welcome') &&
+      targetSlide.position === 1;
+    
+    if (targetIsWelcome && direction === 'up') {
+      toast({ 
+        title: "Cannot move above welcome slide", 
+        description: "Welcome slides must remain at the beginning of the intro section",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    // Swap positions
+    const updates = [
+      { slideId: slide.id, position: targetSlide.position },
+      { slideId: targetSlide.id, position: slide.position }
+    ];
+    
+    // Update local state optimistically
+    const newLocalSlides = localSlides.map(s => {
+      const update = updates.find(u => u.slideId === s.id);
+      if (update) {
+        return { ...s, position: update.position };
+      }
+      return s;
+    });
+    
+    // Set local state and mark as having changes
+    setLocalSlides(newLocalSlides);
+    setHasLocalChanges(true);
+    
+    // Also update slides state for activeSlide reference
+    setSlides(newLocalSlides);
+    
+    // Send to server
+    reorderSlidesMutation.mutate(updates);
   };
 
   const handleQuickAddQuestion = (wineId: string, sectionType: 'intro' | 'deep_dive' | 'ending') => {
@@ -201,9 +363,8 @@ export default function PackageEditor() {
   const handleQuestionSave = (question: GenericQuestion) => {
     if (!currentWineContext) return;
 
-    const wineSlides = slides.filter(s => s.packageWineId === currentWineContext.wineId);
-    // Position must be unique across ALL slides for this wine, not just the section
-    const nextPosition = (wineSlides.length > 0 ? Math.max(...wineSlides.map(s => s.position)) : 0) + 1;
+    // Use getNextPositionForSection for proper section-based positioning
+    const nextPosition = getNextPositionForSection(currentWineContext.wineId, currentWineContext.sectionType);
 
     // Determine the correct slide type based on question format
     let slideType: 'question' | 'video_message' | 'audio_message' = 'question';
@@ -312,7 +473,7 @@ export default function PackageEditor() {
                 </div>
                 <div className="space-y-4">
                   {wines.map(wine => {
-                    const wineSlides = slides.filter(s => s.packageWineId === wine.id);
+                    const wineSlides = localSlides.filter(s => s.packageWineId === wine.id);
                     const isExpanded = expandedWines.has(wine.id);
                     return (
                       <Card key={wine.id} className="bg-gradient-to-br from-white/8 to-white/4 border-white/20 backdrop-blur-sm shadow-xl shadow-black/20 hover:shadow-2xl hover:shadow-black/30 transition-all duration-300">
@@ -358,7 +519,18 @@ export default function PackageEditor() {
                               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="pl-4 mt-2 border-l-2 border-white/10 ml-5 space-y-4 py-2">
                                 {/* --- SECTION-BASED UI (POWER USER FLOW) --- */}
                                 {Object.entries(sectionDetails).map(([key, { title, icon }]) => {
-                                  const sectionSlides = wineSlides.filter(s => s.section_type === key);
+                                  const sectionSlides = wineSlides
+                                    .filter(s => s.section_type === key)
+                                    .sort((a, b) => {
+                                      // Welcome slides always first in intro section
+                                      if (key === 'intro') {
+                                        const aIsWelcome = a.type === 'interlude' && (a.payloadJson as any)?.title?.toLowerCase().includes('welcome');
+                                        const bIsWelcome = b.type === 'interlude' && (b.payloadJson as any)?.title?.toLowerCase().includes('welcome');
+                                        if (aIsWelcome && !bIsWelcome) return -1;
+                                        if (!aIsWelcome && bIsWelcome) return 1;
+                                      }
+                                      return a.position - b.position;
+                                    });
                                   return (
                                     <div key={key}>
                                       <div className="mb-3">
@@ -379,26 +551,75 @@ export default function PackageEditor() {
                                       </div>
                                       <div className="pl-3 space-y-1.5">
                                         {sectionSlides.length > 0 ? (
-                                          sectionSlides.map(slide => (
-                                            <div 
-                                              key={slide.id} 
-                                              className={`group p-2.5 rounded-lg cursor-pointer transition-all duration-200 border border-transparent ${
-                                                activeSlideId === slide.id 
-                                                  ? 'bg-gradient-to-r from-purple-600/40 to-purple-700/30 border-purple-500/50 shadow-lg shadow-purple-900/25' 
-                                                  : 'hover:bg-white/8 hover:border-white/10 hover:shadow-md'
-                                              }`} 
-                                              onClick={() => setActiveSlideId(slide.id)}
-                                            >
-                                              <div className="flex items-center">
-                                                <div className={`w-1.5 h-1.5 rounded-full mr-2.5 transition-colors ${
-                                                  activeSlideId === slide.id ? 'bg-purple-300' : 'bg-white/40 group-hover:bg-white/60'
-                                                }`} />
-                                                <p className="text-sm font-medium text-white truncate">
-                                                  {(slide.payloadJson as any)?.title || 'Untitled Slide'}
-                                                </p>
+                                          sectionSlides.map(slide => {
+                                            const isWelcomeSlide = slide.type === 'interlude' && 
+                                              (slide.payloadJson as any)?.title?.toLowerCase().includes('welcome');
+                                            
+                                            const slideIndex = sectionSlides.findIndex(s => s.id === slide.id);
+                                            const canMoveUp = slideIndex > 0;
+                                            const canMoveDown = slideIndex < sectionSlides.length - 1;
+                                            
+                                            return (
+                                              <div 
+                                                key={slide.id} 
+                                                className={`group relative rounded-lg transition-all duration-200 border ${
+                                                  activeSlideId === slide.id 
+                                                    ? 'bg-gradient-to-r from-purple-600/40 to-purple-700/30 border-purple-500/50 shadow-lg shadow-purple-900/25' 
+                                                    : isWelcomeSlide
+                                                    ? 'bg-gradient-to-r from-amber-900/20 to-amber-800/10 border-amber-500/20 hover:border-amber-500/40'
+                                                    : 'border-transparent hover:bg-white/8 hover:border-white/10 hover:shadow-md'
+                                                }`}
+                                              >
+                                                <div 
+                                                  className="p-2.5 cursor-pointer flex items-center"
+                                                  onClick={() => setActiveSlideId(slide.id)}
+                                                >
+                                                  <GripVertical className="w-3.5 h-3.5 text-white/30 mr-2 flex-shrink-0" />
+                                                  <div className={`w-1.5 h-1.5 rounded-full mr-2.5 transition-colors ${
+                                                    activeSlideId === slide.id 
+                                                      ? 'bg-purple-300' 
+                                                      : isWelcomeSlide 
+                                                      ? 'bg-amber-400' 
+                                                      : 'bg-white/40 group-hover:bg-white/60'
+                                                  }`} />
+                                                  <p className="text-sm font-medium text-white truncate flex items-center flex-1">
+                                                    {isWelcomeSlide && <Sparkles className="w-3 h-3 mr-1.5 text-amber-400" />}
+                                                    {(slide.payloadJson as any)?.title || 'Untitled Slide'}
+                                                  </p>
+                                                  
+                                                  {/* Reorder buttons */}
+                                                  <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Button
+                                                      size="sm"
+                                                      variant="ghost"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleSlideReorder(slide.id, 'up');
+                                                      }}
+                                                      disabled={!canMoveUp}
+                                                      className="h-6 w-6 p-0 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+                                                      title="Move up"
+                                                    >
+                                                      <ArrowUp className="w-3 h-3" />
+                                                    </Button>
+                                                    <Button
+                                                      size="sm"
+                                                      variant="ghost"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleSlideReorder(slide.id, 'down');
+                                                      }}
+                                                      disabled={!canMoveDown}
+                                                      className="h-6 w-6 p-0 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+                                                      title="Move down"
+                                                    >
+                                                      <ArrowDown className="w-3 h-3" />
+                                                    </Button>
+                                                  </div>
+                                                </div>
                                               </div>
-                                            </div>
-                                          ))
+                                            );
+                                          })
                                         ) : (
                                           <div className="px-3 py-2 text-xs text-white/50 italic bg-white/5 rounded-lg border border-dashed border-white/20">
                                             No slides in this section
@@ -450,19 +671,52 @@ export default function PackageEditor() {
 
         {/* Main Content Area */}
         <div className="flex-1 p-6 overflow-y-auto">
-          {activeSlide ? (
-            <motion.div key={activeSlide.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-              <div className="mb-6 text-center">
-                <h2 className="text-2xl font-bold">Slide Editor Panel</h2>
-                <p className="text-white/70">Editing: {(activeSlide.payloadJson as any)?.title}</p>
-              </div>
-              <SlideConfigPanel
-                slide={activeSlide}
-                onUpdate={handleSlideUpdate}
-                onDelete={handleSlideDelete}
-              />
-            </motion.div>
-          ) : (
+          {activeSlide ? (() => {
+            const currentWine = wines.find(w => w.id === activeSlide.packageWineId);
+            const wineSlides = localSlides.filter(s => s.packageWineId === activeSlide.packageWineId);
+            const slideNumber = wineSlides.findIndex(s => s.id === activeSlide.id) + 1;
+            const totalSlidesInWine = wineSlides.length;
+            
+            return (
+              <motion.div key={activeSlide.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                {/* Enhanced Breadcrumb Navigation */}
+                <div className="mb-6">
+                  <div className="flex items-center space-x-2 text-white/60 text-sm mb-3">
+                    <span className="text-white/80 font-medium">{editorData.name}</span>
+                    <ChevronRight className="w-4 h-4" />
+                    <span className="text-white/80 font-medium">{currentWine?.wineName}</span>
+                    <ChevronRight className="w-4 h-4" />
+                    <span className="text-white/80 font-medium">
+                      {sectionDetails[activeSlide.section_type || 'deep_dive'].icon} {sectionDetails[activeSlide.section_type || 'deep_dive'].title}
+                    </span>
+                    <ChevronRight className="w-4 h-4" />
+                    <span className="text-purple-300 font-medium">Slide {slideNumber} of {totalSlidesInWine}</span>
+                  </div>
+                  
+                  {/* Slide Title and Type */}
+                  <div className="bg-gradient-to-r from-purple-900/30 to-transparent rounded-lg p-4 border border-purple-500/20">
+                    <h2 className="text-2xl font-bold text-white mb-1">
+                      {(activeSlide.payloadJson as any)?.title || 'Untitled Slide'}
+                    </h2>
+                    <div className="flex items-center space-x-3">
+                      <Badge className="bg-purple-600/20 text-purple-300">
+                        {activeSlide.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </Badge>
+                      <span className="text-white/50 text-sm">
+                        Position: {activeSlide.position}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <SlideConfigPanel
+                  slide={activeSlide}
+                  onUpdate={handleSlideUpdate}
+                  onDelete={handleSlideDelete}
+                />
+              </motion.div>
+            );
+          })() : (
             <div className="flex items-center justify-center h-full"><div className="text-center"><Settings className="h-12 w-12 text-white/40 mx-auto mb-4" /><h3 className="text-lg font-medium text-white mb-2">Select a Wine or Slide</h3><p className="text-white/60">Choose an item from the sidebar to begin editing.</p></div></div>
           )}
         </div>

@@ -522,6 +522,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Export session analytics as CSV
+  app.get("/api/sessions/:sessionId/export/csv", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      
+      // Get analytics data
+      const analyticsData = await storage.getAggregatedSessionAnalytics(sessionId);
+      
+      // Get all responses for detailed export
+      const responses = await storage.getSessionResponses(sessionId);
+      
+      // Build CSV content
+      let csv = 'Session Analytics Export\n';
+      csv += `Session ID:,${analyticsData.sessionId}\n`;
+      csv += `Session Name:,${analyticsData.sessionName}\n`;
+      csv += `Package:,${analyticsData.packageName}\n`;
+      csv += `Total Participants:,${analyticsData.totalParticipants}\n`;
+      csv += `Completed Participants:,${analyticsData.completedParticipants}\n`;
+      csv += `Average Progress:,${analyticsData.averageProgressPercent}%\n`;
+      csv += '\n';
+      
+      // Question-by-question breakdown
+      csv += 'Question Analytics\n';
+      csv += 'Position,Title,Type,Total Responses,Details\n';
+      
+      for (const slide of analyticsData.slidesAnalytics) {
+        csv += `${slide.slidePosition},"${slide.slideTitle.replace(/"/g, '""')}",${slide.questionType || 'N/A'},${slide.totalResponses},`;
+        
+        if (slide.questionType === 'multiple_choice' && slide.aggregatedData.optionsSummary) {
+          // Format multiple choice options
+          const optionsText = slide.aggregatedData.optionsSummary
+            .map(opt => `${opt.optionText}: ${opt.count} (${opt.percentage}%)`)
+            .join(' | ');
+          csv += `"${optionsText.replace(/"/g, '""')}"\n`;
+          
+          if (slide.aggregatedData.notesSubmittedCount) {
+            csv += `,,,,"Notes submitted: ${slide.aggregatedData.notesSubmittedCount}"\n`;
+          }
+        } else if (slide.questionType === 'scale' && slide.aggregatedData.averageScore !== undefined) {
+          csv += `"Average: ${slide.aggregatedData.averageScore}, Range: ${slide.aggregatedData.minScore}-${slide.aggregatedData.maxScore}"\n`;
+        } else {
+          csv += '"No response data"\n';
+        }
+      }
+      
+      csv += '\n';
+      
+      // Detailed responses section
+      csv += 'Detailed Participant Responses\n';
+      csv += 'Participant,Email,Question,Answer,Notes,Timestamp\n';
+      
+      for (const response of responses) {
+        const answer = response.responseType === 'scale' 
+          ? response.scaleValue?.toString() || 'N/A'
+          : response.selectedOptionText || 'N/A';
+        
+        csv += `"${response.participantName.replace(/"/g, '""')}",`;
+        csv += `"${(response.participantEmail || 'N/A').replace(/"/g, '""')}",`;
+        csv += `"${response.slideTitle.replace(/"/g, '""')}",`;
+        csv += `"${answer.replace(/"/g, '""')}",`;
+        csv += `"${(response.notes || '').replace(/"/g, '""')}",`;
+        csv += `"${new Date(response.answeredAt).toLocaleString()}"\n`;
+      }
+      
+      // Set headers for CSV download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="wine-tasting-session-${sessionId}-analytics.csv"`);
+      res.send(csv);
+      
+    } catch (error) {
+      console.error("Error exporting session analytics:", error);
+      if (error instanceof Error && error.message === 'Session not found') {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Get participant by ID
   app.get("/api/participants/:participantId", async (req, res) => {
     try {
@@ -807,6 +885,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting slide:", error);
       res.status(500).json({ error: "Failed to delete slide" });
+    }
+  });
+
+  // Reorder slides
+  app.put("/api/slides/reorder", async (req, res) => {
+    try {
+      const { updates } = req.body;
+      if (!Array.isArray(updates)) {
+        return res.status(400).json({ message: "Updates must be an array" });
+      }
+      
+      // Update each slide's position
+      for (const update of updates) {
+        if (update.slideId && update.position) {
+          await storage.updateSlide(update.slideId, { position: update.position });
+        }
+      }
+      
+      res.json({ message: "Slides reordered successfully" });
+    } catch (error) {
+      console.error("Error reordering slides:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 

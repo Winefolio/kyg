@@ -9,6 +9,8 @@ import { SegmentedProgressBar } from "@/components/ui/SegmentedProgressBar";
 import { MultipleChoiceQuestion } from "@/components/questions/MultipleChoiceQuestion";
 import { EnhancedMultipleChoice } from "@/components/questions/EnhancedMultipleChoice";
 import { ScaleQuestion } from "@/components/questions/ScaleQuestion";
+import { TextQuestion } from "@/components/questions/TextQuestion";
+import { BooleanQuestion } from "@/components/questions/BooleanQuestion";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import { useHaptics } from "@/hooks/useHaptics";
@@ -535,34 +537,38 @@ export default function TastingSession() {
                 </div>
               );
             
+            case 'text':
+              return (
+                <TextQuestion
+                  question={{
+                    title: gq.config.title,
+                    description: gq.config.description,
+                    placeholder: (gq.config as any).placeholder,
+                    maxLength: (gq.config as any).maxLength,
+                    minLength: (gq.config as any).minLength,
+                    rows: (gq.config as any).rows,
+                    category: gq.config.category
+                  }}
+                  value={answers[currentSlide.id] || ''}
+                  onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+                />
+              );
+            
             case 'boolean':
               return (
-                <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
-                  <h3 className="text-lg font-semibold text-white mb-4">
-                    <DynamicTextRenderer text={gq.config.title} />
-                  </h3>
-                  {gq.config.description && (
-                    <p className="text-white/70 text-sm mb-6">
-                      <DynamicTextRenderer text={gq.config.description} />
-                    </p>
-                  )}
-                  <div className="flex gap-4 justify-center">
-                    <Button
-                      variant={answers[currentSlide.id] === true ? "default" : "outline"}
-                      onClick={() => handleAnswerChange(currentSlide.id, true)}
-                      className="flex-1 max-w-32"
-                    >
-                      {gq.config.trueLabel || 'Yes'}
-                    </Button>
-                    <Button
-                      variant={answers[currentSlide.id] === false ? "default" : "outline"}
-                      onClick={() => handleAnswerChange(currentSlide.id, false)}
-                      className="flex-1 max-w-32"
-                    >
-                      {gq.config.falseLabel || 'No'}
-                    </Button>
-                  </div>
-                </div>
+                <BooleanQuestion
+                  question={{
+                    title: gq.config.title,
+                    description: gq.config.description,
+                    category: gq.config.category,
+                    trueLabel: (gq.config as any).trueLabel,
+                    falseLabel: (gq.config as any).falseLabel,
+                    trueIcon: (gq.config as any).trueIcon,
+                    falseIcon: (gq.config as any).falseIcon
+                  }}
+                  value={answers[currentSlide.id] ?? null}
+                  onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+                />
               );
             
             case 'video_message':
@@ -655,6 +661,42 @@ export default function TastingSession() {
                 show_controls: questionData.controls !== false
               } as VideoMessagePayload}
               key={`video-legacy-${currentSlide.id}`}
+            />
+          );
+        }
+
+        if (questionData.questionType === 'text' || questionData.question_type === 'text') {
+          return (
+            <TextQuestion
+              question={{
+                title: questionData.title || questionData.question,
+                description: questionData.description || '',
+                placeholder: questionData.placeholder || '',
+                maxLength: questionData.maxLength || questionData.max_length || 500,
+                minLength: questionData.minLength || questionData.min_length,
+                rows: questionData.rows || 4,
+                category: questionData.category || 'Text Response'
+              }}
+              value={answers[currentSlide.id] || ''}
+              onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+            />
+          );
+        }
+
+        if (questionData.questionType === 'boolean' || questionData.question_type === 'boolean') {
+          return (
+            <BooleanQuestion
+              question={{
+                title: questionData.title || questionData.question,
+                description: questionData.description || '',
+                category: questionData.category || 'Yes/No',
+                trueLabel: questionData.trueLabel || questionData.true_label,
+                falseLabel: questionData.falseLabel || questionData.false_label,
+                trueIcon: questionData.trueIcon !== false,
+                falseIcon: questionData.falseIcon !== false
+              }}
+              value={answers[currentSlide.id] ?? null}
+              onChange={(value) => handleAnswerChange(currentSlide.id, value)}
             />
           );
         }

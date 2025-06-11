@@ -665,9 +665,10 @@ export default function SommelierDashboard() {
                                               <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={() =>
-                                                  openWineModal("edit", wine)
-                                                }
+                                                onClick={() => {
+                                                  setSelectedPackage(pkg);
+                                                  openWineModal("edit", wine);
+                                                }}
                                                 className="text-white/60 hover:text-white hover:bg-white/10"
                                               >
                                                 <Edit3 className="w-3 h-3" />
@@ -1142,6 +1143,7 @@ function PackageModal({
   const [formData, setFormData] = useState({
     name: pkg?.name || "",
     description: pkg?.description || "",
+    imageUrl: pkg?.imageUrl || "",
     isActive: pkg?.isActive ?? true,
   });
 
@@ -1205,7 +1207,22 @@ function PackageModal({
             />
           </div>
 
-
+          <div className="space-y-2">
+            <Label className="text-white/80 flex items-center space-x-2">
+              <span>Package Cover Image</span>
+              <span className="text-white/50 text-xs font-normal">(shown on Gateway)</span>
+            </Label>
+            <ImageUpload
+              label=""
+              value={formData.imageUrl}
+              onChange={(imageUrl) =>
+                setFormData({ ...formData, imageUrl })
+              }
+              disabled={mode === "view"}
+              placeholder="Upload a cover image for this wine package"
+            />
+            <p className="text-white/40 text-xs">This image will be displayed when participants are joining a tasting session.</p>
+          </div>
 
           <div className="flex items-center space-x-2">
             <Switch

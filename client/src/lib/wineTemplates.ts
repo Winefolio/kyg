@@ -1,6 +1,21 @@
-import { Eye, Wind, Palette, Droplets, Zap, Clock, Star, Type, CheckCircle } from 'lucide-react';
+import { Eye, Wind, Palette, Droplets, Zap, Clock, Star, Type, CheckCircle, Sparkles } from 'lucide-react';
 
 export const SLIDE_TEMPLATES = [
+  {
+    id: 'welcome-slide',
+    name: 'Welcome to Tasting',
+    type: 'interlude',
+    sectionType: 'intro',
+    icon: Sparkles,
+    description: 'Introduction slide for the wine',
+    payloadTemplate: {
+      title: "Welcome to {Wine Name}",
+      description: "Get ready to explore this exceptional wine. We'll guide you through its unique characteristics and flavors.",
+      duration: 5000,
+      backgroundImage: '',
+      animation: 'fade'
+    }
+  },
   {
     id: 'visual-assessment',
     name: 'Visual Assessment',

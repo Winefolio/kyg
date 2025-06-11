@@ -1,13 +1,15 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ModernCard } from "@/components/ui/modern-card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { apiRequest } from "@/lib/queryClient";
-import { Wine, GripVertical, Eye, EyeOff, Check, X, Sparkles } from "lucide-react";
+import { Wine, GripVertical, Eye, EyeOff, Check, X, Sparkles, MapPin, Calendar, Grape } from "lucide-react";
 import type { PackageWine, SessionWineSelection } from "@shared/schema";
 
 interface SessionWineSelectorProps {
@@ -162,25 +164,43 @@ export function SessionWineSelector({ sessionId, packageId, onSelectionChange }:
   const totalCount = wineSelections.length;
 
   return (
-    <Card className="bg-gradient-card backdrop-blur-xl border border-white/20 shadow-2xl">
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-purple-500/20 rounded-lg">
-              <Wine className="w-5 h-5 text-purple-400" />
+    <div className="space-y-6">
+      <Card className="bg-gradient-card backdrop-blur-xl border border-white/20 shadow-2xl">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <motion.div 
+                className="p-3 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl"
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: "spring", stiffness: 400 }}
+              >
+                <Wine className="w-6 h-6 text-purple-400" />
+              </motion.div>
+              <div>
+                <CardTitle className="text-white text-xl">Wine Selection</CardTitle>
+                <CardDescription className="text-purple-200">
+                  Customize your tasting journey
+                </CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-white text-lg">Wine Selection</CardTitle>
-              <CardDescription className="text-purple-200">
-                Choose and arrange wines for your session
-              </CardDescription>
+            <div className="flex items-center gap-3">
+              <Badge 
+                variant="secondary" 
+                className={`
+                  px-4 py-1.5 text-sm font-medium transition-all duration-300
+                  ${selectedCount === 0 
+                    ? 'bg-red-500/20 text-red-300 border-red-400/30' 
+                    : 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-100 border-purple-400/30'
+                  }
+                `}
+              >
+                <span className="text-lg font-bold">{selectedCount}</span>
+                <span className="mx-1.5 text-purple-300/50">/</span>
+                <span className="text-sm">{totalCount} wines</span>
+              </Badge>
             </div>
           </div>
-          <Badge variant="secondary" className="bg-purple-500/20 text-purple-200 border-purple-400/30">
-            {selectedCount} of {totalCount} selected
-          </Badge>
-        </div>
-      </CardHeader>
+        </CardHeader>
 
       <CardContent className="space-y-4">
         {/* Instructions */}
@@ -196,86 +216,105 @@ export function SessionWineSelector({ sessionId, packageId, onSelectionChange }:
           </div>
         </div>
 
-        {/* Wine List */}
+        {/* Wine List - Compact Layout */}
         <Reorder.Group 
           axis="y" 
           values={wineSelections} 
           onReorder={handleReorder}
           className="space-y-3"
         >
-          <AnimatePresence>
-            {wineSelections.map((item, index) => (
-              <Reorder.Item
-                key={item.wine.id}
-                value={item}
-                className="cursor-grab active:cursor-grabbing"
-              >
-                <motion.div
-                  layout
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className={`
-                    p-4 rounded-xl border-2 transition-all duration-200
-                    ${item.isIncluded 
-                      ? 'bg-gradient-to-r from-purple-600/20 to-indigo-600/20 border-purple-400/40 shadow-lg' 
-                      : 'bg-white/5 border-white/20 opacity-60'
-                    }
-                  `}
+            <AnimatePresence>
+              {wineSelections.map((item, index) => (
+                <Reorder.Item
+                  key={item.wine.id}
+                  value={item}
+                  className="cursor-grab active:cursor-grabbing"
                 >
-                  <div className="flex items-center gap-4">
-                    {/* Drag Handle */}
-                    <div className="text-white/40 hover:text-white/60 transition-colors">
-                      <GripVertical size={20} />
-                    </div>
-
-                    {/* Position Badge */}
-                    <div className={`
-                      w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+                  <motion.div
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    whileHover={{ scale: 1.02 }}
+                    transition={{ duration: 0.2 }}
+                    className={`
+                      relative bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-4 
+                      transition-all duration-300 hover:bg-white/10 hover:border-white/30
                       ${item.isIncluded 
-                        ? 'bg-purple-500 text-white' 
-                        : 'bg-white/20 text-white/60'
+                        ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-400/30' 
+                        : 'opacity-60 grayscale'
                       }
-                    `}>
-                      {index + 1}
-                    </div>
-
-                    {/* Wine Image */}
-                    {item.wine.wineImageUrl && (
-                      <div className="w-12 h-16 rounded-lg overflow-hidden shadow-md flex-shrink-0">
-                        <img
-                          src={item.wine.wineImageUrl}
-                          alt={item.wine.wineName}
-                          className="w-full h-full object-cover"
-                        />
+                    `}
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Drag Handle */}
+                      <div className="flex-shrink-0">
+                        <GripVertical className="w-4 h-4 text-white/40" />
                       </div>
-                    )}
 
-                    {/* Wine Info */}
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-white font-medium truncate">
-                        {item.wine.wineName}
-                      </h4>
-                      <p className="text-white/60 text-sm truncate">
-                        {item.wine.wineType} • {item.wine.vintage} • {item.wine.region}
-                      </p>
-                    </div>
+                      {/* Wine Image - Smaller */}
+                      <div className="relative w-12 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-white/5">
+                        {item.wine.wineImageUrl ? (
+                          <img
+                            src={item.wine.wineImageUrl}
+                            alt={item.wine.wineName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-purple-600/20 to-pink-600/20 flex items-center justify-center">
+                            <Wine className="w-6 h-6 text-white/30" />
+                          </div>
+                        )}
+                      </div>
 
-                    {/* Toggle Switch */}
-                    <div className="flex items-center space-x-2">
-                      {item.isIncluded ? (
-                        <Eye className="w-4 h-4 text-green-400" />
-                      ) : (
-                        <EyeOff className="w-4 h-4 text-white/40" />
-                      )}
-                      <Switch
-                        checked={item.isIncluded}
-                        onCheckedChange={() => handleToggleWine(item.wine.id)}
-                        className="data-[state=checked]:bg-purple-500"
-                      />
+                      {/* Wine Content - Compact */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0 pr-4">
+                            <h4 className="text-white font-semibold text-lg truncate">
+                              {item.wine.wineName}
+                            </h4>
+                            {item.wine.producer && (
+                              <p className="text-purple-200 text-sm truncate">
+                                {item.wine.producer}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1">
+                              {item.wine.wineType && (
+                                <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/20 text-xs">
+                                  {item.wine.wineType}
+                                </Badge>
+                              )}
+                              {item.wine.vintage && (
+                                <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/20 text-xs">
+                                  {item.wine.vintage}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Position Badge & Controls */}
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <div className={`
+                              w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+                              ${item.isIncluded 
+                                ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white' 
+                                : 'bg-white/20 text-white/60'
+                              }
+                            `}>
+                              {index + 1}
+                            </div>
+                            
+                            <Switch
+                              checked={item.isIncluded}
+                              onCheckedChange={() => handleToggleWine(item.wine.id)}
+                              className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-purple-500 data-[state=checked]:to-pink-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
+                  </motion.div>
               </Reorder.Item>
             ))}
           </AnimatePresence>
@@ -336,5 +375,77 @@ export function SessionWineSelector({ sessionId, packageId, onSelectionChange }:
         )}
       </CardContent>
     </Card>
+
+    {/* Session Flow Preview */}
+    {selectedCount > 0 && (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <Card className="bg-gradient-card backdrop-blur-xl border border-white/20">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <CardTitle className="text-white text-lg">Session Flow Preview</CardTitle>
+              </div>
+              <p className="text-purple-200 text-sm">
+                Estimated duration: ~{selectedCount * 15} minutes
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2 overflow-x-auto pb-2">
+              {wineSelections
+                .filter(item => item.isIncluded)
+                .map((item, index, arr) => (
+                  <React.Fragment key={item.wine.id}>
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex-shrink-0"
+                    >
+                      <div className="relative group">
+                        {item.wine.wineImageUrl ? (
+                          <div className="w-20 h-24 rounded-lg overflow-hidden shadow-lg ring-2 ring-purple-400/30">
+                            <img
+                              src={item.wine.wineImageUrl}
+                              alt={item.wine.wineName}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-20 h-24 rounded-lg bg-gradient-to-br from-purple-600/30 to-pink-600/30 flex items-center justify-center shadow-lg ring-2 ring-purple-400/30">
+                            <Wine className="w-8 h-8 text-white/40" />
+                          </div>
+                        )}
+                        <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg">
+                          {index + 1}
+                        </div>
+                      </div>
+                      <p className="text-white/80 text-xs text-center mt-2 line-clamp-1 max-w-[80px]">
+                        {item.wine.wineName}
+                      </p>
+                    </motion.div>
+                    {index < arr.length - 1 && (
+                      <motion.div
+                        initial={{ opacity: 0, scaleX: 0 }}
+                        animate={{ opacity: 1, scaleX: 1 }}
+                        transition={{ delay: index * 0.1 + 0.05 }}
+                        className="flex-shrink-0"
+                      >
+                        <div className="w-8 h-0.5 bg-gradient-to-r from-purple-400/40 to-pink-400/40" />
+                      </motion.div>
+                    )}
+                  </React.Fragment>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    )}
+    </div>
   );
 }

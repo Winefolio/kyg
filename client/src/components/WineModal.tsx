@@ -187,13 +187,20 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
                 <Label className="text-white">Description</Label>
                 <Textarea value={wineForm.wineDescription} onChange={(e) => setWineForm(prev => ({ ...prev, wineDescription: e.target.value }))} className="bg-white/10 border-white/20 text-white" placeholder="Describe the wine..." disabled={isReadOnly} />
               </div>
-              <ImageUpload
-                label="Wine Image"
-                value={wineForm.wineImageUrl}
-                onChange={(imageUrl) => setWineForm(prev => ({ ...prev, wineImageUrl: imageUrl }))}
-                disabled={isReadOnly}
-                placeholder="Upload an image of the wine"
-              />
+              <div className="space-y-2">
+                <Label className="text-white flex items-center space-x-2">
+                  <span>Wine Bottle Image</span>
+                  <span className="text-white/50 text-xs font-normal">(will be shown in wine transitions)</span>
+                </Label>
+                <ImageUpload
+                  label=""
+                  value={wineForm.wineImageUrl}
+                  onChange={(imageUrl) => setWineForm(prev => ({ ...prev, wineImageUrl: imageUrl }))}
+                  disabled={isReadOnly}
+                  placeholder="Upload a photo of the wine bottle or label"
+                />
+                <p className="text-white/40 text-xs">This image will appear when transitioning between wines during the tasting session.</p>
+              </div>
               <div>
                 <Label className="text-white">Grape Varietals</Label>
                 <div className="space-y-3 mt-2">

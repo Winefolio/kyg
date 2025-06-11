@@ -121,6 +121,7 @@ export interface IStorage {
   // Analytics
   getAggregatedSessionAnalytics(sessionId: string): Promise<any>;
   getParticipantAnalytics(sessionId: string, participantId: string): Promise<any>;
+  getSessionResponses(sessionId: string): Promise<any[]>;
 
   // Package management for sommelier dashboard
   getAllPackages(): Promise<Package[]>;
@@ -1502,6 +1503,67 @@ export class DatabaseStorage implements IStorage {
 
   async getWineCharacteristics(): Promise<any[]> {
     return await db.select().from(wineCharacteristics).where(eq(wineCharacteristics.isActive, true)).orderBy(wineCharacteristics.category, wineCharacteristics.name);
+  }
+
+  // Get all responses for a session (for CSV export)
+  async getSessionResponses(sessionId: string): Promise<any[]> {
+    // Get all responses with participant and slide details
+    const allResponses = await db
+      .select({
+        participantId: responses.participantId,
+        participantName: participants.displayName,
+        participantEmail: participants.email,
+        slideId: responses.slideId,
+        slidePayload: slides.payloadJson,
+        slidePosition: slides.position,
+        answerJson: responses.answerJson,
+        answeredAt: responses.answeredAt,
+      })
+      .from(responses)
+      .innerJoin(participants, eq(responses.participantId, participants.id))
+      .innerJoin(slides, eq(responses.slideId, slides.id))
+      .where(
+        and(
+          eq(participants.sessionId, sessionId),
+          eq(participants.isHost, false) // Exclude host responses
+        )
+      )
+      .orderBy(participants.displayName, slides.position);
+
+    // Process the response data to extract meaningful information
+    return allResponses.map((response) => {
+      const slidePayload = response.slidePayload as any;
+      const answerJson = response.answerJson as any;
+      const questionType = slidePayload?.questionType || 'unknown';
+      const slideTitle = slidePayload?.title || slidePayload?.question || 'Untitled Question';
+      
+      // Extract answer based on question type
+      let selectedOptionText = '';
+      let scaleValue = null;
+      let notes = '';
+      
+      if (answerJson) {
+        if (questionType === 'multiple_choice' && answerJson.selectedOptionId) {
+          const selectedOption = slidePayload?.options?.find((opt: any) => opt.id === answerJson.selectedOptionId);
+          selectedOptionText = selectedOption?.text || answerJson.selectedOptionId;
+        } else if (questionType === 'scale' && answerJson.selectedScore !== undefined) {
+          scaleValue = answerJson.selectedScore;
+        }
+        notes = answerJson.notes || '';
+      }
+      
+      return {
+        participantName: response.participantName,
+        participantEmail: response.participantEmail,
+        slideTitle,
+        slidePosition: response.slidePosition,
+        responseType: questionType,
+        selectedOptionText,
+        scaleValue,
+        notes,
+        answeredAt: response.answeredAt,
+      };
+    });
   }
 
   // Package management methods for sommelier dashboard

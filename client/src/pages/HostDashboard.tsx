@@ -244,32 +244,49 @@ export default function HostDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-primary">
-      <div className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Host Dashboard</h1>
-          <p className="text-purple-200">
-            {analyticsData?.packageName || session?.packageCode || 'Wine Collection'} • {participants.length} participants
-          </p>
-          <Badge 
-            className={`mt-2 ${
-              sessionStatus === 'active' ? 'bg-green-500' : 
-              sessionStatus === 'paused' ? 'bg-yellow-500' : 
-              sessionStatus === 'completed' ? 'bg-blue-500' : 'bg-gray-500'
-            }`}
-          >
-            {sessionStatus.charAt(0).toUpperCase() + sessionStatus.slice(1)}
-          </Badge>
-          
-          {/* Display Short Session Code */}
-          {session?.short_code && (
-            <div className="mt-4">
-              <p className="text-purple-200 mb-2">Share this code with participants:</p>
-              <Badge className="text-2xl font-bold tracking-wider bg-white/20 text-white px-6 py-3 border border-white/30">
-                {session.short_code}
-              </Badge>
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        {/* Improved Header with Better Spacing */}
+        <div className="text-center mb-10 space-y-6">
+          <div className="space-y-3">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white tracking-tight">
+              Host Dashboard
+            </h1>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-lg">
+              <span className="text-purple-200 font-medium">
+                {analyticsData?.packageName || session?.packageCode || 'Wine Collection'}
+              </span>
+              <span className="hidden sm:block text-purple-300">•</span>
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-purple-300" />
+                <span className="text-purple-200">{participants.length} participants</span>
+              </div>
             </div>
-          )}
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Badge 
+              className={`px-4 py-2 text-sm font-medium ${
+                sessionStatus === 'active' ? 'bg-green-500/20 text-green-300 border-green-400/50' : 
+                sessionStatus === 'paused' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-400/50' : 
+                sessionStatus === 'completed' ? 'bg-blue-500/20 text-blue-300 border-blue-400/50' : 
+                'bg-gray-500/20 text-gray-300 border-gray-400/50'
+              } border`}
+            >
+              {sessionStatus.charAt(0).toUpperCase() + sessionStatus.slice(1)}
+            </Badge>
+            
+            {/* Session Code with Better Design */}
+            {session?.short_code && (
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-purple-300 text-sm font-medium">Session Code</span>
+                <div className="bg-white/15 backdrop-blur-md border border-white/30 rounded-2xl px-6 py-3">
+                  <span className="text-white text-2xl font-bold tracking-[0.2em] font-mono">
+                    {session.short_code}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-6xl mx-auto">
@@ -400,21 +417,13 @@ export default function HostDashboard() {
 
           <TabsContent value="wines" className="space-y-6">
             {session?.packageId && (
-              <>
-                <div className="bg-blue-500/10 border border-blue-400/20 rounded-xl p-4">
-                  <div className="text-sm text-blue-200">
-                    <p>Debug: Session ID: {session.id}</p>
-                    <p>Debug: Package ID: {session.packageId}</p>
-                  </div>
-                </div>
-                <SessionWineSelector 
-                  sessionId={session.id}
-                  packageId={session.packageId}
-                  onSelectionChange={(selectedCount) => {
-                    console.log(`Host selected ${selectedCount} wines for session`);
-                  }}
-                />
-              </>
+              <SessionWineSelector 
+                sessionId={session.id}
+                packageId={session.packageId}
+                onSelectionChange={(selectedCount) => {
+                  console.log(`Host selected ${selectedCount} wines for session`);
+                }}
+              />
             )}
             {!session?.packageId && (
               <Card className="bg-gradient-card backdrop-blur-xl border border-white/20">
@@ -705,6 +714,20 @@ export default function HostDashboard() {
                     <h3 className="text-white font-medium">Data Export</h3>
                     <div className="space-y-2">
                       <Button
+                        onClick={() => {
+                          // Download CSV export
+                          const link = document.createElement('a');
+                          link.href = `/api/sessions/${sessionId}/export/csv`;
+                          link.download = `wine-tasting-session-${sessionId}-analytics.csv`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          
+                          toast({
+                            title: "Export Started",
+                            description: "Your CSV file will download shortly"
+                          });
+                        }}
                         variant="outline"
                         className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20"
                       >
