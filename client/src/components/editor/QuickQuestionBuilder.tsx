@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -142,6 +142,33 @@ export function QuickQuestionBuilder({
     { id: '3', text: '' },
     { id: '4', text: '' }
   ]);
+
+  // Reset all state when modal opens
+  useEffect(() => {
+    if (open) {
+      // Reset to initial state
+      setStep('type');
+      setSelectedFormat(null);
+      setQuestionData({
+        format: 'multiple_choice',
+        config: {
+          title: '',
+          description: ''
+        },
+        metadata: {
+          category: 'general',
+          difficulty: 'intermediate',
+          tags: []
+        }
+      });
+      setMcOptions([
+        { id: '1', text: '' },
+        { id: '2', text: '' },
+        { id: '3', text: '' },
+        { id: '4', text: '' }
+      ]);
+    }
+  }, [open]);
 
   const handleSelectType = (format: QuestionFormat) => {
     setSelectedFormat(format);

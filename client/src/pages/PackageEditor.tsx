@@ -22,6 +22,7 @@ import { SlidePreview } from '@/components/SlidePreview';
 import { SlideConfigPanel } from '@/components/editor/SlideConfigPanel';
 import { QuickQuestionBuilder } from '@/components/editor/QuickQuestionBuilder';
 import { SimpleCopyButton } from '@/components/editor/SimpleCopyButton';
+import { PackageIntroCard } from '@/components/editor/PackageIntroCard';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -694,50 +695,14 @@ export default function PackageEditor() {
                     Add Wine
                   </Button>
                 </div>
-                {/* Package Introduction Section */}
-                {(() => {
-                  const packageIntroSlide = localSlides.find(s => 
-                    s.payloadJson && 
-                    (s.payloadJson as any).is_package_intro === true
-                  );
-                  
-                  if (packageIntroSlide) {
-                    return (
-                      <div className="mb-6 bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-xl border border-purple-500/30 p-4">
-                        <div className="flex items-center mb-3">
-                          <div className="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center mr-3">
-                            <Wine className="w-3 h-3 text-white" />
-                          </div>
-                          <h3 className="text-sm font-semibold text-white">Package Introduction</h3>
-                        </div>
-                        <div 
-                          className={`group rounded-lg border transition-all duration-200 cursor-pointer ${
-                            activeSlideId === packageIntroSlide.id 
-                              ? 'border-purple-400 bg-purple-600/20 shadow-lg shadow-purple-900/25' 
-                              : 'border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30'
-                          }`}
-                          onClick={() => setActiveSlideId(packageIntroSlide.id)}
-                        >
-                          <div className="p-3 flex items-center">
-                            <div className={`w-2 h-2 rounded-full mr-3 ${
-                              activeSlideId === packageIntroSlide.id ? 'bg-purple-400' : 'bg-white/40'
-                            }`} />
-                            <Sparkles className="w-4 h-4 mr-2 text-purple-400" />
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-white">
-                                {(packageIntroSlide.payloadJson as any)?.title || 'Package Welcome'}
-                              </p>
-                              <p className="text-xs text-white/60 mt-1">
-                                Main package introduction
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
+                {/* Package Introduction - Non-editable Overview */}
+                {data && (
+                  <PackageIntroCard 
+                    packageName={data.name}
+                    description={data.description || "Explore exceptional wines in this curated tasting experience"}
+                    wineCount={wines.length}
+                  />
+                )}
 
                 <div className="space-y-4">
                   {wines.map(wine => {
