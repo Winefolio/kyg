@@ -457,7 +457,20 @@ export default function TastingSession() {
           >
             {isPackageIntro && (
               <div className="mb-6">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                {currentSlide.payloadJson.package_image || currentSlide.payloadJson.background_image ? (
+                  <img 
+                    src={currentSlide.payloadJson.package_image || currentSlide.payloadJson.background_image} 
+                    alt={currentSlide.payloadJson.package_name || "Package"} 
+                    className="w-40 h-40 mx-auto rounded-xl object-cover shadow-2xl border-4 border-white/20"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                      const fallback = target.nextElementSibling as HTMLDivElement;
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full items-center justify-center" style={{display: 'none'}}>
                   <Wine className="w-8 h-8 text-white" />
                 </div>
               </div>

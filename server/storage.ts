@@ -551,7 +551,38 @@ export class DatabaseStorage implements IStorage {
         sommelierId: pkg.sommelierId,
       })
       .returning();
-    return result[0];
+    
+    const newPackage = result[0];
+    
+    // Create a temporary first wine to hold the package intro slide
+    const tempWine = await this.createPackageWine({
+      packageId: newPackage.id,
+      position: 0,
+      wineName: "Package Introduction",
+      wineDescription: pkg.description || "Welcome to this wine tasting experience",
+      wineImageUrl: (pkg as any).imageUrl || "",
+      wineType: "Introduction",
+      region: "",
+      vintage: null
+    });
+    
+    // Create package introduction slide
+    await this.createSlide({
+      packageWineId: tempWine.id,
+      position: 1,
+      type: "interlude",
+      section_type: "intro",
+      payloadJson: {
+        title: `Welcome to ${pkg.name}`,
+        description: pkg.description || "You're about to embark on an exceptional wine tasting journey.",
+        is_package_intro: true,
+        package_name: pkg.name,
+        package_image: (pkg as any).imageUrl || "",
+        background_image: (pkg as any).imageUrl || ""
+      },
+    });
+    
+    return newPackage;
   }
 
   // Package Wine methods
@@ -564,9 +595,37 @@ export class DatabaseStorage implements IStorage {
         wineName: wine.wineName,
         wineDescription: wine.wineDescription,
         wineImageUrl: wine.wineImageUrl,
+        wineType: wine.wineType,
+        region: wine.region,
+        vintage: wine.vintage,
       })
       .returning();
-    return result[0];
+    
+    const newWine = result[0];
+    
+    // Don't create intro slide for the special "Package Introduction" wine
+    if (wine.wineName !== "Package Introduction") {
+      // Create wine introduction slide
+      await this.createSlide({
+        packageWineId: newWine.id,
+        position: 1,
+        type: "interlude",
+        section_type: "intro",
+        payloadJson: {
+          title: `Meet ${wine.wineName}`,
+          description: wine.wineDescription || `Discover the unique characteristics of this exceptional wine.`,
+          wine_name: wine.wineName,
+          wine_image: wine.wineImageUrl || "",
+          wine_type: wine.wineType || "",
+          wine_region: wine.region || "",
+          wine_vintage: wine.vintage || "",
+          is_welcome: true,
+          is_wine_intro: true
+        },
+      });
+    }
+    
+    return newWine;
   }
 
   async getPackageWines(packageId: string): Promise<PackageWine[]> {
