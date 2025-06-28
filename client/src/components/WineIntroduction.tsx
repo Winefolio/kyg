@@ -81,7 +81,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
                 <Sparkles className="w-8 h-8 text-amber-300" />
               </motion.div>
               <span className="text-white text-xl font-semibold">
-                {isFirstWine ? "Welcome to Your Wine Tasting Experience" : `Now Introducing Wine ${wine.position}`}
+                {isFirstWine || wine.position === 0 ? "Welcome to Your Wine Tasting Experience" : `Now Introducing Wine ${wine.position}`}
               </span>
             </div>
           </motion.div>
@@ -107,26 +107,30 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
                   <div className="absolute -inset-8 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-3xl blur-2xl -z-10" />
                   
                   {/* Floating elements around wine */}
-                  <motion.div
-                    className="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center"
-                    animate={{ y: [-5, 5, -5] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                  >
-                    <span className="text-white font-bold text-lg">{wine.position}</span>
-                  </motion.div>
+                  {wine.position > 0 && (
+                    <motion.div
+                      className="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center"
+                      animate={{ y: [-5, 5, -5] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                      <span className="text-white font-bold text-lg">{wine.position}</span>
+                    </motion.div>
+                  )}
                 </div>
               ) : (
                 <div className="relative">
                   <div className="w-80 h-96 rounded-3xl bg-gradient-to-br from-amber-600/40 to-orange-600/40 flex items-center justify-center border-8 border-white/20 backdrop-blur-sm">
                     <Wine className="w-32 h-32 text-white/60" />
                   </div>
-                  <motion.div
-                    className="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center"
-                    animate={{ y: [-5, 5, -5] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                  >
-                    <span className="text-white font-bold text-lg">{wine.position}</span>
-                  </motion.div>
+                  {wine.position > 0 && (
+                    <motion.div
+                      className="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center"
+                      animate={{ y: [-5, 5, -5] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                      <span className="text-white font-bold text-lg">{wine.position}</span>
+                    </motion.div>
+                  )}
                 </div>
               )}
             </motion.div>
@@ -145,7 +149,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
                   animate={{ opacity: 1 }}
                   transition={{ delay: 1, duration: 0.6 }}
                 >
-                  Wine {wine.position}
+                  {wine.position > 0 ? `Wine ${wine.position}` : "Package Introduction"}
                 </motion.p>
                 
                 <motion.h1
@@ -183,7 +187,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
                     <span className="text-amber-200 font-medium">Wine Tasting Experience</span>
                   </div>
                   <div className="px-6 py-3 bg-white/10 rounded-full border border-white/30">
-                    <span className="text-white/90 font-medium">Position {wine.position}</span>
+                    {wine.position > 0 && <span className="text-white/90 font-medium">Position {wine.position}</span>}
                   </div>
                 </div>
               </motion.div>

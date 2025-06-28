@@ -42,6 +42,7 @@ export function AudioPlayer({
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
+  const [bufferedPercentage, setBufferedPercentage] = useState(0);
 
   const audio = audioRef.current;
 
@@ -70,6 +71,13 @@ export function AudioPlayer({
   const handleTimeUpdate = () => {
     if (audio) {
       setCurrentTime(audio.currentTime);
+      
+      // Update buffered percentage
+      if (audio.buffered.length > 0 && audio.duration > 0) {
+        const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
+        const percentage = (bufferedEnd / audio.duration) * 100;
+        setBufferedPercentage(percentage);
+      }
     }
   };
 
@@ -180,12 +188,15 @@ export function AudioPlayer({
         ref={audioRef}
         src={src}
         autoPlay={autoplay}
+        preload="metadata"
         onLoadStart={handleLoadStart}
         onCanPlay={handleCanPlay}
         onError={handleError}
         onTimeUpdate={handleTimeUpdate}
         onPlay={handlePlay}
         onPause={handlePause}
+        onWaiting={() => setIsLoading(true)}
+        onPlaying={() => setIsLoading(false)}
         onEnded={handleEnded}
       />
 
@@ -269,15 +280,32 @@ export function AudioPlayer({
 
             {/* Progress Bar */}
             <div className="space-y-2">
-              <Progress
-                value={duration ? (currentTime / duration) * 100 : 0}
-                className="h-2 cursor-pointer"
+              <div
+                className="relative h-2 bg-white/20 rounded-full cursor-pointer overflow-hidden"
                 onClick={(e) => {
                   const rect = e.currentTarget.getBoundingClientRect();
                   const percentage = ((e.clientX - rect.left) / rect.width) * 100;
                   handleSeek(percentage);
                 }}
-              />
+              >
+                {/* Buffered Progress */}
+                <div
+                  className="absolute inset-y-0 left-0 bg-white/30 transition-all duration-300"
+                  style={{ width: `${bufferedPercentage}%` }}
+                />
+                
+                {/* Playback Progress */}
+                <div
+                  className="absolute inset-y-0 left-0 bg-purple-400 transition-all duration-150"
+                  style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
+                />
+                
+                {/* Progress Handle */}
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg transition-all duration-150"
+                  style={{ left: duration ? `calc(${(currentTime / duration) * 100}% - 8px)` : '-8px' }}
+                />
+              </div>
               <div className="flex justify-between text-xs text-white/60">
                 <span>{formatTime(currentTime)}</span>
                 <span>{formatTime(duration)}</span>

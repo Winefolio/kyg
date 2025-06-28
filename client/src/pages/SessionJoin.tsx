@@ -15,7 +15,7 @@ import { UserProfileModal } from "@/components/UserProfileModal";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { apiRequest } from "@/lib/queryClient";
-import { Wine, Users, User } from "lucide-react";
+import { Wine, Users, User, Clock, Loader2 } from "lucide-react";
 import type { Package, Participant, Session } from "@shared/schema";
 
 const joinFormSchema = z.object({
@@ -60,6 +60,24 @@ export default function SessionJoin() {
   const { data: packageData, isLoading: packageLoading } = useQuery<Package>({
     queryKey: [`/api/packages/${effectivePackageCode}`],
     enabled: !!effectivePackageCode
+  });
+
+  // Get package slides to determine wine count and total slides
+  const { data: slidesData, isLoading: slidesLoading } = useQuery<{
+    package: Package;
+    slides: any[];
+    totalCount: number;
+    wines: any[];
+  }>({
+    queryKey: [`/api/packages/${effectivePackageCode}/slides`],
+    enabled: !!effectivePackageCode
+  });
+
+  // Get participants count when joining existing session
+  const { data: participants, isLoading: participantsLoading } = useQuery<Participant[]>({
+    queryKey: [`/api/sessions/${sessionIdFromUrl}/participants`],
+    enabled: !!sessionIdFromUrl,
+    refetchInterval: 5000 // Refresh every 5 seconds to get updated count
   });
 
   // Create session mutation
@@ -135,7 +153,7 @@ export default function SessionJoin() {
     }
   };
 
-  if (packageLoading || sessionLoading) {
+  if (packageLoading || sessionLoading || slidesLoading) {
     return <LoadingOverlay isVisible={true} message="Loading session details..." />;
   }
 
@@ -163,16 +181,43 @@ export default function SessionJoin() {
           {/* Session Stats */}
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-white">6</div>
-              <div className="text-white/60 text-sm">Wines</div>
+              <div className="text-2xl font-bold text-white h-8 flex items-center justify-center">
+                {slidesLoading ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  slidesData?.wines ? slidesData.wines.filter(w => w.position > 0).length : 0
+                )}
+              </div>
+              <div className="text-white/60 text-sm flex items-center justify-center gap-1">
+                <Wine className="w-3 h-3" />
+                Wines
+              </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-white">45</div>
-              <div className="text-white/60 text-sm">Minutes</div>
+              <div className="text-2xl font-bold text-white h-8 flex items-center justify-center">
+                {slidesLoading ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  slidesData?.totalCount ? Math.round(slidesData.totalCount * 1) : 0
+                )}
+              </div>
+              <div className="text-white/60 text-sm flex items-center justify-center gap-1">
+                <Clock className="w-3 h-3" />
+                Minutes
+              </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-white">0</div>
-              <div className="text-white/60 text-sm">Participants</div>
+              <div className="text-2xl font-bold text-white h-8 flex items-center justify-center">
+                {participantsLoading && sessionIdFromUrl ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  sessionIdFromUrl && participants ? participants.length : 0
+                )}
+              </div>
+              <div className="text-white/60 text-sm flex items-center justify-center gap-1">
+                <Users className="w-3 h-3" />
+                Participants
+              </div>
             </div>
           </div>
         </motion.div>

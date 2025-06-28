@@ -358,7 +358,7 @@ export const QUESTION_TEMPLATES: QuestionTemplate[] = [
       config: {
         title: 'Welcome to Our Wine Tasting',
         description: 'A personal greeting from your sommelier',
-        videoUrl: '',
+        video_url: '',
         autoplay: false,
         controls: true
       },
@@ -381,7 +381,7 @@ export const QUESTION_TEMPLATES: QuestionTemplate[] = [
       config: {
         title: 'About This Wine',
         description: 'Learn about the wine you\'re about to taste',
-        videoUrl: '',
+        video_url: '',
         autoplay: false,
         controls: true
       },
@@ -404,7 +404,7 @@ export const QUESTION_TEMPLATES: QuestionTemplate[] = [
       config: {
         title: 'Wine Tasting Techniques',
         description: 'Learn how to properly taste and evaluate wine',
-        videoUrl: '',
+        video_url: '',
         autoplay: false,
         controls: true
       },
@@ -427,7 +427,7 @@ export const QUESTION_TEMPLATES: QuestionTemplate[] = [
       config: {
         title: 'A Message from Your Sommelier',
         description: 'Listen to personal insights about this wine',
-        audioUrl: '',
+        audio_url: '',
         autoplay: false
       },
       metadata: {
@@ -449,7 +449,7 @@ export const QUESTION_TEMPLATES: QuestionTemplate[] = [
       config: {
         title: 'The Story Behind This Wine',
         description: 'Discover the vineyard, winemaker, and production story',
-        audioUrl: '',
+        audio_url: '',
         autoplay: false
       },
       metadata: {
@@ -471,7 +471,7 @@ export const QUESTION_TEMPLATES: QuestionTemplate[] = [
       config: {
         title: 'You\'re Doing Great!',
         description: 'Encouragement and guidance for new wine tasters',
-        audioUrl: '',
+        audio_url: '',
         autoplay: false
       },
       metadata: {

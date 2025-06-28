@@ -421,6 +421,7 @@ export class DatabaseStorage implements IStorage {
       {
         position: 9,
         type: "question" as const,
+        section_type: "ending",
         payloadJson: {
           title: "Overall wine rating",
           description: "Your overall impression of this wine",
@@ -567,21 +568,9 @@ export class DatabaseStorage implements IStorage {
     
     const newPackage = result[0];
     
-    // Create a temporary first wine to hold the package intro slide
-    const tempWine = await this.createPackageWine({
+    // Create package introduction slide directly attached to the package
+    await this.createPackageSlide({
       packageId: newPackage.id,
-      position: 0,
-      wineName: "Package Introduction",
-      wineDescription: pkg.description || "Welcome to this wine tasting experience",
-      wineImageUrl: (pkg as any).imageUrl || "",
-      wineType: "Introduction",
-      region: "",
-      vintage: null
-    });
-    
-    // Create package introduction slide
-    await this.createSlide({
-      packageWineId: tempWine.id,
       position: 1,
       type: "interlude",
       section_type: "intro",
@@ -660,6 +649,15 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async getSlidesByPackageId(packageId: string): Promise<Slide[]> {
+    const result = await db
+      .select()
+      .from(slides)
+      .where(eq(slides.packageId, packageId))
+      .orderBy(slides.position);
+    return result;
+  }
+
   async getSlideById(id: string): Promise<Slide | undefined> {
     const result = await db
       .select()
@@ -669,8 +667,45 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async createPackageSlide(slide: Omit<InsertSlide, 'packageWineId'> & { packageId: string }): Promise<Slide> {
+    // Auto-assign position if not provided
+    let targetPosition = slide.position;
+    if (!targetPosition) {
+      const existingSlides = await db.select({ position: slides.position })
+        .from(slides)
+        .where(eq(slides.packageId, slide.packageId))
+        .orderBy(desc(slides.position))
+        .limit(1);
+      
+      targetPosition = (existingSlides[0]?.position || 0) + 1;
+    }
+
+    // Package-level slides use negative global positions to ensure they come before wine slides
+    const targetGlobalPosition = -targetPosition;
+
+    const result = await db
+      .insert(slides)
+      .values({
+        packageId: slide.packageId,
+        packageWineId: null, // Package-level slides don't belong to a wine
+        position: targetPosition,
+        globalPosition: targetGlobalPosition,
+        type: slide.type,
+        section_type: slide.section_type,
+        payloadJson: slide.payloadJson,
+        genericQuestions: slide.genericQuestions,
+      })
+      .returning();
+    
+    return result[0];
+  }
+
   async createSlide(slide: InsertSlide): Promise<Slide> {
-    // Get the wine to determine global position
+    // For wine-specific slides, get the wine to determine global position
+    if (!slide.packageWineId) {
+      throw new Error('createSlide requires packageWineId. Use createPackageSlide for package-level slides.');
+    }
+    
     const wine = await db
       .select()
       .from(packageWines)
@@ -726,7 +761,7 @@ export class DatabaseStorage implements IStorage {
     if (!targetPosition) {
       const existingSlides = await db.select({ position: slides.position })
         .from(slides)
-        .where(eq(slides.packageWineId, slide.packageWineId))
+        .where(eq(slides.packageWineId, slide.packageWineId!))
         .orderBy(desc(slides.position))
         .limit(1);
       
@@ -1818,7 +1853,9 @@ export class DatabaseStorage implements IStorage {
   async createPackageWineFromDashboard(wine: InsertPackageWine): Promise<PackageWine> {
     // Get the next position for this package
     const existingWines = await this.getPackageWines(wine.packageId);
-    const nextPosition = existingWines.length + 1;
+    // Filter out the position 0 "Package Introduction" wine when calculating next position
+    const realWines = existingWines.filter(w => w.position > 0);
+    const nextPosition = realWines.length + 1;
     
     const wineData = {
       ...wine,
@@ -1965,10 +2002,22 @@ export class DatabaseStorage implements IStorage {
     }
 
     const wineIds = wines.map(w => w.id);
-    const allSlidesForPackage = await db.select()
+    
+    // Fetch package-level slides
+    const packageSlides = await db.select()
+      .from(slides)
+      .where(eq(slides.packageId, pkg.id))
+      .orderBy(slides.position);
+    
+    // Fetch wine-level slides
+    const wineSlides = await db.select()
       .from(slides)
       .where(inArray(slides.packageWineId, wineIds))
       .orderBy(slides.position);
+
+    // Combine all slides and sort by global position
+    const allSlidesForPackage = [...packageSlides, ...wineSlides]
+      .sort((a, b) => (a.globalPosition || 0) - (b.globalPosition || 0));
 
     return {
       ...pkg,
@@ -2006,6 +2055,7 @@ export class DatabaseStorage implements IStorage {
       const slide = slideData[index];
       if (slide) {
         const targetWineId = update.packageWineId || slide.packageWineId;
+        if (!targetWineId) return; // Skip slides without wine assignment
         if (!updatesByWine.has(targetWineId)) {
           updatesByWine.set(targetWineId, []);
         }

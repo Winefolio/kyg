@@ -533,7 +533,7 @@ export default function PackageEditor() {
       payloadJson = {
         title: question.config.title,
         description: question.config.description,
-        video_url: (question.config as any).videoUrl,
+        video_url: (question.config as any).video_url,
         autoplay: (question.config as any).autoplay || false,
         show_controls: (question.config as any).controls !== false
       };
@@ -544,7 +544,7 @@ export default function PackageEditor() {
       payloadJson = {
         title: question.config.title,
         description: question.config.description,
-        audio_url: (question.config as any).audioUrl,
+        audio_url: (question.config as any).audio_url,
         autoplay: (question.config as any).autoplay || false,
         show_controls: true
       };
@@ -765,7 +765,9 @@ export default function PackageEditor() {
                                   <Wine className="h-4 w-4 text-purple-300" />
                                 </div>
                                 <div>
-                                  <p className="font-semibold text-white">{wine.wineName}</p>
+                                  <p className="font-semibold text-white">
+                                    {wine.position > 0 ? `Wine ${wine.position}: ` : ''}{wine.wineName}
+                                  </p>
                                   <p className="text-xs text-white/60 font-medium">{wineSlides.length} slides</p>
                                 </div>
                               </div>

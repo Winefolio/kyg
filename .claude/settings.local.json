@@ -28,7 +28,9 @@
       "Bash(chmod:*)",
       "Bash(./add_missing_slides.sh:*)",
       "Bash(npm config:*)",
-      "Bash(/home/runner/workspace/.config/npm/node_global/bin/claude-code settings set autoUpdate true)"
+      "Bash(/home/runner/workspace/.config/npm/node_global/bin/claude-code settings set autoUpdate true)",
+      "Bash(npm run:*)",
+      "Bash(awk:*)"
     ],
     "deny": []
   }

@@ -10,8 +10,18 @@ let supabaseStorage: ReturnType<typeof createClient> | null = null;
 function getSupabaseStorage() {
   if (!supabaseStorage) {
     if (!supabaseUrl || !supabaseServiceRole) {
+      console.error('Supabase configuration missing:', {
+        hasUrl: !!supabaseUrl,
+        hasServiceRole: !!supabaseServiceRole,
+        urlPrefix: supabaseUrl?.substring(0, 30) + '...'
+      });
       throw new Error('Missing Supabase environment variables: SUPABASE_URL and SUPABASE_SERVICE_ROLE required for media uploads');
     }
+    
+    console.log('Initializing Supabase Storage client:', {
+      url: supabaseUrl,
+      bucket: STORAGE_BUCKET
+    });
     
     // Create client with service role for server-side operations
     supabaseStorage = createClient(supabaseUrl, supabaseServiceRole, {
@@ -47,7 +57,11 @@ export const ALLOWED_FILE_TYPES = {
     'image/bmp', 'image/tiff', 'image/svg+xml', 'image/avif', 'image/heic', 
     'image/heif'
   ],
-  audio: ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/m4a'],
+  audio: [
+    'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav',
+    'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac',
+    'audio/ogg', 'audio/webm'
+  ],
   video: ['video/mp4', 'video/webm', 'video/quicktime'],
 };
 
@@ -85,9 +99,18 @@ export async function uploadMediaFile(
 ): Promise<string> {
   const storage = getSupabaseStorage();
   
-  const mediaType = getMediaType(mimeType);
+  let mediaType = getMediaType(mimeType);
+  
+  // Fallback for M4A files with non-standard MIME types
+  if (!mediaType && fileName.toLowerCase().endsWith('.m4a')) {
+    console.log(`M4A file detected with MIME type: ${mimeType}, treating as audio`);
+    mediaType = 'audio';
+    // Override MIME type for Supabase storage
+    mimeType = 'audio/mp4';
+  }
+  
   if (!mediaType) {
-    throw new Error(`Unsupported file type: ${mimeType}`);
+    throw new Error(`Unsupported file type: ${mimeType} (file: ${fileName})`);
   }
 
   // Check file size
@@ -106,7 +129,30 @@ export async function uploadMediaFile(
     });
 
   if (error) {
-    console.error('Storage upload error:', error);
+    console.error('Supabase Storage upload error:', {
+      error: error,
+      errorCode: error.code,
+      errorMessage: error.message,
+      errorDetails: error.details,
+      errorHint: error.hint,
+      filePath: filePath,
+      fileName: fileName,
+      mimeType: mimeType,
+      fileSize: file.length,
+      bucket: STORAGE_BUCKET
+    });
+    
+    // Provide more specific error messages based on error code
+    if (error.message?.includes('row-level security')) {
+      throw new Error('Storage access denied. Please check Supabase RLS policies.');
+    } else if (error.message?.includes('bucket')) {
+      throw new Error(`Storage bucket '${STORAGE_BUCKET}' not found or not accessible.`);
+    } else if (error.message?.includes('size')) {
+      throw new Error(`File size exceeds storage limits.`);
+    } else if (error.message?.includes('duplicate')) {
+      throw new Error('A file with this name already exists.');
+    }
+    
     throw new Error(`Failed to upload file: ${error.message}`);
   }
 
@@ -116,6 +162,64 @@ export async function uploadMediaFile(
     .getPublicUrl(filePath);
 
   return urlData.publicUrl;
+}
+
+// Verify Supabase Storage bucket exists and is accessible
+export async function verifyStorageBucket(): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) {
+    return { 
+      success: false, 
+      error: 'Supabase environment variables not configured' 
+    };
+  }
+
+  try {
+    const storage = getSupabaseStorage();
+    
+    // List buckets to check if our bucket exists
+    const { data: buckets, error: listError } = await storage.storage.listBuckets();
+    
+    if (listError) {
+      console.error('Failed to list Supabase buckets:', listError);
+      return { 
+        success: false, 
+        error: `Failed to list buckets: ${listError.message}` 
+      };
+    }
+    
+    const bucketExists = buckets?.some(bucket => bucket.name === STORAGE_BUCKET);
+    
+    if (!bucketExists) {
+      console.error(`Supabase bucket '${STORAGE_BUCKET}' does not exist`);
+      return { 
+        success: false, 
+        error: `Storage bucket '${STORAGE_BUCKET}' does not exist. Please create it in Supabase dashboard.` 
+      };
+    }
+    
+    // Try to list files in the bucket to verify access
+    const { error: accessError } = await storage.storage
+      .from(STORAGE_BUCKET)
+      .list('', { limit: 1 });
+    
+    if (accessError) {
+      console.error(`Cannot access Supabase bucket '${STORAGE_BUCKET}':`, accessError);
+      return { 
+        success: false, 
+        error: `Cannot access bucket '${STORAGE_BUCKET}': ${accessError.message}. Please check bucket permissions.` 
+      };
+    }
+    
+    console.log(`✅ Supabase Storage bucket '${STORAGE_BUCKET}' is accessible`);
+    return { success: true };
+    
+  } catch (error) {
+    console.error('Error verifying Supabase Storage:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
 }
 
 // Delete file from Supabase Storage
@@ -138,7 +242,14 @@ export async function deleteMediaFile(fileUrl: string): Promise<void> {
       .remove([filePath]);
 
     if (error) {
-      console.error('Storage delete error:', error);
+      console.error('Supabase Storage delete error:', {
+        error: error,
+        errorCode: error.code,
+        errorMessage: error.message,
+        filePath: filePath,
+        fileUrl: fileUrl,
+        bucket: STORAGE_BUCKET
+      });
       throw new Error(`Failed to delete file: ${error.message}`);
     }
   } catch (error) {

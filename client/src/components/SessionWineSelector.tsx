@@ -281,7 +281,7 @@ export function SessionWineSelector({ sessionId, packageId, onSelectionChange }:
                           <div className="flex-1 min-w-0 space-y-2">
                             <div className="space-y-1">
                               <h4 className="text-white font-semibold text-lg leading-tight truncate">
-                                {item.wine.wineName}
+                                {item.wine.position > 0 ? `Wine ${item.wine.position}: ` : ''}{item.wine.wineName}
                               </h4>
                               {item.wine.producer && (
                                 <p className="text-purple-200 text-sm leading-tight truncate">
@@ -442,8 +442,8 @@ export function SessionWineSelector({ sessionId, packageId, onSelectionChange }:
                           {index + 1}
                         </div>
                       </div>
-                      <p className="text-white/80 text-xs text-center mt-2 line-clamp-1 max-w-[80px]">
-                        {item.wine.wineName}
+                      <p className="text-white/80 text-xs text-center mt-2 line-clamp-1 max-w-[80px]" title={item.wine.wineName}>
+                        {item.wine.position > 0 ? `W${item.wine.position}: ` : ''}{item.wine.wineName}
                       </p>
                     </motion.div>
                     {index < arr.length - 1 && (

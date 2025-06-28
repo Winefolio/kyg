@@ -110,7 +110,8 @@ const slideTypes = ['question', 'media', 'interlude', 'video_message', 'audio_me
 // Slides table - ALL content lives here, now linked to package wines
 export const slides = pgTable("slides", {
   id: uuid("id").primaryKey().defaultRandom(),
-  packageWineId: uuid("package_wine_id").notNull().references(() => packageWines.id, { onDelete: "cascade" }),
+  packageWineId: uuid("package_wine_id").references(() => packageWines.id, { onDelete: "cascade" }), // Now nullable
+  packageId: uuid("package_id").references(() => packages.id, { onDelete: "cascade" }), // New field for package-level slides
   position: integer("position").notNull(),
   globalPosition: integer("global_position").notNull().default(0),
   type: varchar("type", { length: 50 }).$type<typeof slideTypes[number]>().notNull(),
@@ -121,7 +122,8 @@ export const slides = pgTable("slides", {
 }, (table) => ({
   packageWinePositionIdx: index("idx_slides_package_wine_position").on(table.packageWineId, table.position),
   globalPositionIdx: index("idx_slides_global_position").on(table.packageWineId, table.globalPosition),
-  packageWineIdx: index("idx_slides_package_wine_id").on(table.packageWineId)
+  packageWineIdx: index("idx_slides_package_wine_id").on(table.packageWineId),
+  packageIdIdx: index("idx_slides_package_id").on(table.packageId)
 }));
 
 // Sessions table
@@ -294,6 +296,13 @@ export const insertSlideSchema = createInsertSchema(slides, {
 }).omit({
   id: true,
   createdAt: true
+}).refine((data) => {
+  // Ensure slides have either packageWineId OR packageId (but not both and not neither)
+  const hasWineId = data.packageWineId !== null && data.packageWineId !== undefined;
+  const hasPackageId = data.packageId !== null && data.packageId !== undefined;
+  return (hasWineId && !hasPackageId) || (!hasWineId && hasPackageId);
+}, {
+  message: "Slide must belong to either a wine (packageWineId) or directly to a package (packageId), but not both"
 });
 
 export const insertSessionSchema = createInsertSchema(sessions, {
@@ -425,18 +434,18 @@ export interface BooleanConfig extends QuestionConfig {
 }
 
 export interface VideoMessageConfig extends QuestionConfig {
-  videoUrl: string;
+  video_url: string;
   duration?: number;
-  thumbnailUrl?: string;
+  thumbnail_url?: string;
   autoplay?: boolean;
   controls?: boolean;
 }
 
 export interface AudioMessageConfig extends QuestionConfig {
-  audioUrl: string;
+  audio_url: string;
   duration?: number;
   autoplay?: boolean;
-  waveformData?: string;
+  waveform_data?: string;
 }
 
 export interface QuestionMetadata {

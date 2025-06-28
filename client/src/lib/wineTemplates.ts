@@ -1,4 +1,4 @@
-import { Eye, Wind, Palette, Droplets, Zap, Clock, Star, Type, CheckCircle, Sparkles } from 'lucide-react';
+import { Eye, Wind, Palette, Droplets, Zap, Clock, Star, Type, CheckCircle, Sparkles, Wine } from 'lucide-react';
 
 export const SLIDE_TEMPLATES = [
   {
@@ -190,6 +190,86 @@ export const SLIDE_TEMPLATES = [
       scaleLabels: ['Poor', 'Excellent'],
       timeLimit: 30,
       points: 25
+    }
+  },
+  {
+    id: 'wine-transition',
+    name: 'Wine Transition',
+    type: 'transition',
+    sectionType: 'intro',
+    icon: Sparkles,
+    description: 'Smooth transition between wines',
+    payloadTemplate: {
+      title: "Moving to our next selection",
+      description: "Prepare your palate for the next wine experience",
+      duration: 2500,
+      showContinueButton: false,
+      animation_type: 'wine_glass_fill',
+      backgroundImage: ''
+    }
+  },
+  {
+    id: 'section-transition',
+    name: 'Section Transition',
+    type: 'transition',
+    sectionType: 'deep_dive',
+    icon: CheckCircle,
+    description: 'Transition between tasting sections',
+    payloadTemplate: {
+      title: "Let's dive deeper",
+      description: "Now we'll explore the wine's complexity",
+      duration: 2000,
+      showContinueButton: false,
+      animation_type: 'fade',
+      backgroundImage: ''
+    }
+  },
+  {
+    id: 'quick-transition',
+    name: 'Quick Transition',
+    type: 'transition',
+    sectionType: 'ending',
+    icon: Zap,
+    description: 'Brief transition for flow',
+    payloadTemplate: {
+      title: "Almost there",
+      description: "",
+      duration: 1500,
+      showContinueButton: false,
+      animation_type: 'slide',
+      backgroundImage: ''
+    }
+  },
+  {
+    id: 'wine-intro-quick',
+    name: 'Quick Wine Introduction',
+    type: 'transition',
+    sectionType: 'intro',
+    icon: Wine,
+    description: 'Fast 1-2 second wine intro',
+    payloadTemplate: {
+      title: "Next: {Wine Name}",
+      description: "Get ready for your next tasting",
+      duration: 1200,
+      showContinueButton: false,
+      animation_type: 'wine_glass_fill',
+      backgroundImage: ''
+    }
+  },
+  {
+    id: 'manual-transition',
+    name: 'Manual Continue',
+    type: 'transition',
+    sectionType: 'intro',
+    icon: Clock,
+    description: 'Transition with manual advance',
+    payloadTemplate: {
+      title: "Take a moment",
+      description: "When you're ready, continue to the next experience",
+      duration: 5000,
+      showContinueButton: true,
+      animation_type: 'wine_glass_fill',
+      backgroundImage: ''
     }
   }
 ];

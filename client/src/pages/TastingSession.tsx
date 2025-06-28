@@ -22,7 +22,29 @@ import { WineIntroduction } from "@/components/WineIntroduction";
 import { SectionTransition } from "@/components/SectionTransition";
 import { VideoMessageSlide } from "@/components/slides/VideoMessageSlide";
 import { AudioMessageSlide } from "@/components/slides/AudioMessageSlide";
-import type { Slide, Participant, Session, Package, VideoMessagePayload, AudioMessagePayload } from "@shared/schema";
+import { TransitionSlide } from "@/components/slides/TransitionSlide";
+import type { Slide, Participant, Session, Package, VideoMessagePayload, AudioMessagePayload, TransitionPayload } from "@shared/schema";
+
+// Configurable transition durations (in milliseconds)
+const TRANSITION_DURATIONS = {
+  slideNavigation: 600,        // Delay before changing slides
+  slideJump: 400,             // Delay when jumping to a specific slide
+  slideAnimation: {           // Framer Motion animation config
+    type: "spring",
+    stiffness: 200,
+    damping: 25,
+    mass: 0.8,
+    opacity: { duration: 0.4 },
+    scale: { duration: 0.5 }
+  },
+  packageIntroAnimation: {    // Special animation for package intro
+    type: "spring",
+    stiffness: 150,
+    damping: 20,
+    duration: 0.8,
+    opacity: { duration: 0.6 }
+  }
+};
 
 export default function TastingSession() {
   const { sessionId, participantId } = useParams();
@@ -156,14 +178,20 @@ export default function TastingSession() {
   }
 
   const allSlides = slidesData.slides || [];
+  // All wines should now start from position 1 (no more position 0 wines after migration)
   const wines = slidesData.wines || [];
   
-  // Filter out transition slides from navigation (they auto-play between regular slides)
-  const rawSlides = allSlides.filter(slide => slide.type !== 'transition');
+  // Include transition slides in the navigation flow
+  const rawSlides = allSlides;
   
-  // Group slides by wine and sort them properly within each wine
-  const slidesByWine = rawSlides.reduce((acc: Record<string, any[]>, slide) => {
+  // Separate package-level slides from wine-level slides
+  const packageLevelSlides = rawSlides.filter(slide => slide.packageId && !slide.packageWineId);
+  const wineLevelSlides = rawSlides.filter(slide => slide.packageWineId);
+  
+  // Group wine-level slides by wine
+  const slidesByWine = wineLevelSlides.reduce((acc: Record<string, any[]>, slide) => {
     const wineId = slide.packageWineId;
+    if (!wineId) return acc; // Skip slides without packageWineId
     if (!acc[wineId]) {
       acc[wineId] = [];
     }
@@ -171,8 +199,8 @@ export default function TastingSession() {
     return acc;
   }, {});
 
-  // Handle package intro slide separately to avoid breaking wine slide counts
-  let packageIntroSlides: any[] = [];
+  // Handle package intro slides
+  let packageIntroSlides: any[] = packageLevelSlides.sort((a, b) => (a.globalPosition || 0) - (b.globalPosition || 0));
   const wineSpecificSlidesByWine: Record<string, any[]> = {};
   
   Object.keys(slidesByWine).forEach(wineId => {
@@ -230,13 +258,16 @@ export default function TastingSession() {
     return acc;
   }, {} as Record<string, any[]>);
 
-  // Create final ordered slides array: All wine slides in order (package intro handled within wine flow)
-  const slides = wines
+  // Create final ordered slides array: Package slides first, then wine slides in order
+  const wineSlides = wines
     .sort((a, b) => a.position - b.position)
     .flatMap(wine => sortedSlidesByWine[wine.id] || []);
+  
+  const slides = [...packageIntroSlides, ...wineSlides];
     
   const currentSlide = slides[currentSlideIndex];
   const currentWine = currentSlide ? wines.find(w => w.id === currentSlide.packageWineId) : null;
+  const isPackageLevelSlide = currentSlide && currentSlide.packageId && !currentSlide.packageWineId;
 
   // Helper function to get section for a slide (defined early to avoid hoisting issues)
   const getSlideSection = (slide: any) => {
@@ -268,9 +299,9 @@ export default function TastingSession() {
     return isLast;
   };
 
-  // Calculate section progress based on current wine's slides only
-  const currentWineSlides = currentWine ? sortedSlidesByWine[currentWine.id] || [] : [];
-  const currentWineStartIndex = currentWine ? slides.findIndex(s => s.packageWineId === currentWine.id) : 0;
+  // Calculate section progress based on current wine's slides only (or package context for package-level slides)
+  const currentWineSlides = currentWine ? sortedSlidesByWine[currentWine.id] || [] : (isPackageLevelSlide ? packageIntroSlides : []);
+  const currentWineStartIndex = currentWine ? slides.findIndex(s => s.packageWineId === currentWine.id) : (isPackageLevelSlide ? 0 : 0);
   const currentSlideInWine = currentSlideIndex - currentWineStartIndex;
   
   const sectionNames = ['Introduction', 'Deep Dive', 'Final Thoughts'];
@@ -346,43 +377,44 @@ export default function TastingSession() {
       
 
       
-      // Check if we're transitioning to a new wine
-      if (currentWine && nextWine && currentWine.id !== nextWine.id) {
+      // Check if we're leaving package intro or transitioning to a new wine
+      const isLeavingPackageIntro = currentSlide?.payloadJson?.is_package_intro === true;
+      
+      // Check if the next slide is a transition slide
+      const nextSlideIsTransition = nextSlide?.type === 'transition';
+      
+      if (((currentWine && nextWine && currentWine.id !== nextWine.id) || isLeavingPackageIntro) && !nextSlideIsTransition) {
+        // Only show automatic transition if there's no manual transition slide
         setIsTransitioningSection(true);
         setTransitionSectionName(nextWine.wineName);
         triggerHaptic('success');
         
         // Show wine transition for 2.5 seconds, then check if wine introduction needed
         setTimeout(() => {
-          const nextWinePosition = wines.findIndex(w => w.id === nextWine.id) + 1;
+          const nextWinePosition = nextWine.position; // Use the actual position from the wine object
           const isFirstWine = nextWinePosition === 1;
           
           setIsTransitioningSection(false);
           
-          // Show wine introduction for 2nd, 3rd, etc. wines (not first wine)
-          if (!isFirstWine) {
-            setWineIntroductionData({
-              wine: {
-                wineName: nextWine.wineName,
-                wineDescription: nextWine.wineDescription,
-                wineImageUrl: nextWine.wineImageUrl,
-                position: nextWinePosition
-              },
-              isFirstWine
-            });
-            setShowingWineIntroduction(true);
-          } else {
-            // For first wine, just advance directly
-            setCurrentSlideIndex(currentSlideIndex + 1);
-            setCompletedSlides(prev => [...prev, currentSlideIndex]);
-          }
+          // Always show wine introduction when leaving package intro or transitioning wines
+          setWineIntroductionData({
+            wine: {
+              wineName: nextWine.wineName,
+              wineDescription: nextWine.wineDescription,
+              wineImageUrl: nextWine.wineImageUrl,
+              position: nextWinePosition
+            },
+            isFirstWine
+          });
+          setShowingWineIntroduction(true);
         }, 2500);
       } 
       // Check if we're transitioning to a new section within the same wine
       // ONLY trigger section transition when completing the LAST slide of current section
       else if (currentWine && nextWine && currentWine.id === nextWine.id && 
                currentSection !== nextSection && 
-               isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection)) {
+               isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection) &&
+               !nextSlideIsTransition) {
         
         // Debug logging for section transitions
         console.log('🎯 SECTION TRANSITION DETECTED:');
@@ -407,24 +439,35 @@ export default function TastingSession() {
           setCurrentSlideIndex(currentSlideIndex + 1);
           setCompletedSlides(prev => [...prev, currentSlideIndex]);
           setIsNavigating(false);
-        }, 150);
+        }, TRANSITION_DURATIONS.slideNavigation);
       }
     }
   };
 
   const handleSectionTransitionComplete = () => {
     setShowSectionTransition(false);
-    setCurrentSlideIndex(currentSlideIndex + 1);
-    setCompletedSlides(prev => [...prev, currentSlideIndex]);
+    // Add bounds checking to prevent accessing undefined slides
+    if (currentSlideIndex < slides.length - 1) {
+      setCurrentSlideIndex(currentSlideIndex + 1);
+      setCompletedSlides(prev => [...prev, currentSlideIndex]);
+    } else {
+      // End of slides reached, complete the session
+      handleComplete();
+    }
     setSectionTransitionData(null);
   };
 
   const handleWineIntroductionComplete = () => {
     setShowingWineIntroduction(false);
     setWineIntroductionData(null);
-    // Advance to next slide after wine introduction
-    setCurrentSlideIndex(currentSlideIndex + 1);
-    setCompletedSlides(prev => [...prev, currentSlideIndex]);
+    // Add bounds checking to prevent accessing undefined slides
+    if (currentSlideIndex < slides.length - 1) {
+      setCurrentSlideIndex(currentSlideIndex + 1);
+      setCompletedSlides(prev => [...prev, currentSlideIndex]);
+    } else {
+      // End of slides reached, complete the session
+      handleComplete();
+    }
   };
 
   const goToPreviousSlide = () => {
@@ -436,7 +479,7 @@ export default function TastingSession() {
         setCurrentSlideIndex(currentSlideIndex - 1);
         setCompletedSlides(prev => prev.filter(i => i !== currentSlideIndex));
         setIsNavigating(false);
-      }, 150);
+      }, 600);
     }
   };
 
@@ -448,7 +491,7 @@ export default function TastingSession() {
       setTimeout(() => {
         setCurrentSlideIndex(slideIndex);
         setIsNavigating(false);
-      }, 150);
+      }, TRANSITION_DURATIONS.slideJump);
     }
     setSidebarOpen(false);
   };
@@ -487,8 +530,9 @@ export default function TastingSession() {
         return (
           <motion.div
             key={`interlude-${currentSlide.id}`}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: isPackageIntro ? 40 : 20, scale: isPackageIntro ? 0.9 : 1 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={isPackageIntro ? TRANSITION_DURATIONS.packageIntroAnimation : undefined}
             className="bg-gradient-card backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl text-center"
           >
             {isPackageIntro && (
@@ -655,7 +699,7 @@ export default function TastingSession() {
                   payload={{
                     title: gq.config.title,
                     description: gq.config.description,
-                    video_url: (gq.config as any).videoUrl,
+                    video_url: (gq.config as any).video_url,
                     autoplay: (gq.config as any).autoplay || false,
                     show_controls: (gq.config as any).controls !== false
                   } as VideoMessagePayload}
@@ -669,7 +713,7 @@ export default function TastingSession() {
                   payload={{
                     title: gq.config.title,
                     description: gq.config.description,
-                    audio_url: (gq.config as any).audioUrl,
+                    audio_url: (gq.config as any).audio_url,
                     autoplay: (gq.config as any).autoplay || false,
                     show_controls: true
                   } as AudioMessagePayload}
@@ -734,7 +778,7 @@ export default function TastingSession() {
               payload={{
                 title: questionData.title || questionData.question || '',
                 description: questionData.description || '',
-                video_url: questionData.videoUrl || questionData.video_url || '',
+                video_url: questionData.video_url || '',
                 autoplay: questionData.autoplay || false,
                 show_controls: questionData.controls !== false
               } as VideoMessagePayload}
@@ -785,7 +829,7 @@ export default function TastingSession() {
               payload={{
                 title: questionData.title || questionData.question || '',
                 description: questionData.description || '',
-                audio_url: questionData.audioUrl || questionData.audio_url || '',
+                audio_url: questionData.audio_url || '',
                 autoplay: questionData.autoplay || false,
                 show_controls: true
               } as AudioMessagePayload}
@@ -877,6 +921,16 @@ export default function TastingSession() {
           />
         );
 
+      case 'transition':
+        const transitionPayload = currentSlide.payloadJson as TransitionPayload;
+        return (
+          <TransitionSlide
+            payload={transitionPayload}
+            onContinue={goToNextSlide}
+            autoAdvance={!transitionPayload.showContinueButton}
+          />
+        );
+
       default:
         return (
           <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl text-center">
@@ -901,6 +955,7 @@ export default function TastingSession() {
   if (isTransitioningSection && currentWine) {
     const nextSlide = slides[currentSlideIndex + 1];
     const nextWine = nextSlide ? wines.find(w => w.id === nextSlide.packageWineId) : null;
+    const isFromPackageIntro = currentSlide?.payloadJson?.is_package_intro === true;
     
     return (
       <WineTransition
@@ -908,18 +963,24 @@ export default function TastingSession() {
           wineName: currentWine.wineName,
           wineDescription: currentWine.wineDescription || '',
           wineImageUrl: currentWine.wineImageUrl || '',
-          position: wines.findIndex(w => w.id === currentWine.id) + 1
+          position: isFromPackageIntro ? 0 : currentWine.position // Use 0 for package intro to hide wine number
         }}
         nextWine={nextWine ? {
           wineName: nextWine.wineName,
           wineDescription: nextWine.wineDescription || '',
           wineImageUrl: nextWine.wineImageUrl || '',
-          position: wines.findIndex(w => w.id === nextWine.id) + 1
+          position: nextWine.position // Use actual position from wine object
         } : undefined}
         sectionType={currentSlide?.section_type}
         onContinue={() => {
-          setCurrentSlideIndex(currentSlideIndex + 1);
-          setCompletedSlides(prev => [...prev, currentSlideIndex]);
+          // Add bounds checking to prevent accessing undefined slides
+          if (currentSlideIndex < slides.length - 1) {
+            setCurrentSlideIndex(currentSlideIndex + 1);
+            setCompletedSlides(prev => [...prev, currentSlideIndex]);
+          } else {
+            // End of slides reached, complete the session
+            handleComplete();
+          }
           setIsTransitioningSection(false);
         }}
       />
@@ -1028,7 +1089,7 @@ export default function TastingSession() {
                               }`} />
                               <div className="text-left">
                                 <h3 className="font-medium text-white">
-                                  <DynamicTextRenderer text={wine.wineName} />
+                                  Wine {wineIndex + 1}: <DynamicTextRenderer text={wine.wineName} />
                                 </h3>
                                 <p className="text-xs text-white/60">
                                   <DynamicTextRenderer text={wine.wineDescription || ''} />
@@ -1126,18 +1187,25 @@ export default function TastingSession() {
                 </Button>
                 <div className="text-white">
                   <h1 className="font-semibold">
-                    <DynamicTextRenderer text={currentWine?.wineName || 'Wine Tasting'} />
+                    {currentSlide?._isPackageIntro ? (
+                      <DynamicTextRenderer text={slidesData.package.name} />
+                    ) : (
+                      <DynamicTextRenderer text={currentWine?.wineName || 'Wine Tasting'} />
+                    )}
                   </h1>
                   <p className="text-xs text-white/60">
-                    <DynamicTextRenderer text={slidesData.package.name} />
+                    {currentSlide?._isPackageIntro ? 
+                      "Welcome to your tasting experience" :
+                      <DynamicTextRenderer text={slidesData.package.name} />
+                    }
                   </p>
                 </div>
               </div>
               
               <div className="text-right text-white">
-                <p className="text-sm font-medium">{currentSlideIndex + 1} of {slides.length}</p>
+                <p className="text-sm font-medium">{Math.min(currentSlideIndex + 1, slides.length)} of {slides.length}</p>
                 <p className="text-xs text-white/60">
-                  {Math.round(((currentSlideIndex + 1) / slides.length) * 100)}% complete
+                  {Math.round((Math.min(currentSlideIndex + 1, slides.length) / slides.length) * 100)}% complete
                 </p>
               </div>
             </div>
@@ -1146,8 +1214,8 @@ export default function TastingSession() {
             <div className="mt-4">
               <SegmentedProgressBar 
                 sections={sections}
-                currentWineName={currentWine?.wineName}
-                currentOverallProgressInfo={`${currentSlideIndex + 1} of ${slides.length} slides`}
+                currentWineName={currentSlide?._isPackageIntro ? null : currentWine?.wineName}
+                currentOverallProgressInfo={`${Math.min(currentSlideIndex + 1, slides.length)} of ${slides.length} slides`}
                 onSectionClick={(sectionName) => {
                   const wine = wines.find(w => w.wineName === sectionName);
                   if (wine) {
@@ -1166,15 +1234,10 @@ export default function TastingSession() {
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentSlide?.id || currentSlideIndex}
-                initial={{ opacity: 0, x: isNavigating ? (currentSlideIndex > 0 ? 20 : -20) : 0, y: 20 }}
-                animate={{ opacity: 1, x: 0, y: 0 }}
-                exit={{ opacity: 0, x: isNavigating ? (currentSlideIndex < slides.length - 1 ? -20 : 20) : 0, y: -20 }}
-                transition={{ 
-                  duration: 0.4, 
-                  ease: "easeInOut",
-                  opacity: { duration: 0.3 },
-                  y: { duration: 0.4, ease: "easeOut" }
-                }}
+                initial={{ opacity: 0, x: isNavigating ? (currentSlideIndex > 0 ? 30 : -30) : 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+                exit={{ opacity: 0, x: isNavigating ? (currentSlideIndex < slides.length - 1 ? -30 : 30) : 0, y: -20, scale: 0.95 }}
+                transition={TRANSITION_DURATIONS.slideAnimation}
                 className="flex-grow flex flex-col justify-center max-w-2xl mx-auto w-full"
               >
                 {renderSlideContent()}
@@ -1217,12 +1280,17 @@ export default function TastingSession() {
               </div>
 
               <Button
-                variant="ghost"
+                variant={currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro ? "default" : "ghost"}
                 onClick={currentSlideIndex >= slides.length - 1 ? handleComplete : goToNextSlide}
                 disabled={isNavigating}
-                className="text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={
+                  currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro
+                    ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold px-8 py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105"
+                    : "text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                }
               >
-                {currentSlideIndex >= slides.length - 1 ? 'Complete' : 'Next'}
+                {currentSlideIndex >= slides.length - 1 ? 'Complete' : 
+                 (currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro) ? 'Continue Your Wine Journey' : 'Next'}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>

@@ -47,6 +47,7 @@ export function VideoPlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [controlsTimeout, setControlsTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [bufferedPercentage, setBufferedPercentage] = useState(0);
 
   const video = videoRef.current;
 
@@ -95,6 +96,13 @@ export function VideoPlayer({
   const handleTimeUpdate = () => {
     if (video) {
       setCurrentTime(video.currentTime);
+      
+      // Update buffered percentage
+      if (video.buffered.length > 0 && video.duration > 0) {
+        const bufferedEnd = video.buffered.end(video.buffered.length - 1);
+        const percentage = (bufferedEnd / video.duration) * 100;
+        setBufferedPercentage(percentage);
+      }
     }
   };
 
@@ -187,12 +195,15 @@ export function VideoPlayer({
         ref={videoRef}
         src={src}
         autoPlay={autoplay}
+        preload="metadata"
         onLoadStart={handleLoadStart}
         onCanPlay={handleCanPlay}
         onError={handleError}
         onTimeUpdate={handleTimeUpdate}
         onPlay={handlePlay}
         onPause={handlePause}
+        onWaiting={() => setIsLoading(true)}
+        onPlaying={() => setIsLoading(false)}
         className="w-full h-full object-contain"
         playsInline
       />
@@ -275,16 +286,33 @@ export function VideoPlayer({
               className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent"
             >
               {/* Progress Bar */}
-              <div className="mb-4">
-                <Progress
-                  value={duration ? (currentTime / duration) * 100 : 0}
-                  className="h-1 cursor-pointer"
+              <div className="mb-4 relative">
+                <div
+                  className="relative h-1 bg-white/20 rounded-full cursor-pointer overflow-hidden"
                   onClick={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const percentage = ((e.clientX - rect.left) / rect.width) * 100;
                     handleSeek(percentage);
                   }}
-                />
+                >
+                  {/* Buffered Progress */}
+                  <div
+                    className="absolute inset-y-0 left-0 bg-white/30 transition-all duration-300"
+                    style={{ width: `${bufferedPercentage}%` }}
+                  />
+                  
+                  {/* Playback Progress */}
+                  <div
+                    className="absolute inset-y-0 left-0 bg-purple-500 transition-all duration-150"
+                    style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
+                  />
+                  
+                  {/* Progress Handle */}
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg transition-all duration-150"
+                    style={{ left: duration ? `calc(${(currentTime / duration) * 100}% - 6px)` : '-6px' }}
+                  />
+                </div>
               </div>
 
               {/* Control Buttons */}

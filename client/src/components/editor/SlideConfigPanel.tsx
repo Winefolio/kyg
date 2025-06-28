@@ -182,7 +182,7 @@ export function SlideConfigPanel({
                         <div>
                             <Label className="text-white/80">Video URL</Label>
                             <Input
-                                value={localPayload.video_url || localPayload.videoUrl || ""}
+                                value={localPayload.video_url || ""}
                                 onChange={(e) => handleFieldChange("video_url", e.target.value)}
                                 className="bg-white/10 border-white/20 text-white"
                                 placeholder="Enter video URL"
@@ -213,7 +213,7 @@ export function SlideConfigPanel({
                         <div>
                             <Label className="text-white/80">Audio URL</Label>
                             <Input
-                                value={localPayload.audio_url || localPayload.audioUrl || ""}
+                                value={localPayload.audio_url || ""}
                                 onChange={(e) => handleFieldChange("audio_url", e.target.value)}
                                 className="bg-white/10 border-white/20 text-white"
                                 placeholder="Enter audio URL"
@@ -233,7 +233,83 @@ export function SlideConfigPanel({
                 </Card>
             )}
 
-            {slide.type !== "question" && slide.type !== "video_message" && slide.type !== "audio_message" && (
+            {slide.type === "transition" && (
+                <Card className="bg-white/5 border-white/10">
+                    <CardHeader>
+                        <CardTitle className="text-lg text-white">
+                            Transition Settings
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <Label className="text-white/80">Title</Label>
+                            <Input
+                                value={localPayload.title || ""}
+                                onChange={(e) => handleFieldChange("title", e.target.value)}
+                                className="bg-white/10 border-white/20 text-white"
+                                placeholder="Enter transition title"
+                            />
+                        </div>
+                        <div>
+                            <Label className="text-white/80">Description (optional)</Label>
+                            <Textarea
+                                value={localPayload.description || ""}
+                                onChange={(e) => handleFieldChange("description", e.target.value)}
+                                className="bg-white/10 border-white/20 text-white"
+                                placeholder="Enter transition description"
+                                rows={2}
+                            />
+                        </div>
+                        <div>
+                            <Label className="text-white/80">Duration (milliseconds)</Label>
+                            <Input
+                                type="number"
+                                value={localPayload.duration || 2000}
+                                onChange={(e) => handleFieldChange("duration", parseInt(e.target.value) || 2000)}
+                                className="bg-white/10 border-white/20 text-white"
+                                min={500}
+                                max={10000}
+                                step={500}
+                            />
+                        </div>
+                        <div>
+                            <Label className="text-white/80">Animation Type</Label>
+                            <select
+                                value={localPayload.animation_type || "wine_glass_fill"}
+                                onChange={(e) => handleFieldChange("animation_type", e.target.value)}
+                                className="w-full bg-white/10 border border-white/20 text-white rounded-md px-3 py-2"
+                            >
+                                <option value="wine_glass_fill">Wine Glass Fill</option>
+                                <option value="fade">Fade Progress</option>
+                                <option value="slide">Sliding Dots</option>
+                            </select>
+                        </div>
+                        <div>
+                            <Label className="text-white/80">Background Image URL (optional)</Label>
+                            <Input
+                                value={localPayload.backgroundImage || ""}
+                                onChange={(e) => handleFieldChange("backgroundImage", e.target.value)}
+                                className="bg-white/10 border-white/20 text-white"
+                                placeholder="Enter image URL"
+                            />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                id="showContinueButton"
+                                checked={localPayload.showContinueButton || false}
+                                onChange={(e) => handleFieldChange("showContinueButton", e.target.checked)}
+                                className="rounded"
+                            />
+                            <Label htmlFor="showContinueButton" className="text-white/80">
+                                Show manual continue button
+                            </Label>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {slide.type !== "question" && slide.type !== "video_message" && slide.type !== "audio_message" && slide.type !== "transition" && slide.type !== "interlude" && (
                 <Card className="bg-white/5 border-white/10">
                     <CardHeader>
                         <CardTitle className="text-lg text-white">

@@ -45,13 +45,13 @@ export function MediaUpload({
   const getAcceptString = () => {
     switch (accept) {
       case 'image':
-        return 'image/jpeg,image/png,image/webp';
+        return 'image/jpeg,image/jpg,image/png,image/webp,image/gif,image/bmp,image/tiff,image/svg+xml,image/avif,image/heic,image/heif';
       case 'video':
         return 'video/mp4,video/webm,video/quicktime';
       case 'audio':
-        return 'audio/mpeg,audio/wav,audio/mp4,audio/m4a';
+        return 'audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/mp4,audio/m4a,audio/x-m4a,audio/aac,audio/ogg,audio/webm';
       case 'all':
-        return 'image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/mp4,audio/m4a';
+        return 'image/jpeg,image/jpg,image/png,image/webp,image/gif,image/bmp,image/tiff,image/svg+xml,image/avif,image/heic,image/heif,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/mp4,audio/m4a,audio/x-m4a,audio/aac,audio/ogg,audio/webm';
       default:
         return '';
     }
@@ -107,11 +107,72 @@ export function MediaUpload({
     }
 
     const acceptedTypes = getAcceptString().split(',');
-    if (!acceptedTypes.includes(file.type)) {
-      return `File type not supported. Accepted types: ${acceptedTypes.join(', ')}`;
+    
+    // Direct MIME type check
+    if (acceptedTypes.includes(file.type)) {
+      return null;
     }
+    
+    // Fallback: Check by file extension
+    const fileName = file.name.toLowerCase();
+    const fileExtension = fileName.split('.').pop();
+    
+    // Map common audio extensions to their MIME types
+    const audioExtensionMap: Record<string, string[]> = {
+      'm4a': ['audio/m4a', 'audio/x-m4a', 'audio/mp4'],
+      'mp3': ['audio/mpeg', 'audio/mp3'],
+      'wav': ['audio/wav', 'audio/x-wav'],
+      'aac': ['audio/aac'],
+      'ogg': ['audio/ogg'],
+      'webm': ['audio/webm']
+    };
+    
+    // Check if file extension matches any accepted audio format
+    if (accept === 'audio' || accept === 'all') {
+      const validMimeTypes = audioExtensionMap[fileExtension || ''];
+      if (validMimeTypes && validMimeTypes.some(mime => acceptedTypes.includes(mime))) {
+        console.log(`File validated by extension: ${fileName} (${file.type} -> ${validMimeTypes.join(', ')})`);
+        return null;
+      }
+    }
+    
+    // If M4A file specifically, provide helpful message
+    if (fileExtension === 'm4a') {
+      return `M4A file detected. Your browser reports this as "${file.type}". Please try a different browser or convert to MP3 format.`;
+    }
+    
+    return `File type "${file.type}" not supported. Accepted audio formats: MP3, M4A, WAV, AAC, OGG, WebM`;
+  };
 
-    return null;
+  const uploadWithRetry = async (formData: FormData, maxRetries = 3): Promise<Response> => {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await apiRequest('POST', '/api/upload', formData);
+        
+        // If successful or client error (4xx), return immediately
+        if (response.ok || (response.status >= 400 && response.status < 500)) {
+          return response;
+        }
+        
+        // For server errors (5xx), throw to trigger retry
+        throw new Error(`Server error: ${response.status}`);
+      } catch (error) {
+        lastError = error as Error;
+        console.log(`Upload attempt ${attempt} failed:`, error);
+        
+        // Don't retry on the last attempt
+        if (attempt < maxRetries) {
+          // Exponential backoff: wait 1s, 2s, 4s...
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          setError(`Upload failed, retrying in ${delay / 1000} seconds... (Attempt ${attempt}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    throw lastError || new Error('Upload failed after all retry attempts');
   };
 
   const handleFileSelect = async (file: File) => {
@@ -137,7 +198,7 @@ export function MediaUpload({
         setUploadProgress(prev => Math.min(prev + 10, 90));
       }, 200);
 
-      const response = await apiRequest('POST', '/api/upload/media', formData);
+      const response = await uploadWithRetry(formData);
       const result = await response.json() as UploadResult;
 
       clearInterval(progressInterval);

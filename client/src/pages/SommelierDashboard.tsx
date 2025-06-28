@@ -527,7 +527,7 @@ export default function SommelierDashboard() {
                                 <div className="flex items-center space-x-4 text-sm text-white/60">
                                   <div className="flex items-center space-x-1">
                                     <Wine className="w-4 h-4" />
-                                    <span>{pkg.wines?.length || 0} wines</span>
+                                    <span>{pkg.wines?.filter(w => w.position > 0).length || 0} wines</span>
                                   </div>
                                   <div className="flex items-center space-x-1">
                                     <Clock className="w-4 h-4" />
@@ -976,7 +976,7 @@ export default function SommelierDashboard() {
                     <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
                       <Wine className="w-6 h-6 md:w-8 md:h-8 text-red-400 mx-auto mb-2" />
                       <div className="text-xl md:text-2xl font-bold text-white">
-                        {packages?.reduce((total, p) => total + (p.wines?.length || 0), 0) || 0}
+                        {packages?.reduce((total, p) => total + (p.wines?.filter(w => w.position > 0).length || 0), 0) || 0}
                       </div>
                       <div className="text-white/70 text-xs md:text-sm">
                         Total Wines
@@ -1009,7 +1009,7 @@ export default function SommelierDashboard() {
                                   variant="outline"
                                   className="text-xs border-white/20 text-white/70 flex-shrink-0"
                                 >
-                                  {pkg.wines?.length || 0}
+                                  {pkg.wines?.filter(w => w.position > 0).length || 0}
                                 </Badge>
                               </div>
                               <div className="text-white/60 text-xs md:text-sm flex-shrink-0 ml-2">

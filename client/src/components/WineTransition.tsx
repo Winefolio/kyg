@@ -103,7 +103,9 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
                 <Sparkles className="w-6 h-6 text-amber-300" />
               </motion.div>
               <span className="text-white font-medium">
-                {isComplete ? "Tasting Experience Complete!" : `Wine ${currentWine.position} - ${getSectionDisplayName(sectionType)} Complete`}
+                {isComplete ? "Tasting Experience Complete!" : 
+                 currentWine.position === 0 ? "Package Introduction Complete" : 
+                 `Wine ${currentWine.position} - ${getSectionDisplayName(sectionType)} Complete`}
               </span>
             </div>
           </motion.div>
@@ -166,9 +168,11 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
                   animate={{ opacity: 1 }}
                   transition={{ delay: 1, duration: 0.6 }}
                 >
-                  <div className="px-4 py-2 bg-white/10 rounded-full text-white/90 text-sm font-medium border border-white/20">
-                    Wine {currentWine.position}
-                  </div>
+                  {currentWine.position > 0 && (
+                    <div className="px-4 py-2 bg-white/10 rounded-full text-white/90 text-sm font-medium border border-white/20">
+                      Wine {currentWine.position}
+                    </div>
+                  )}
                   <div className="px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full text-white/90 text-sm font-medium border border-purple-400/20">
                     {getSectionDisplayName(sectionType)}
                   </div>
@@ -206,7 +210,7 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
                   <h4 className="text-xl font-medium text-white mb-1">
                     {nextWine.wineName}
                   </h4>
-                  <p className="text-white/60 text-sm">Wine {nextWine.position}</p>
+                  {nextWine.position > 0 && <p className="text-white/60 text-sm">Wine {nextWine.position}</p>}
                   {nextWine.wineDescription && (
                     <p className="text-white/70 text-sm mt-2 line-clamp-2">
                       {nextWine.wineDescription}

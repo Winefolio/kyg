@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
-import { uploadMediaFile, deleteMediaFile, getMediaType, isSupabaseConfigured } from "./supabase-storage";
+import { uploadMediaFile, deleteMediaFile, getMediaType, isSupabaseConfigured, verifyStorageBucket } from "./supabase-storage";
 import { 
   insertSessionSchema,
   insertParticipantSchema,
@@ -21,28 +21,64 @@ const upload = multer({
     fileSize: 200 * 1024 * 1024, // 200MB max file size
   },
   fileFilter: (req, file, cb) => {
-    // Support all major image formats
+    // Support all major media formats
     const allowedImageTypes = [
       'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif',
       'image/bmp', 'image/tiff', 'image/svg+xml', 'image/avif', 'image/heic', 'image/heif'
     ];
+    const allowedAudioTypes = [
+      'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 
+      'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac', 
+      'audio/ogg', 'audio/webm'
+    ];
+    const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
     
-    // For image uploads, check size limit (10MB)
+    // Check file type
     if (file.mimetype.startsWith('image/')) {
       if (allowedImageTypes.includes(file.mimetype)) {
         cb(null, true);
       } else {
         cb(new Error(`Unsupported image format: ${file.mimetype}`));
       }
+    } else if (file.mimetype.startsWith('audio/')) {
+      if (allowedAudioTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        // Check file extension as fallback for M4A files
+        const fileName = file.originalname.toLowerCase();
+        if (fileName.endsWith('.m4a')) {
+          console.log(`M4A file accepted by extension despite MIME type: ${file.mimetype}`);
+          cb(null, true);
+        } else {
+          cb(new Error(`Unsupported audio format: ${file.mimetype} (file: ${file.originalname})`));
+        }
+      }
+    } else if (file.mimetype.startsWith('video/')) {
+      if (allowedVideoTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error(`Unsupported video format: ${file.mimetype}`));
+      }
     } else {
-      // For other media types, use existing logic
-      cb(null, true);
+      cb(new Error(`Unsupported file type: ${file.mimetype}`));
     }
   }
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
   console.log("🚀 Starting route registration...");
+  
+  // Verify Supabase Storage configuration if configured
+  if (isSupabaseConfigured()) {
+    console.log("🔍 Checking Supabase Storage configuration...");
+    const storageCheck = await verifyStorageBucket();
+    if (!storageCheck.success) {
+      console.error("⚠️  Supabase Storage verification failed:", storageCheck.error);
+      console.error("⚠️  Media uploads will not work properly until this is fixed.");
+    }
+  } else {
+    console.log("ℹ️  Supabase not configured - media uploads will use base64 encoding (development mode)");
+  }
   
   // Validate package code
   app.get("/api/packages/:code", async (req, res) => {
@@ -99,6 +135,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let allSlides: any[] = [];
 
+      // Fetch package-level slides (intros, transitions, etc.)
+      const packageSlides = await storage.getSlidesByPackageId(pkg.id);
+      // Add package context to each package-level slide
+      const packageSlidesWithContext = packageSlides.map(slide => ({
+        ...slide,
+        packageInfo: {
+          id: pkg.id,
+          name: pkg.name,
+          description: pkg.description
+        }
+      }));
+      allSlides = allSlides.concat(packageSlidesWithContext);
+
       // Get slides for each wine and combine them
       for (const wine of wines) {
         const wineSlides = await storage.getSlidesByPackageWineId(wine.id);
@@ -117,7 +166,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Sort all slides by global position to ensure correct order
-      allSlides.sort((a, b) => (a.globalPosition || 0) - (b.globalPosition || 0));
+      // Add stable sorting with ID fallback to prevent unstable ordering for duplicate positions
+      allSlides.sort((a, b) => {
+        const posA = a.globalPosition || 0;
+        const posB = b.globalPosition || 0;
+        if (posA !== posB) return posA - posB;
+        // Fallback: sort by slide ID for stability when positions are equal
+        return a.id.localeCompare(b.id);
+      });
 
       // Filter host-only slides if not host
       if (!isHost) {
@@ -1361,10 +1417,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uploadEntityId = entityId || `package-temp-${Date.now()}`;
 
       // Validate file type
-      const mediaType = getMediaType(mimetype);
+      let mediaType = getMediaType(mimetype);
+      
+      // Fallback for M4A files with non-standard MIME types
+      if (!mediaType && originalname.toLowerCase().endsWith('.m4a')) {
+        console.log(`M4A file detected with MIME type: ${mimetype}, treating as audio`);
+        mediaType = 'audio';
+      }
+      
       if (!mediaType) {
         return res.status(400).json({ 
-          message: `Unsupported file type: ${mimetype}. Supported types: images (JPEG, PNG, WebP, GIF, AVIF, HEIC, etc.), audio (MP3, WAV, M4A), video (MP4, WebM, MOV)` 
+          message: `Unsupported file type: ${mimetype} (file: ${originalname}). Supported types: images (JPEG, PNG, WebP, GIF, AVIF, HEIC, etc.), audio (MP3, M4A, WAV, AAC, OGG, WebM), video (MP4, WebM, MOV)` 
         });
       }
 
@@ -1378,9 +1441,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileSize: buffer.length
       });
     } catch (error) {
-      console.error("Error uploading media:", error);
-      res.status(500).json({ 
-        message: error instanceof Error ? error.message : "Failed to upload media" 
+      // Detailed error logging
+      console.error("Media upload failed:", {
+        error: error,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorStack: error instanceof Error ? error.stack : undefined,
+        requestDetails: {
+          fileName: req.file?.originalname,
+          fileSize: req.file?.size,
+          mimeType: req.file?.mimetype,
+          entityId: req.body?.entityId,
+          entityType: req.body?.entityType
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+      // Determine appropriate status code and message
+      let statusCode = 500;
+      let errorMessage = "Failed to upload media";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        
+        // Map specific errors to appropriate status codes
+        if (error.message.includes('bucket') || error.message.includes('not found')) {
+          statusCode = 503; // Service unavailable
+          errorMessage = "Storage service is not properly configured. Please contact support.";
+        } else if (error.message.includes('access denied') || error.message.includes('RLS')) {
+          statusCode = 403; // Forbidden
+          errorMessage = "Storage access denied. Please check your permissions.";
+        } else if (error.message.includes('size')) {
+          statusCode = 413; // Payload too large
+        } else if (error.message.includes('Unsupported')) {
+          statusCode = 415; // Unsupported media type
+        }
+      }
+      
+      res.status(statusCode).json({ 
+        message: errorMessage,
+        error: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.message : 'Unknown error' : undefined
       });
     }
   });
@@ -1403,10 +1502,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await deleteMediaFile(fileUrl);
       res.json({ message: "File deleted successfully" });
     } catch (error) {
-      console.error("Error deleting media:", error);
-      res.status(500).json({ 
-        message: error instanceof Error ? error.message : "Failed to delete media" 
+      // Detailed error logging for delete operations
+      console.error("Media deletion failed:", {
+        error: error,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        fileUrl: req.body?.fileUrl,
+        timestamp: new Date().toISOString()
       });
+      
+      // Don't fail if file is already deleted
+      if (error instanceof Error && error.message.includes('not found')) {
+        res.json({ message: "File deleted successfully (or already deleted)" });
+      } else {
+        res.status(500).json({ 
+          message: error instanceof Error ? error.message : "Failed to delete media",
+          error: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.message : 'Unknown error' : undefined
+        });
+      }
     }
   });
 

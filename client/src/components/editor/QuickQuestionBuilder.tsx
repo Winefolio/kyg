@@ -220,7 +220,7 @@ export function QuickQuestionBuilder({
         return {
           title: '',
           description: '',
-          videoUrl: '',
+          video_url: '',
           autoplay: false,
           controls: true
         } as VideoMessageConfig;
@@ -228,7 +228,7 @@ export function QuickQuestionBuilder({
         return {
           title: '',
           description: '',
-          audioUrl: '',
+          audio_url: '',
           autoplay: false
         } as AudioMessageConfig;
       default:
@@ -482,8 +482,8 @@ export function QuickQuestionBuilder({
             </div>
 
             <MediaUpload
-              value={(questionData.config as VideoMessageConfig).videoUrl || ''}
-              onChange={(url) => updateConfig('videoUrl', url)}
+              value={(questionData.config as VideoMessageConfig).video_url || ''}
+              onChange={(url) => updateConfig('video_url', url)}
               accept="video"
               label="Video File"
               placeholder="No video selected"
@@ -535,8 +535,8 @@ export function QuickQuestionBuilder({
             </div>
 
             <MediaUpload
-              value={(questionData.config as AudioMessageConfig).audioUrl || ''}
-              onChange={(url) => updateConfig('audioUrl', url)}
+              value={(questionData.config as AudioMessageConfig).audio_url || ''}
+              onChange={(url) => updateConfig('audio_url', url)}
               accept="audio"
               label="Audio File"
               placeholder="No audio selected"
@@ -619,9 +619,9 @@ export function QuickQuestionBuilder({
             {previewConfig.description && (
               <p className="text-white/70 text-sm mb-4">{previewConfig.description}</p>
             )}
-            {(previewConfig as VideoMessageConfig).videoUrl ? (
+            {(previewConfig as VideoMessageConfig).video_url ? (
               <VideoPlayer
-                src={(previewConfig as VideoMessageConfig).videoUrl}
+                src={(previewConfig as VideoMessageConfig).video_url}
                 title={previewConfig.title}
                 description={previewConfig.description}
                 autoplay={(previewConfig as VideoMessageConfig).autoplay}
@@ -643,9 +643,9 @@ export function QuickQuestionBuilder({
             {previewConfig.description && (
               <p className="text-white/70 text-sm mb-4">{previewConfig.description}</p>
             )}
-            {(previewConfig as AudioMessageConfig).audioUrl ? (
+            {(previewConfig as AudioMessageConfig).audio_url ? (
               <AudioPlayer
-                src={(previewConfig as AudioMessageConfig).audioUrl}
+                src={(previewConfig as AudioMessageConfig).audio_url}
                 title={previewConfig.title}
                 description={previewConfig.description}
                 autoplay={(previewConfig as AudioMessageConfig).autoplay}
