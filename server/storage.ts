@@ -1850,12 +1850,176 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Wine management methods for sommelier dashboard
+  private getDefaultSlideTemplates() {
+    return [
+      {
+        position: 1,
+        type: "interlude" as const,
+        section_type: "intro" as const,
+        payloadJson: {
+          title: "Welcome to Your Wine Tasting",
+          description: "Let's begin our journey through this exceptional wine",
+        },
+      },
+      {
+        position: 2,
+        type: "question" as const,
+        section_type: "intro" as const,
+        payloadJson: {
+          title: "What aromas do you detect?",
+          description: "Take a moment to swirl and smell. Select all the aromas you can identify.",
+          question_type: "multiple_choice",
+          category: "Aroma",
+          options: [
+            {
+              id: "1",
+              text: "Dark fruits (blackberry, plum)",
+              description: "Rich, concentrated berry aromas",
+            },
+            {
+              id: "2",
+              text: "Vanilla and oak",
+              description: "From barrel aging",
+            },
+            {
+              id: "3",
+              text: "Spices (pepper, clove)",
+              description: "Complex spice notes",
+            },
+            {
+              id: "4",
+              text: "Floral notes",
+              description: "Violet or rose petals",
+            },
+            {
+              id: "5",
+              text: "Earth and minerals",
+              description: "Terroir characteristics",
+            },
+          ],
+          allow_multiple: true,
+          allow_notes: true,
+        },
+      },
+      {
+        position: 3,
+        type: "question" as const,
+        section_type: "deep_dive" as const,
+        payloadJson: {
+          title: "Rate the aroma intensity",
+          description: "How strong are the aromas? 1 = Very light, 10 = Very intense",
+          question_type: "scale",
+          category: "Intensity",
+          scale_min: 1,
+          scale_max: 10,
+          scale_labels: ["Very Light", "Very Intense"],
+          backgroundImage: "https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?w=600&h=400&fit=crop",
+        },
+      },
+      {
+        position: 4,
+        type: "question" as const,
+        section_type: "deep_dive" as const,
+        payloadJson: {
+          title: "Describe the taste profile",
+          description: "Take a sip and identify the flavors you experience.",
+          question_type: "multiple_choice",
+          category: "Taste",
+          backgroundImage: "https://images.unsplash.com/photo-1574982817-a0138501b8e7?w=600&h=400&fit=crop",
+          options: [
+            {
+              id: "1",
+              text: "Red fruits (cherry, raspberry)",
+              description: "Bright fruit flavors",
+            },
+            {
+              id: "2",
+              text: "Dark fruits (blackcurrant, plum)",
+              description: "Rich, deep fruit flavors",
+            },
+            {
+              id: "3",
+              text: "Chocolate and coffee",
+              description: "Rich, roasted notes",
+            },
+            {
+              id: "4",
+              text: "Tobacco and leather",
+              description: "Aged, complex flavors",
+            },
+            {
+              id: "5",
+              text: "Herbs and spices",
+              description: "Savory elements",
+            },
+          ],
+          allow_multiple: true,
+          allow_notes: true,
+        },
+      },
+      {
+        position: 5,
+        type: "question" as const,
+        section_type: "deep_dive" as const,
+        payloadJson: {
+          title: "How would you describe the body?",
+          description: "The weight and fullness of the wine in your mouth",
+          question_type: "scale",
+          category: "Body",
+          scale_min: 1,
+          scale_max: 5,
+          scale_labels: ["Light Body", "Full Body"],
+        },
+      },
+      {
+        position: 6,
+        type: "question" as const,
+        section_type: "deep_dive" as const,
+        payloadJson: {
+          title: "Tannin level assessment",
+          description: "How much dryness and grip do you feel on your gums and tongue?",
+          question_type: "scale",
+          category: "Tannins",
+          scale_min: 1,
+          scale_max: 10,
+          scale_labels: ["Soft Tannins", "Firm Tannins"],
+        },
+      },
+      {
+        position: 7,
+        type: "question" as const,
+        section_type: "ending" as const,
+        payloadJson: {
+          title: "How long is the finish?",
+          description: "How long do the flavors linger after swallowing?",
+          question_type: "scale",
+          category: "Finish",
+          scale_min: 1,
+          scale_max: 10,
+          scale_labels: ["Short Finish", "Very Long Finish"],
+        },
+      },
+      {
+        position: 8,
+        type: "question" as const,
+        section_type: "ending" as const,
+        payloadJson: {
+          title: "Overall wine rating",
+          description: "Your overall impression of this wine",
+          question_type: "scale",
+          category: "Overall",
+          scale_min: 1,
+          scale_max: 10,
+          scale_labels: ["Poor", "Excellent"],
+        },
+      },
+    ];
+  }
+
   async createPackageWineFromDashboard(wine: InsertPackageWine): Promise<PackageWine> {
     // Get the next position for this package
     const existingWines = await this.getPackageWines(wine.packageId);
-    // Filter out the position 0 "Package Introduction" wine when calculating next position
-    const realWines = existingWines.filter(w => w.position > 0);
-    const nextPosition = realWines.length + 1;
+    const nextPosition = existingWines.length + 1;
     
     const wineData = {
       ...wine,
@@ -1875,6 +2039,48 @@ export class DatabaseStorage implements IStorage {
     };
     
     const [newWine] = await db.insert(packageWines).values(wineData).returning();
+    
+    // Create wine introduction slide with wine-specific information
+    await this.createSlide({
+      packageWineId: newWine.id,
+      position: 1,
+      type: "interlude",
+      section_type: "intro",
+      payloadJson: {
+        title: `Meet ${newWine.wineName}`,
+        description: newWine.wineDescription || `Discover the unique characteristics of this exceptional wine.`,
+        wine_name: newWine.wineName,
+        wine_image: newWine.wineImageUrl || "",
+        wine_type: newWine.wineType || "",
+        wine_region: newWine.region || "",
+        wine_vintage: newWine.vintage || "",
+        is_welcome: true,
+        is_wine_intro: true
+      },
+    });
+    
+    // Create default slide templates for this wine
+    const slideTemplates = this.getDefaultSlideTemplates();
+    let position = 2; // Start after the wine intro slide
+    
+    for (const template of slideTemplates.slice(1)) { // Skip the first template (intro) since we already created wine intro
+      // Add wine context to all slides
+      const payloadJson = {
+        ...template.payloadJson,
+        wine_name: newWine.wineName,
+        wine_image: newWine.wineImageUrl,
+        wine_type: newWine.wineType
+      };
+
+      await this.createSlide({
+        packageWineId: newWine.id,
+        position: position++,
+        type: template.type,
+        section_type: template.section_type,
+        payloadJson: payloadJson,
+      });
+    }
+    
     return newWine;
   }
 

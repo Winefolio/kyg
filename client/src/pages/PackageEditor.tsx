@@ -101,55 +101,16 @@ export default function PackageEditor() {
       return result.wine;
     },
     onSuccess: async (newWine: PackageWine) => {
-      // Check if this is the first wine
-      const wines = editorData?.wines || [];
-      const isFirstWine = wines.length === 0;
+      // Wine introduction slide is now automatically created in the backend
+      toast({ 
+        title: "🍷 Wine created successfully", 
+        description: `${newWine.wineName} is ready for content`
+      });
+      // Invalidate and reset data loaded flag to get fresh data
+      dataLoadedRef.current = false;
       
-      if (isFirstWine && editorData?.id) {
-        // Ensure package intro exists
-        try {
-          await apiRequest('POST', `/api/packages/${editorData.id}/intro`, {
-            title: `Welcome to ${editorData.name || 'Your Wine Tasting'}`,
-            description: 'You are about to embark on a journey through exceptional wines. Each wine has been carefully selected to showcase unique characteristics and flavors.',
-            imageUrl: editorData.imageUrl
-          });
-        } catch (error) {
-          console.error('Failed to create package intro slide:', error);
-        }
-      }
-      
-      // Auto-create wine introduction slide
-      const wineIntroPosition = 1; // Local position within wine
-      const wineIntroData = {
-        packageWineId: newWine.id,
-        position: wineIntroPosition,
-        type: 'interlude',
-        section_type: 'intro',
-        payloadJson: {
-          title: `Meet ${newWine.wineName}`,
-          description: newWine.wineDescription || `Discover the unique characteristics of this exceptional wine.`,
-          wine_name: newWine.wineName,
-          wine_image: newWine.wineImageUrl || '',
-          wine_type: newWine.wineType,
-          wine_region: newWine.region,
-          wine_vintage: newWine.vintage,
-          is_welcome: true,
-          is_wine_intro: true
-        }
-      };
-      
-      try {
-        await apiRequest('POST', '/api/slides', wineIntroData);
-        toast({ 
-          title: "🍷 Wine created with welcome slide", 
-          description: `${newWine.wineName} is ready for content`
-        });
-        // Invalidate and reset data loaded flag to get fresh data
-        dataLoadedRef.current = false;
-      } catch (error) {
-        console.error('Failed to create welcome slide:', error);
-        toast({ title: "Wine created successfully", description: "Note: Welcome slide creation failed" });
-      }
+      // Auto-expand the newly created wine to show its sections
+      setExpandedWines(prev => new Set([...prev, newWine.id]));
       
       queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
       setIsWineModalOpen(false);
@@ -259,6 +220,27 @@ export default function PackageEditor() {
       else newSet.add(wineId);
       return newSet;
     });
+  };
+
+  // Type-safe helper functions for wine expansion
+  const expandWine = (wineId: string) => {
+    setExpandedWines(prev => new Set(prev).add(wineId));
+  };
+
+  const collapseWine = (wineId: string) => {
+    setExpandedWines(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(wineId);
+      return newSet;
+    });
+  };
+
+  const expandAllWines = () => {
+    setExpandedWines(new Set(wines.map(w => w.id)));
+  };
+
+  const collapseAllWines = () => {
+    setExpandedWines(new Set());
   };
 
   const handleAddSlide = (wineId: string, template: any, sectionType?: 'intro' | 'deep_dive' | 'ending') => {
@@ -414,9 +396,6 @@ export default function PackageEditor() {
     setLocalSlides(newLocalSlides);
     setHasUnsavedChanges(true);
     
-    // Also update slides state for activeSlide reference
-    setSlides(newLocalSlides);
-    
     // Immediately save the changes to database - much more reliable than complex state management
     if (updates.length > 0) {
       console.log('🔄 Immediately saving slide order changes:', updates);
@@ -485,6 +464,19 @@ export default function PackageEditor() {
       toast({ title: "No changes to save" });
     }
   }, [hasUnsavedChanges, localSlides, slides, reorderSlidesMutation, toast]);
+
+  // Development invariant checks
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      if (!(expandedWines instanceof Set)) {
+        console.error('⚠️ State corruption detected: expandedWines is not a Set!', {
+          type: typeof expandedWines,
+          value: expandedWines,
+          isArray: Array.isArray(expandedWines)
+        });
+      }
+    }
+  }, [expandedWines]);
 
   // Keyboard shortcut for saving
   useEffect(() => {
@@ -695,7 +687,7 @@ export default function PackageEditor() {
                 )}
 
                 {/* Package Introduction Section */}
-                {editorData && localSlides.some(s => (s.payloadJson as any)?.is_package_intro) && (
+                {editorData && (
                   <Card className="mb-4 bg-gradient-to-br from-purple-600/20 to-purple-700/10 border-purple-500/30 backdrop-blur-sm shadow-xl shadow-purple-900/20">
                     <div className="p-5">
                       <div className="flex items-center space-x-3 mb-3">
@@ -729,6 +721,12 @@ export default function PackageEditor() {
                             </div>
                           </div>
                         ))}
+                      {localSlides.filter(s => (s.payloadJson as any)?.is_package_intro).length === 0 && (
+                        <div className="p-3 bg-white/5 rounded-lg">
+                          <p className="text-sm text-white/60 text-center">No package introduction slide yet</p>
+                          <p className="text-xs text-white/40 text-center mt-1">Package intro is created automatically</p>
+                        </div>
+                      )}
                     </div>
                   </Card>
                 )}

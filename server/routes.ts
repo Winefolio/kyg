@@ -784,15 +784,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Package not found" });
       }
 
-      // Get the first wine in the package to attach the intro slide
-      const wines = await storage.getPackageWines(packageId);
-      if (!wines || wines.length === 0) {
-        return res.status(400).json({ message: "Package must have at least one wine before adding intro" });
-      }
-
-      // Check if package intro already exists
-      const existingSlides = await storage.getSlidesByPackageWineId(wines[0].id);
-      const existingIntro = existingSlides.find(s => (s.payloadJson as any)?.is_package_intro === true);
+      // Check if package intro already exists at package level
+      const existingPackageSlides = await storage.getSlidesByPackageId(packageId);
+      const existingIntro = existingPackageSlides.find(s => (s.payloadJson as any)?.is_package_intro === true);
 
       if (existingIntro) {
         // Update existing intro
@@ -809,9 +803,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         res.json({ slide: updatedSlide, action: 'updated' });
       } else {
-        // Create new intro slide at position 0 (before wine intro)
-        const introSlide = await storage.createSlide({
-          packageWineId: wines[0].id,
+        // Create new intro slide at package level using createPackageSlide
+        const introSlide = await storage.createPackageSlide({
+          packageId: packageId,
           position: 0, // Always first
           type: 'interlude',
           section_type: 'intro',

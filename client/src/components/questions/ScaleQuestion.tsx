@@ -50,7 +50,18 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
   const rightLabelScale = 1 + (progressPercent * 0.05);
   const leftLabelScale = 1 + ((1 - progressPercent) * 0.05);
 
-
+  // Dynamic feedback text based on slider value
+  const feedbackText = useMemo(() => {
+    const range = question.scale_max - question.scale_min;
+    const normalizedValue = (value - question.scale_min) / range;
+    
+    if (normalizedValue <= 0.1) return "Barely noticeable";
+    if (normalizedValue <= 0.3) return "Subtle";
+    if (normalizedValue <= 0.5) return "Moderate";
+    if (normalizedValue <= 0.7) return "Strong";
+    if (normalizedValue <= 0.9) return "Intense";
+    return "Overwhelming";
+  }, [value, question.scale_min, question.scale_max]);
 
   return (
     <motion.div
@@ -86,6 +97,21 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
       </div>
 
       <div className="space-y-6">
+        {/* Dynamic Feedback Text */}
+        <div className="h-8 text-center">
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={feedbackText}
+              className="text-lg font-semibold text-purple-300"
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -5 }}
+              transition={{ duration: 0.2 }}
+            >
+              {feedbackText}
+            </motion.p>
+          </AnimatePresence>
+        </div>
 
         <ModernSlider
           value={value}
