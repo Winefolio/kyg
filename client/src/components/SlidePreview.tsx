@@ -8,7 +8,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Play, Pause, Volume2, Info } from 'lucide-react';
-import { WineTastingTooltip } from '@/components/WineTastingTooltip';
 import type { Slide } from "@shared/schema";
 
 interface SlidePreviewProps {
@@ -53,9 +52,7 @@ export function SlidePreview({ slide, mode }: SlidePreviewProps) {
                       <Label htmlFor={`option-${index}`} className="text-white font-medium cursor-pointer">
                         {option.text}
                         {option.tooltip && (
-                          <WineTastingTooltip term={option.text}>
-                            <Info className="inline ml-1 h-3 w-3 text-purple-300" />
-                          </WineTastingTooltip>
+                          <Info className="inline ml-1 h-3 w-3 text-purple-300" />
                         )}
                       </Label>
                       {option.description && (

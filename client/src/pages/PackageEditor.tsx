@@ -24,7 +24,6 @@ import { QuickQuestionBuilder } from '@/components/editor/QuickQuestionBuilder';
 import { SimpleCopyButton } from '@/components/editor/SimpleCopyButton';
 import { PackageIntroCard } from '@/components/editor/PackageIntroCard';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Section details for organizing slides
 const sectionDetails = {
@@ -582,38 +581,25 @@ export default function PackageEditor() {
                 className="relative"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg blur-lg opacity-50 animate-pulse" />
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        size="sm" 
-                        onClick={handleSaveSlideOrder}
-                        disabled={isSavingOrder}
-                        className="relative bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
-                      >
-                        {isSavingOrder ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="mr-2 h-4 w-4" />
-                            Save Slide Order
-                          </>
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="bg-gray-900 text-white border-gray-700">
-                      <p className="text-sm">Save all position changes</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        <kbd className="px-1 py-0.5 bg-gray-800 rounded text-[10px]">⌘</kbd>
-                        <span className="mx-1">+</span>
-                        <kbd className="px-1 py-0.5 bg-gray-800 rounded text-[10px]">S</kbd>
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Button 
+                  size="sm" 
+                  onClick={handleSaveSlideOrder}
+                  disabled={isSavingOrder}
+                  title="Save all position changes (⌘+S)"
+                  className="relative bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+                >
+                  {isSavingOrder ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Slide Order
+                    </>
+                  )}
+                </Button>
                 <Badge className="absolute -top-2 -right-2 bg-red-500 text-white animate-bounce">
                   Unsaved
                 </Badge>

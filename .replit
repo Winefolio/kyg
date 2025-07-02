@@ -41,13 +41,13 @@ localPort = 5001
 externalPort = 3000
 
 [[ports]]
-localPort = 13060
-externalPort = 3003
+localPort = 14022
+externalPort = 5000
 exposeLocalhost = true
 
 [[ports]]
-localPort = 22965
-externalPort = 5000
+localPort = 26690
+externalPort = 5173
 exposeLocalhost = true
 
 [[ports]]
@@ -56,13 +56,12 @@ externalPort = 4200
 exposeLocalhost = true
 
 [[ports]]
-localPort = 57594
-externalPort = 3001
-exposeLocalhost = true
+localPort = 54545
+externalPort = 3003
 
 [[ports]]
-localPort = 58535
-externalPort = 5173
+localPort = 57594
+externalPort = 3001
 exposeLocalhost = true
 
 [[ports]]

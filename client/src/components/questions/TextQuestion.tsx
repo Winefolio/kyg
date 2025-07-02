@@ -1,10 +1,15 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { DynamicTextRenderer } from '@/components/ui/DynamicTextRenderer';
+import { DynamicTextRenderer, extractRelevantTerms } from '@/components/ui/DynamicTextRenderer';
+import { TooltipInfoPanel } from '@/components/ui/TooltipInfoPanel';
 import { Progress } from '@/components/ui/progress';
+import { useGlossary } from '@/contexts/GlossaryContext';
+import { useHaptics } from '@/hooks/useHaptics';
+import { Info, BookOpen } from 'lucide-react';
+import { ModernButton } from '@/components/ui/modern-button';
 
 interface TextQuestionProps {
   question: {
@@ -23,6 +28,15 @@ interface TextQuestionProps {
 export function TextQuestion({ question, value = '', onChange }: TextQuestionProps) {
   const [localValue, setLocalValue] = useState(value);
   const [isFocused, setIsFocused] = useState(false);
+  const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
+  const { terms } = useGlossary();
+  const { triggerHaptic } = useHaptics();
+  
+  // Extract all relevant glossary terms from the current slide content
+  const relevantTerms = useMemo(() => {
+    const allText = [question.title, question.description || ''].join(' ');
+    return extractRelevantTerms(allText, terms);
+  }, [question, terms]);
   
   // Sync with external value
   useEffect(() => {
@@ -50,14 +64,27 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
     >
       <Card className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl">
         <div className="space-y-4">
-          {/* Category Badge */}
-          {question.category && (
-            <div className="flex justify-start mb-2">
+          {/* Category Badge and Info Button */}
+          <div className="flex items-center justify-between mb-2">
+            {question.category && (
               <span className="px-3 py-1 bg-purple-600/20 text-purple-300 text-xs font-medium rounded-full">
                 {question.category}
               </span>
-            </div>
-          )}
+            )}
+            {relevantTerms.length > 0 && (
+              <ModernButton
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  triggerHaptic('selection');
+                  setIsInfoPanelOpen(!isInfoPanelOpen);
+                }}
+                className="text-purple-300 hover:text-white hover:bg-white/10 p-2 rounded-full transition-all duration-200"
+              >
+                <Info size={16} />
+              </ModernButton>
+            )}
+          </div>
 
           {/* Question Title */}
           <h3 className="text-xl md:text-2xl font-semibold text-white">
@@ -70,6 +97,14 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
               <DynamicTextRenderer text={question.description} />
             </p>
           )}
+
+          {/* Inline Tooltip Info Panel */}
+          <TooltipInfoPanel
+            relevantTerms={relevantTerms}
+            isOpen={isInfoPanelOpen}
+            onOpenChange={setIsInfoPanelOpen}
+            themeColor="purple"
+          />
 
           {/* Text Input Area */}
           <div className="space-y-2">
@@ -127,11 +162,6 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
               <Progress 
                 value={progress} 
                 className="h-1 bg-white/10"
-                indicatorClassName={`
-                  transition-colors duration-200
-                  ${progress > 90 ? 'bg-yellow-400' : 'bg-purple-400'}
-                  ${progress >= 100 ? 'bg-red-400' : ''}
-                `}
               />
             </div>
 

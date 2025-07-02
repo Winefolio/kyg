@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ModernButton } from "@/components/ui/modern-button";
 import { ModernCard } from "@/components/ui/modern-card";
 import { DynamicTextRenderer, extractRelevantTerms } from "@/components/ui/DynamicTextRenderer";
+import { TooltipInfoPanel } from "@/components/ui/TooltipInfoPanel";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronUp, MessageSquare, Info, BookOpen } from "lucide-react";
 import { modernCardVariants, staggeredReveal, springTransition } from "@/lib/modern-animations";
@@ -103,45 +104,6 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
                 <Info size={14} />
               </ModernButton>
               
-              {/* Glossary Panel - Positioned next to button */}
-              <AnimatePresence>
-                {isInfoPanelOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9, x: 10 }}
-                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, x: 10 }}
-                    className="absolute top-0 right-full mr-2 z-50"
-                  >
-                    <div className="bg-gray-800/95 backdrop-blur-xl rounded-lg border border-purple-500/30 shadow-xl p-3 w-60">
-                      <h4 className="text-purple-300 font-semibold text-xs mb-2 flex items-center gap-1">
-                        <BookOpen className="w-3 h-3" />
-                        Wine Terms
-                      </h4>
-                      <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                        {relevantTerms.slice(0, 5).map((term) => (
-                          <div key={term.id} className="text-xs">
-                            <button
-                              onClick={() => {
-                                triggerHaptic('selection');
-                                // Show term definition popup - will be handled by parent
-                              }}
-                              className="text-purple-200 hover:text-white font-medium transition-colors underline decoration-purple-400/50 hover:decoration-purple-300"
-                            >
-                              {term.term}
-                            </button>
-                            <p className="text-gray-300 mt-0.5 leading-relaxed">
-                              {term.definition.length > 70 
-                                ? `${term.definition.substring(0, 70)}...` 
-                                : term.definition
-                              }
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
           )}
         </div>
@@ -152,6 +114,14 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
           <DynamicTextRenderer text={question.description} />
         </p>
       </div>
+
+      {/* Integrated Info Panel using shared component */}
+      <TooltipInfoPanel
+        relevantTerms={relevantTerms}
+        isOpen={isInfoPanelOpen}
+        onOpenChange={setIsInfoPanelOpen}
+        themeColor="purple"
+      />
 
       <div className="space-y-2 mb-4">
         {question.options.map((option, index) => {
@@ -268,61 +238,6 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
         </div>
       )}
 
-      {/* Integrated Info Panel */}
-      {relevantTerms.length > 0 && (
-        <Collapsible open={isInfoPanelOpen} onOpenChange={setIsInfoPanelOpen}>
-          <CollapsibleContent asChild>
-            <AnimatePresence>
-              {isInfoPanelOpen && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                  animate={{ opacity: 1, height: "auto", marginTop: 16 }}
-                  exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
-                  className="overflow-hidden"
-                >
-                  <div className="p-4 bg-gradient-to-br from-purple-900/40 via-purple-800/30 to-purple-900/40 rounded-xl border border-purple-500/30 backdrop-blur-sm shadow-lg">
-                    <div className="flex items-center gap-2 mb-3">
-                      <BookOpen size={16} className="text-purple-300" />
-                      <h4 className="text-sm font-semibold text-purple-200">Wine Terms</h4>
-                    </div>
-                    <div className="space-y-3">
-                      {relevantTerms.map((term, index) => (
-                        <motion.div
-                          key={term.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.05, duration: 0.2 }}
-                          className="border-l-2 border-purple-400/50 pl-3 py-1"
-                        >
-                          <h5 className="text-sm font-medium text-purple-100 capitalize mb-1">
-                            {term.term}
-                          </h5>
-                          <p className="text-xs text-white/90 leading-relaxed">
-                            {term.definition}
-                          </p>
-                          {term.variations && term.variations.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {term.variations.map((variation, i) => (
-                                <span
-                                  key={i}
-                                  className="px-2 py-0.5 bg-purple-500/30 text-purple-200 text-xs rounded-md border border-purple-400/30"
-                                >
-                                  {variation}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </CollapsibleContent>
-        </Collapsible>
-      )}
     </motion.div>
   );
 }

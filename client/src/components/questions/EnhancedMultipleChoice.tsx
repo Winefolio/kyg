@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { WineTermText } from "@/components/WineTastingTooltip";
+import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
 import { AromaDiagram } from "@/components/AromaDiagram";
 import { ChevronDown, ChevronUp, User, MessageCircle, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,7 @@ export function EnhancedMultipleChoice({ slideId, question, value, onChange }: E
       <div className="space-y-3 text-center">
         <div className="flex items-center justify-center gap-3">
           <h3 className="text-xl md:text-2xl font-bold text-white leading-tight">
-            <WineTermText>{question.title}</WineTermText>
+            <DynamicTextRenderer text={question.title} />
           </h3>
           
           {isAromaQuestion && (
@@ -78,7 +78,7 @@ export function EnhancedMultipleChoice({ slideId, question, value, onChange }: E
         
         {question.description && (
           <p className="text-white/70 text-sm md:text-base leading-relaxed">
-            <WineTermText>{question.description}</WineTermText>
+            <DynamicTextRenderer text={question.description} />
           </p>
         )}
         
@@ -145,11 +145,11 @@ export function EnhancedMultipleChoice({ slideId, question, value, onChange }: E
                 {/* Option Content */}
                 <div className="flex-1">
                   <div className="text-white font-medium">
-                    <WineTermText>{option.text}</WineTermText>
+                    <DynamicTextRenderer text={option.text} />
                   </div>
                   {option.description && (
                     <div className="text-white/60 text-sm mt-1">
-                      <WineTermText>{option.description}</WineTermText>
+                      <DynamicTextRenderer text={option.description} />
                     </div>
                   )}
                 </div>

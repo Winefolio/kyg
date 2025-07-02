@@ -109,6 +109,20 @@ const questionTypes: QuestionTypeCard[] = [
     title: 'Matrix',
     description: 'Grid of related questions',
     available: false
+  },
+  {
+    format: 'image_selection' as any,
+    icon: <Image className="w-8 h-8" />,
+    title: 'Image Selection',
+    description: 'Choose from visual options',
+    available: false
+  },
+  {
+    format: 'drawing' as any,
+    icon: <PenTool className="w-8 h-8" />,
+    title: 'Drawing Canvas',
+    description: 'Draw or annotate images',
+    available: false
   }
 ];
 
@@ -247,8 +261,9 @@ export function QuickQuestionBuilder({
   };
 
   const renderTypeSelector = () => (
-    <div className="grid grid-cols-2 gap-4 p-6">
-      {questionTypes.map((type) => (
+    <ScrollArea className="h-[400px] pr-4">
+      <div className="grid grid-cols-2 gap-4 p-6">
+        {questionTypes.map((type) => (
         <Card
           key={type.format}
           className={`p-6 cursor-pointer transition-all ${
@@ -268,7 +283,8 @@ export function QuickQuestionBuilder({
           </div>
         </Card>
       ))}
-    </div>
+      </div>
+    </ScrollArea>
   );
 
   const renderMultipleChoiceConfig = () => (
@@ -715,7 +731,7 @@ export function QuickQuestionBuilder({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-purple-400" />

@@ -128,8 +128,20 @@ export default function TastingSession() {
 
   if (sessionDetailsLoading || isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="bg-gradient-card backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-xl max-w-md w-full text-center"
+        >
+          <Wine className="w-16 h-16 mx-auto mb-4 text-purple-300" />
+          <h2 className="text-2xl font-semibold text-white mb-2">Preparing Your Wine Journey</h2>
+          <p className="text-purple-200 mb-6">Loading tasting experience...</p>
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
+          </div>
+        </motion.div>
       </div>
     );
   }
@@ -654,7 +666,7 @@ export default function TastingSession() {
                     scale_max: gq.config.scaleMax || 10,
                     scale_labels: gq.config.scaleLabels || ['Low', 'High']
                   }}
-                  value={answers[currentSlide.id] || gq.config.scaleMin || 1}
+                  value={answers[currentSlide.id] ?? Math.floor(((gq.config.scaleMin || 1) + (gq.config.scaleMax || 10)) / 2)}
                   onChange={(value) => handleAnswerChange(currentSlide.id, value)}
                 />
               );
@@ -766,7 +778,7 @@ export default function TastingSession() {
                 scale_max: questionData.scale_max || questionData.scaleMax || 10,
                 scale_labels: questionData.scale_labels || questionData.scaleLabels || ['Low', 'High']
               }}
-              value={answers[currentSlide.id] || questionData.scale_min || questionData.scaleMin || 1}
+              value={answers[currentSlide.id] ?? Math.floor(((questionData.scale_min || questionData.scaleMin || 1) + (questionData.scale_max || questionData.scaleMax || 10)) / 2)}
               onChange={(value) => handleAnswerChange(currentSlide.id, value)}
             />
           );
@@ -898,7 +910,7 @@ export default function TastingSession() {
                 scale_max: questionData.scale_max || questionData.scaleMax || 10,
                 scale_labels: questionData.scale_labels || questionData.scaleLabels || ['Low', 'High']
               }}
-              value={answers[currentSlide.id] || questionData.scale_min || questionData.scaleMin || 1}
+              value={answers[currentSlide.id] ?? Math.floor(((questionData.scale_min || questionData.scaleMin || 1) + (questionData.scale_max || questionData.scaleMax || 10)) / 2)}
               onChange={(value) => handleAnswerChange(currentSlide.id, value)}
             />
           );
@@ -1285,7 +1297,7 @@ export default function TastingSession() {
                 disabled={isNavigating}
                 className={
                   currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro
-                    ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold px-8 py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105"
+                    ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold px-8 py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 transform hover:scale-105 active:scale-100"
                     : "text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                 }
               >
@@ -1306,7 +1318,7 @@ export default function TastingSession() {
           toSection={sectionTransitionData.toSection}
           wineName={sectionTransitionData.wineName}
           onComplete={handleSectionTransitionComplete}
-          duration={2500}
+          duration={3000}
         />
       )}
     </>

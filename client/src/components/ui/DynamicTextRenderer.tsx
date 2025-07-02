@@ -1,7 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useMemo } from 'react';
 import { useGlossary } from '@/contexts/GlossaryContext';
-import { useHaptics } from '@/hooks/useHaptics';
 import type { GlossaryTerm } from '@shared/schema';
 
 interface DynamicTextRendererProps {
@@ -12,9 +10,6 @@ interface DynamicTextRendererProps {
 
 export function DynamicTextRenderer({ text, className, enableHighlighting = true }: DynamicTextRendererProps) {
   const { terms, isLoading } = useGlossary();
-  const { triggerHaptic } = useHaptics();
-  const [selectedTerm, setSelectedTerm] = useState<GlossaryTerm | null>(null);
-  const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
 
   const renderedContent = useMemo(() => {
     if (isLoading || !text || terms.length === 0 || !enableHighlighting) {
@@ -83,21 +78,12 @@ export function DynamicTextRenderer({ text, className, enableHighlighting = true
             if (!processedTerms.has(termKey)) {
               processedTerms.add(termKey);
               result.push(
-                <button
+                <span
                   key={`${termKey}-${matchIndex}`}
-                  onClick={(e) => {
-                    triggerHaptic('selection');
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setPopupPosition({
-                      x: rect.left + rect.width / 2,
-                      y: rect.top - 10
-                    });
-                    setSelectedTerm(termData.data);
-                  }}
-                  className="underline decoration-dotted decoration-purple-400/60 decoration-1 font-medium text-purple-300 hover:text-purple-200 hover:decoration-purple-300 transition-colors cursor-pointer bg-transparent border-none p-0 m-0"
+                  className="font-semibold text-purple-200"
                 >
                   {matchedTerm}
-                </button>
+                </span>
               );
             } else {
               // Term already highlighted once, render as plain text
@@ -114,75 +100,7 @@ export function DynamicTextRenderer({ text, className, enableHighlighting = true
     return <span className={className}>{result}</span>;
   }, [text, terms, isLoading, className, enableHighlighting]);
 
-  return (
-    <div className="relative">
-      {renderedContent}
-      
-      {/* Definition Popup */}
-      <AnimatePresence>
-        {selectedTerm && (
-          <>
-            {/* Backdrop */}
-            <div 
-              className="fixed inset-0 z-40"
-              onClick={() => setSelectedTerm(null)}
-            />
-            
-            {/* Popup */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 10 }}
-              style={{
-                position: 'fixed',
-                left: popupPosition.x,
-                top: popupPosition.y,
-                transform: 'translateX(-50%) translateY(-100%)',
-                zIndex: 50
-              }}
-              className="bg-gray-900/95 backdrop-blur-xl rounded-lg border border-purple-500/30 shadow-2xl p-4 max-w-xs"
-            >
-              <div className="flex items-start justify-between mb-2">
-                <h4 className="text-purple-300 font-semibold text-sm">
-                  {selectedTerm.term}
-                </h4>
-                <button
-                  onClick={() => setSelectedTerm(null)}
-                  className="text-gray-400 hover:text-white transition-colors p-1"
-                >
-                  ×
-                </button>
-              </div>
-              
-              <p className="text-gray-200 text-xs leading-relaxed mb-2">
-                {selectedTerm.definition}
-              </p>
-              
-              {selectedTerm.category && (
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-1 bg-purple-600/20 rounded-full text-purple-300 text-xs">
-                    {selectedTerm.category}
-                  </span>
-                </div>
-              )}
-              
-              {/* Arrow pointer */}
-              <div 
-                className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full"
-                style={{ 
-                  width: 0, 
-                  height: 0,
-                  borderLeft: '6px solid transparent',
-                  borderRight: '6px solid transparent',
-                  borderTop: '6px solid rgba(17, 24, 39, 0.95)'
-                }}
-              />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </div>
-  );
+  return renderedContent;
 }
 
 // Helper function to extract relevant glossary terms from text

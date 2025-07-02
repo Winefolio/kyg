@@ -49,32 +49,30 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
             background: [
               "radial-gradient(circle at 20% 20%, rgba(168, 85, 247, 0.2) 0%, transparent 50%)",
               "radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.2) 0%, transparent 50%)",
-              "radial-gradient(circle at 40% 60%, rgba(168, 85, 247, 0.2) 0%, transparent 50%)",
             ]
           }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
         />
       </div>
 
-      {/* Floating particles */}
+      {/* Simplified floating particles */}
       <div className="absolute inset-0 overflow-hidden">
-        {[...Array(20)].map((_, i) => (
+        {[...Array(10)].map((_, i) => (
           <motion.div
             key={i}
             className="absolute w-1 h-1 bg-white/20 rounded-full"
             animate={{
               y: [-20, -100],
               opacity: [0, 1, 0],
-              scale: [0.5, 1, 0.5],
             }}
             transition={{
-              duration: 3 + Math.random() * 2,
+              duration: 4,
               repeat: Infinity,
-              delay: Math.random() * 5,
+              delay: i * 0.4,
               ease: "easeOut",
             }}
             style={{
-              left: `${Math.random() * 100}%`,
+              left: `${(i * 10) + Math.random() * 10}%`,
               top: `${100 + Math.random() * 20}%`,
             }}
           />

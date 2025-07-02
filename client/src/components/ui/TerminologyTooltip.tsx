@@ -29,7 +29,7 @@ export function TerminologyTooltip({ term, children, className }: TerminologyToo
       <PopoverContent 
         side="top" 
         sideOffset={8}
-        className="max-w-sm w-80 p-0 bg-gradient-to-br from-gray-900 via-purple-950 to-black border border-purple-500/30 shadow-2xl rounded-2xl overflow-hidden"
+        className="max-w-sm w-80 p-0 bg-gradient-to-br from-gray-900 via-purple-950 to-black border border-purple-500/30 shadow-2xl rounded-2xl overflow-hidden z-[9999]"
         asChild
       >
         <motion.div

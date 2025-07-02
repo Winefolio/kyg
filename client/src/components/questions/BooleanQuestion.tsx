@@ -1,8 +1,13 @@
-import { motion } from 'framer-motion';
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { DynamicTextRenderer } from '@/components/ui/DynamicTextRenderer';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { DynamicTextRenderer, extractRelevantTerms } from '@/components/ui/DynamicTextRenderer';
+import { TooltipInfoPanel } from '@/components/ui/TooltipInfoPanel';
+import { CheckCircle2, XCircle, Info, BookOpen } from 'lucide-react';
+import { useGlossary } from '@/contexts/GlossaryContext';
+import { useHaptics } from '@/hooks/useHaptics';
+import { ModernButton } from '@/components/ui/modern-button';
 
 interface BooleanQuestionProps {
   question: {
@@ -21,6 +26,15 @@ interface BooleanQuestionProps {
 export function BooleanQuestion({ question, value, onChange }: BooleanQuestionProps) {
   const trueLabel = question.trueLabel || 'Yes';
   const falseLabel = question.falseLabel || 'No';
+  const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
+  const { terms } = useGlossary();
+  const { triggerHaptic } = useHaptics();
+  
+  // Extract all relevant glossary terms from the current slide content
+  const relevantTerms = useMemo(() => {
+    const allText = [question.title, question.description || ''].join(' ');
+    return extractRelevantTerms(allText, terms);
+  }, [question, terms]);
 
   const buttonVariants = {
     unselected: {
@@ -48,14 +62,27 @@ export function BooleanQuestion({ question, value, onChange }: BooleanQuestionPr
     >
       <Card className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl">
         <div className="space-y-6">
-          {/* Category Badge */}
-          {question.category && (
-            <div className="flex justify-start">
+          {/* Category Badge and Info Button */}
+          <div className="flex items-center justify-between">
+            {question.category && (
               <span className="px-3 py-1 bg-purple-600/20 text-purple-300 text-xs font-medium rounded-full">
                 {question.category}
               </span>
-            </div>
-          )}
+            )}
+            {relevantTerms.length > 0 && (
+              <ModernButton
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  triggerHaptic('selection');
+                  setIsInfoPanelOpen(!isInfoPanelOpen);
+                }}
+                className="text-purple-300 hover:text-white hover:bg-white/10 p-2 rounded-full transition-all duration-200"
+              >
+                <Info size={16} />
+              </ModernButton>
+            )}
+          </div>
 
           {/* Question Title */}
           <h3 className="text-xl md:text-2xl font-semibold text-white text-center">
@@ -68,6 +95,14 @@ export function BooleanQuestion({ question, value, onChange }: BooleanQuestionPr
               <DynamicTextRenderer text={question.description} />
             </p>
           )}
+
+          {/* Inline Tooltip Info Panel */}
+          <TooltipInfoPanel
+            relevantTerms={relevantTerms}
+            isOpen={isInfoPanelOpen}
+            onOpenChange={setIsInfoPanelOpen}
+            themeColor="purple"
+          />
 
           {/* Boolean Options */}
           <div className="flex gap-4 justify-center pt-4">

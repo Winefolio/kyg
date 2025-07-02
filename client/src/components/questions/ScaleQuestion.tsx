@@ -4,6 +4,7 @@ import { ModernSlider } from "@/components/ui/modern-slider";
 import { Label } from "@/components/ui/label";
 import { ModernButton } from "@/components/ui/modern-button";
 import { DynamicTextRenderer, extractRelevantTerms } from "@/components/ui/DynamicTextRenderer";
+import { TooltipInfoPanel } from "@/components/ui/TooltipInfoPanel";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronUp, Info, BookOpen, TrendingUp } from "lucide-react";
 import { modernCardVariants, springTransition } from "@/lib/modern-animations";
@@ -96,6 +97,14 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
         </p>
       </div>
 
+      {/* Inline Tooltip Info Panel */}
+      <TooltipInfoPanel
+        relevantTerms={relevantTerms}
+        isOpen={isInfoPanelOpen}
+        onOpenChange={setIsInfoPanelOpen}
+        themeColor="blue"
+      />
+
       <div className="space-y-6">
         {/* Dynamic Feedback Text */}
         <div className="h-8 text-center">
@@ -142,7 +151,6 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
           </div>
         )}
       </div>
-
 
     </motion.div>
   );
