@@ -7,7 +7,7 @@ const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE;
 // Lazy initialization of Supabase client
 let supabaseStorage: ReturnType<typeof createClient> | null = null;
 
-function getSupabaseStorage() {
+export function getSupabaseStorage() {
   if (!supabaseStorage) {
     if (!supabaseUrl || !supabaseServiceRole) {
       console.error('Supabase configuration missing:', {

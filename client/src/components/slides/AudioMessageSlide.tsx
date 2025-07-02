@@ -34,7 +34,7 @@ export function AudioMessageSlide({ payload, className = "" }: AudioMessageSlide
       {/* Audio Player */}
       <div className="max-w-2xl mx-auto">
         <AudioPlayer
-          src={payload.audio_url}
+          src={payload.audio_publicId ? `/api/media/${payload.audio_publicId}/file` : payload.audio_url}
           title={payload.title}
           description={payload.description}
           autoplay={payload.autoplay}

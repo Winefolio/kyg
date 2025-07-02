@@ -13,6 +13,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { reorderSlidesForWine } from './slide-reorder-fix';
+import { registerMediaProxyRoutes } from './routes/media-proxy';
 
 // Configure multer for file uploads with comprehensive image support
 const upload = multer({
@@ -1426,13 +1427,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Upload to Supabase Storage
-      const publicUrl = await uploadMediaFile(buffer, originalname, mimetype, uploadEntityId);
+      const storageUrl = await uploadMediaFile(buffer, originalname, mimetype, uploadEntityId);
+      
+      // Generate unique public ID
+      const publicId = await storage.generateUniqueMediaPublicId();
+      
+      // Create media record in database
+      const mediaRecord = await storage.createMedia({
+        publicId,
+        sommelierId: null, // TODO: Add when auth is implemented
+        entityType: entityType as 'slide' | 'wine' | 'package',
+        entityId: entityId || null,
+        mediaType: mediaType as 'video' | 'audio' | 'image',
+        fileName: originalname,
+        mimeType: mimetype,
+        fileSize: buffer.length,
+        storageUrl,
+        thumbnailUrl: null, // TODO: Generate thumbnails for images/videos
+        duration: null, // TODO: Extract duration for audio/video
+        metadata: {
+          uploadedAt: new Date().toISOString(),
+          originalEntityId: uploadEntityId
+        },
+        isPublic: false
+      });
 
       res.json({
-        url: publicUrl,
+        publicId: mediaRecord.publicId,
         mediaType,
         fileName: originalname,
-        fileSize: buffer.length
+        fileSize: buffer.length,
+        // Provide secure access URL instead of raw storage URL
+        accessUrl: `/api/media/${mediaRecord.publicId}/file`
       });
     } catch (error) {
       // Detailed error logging
@@ -1516,6 +1542,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Register media proxy routes
+  registerMediaProxyRoutes(app);
+  
   console.log("✅ All routes registered successfully!");
   const httpServer = createServer(app);
   return httpServer;

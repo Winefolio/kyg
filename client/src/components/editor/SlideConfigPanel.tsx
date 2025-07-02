@@ -11,6 +11,8 @@ import { Trash2, Loader2 } from "lucide-react";
 import type { Slide } from "@shared/schema";
 import { QuestionConfigForm } from "./QuestionConfigForm";
 import { InterludeConfigForm } from "./InterludeConfigForm";
+import { MediaFileDisplay } from "./MediaFileDisplay";
+import { MediaUpload } from "@/components/ui/media-upload";
 
 interface SlideConfigPanelProps {
     slide: Slide;
@@ -180,13 +182,29 @@ export function SlideConfigPanel({
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div>
-                            <Label className="text-white/80">Video URL</Label>
-                            <Input
-                                value={localPayload.video_url || ""}
-                                onChange={(e) => handleFieldChange("video_url", e.target.value)}
-                                className="bg-white/10 border-white/20 text-white"
-                                placeholder="Enter video URL"
-                            />
+                            <Label className="text-white/80">Video File</Label>
+                            {localPayload.video_publicId ? (
+                                <MediaFileDisplay
+                                    mediaType="video"
+                                    fileName={localPayload.video_fileName}
+                                    fileSize={localPayload.video_fileSize}
+                                    publicId={localPayload.video_publicId}
+                                    onReplace={() => {
+                                        // TODO: Implement media upload modal
+                                        console.log("Replace video");
+                                    }}
+                                />
+                            ) : (
+                                <MediaUpload
+                                    accept="video/*"
+                                    onUpload={async (file) => {
+                                        // TODO: Implement upload handler
+                                        console.log("Upload video", file);
+                                    }}
+                                    maxSizeMB={200}
+                                    uploading={false}
+                                />
+                            )}
                         </div>
                         <div className="flex items-center space-x-2">
                             <input
@@ -211,13 +229,29 @@ export function SlideConfigPanel({
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div>
-                            <Label className="text-white/80">Audio URL</Label>
-                            <Input
-                                value={localPayload.audio_url || ""}
-                                onChange={(e) => handleFieldChange("audio_url", e.target.value)}
-                                className="bg-white/10 border-white/20 text-white"
-                                placeholder="Enter audio URL"
-                            />
+                            <Label className="text-white/80">Audio File</Label>
+                            {localPayload.audio_publicId ? (
+                                <MediaFileDisplay
+                                    mediaType="audio"
+                                    fileName={localPayload.audio_fileName}
+                                    fileSize={localPayload.audio_fileSize}
+                                    publicId={localPayload.audio_publicId}
+                                    onReplace={() => {
+                                        // TODO: Implement media upload modal
+                                        console.log("Replace audio");
+                                    }}
+                                />
+                            ) : (
+                                <MediaUpload
+                                    accept="audio/*"
+                                    onUpload={async (file) => {
+                                        // TODO: Implement upload handler
+                                        console.log("Upload audio", file);
+                                    }}
+                                    maxSizeMB={200}
+                                    uploading={false}
+                                />
+                            )}
                         </div>
                         <div className="flex items-center space-x-2">
                             <input

@@ -15,10 +15,10 @@ interface WineIntroductionProps {
 
 export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroductionProps) {
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="h-[100dvh] relative overflow-hidden">
       {/* Animated Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-amber-900 via-orange-900 to-red-900">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(139,69,19,0.2),transparent_50%)]" />
+        {/* Orange overlay removed for better mobile visibility */}
         <motion.div
           className="absolute inset-0"
           animate={{
@@ -59,45 +59,45 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
         ))}
       </div>
 
-      <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
+      <div className="relative z-10 h-full flex items-center justify-center p-6 pt-safe overflow-auto">
         <motion.div
-          className="max-w-4xl w-full text-center"
+          className="max-w-4xl w-full text-center py-8 sm:py-8"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1, ease: "easeOut" }}
         >
           {/* Introduction Badge */}
           <motion.div
-            className="mb-8"
-            initial={{ y: -30, opacity: 0 }}
+            className="mb-6 sm:mb-8"
+            initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.8 }}
           >
-            <div className="inline-flex items-center space-x-3 bg-white/10 backdrop-blur-xl rounded-full px-8 py-4 border border-white/30">
+            <div className="inline-flex items-center space-x-3 bg-white/10 backdrop-blur-xl rounded-full px-4 sm:px-8 py-3 sm:py-4 border border-white/30">
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
               >
-                <Sparkles className="w-8 h-8 text-amber-300" />
+                <Sparkles className="w-6 sm:w-8 h-6 sm:h-8 text-amber-300" />
               </motion.div>
-              <span className="text-white text-xl font-semibold">
+              <span className="text-white text-base sm:text-xl font-semibold">
                 {isFirstWine || wine.position === 0 ? "Welcome to Your Wine Tasting Experience" : `Now Introducing Wine ${wine.position}`}
               </span>
             </div>
           </motion.div>
 
           {/* Wine Showcase */}
-          <div className="grid lg:grid-cols-2 gap-12 items-center mb-12">
+          <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center mb-6 sm:mb-8 lg:mb-12">
             {/* Wine Image */}
             <motion.div
               className="order-2 lg:order-1 flex justify-center"
-              initial={{ x: -50, opacity: 0 }}
+              initial={{ x: -30, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.6, duration: 0.8 }}
             >
               {wine.wineImageUrl ? (
                 <div className="relative">
-                  <div className="w-80 h-96 rounded-3xl overflow-hidden shadow-2xl border-8 border-white/20">
+                  <div className="w-64 h-80 sm:w-72 sm:h-88 lg:w-80 lg:h-96 rounded-3xl overflow-hidden shadow-2xl border-8 border-white/20">
                     <img 
                       src={wine.wineImageUrl} 
                       alt={wine.wineName}
@@ -119,7 +119,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
                 </div>
               ) : (
                 <div className="relative">
-                  <div className="w-80 h-96 rounded-3xl bg-gradient-to-br from-amber-600/40 to-orange-600/40 flex items-center justify-center border-8 border-white/20 backdrop-blur-sm">
+                  <div className="w-64 h-80 sm:w-72 sm:h-88 lg:w-80 lg:h-96 rounded-3xl bg-gradient-to-br from-amber-600/40 to-orange-600/40 flex items-center justify-center border-8 border-white/20 backdrop-blur-sm">
                     <Wine className="w-32 h-32 text-white/60" />
                   </div>
                   {wine.position > 0 && (
@@ -138,7 +138,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
             {/* Wine Details */}
             <motion.div
               className="order-1 lg:order-2 space-y-6 text-left"
-              initial={{ x: 50, opacity: 0 }}
+              initial={{ x: 30, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.8, duration: 0.8 }}
             >
@@ -153,7 +153,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
                 </motion.p>
                 
                 <motion.h1
-                  className="text-5xl lg:text-7xl font-bold text-white leading-tight"
+                  className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold text-white leading-tight"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 1.2, duration: 0.8 }}
@@ -196,17 +196,17 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
 
           {/* Continue Button */}
           <motion.div
-            initial={{ y: 30, opacity: 0 }}
+            initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 2, duration: 0.8 }}
           >
             <Button
               onClick={onContinue}
               size="lg"
-              className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white border-0 shadow-2xl px-12 py-6 text-xl font-semibold rounded-2xl transition-all duration-300 transform hover:scale-105"
+              className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white border-0 shadow-2xl px-6 sm:px-8 md:px-12 py-4 sm:py-5 md:py-6 text-base sm:text-lg md:text-xl font-semibold rounded-2xl transition-all duration-300 transform hover:scale-105"
             >
               <span>Begin Tasting</span>
-              <ArrowRight className="w-6 h-6 ml-3" />
+              <ArrowRight className="w-5 sm:w-6 h-5 sm:h-6 ml-2 sm:ml-3" />
             </Button>
           </motion.div>
         </motion.div>

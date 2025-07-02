@@ -145,7 +145,7 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="h-[100dvh] relative overflow-hidden">
       {/* Background with image support */}
       <div className="absolute inset-0">
         {payload.backgroundImage ? (
@@ -159,7 +159,7 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
           </>
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-800">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(139,69,19,0.15),transparent_50%)]" />
+            {/* Orange overlay removed for better mobile visibility */}
           </div>
         )}
       </div>
@@ -190,7 +190,7 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
       </div>
 
       {/* Content */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
+      <div className="relative z-10 h-full flex items-center justify-center p-6">
         <motion.div
           className="max-w-2xl w-full text-center"
           initial={{ opacity: 0, y: 20 }}
@@ -204,7 +204,7 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
 
           {/* Title */}
           <motion.h1
-            className="text-4xl md:text-5xl font-bold text-white mb-4"
+            className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}

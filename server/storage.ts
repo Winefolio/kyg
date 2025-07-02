@@ -13,6 +13,8 @@ import {
   type InsertParticipant,
   type Response,
   type InsertResponse,
+  type Media,
+  type InsertMedia,
   type GlossaryTerm,
   type InsertGlossaryTerm,
   packages,
@@ -22,6 +24,7 @@ import {
   sessionWineSelections,
   participants,
   responses,
+  media,
   glossaryTerms,
   wineCharacteristics,
 } from "@shared/schema";
@@ -151,6 +154,14 @@ export interface IStorage {
   
   // Slide duplication
   duplicateWineSlides(sourceWineId: string, targetWineId: string, replaceExisting: boolean): Promise<{ count: number; slides: Slide[] }>;
+  
+  // Media
+  createMedia(media: InsertMedia): Promise<Media>;
+  getMediaByPublicId(publicId: string): Promise<Media | undefined>;
+  getMediaById(id: string): Promise<Media | undefined>;
+  updateMediaLastAccessed(id: string): Promise<void>;
+  deleteMedia(id: string): Promise<void>;
+  generateUniqueMediaPublicId(): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2442,6 +2453,63 @@ export class DatabaseStorage implements IStorage {
       console.error('❌ Error duplicating wine slides:', error);
       throw error;
     }
+  }
+
+  // Media methods
+  async generateUniqueMediaPublicId(): Promise<string> {
+    const characters = "ABCDEFGHIJKLMNPQRSTUVWXYZ123456789";
+    let attempts = 0;
+    const maxAttempts = 20;
+
+    while (attempts < maxAttempts) {
+      let result = "";
+      for (let i = 0; i < 10; i++) {
+        result += characters.charAt(
+          Math.floor(Math.random() * characters.length),
+        );
+      }
+
+      const existingMedia = await db.query.media.findFirst({
+        columns: { id: true },
+        where: eq(media.publicId, result),
+      });
+
+      if (!existingMedia) {
+        return result;
+      }
+      attempts++;
+    }
+
+    // Fallback with crypto
+    return crypto.randomBytes(5).toString("hex").toUpperCase();
+  }
+
+  async createMedia(mediaData: InsertMedia): Promise<Media> {
+    const [created] = await db.insert(media).values(mediaData).returning();
+    return created;
+  }
+
+  async getMediaByPublicId(publicId: string): Promise<Media | undefined> {
+    return db.query.media.findFirst({
+      where: eq(media.publicId, publicId),
+    });
+  }
+
+  async getMediaById(id: string): Promise<Media | undefined> {
+    return db.query.media.findFirst({
+      where: eq(media.id, id),
+    });
+  }
+
+  async updateMediaLastAccessed(id: string): Promise<void> {
+    await db
+      .update(media)
+      .set({ lastAccessedAt: new Date() })
+      .where(eq(media.id, id));
+  }
+
+  async deleteMedia(id: string): Promise<void> {
+    await db.delete(media).where(eq(media.id, id));
   }
 }
 

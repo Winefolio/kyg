@@ -582,7 +582,7 @@ export default function TastingSession() {
               </div>
             )}
             
-            <h2 className="text-3xl font-bold text-white mb-4">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
               <DynamicTextRenderer text={currentSlide.payloadJson.title} />
             </h2>
             
@@ -1297,12 +1297,18 @@ export default function TastingSession() {
                 disabled={isNavigating}
                 className={
                   currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro
-                    ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold px-8 py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 transform hover:scale-105 active:scale-100"
+                    ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold px-4 sm:px-6 md:px-8 py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 transform hover:scale-105 active:scale-100 text-sm sm:text-base"
                     : "text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                 }
               >
-                {currentSlideIndex >= slides.length - 1 ? 'Complete' : 
-                 (currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro) ? 'Continue Your Wine Journey' : 'Next'}
+                <span className="hidden sm:inline">
+                  {currentSlideIndex >= slides.length - 1 ? 'Complete' : 
+                   (currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro) ? 'Continue Your Wine Journey' : 'Next'}
+                </span>
+                <span className="sm:hidden">
+                  {currentSlideIndex >= slides.length - 1 ? 'Complete' : 
+                   (currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro) ? 'Continue' : 'Next'}
+                </span>
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>

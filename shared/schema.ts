@@ -184,6 +184,30 @@ export const responses = pgTable("responses", {
   uniqueParticipantSlide: unique().on(table.participantId, table.slideId)
 }));
 
+// Media table for secure file references
+export const media = pgTable("media", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  publicId: varchar("public_id", { length: 12 }).notNull().unique(), // Public-facing ID
+  sommelierId: uuid("sommelier_id"), // Owner
+  entityType: varchar("entity_type", { length: 50 }).notNull(), // 'slide', 'wine', 'package'
+  entityId: uuid("entity_id"), // Reference to the entity
+  mediaType: varchar("media_type", { length: 20 }).notNull(), // 'video', 'audio', 'image'
+  fileName: text("file_name").notNull(),
+  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  fileSize: integer("file_size").notNull(),
+  storageUrl: text("storage_url").notNull(), // Internal Supabase URL (never exposed)
+  thumbnailUrl: text("thumbnail_url"), // For video/image thumbnails
+  duration: integer("duration"), // For audio/video in seconds
+  metadata: jsonb("metadata"), // Additional metadata
+  isPublic: boolean("is_public").default(false),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  lastAccessedAt: timestamp("last_accessed_at")
+}, (table) => ({
+  publicIdIdx: index("idx_media_public_id").on(table.publicId),
+  entityIdx: index("idx_media_entity").on(table.entityType, table.entityId),
+  sommelierIdx: index("idx_media_sommelier").on(table.sommelierId)
+}));
+
 // Glossary terms table
 export const glossaryTerms = pgTable("glossary_terms", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -202,7 +226,10 @@ export const glossaryTerms = pgTable("glossary_terms", {
 export const videoMessagePayloadSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
-  video_url: z.string().url({ message: "Invalid video URL" }),
+  video_url: z.string().url({ message: "Invalid video URL" }).optional(), // Legacy support
+  video_publicId: z.string().optional(), // New secure reference
+  video_fileName: z.string().optional(),
+  video_fileSize: z.number().optional(),
   poster_url: z.string().url({ message: "Invalid poster URL" }).optional(),
   autoplay: z.boolean().default(false).optional(),
   show_controls: z.boolean().default(true).optional()
@@ -212,7 +239,10 @@ export type VideoMessagePayload = z.infer<typeof videoMessagePayloadSchema>;
 export const audioMessagePayloadSchema = z.object({
   title: z.string().optional(),
   description: z.string().optional(),
-  audio_url: z.string().url({ message: "Invalid audio URL" }),
+  audio_url: z.string().url({ message: "Invalid audio URL" }).optional(), // Legacy support
+  audio_publicId: z.string().optional(), // New secure reference
+  audio_fileName: z.string().optional(),
+  audio_fileSize: z.number().optional(),
   autoplay: z.boolean().default(false).optional(),
   show_controls: z.boolean().default(true).optional()
 });
@@ -356,6 +386,26 @@ export const insertSessionWineSelectionSchema = createInsertSchema(sessionWineSe
   createdAt: true
 });
 
+export const insertMediaSchema = createInsertSchema(media, {
+  publicId: z.string().min(8).max(12),
+  sommelierId: z.string().nullable().optional(),
+  entityType: z.enum(['slide', 'wine', 'package']),
+  entityId: z.string().nullable().optional(),
+  mediaType: z.enum(['video', 'audio', 'image']),
+  fileName: z.string(),
+  mimeType: z.string(),
+  fileSize: z.number().min(0),
+  storageUrl: z.string().url(),
+  thumbnailUrl: z.string().url().nullable().optional(),
+  duration: z.number().min(0).nullable().optional(),
+  metadata: z.any().nullable().optional(),
+  isPublic: z.boolean().default(false).optional()
+}).omit({
+  id: true,
+  uploadedAt: true,
+  lastAccessedAt: true
+});
+
 // Types
 export type Package = typeof packages.$inferSelect;
 export type InsertPackage = z.infer<typeof insertPackageSchema>;
@@ -371,6 +421,8 @@ export type Participant = typeof participants.$inferSelect;
 export type InsertParticipant = z.infer<typeof insertParticipantSchema>;
 export type Response = typeof responses.$inferSelect;
 export type InsertResponse = z.infer<typeof insertResponseSchema>;
+export type Media = typeof media.$inferSelect;
+export type InsertMedia = z.infer<typeof insertMediaSchema>;
 export type GlossaryTerm = typeof glossaryTerms.$inferSelect;
 export type InsertGlossaryTerm = z.infer<typeof insertGlossaryTermSchema>;
 

@@ -174,3 +174,55 @@ input:focus, textarea:focus, button:focus {
 .animate-wine-glass {
   animation: wine-glass 4s ease-in-out infinite;
 }
+
+/* Dynamic viewport height support for mobile */
+.h-dynamic-screen {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Safe area padding for iOS devices */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.pt-safe {
+  padding-top: max(1.5rem, env(safe-area-inset-top));
+}
+
+/* Prevent mobile overflow */
+.mobile-no-overflow {
+  overflow: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile-optimized transitions */
+@media (max-width: 768px) {
+  /* Ensure transition slides fit within viewport */
+  .transition-slide {
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow-y: auto;
+  }
+  
+  /* Reduce padding on mobile for more content space */
+  .mobile-padding {
+    padding: 1rem;
+  }
+  
+  /* Optimize font sizes for mobile readability */
+  .mobile-text-optimize {
+    font-size: clamp(0.875rem, 2vw, 1rem);
+    line-height: 1.6;
+  }
+  
+  /* Better touch targets */
+  .mobile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

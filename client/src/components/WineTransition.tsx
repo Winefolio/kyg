@@ -39,10 +39,10 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden">
+    <div className="h-[100dvh] relative overflow-hidden">
       {/* Animated Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-800">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(139,69,19,0.15),transparent_50%)]" />
+        {/* Orange overlay removed for better mobile visibility */}
         <motion.div
           className="absolute inset-0"
           animate={{
@@ -79,7 +79,7 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
         ))}
       </div>
 
-      <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
+      <div className="relative z-10 h-full flex items-center justify-center p-6">
         <motion.div
           className="max-w-2xl w-full"
           initial={{ opacity: 0, y: 40 }}
