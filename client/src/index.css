@@ -225,4 +225,46 @@ input:focus, textarea:focus, button:focus {
     min-height: 44px;
     min-width: 44px;
   }
+  
+  /* Mobile-specific transition animations */
+  .mobile-transition-content {
+    animation-duration: 0.3s !important; /* Faster animations on mobile */
+  }
+  
+  /* Responsive text scaling for transitions */
+  .mobile-heading {
+    font-size: clamp(1.5rem, 6vw, 2.5rem);
+  }
+  
+  .mobile-subheading {
+    font-size: clamp(1rem, 4vw, 1.5rem);
+  }
+  
+  .mobile-body {
+    font-size: clamp(0.875rem, 3vw, 1.125rem);
+  }
+  
+  /* Optimize image sizes for mobile */
+  .mobile-wine-image {
+    max-width: 60vw;
+    max-height: 40vh;
+  }
+  
+  /* Reduce motion for better performance */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* CSS custom properties for dynamic scaling */
+:root {
+  --mobile-scale: clamp(0.75, 2vw, 1);
+  --transition-padding: clamp(1rem, 4vw, 2rem);
+  --wine-image-size: clamp(8rem, 20vw, 12rem);
+  --button-padding-x: clamp(0.75rem, 3vw, 1.5rem);
+  --button-padding-y: clamp(0.5rem, 2vw, 1rem);
 }

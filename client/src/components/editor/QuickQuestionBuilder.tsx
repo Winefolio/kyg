@@ -499,7 +499,12 @@ export function QuickQuestionBuilder({
 
             <MediaUpload
               value={(questionData.config as VideoMessageConfig).video_url || ''}
-              onChange={(url) => updateConfig('video_url', url)}
+              onChange={(result) => {
+                updateConfig('video_publicId', result.publicId);
+                updateConfig('video_url', result.accessUrl);
+                updateConfig('video_fileName', result.fileName);
+                updateConfig('video_fileSize', result.fileSize);
+              }}
               accept="video"
               label="Video File"
               placeholder="No video selected"
@@ -552,7 +557,12 @@ export function QuickQuestionBuilder({
 
             <MediaUpload
               value={(questionData.config as AudioMessageConfig).audio_url || ''}
-              onChange={(url) => updateConfig('audio_url', url)}
+              onChange={(result) => {
+                updateConfig('audio_publicId', result.publicId);
+                updateConfig('audio_url', result.accessUrl);
+                updateConfig('audio_fileName', result.fileName);
+                updateConfig('audio_fileSize', result.fileSize);
+              }}
               accept="audio"
               label="Audio File"
               placeholder="No audio selected"

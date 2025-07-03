@@ -712,6 +712,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSlide(slide: InsertSlide): Promise<Slide> {
+    // Validate payload before creating slide
+    if (!slide.payloadJson || typeof slide.payloadJson !== 'object' || Object.keys(slide.payloadJson).length === 0) {
+      console.error('[SLIDE_CREATE] Invalid or empty payload detected:', {
+        slideType: slide.type,
+        sectionType: slide.section_type,
+        position: slide.position,
+        payload: slide.payloadJson
+      });
+      throw new Error('Cannot create slide with invalid or empty payload');
+    }
+    
+    // Log slide creation for debugging
+    console.log('[SLIDE_CREATE] Creating slide:', {
+      type: slide.type,
+      section_type: slide.section_type,
+      position: slide.position,
+      payloadKeys: Object.keys(slide.payloadJson)
+    });
+    
     // For wine-specific slides, get the wine to determine global position
     if (!slide.packageWineId) {
       throw new Error('createSlide requires packageWineId. Use createPackageSlide for package-level slides.');
@@ -940,17 +959,70 @@ export class DatabaseStorage implements IStorage {
   async createParticipant(
     participant: InsertParticipant,
   ): Promise<Participant> {
-    const result = await db
-      .insert(participants)
-      .values({
+    // Enhanced logging for debugging
+    console.log(`[STORAGE_TRACE] createParticipant called with:`, {
+      sessionId: participant.sessionId,
+      sessionIdType: typeof participant.sessionId,
+      sessionIdLength: participant.sessionId?.length,
+      email: participant.email,
+      displayName: participant.displayName,
+      isHost: participant.isHost
+    });
+    
+    // Validate sessionId is a proper UUID before insertion
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!participant.sessionId || !uuidRegex.test(participant.sessionId)) {
+      console.error(`[STORAGE_ERROR] Invalid sessionId format for participant creation:`, {
+        sessionId: participant.sessionId,
+        sessionIdType: typeof participant.sessionId,
+        isValidFormat: participant.sessionId ? uuidRegex.test(participant.sessionId) : false
+      });
+      throw new Error(`Invalid sessionId format: ${participant.sessionId}. Expected UUID format.`);
+    }
+    
+    try {
+      console.log(`[STORAGE] Creating participant with data:`, JSON.stringify({
+        sessionId: participant.sessionId,
+        email: participant.email,
+        displayName: participant.displayName,
+        isHost: participant.isHost || false
+      }, null, 2));
+      
+      // Log the exact values being inserted
+      const insertValues = {
         sessionId: participant.sessionId,
         email: participant.email,
         displayName: participant.displayName,
         isHost: participant.isHost || false,
         progressPtr: participant.progressPtr || 0,
-      })
-      .returning();
-    return result[0];
+      };
+      
+      console.log(`[STORAGE_TRACE] About to insert participant with values:`, JSON.stringify(insertValues, null, 2));
+      
+      const result = await db
+        .insert(participants)
+        .values(insertValues)
+        .returning();
+        
+      if (!result || result.length === 0) {
+        throw new Error('Failed to create participant - no record returned from database');
+      }
+        
+      console.log(`[STORAGE] Successfully created participant: ${result[0].id}`);
+      return result[0];
+    } catch (error: any) {
+      console.error(`[STORAGE_ERROR] Failed to create participant:`, {
+        error: error,
+        errorMessage: error?.message,
+        errorCode: error?.code,
+        errorDetail: error?.detail,
+        errorTable: error?.table,
+        errorColumn: error?.column,
+        errorConstraint: error?.constraint,
+        participantData: participant
+      });
+      throw error; // Re-throw to be handled by the route
+    }
   }
 
   async getParticipantById(id: string): Promise<Participant | undefined> {
@@ -2075,13 +2147,24 @@ export class DatabaseStorage implements IStorage {
     let position = 2; // Start after the wine intro slide
     
     for (const template of slideTemplates.slice(1)) { // Skip the first template (intro) since we already created wine intro
-      // Add wine context to all slides
+      // Add wine context to all slides while preserving template structure
       const payloadJson = {
         ...template.payloadJson,
+        // Add wine context as additional fields without overwriting existing structure
         wine_name: newWine.wineName,
-        wine_image: newWine.wineImageUrl,
-        wine_type: newWine.wineType
+        wine_image: newWine.wineImageUrl || "",
+        wine_type: newWine.wineType || ""
       };
+
+      // Validate payload before creating slide
+      if (!payloadJson || Object.keys(payloadJson).length === 0) {
+        console.error('[SLIDE_CREATE_ERROR] Empty payload detected for slide:', {
+          type: template.type,
+          section_type: template.section_type,
+          position
+        });
+        continue; // Skip this slide to prevent empty data
+      }
 
       await this.createSlide({
         packageWineId: newWine.id,

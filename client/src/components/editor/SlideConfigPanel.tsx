@@ -190,19 +190,25 @@ export function SlideConfigPanel({
                                     fileSize={localPayload.video_fileSize}
                                     publicId={localPayload.video_publicId}
                                     onReplace={() => {
-                                        // TODO: Implement media upload modal
-                                        console.log("Replace video");
+                                        // Clear existing media to show upload component
+                                        handleFieldChange('video_publicId', '');
+                                        handleFieldChange('video_url', '');
+                                        handleFieldChange('video_fileName', '');
+                                        handleFieldChange('video_fileSize', 0);
                                     }}
                                 />
                             ) : (
                                 <MediaUpload
-                                    accept="video/*"
-                                    onUpload={async (file) => {
-                                        // TODO: Implement upload handler
-                                        console.log("Upload video", file);
+                                    accept="video"
+                                    value=""
+                                    onChange={(result) => {
+                                        handleFieldChange('video_publicId', result.publicId);
+                                        handleFieldChange('video_url', result.accessUrl);
+                                        handleFieldChange('video_fileName', result.fileName);
+                                        handleFieldChange('video_fileSize', result.fileSize);
                                     }}
-                                    maxSizeMB={200}
-                                    uploading={false}
+                                    label="Upload Video"
+                                    entityId={slide.id}
                                 />
                             )}
                         </div>
@@ -237,19 +243,25 @@ export function SlideConfigPanel({
                                     fileSize={localPayload.audio_fileSize}
                                     publicId={localPayload.audio_publicId}
                                     onReplace={() => {
-                                        // TODO: Implement media upload modal
-                                        console.log("Replace audio");
+                                        // Clear existing media to show upload component
+                                        handleFieldChange('audio_publicId', '');
+                                        handleFieldChange('audio_url', '');
+                                        handleFieldChange('audio_fileName', '');
+                                        handleFieldChange('audio_fileSize', 0);
                                     }}
                                 />
                             ) : (
                                 <MediaUpload
-                                    accept="audio/*"
-                                    onUpload={async (file) => {
-                                        // TODO: Implement upload handler
-                                        console.log("Upload audio", file);
+                                    accept="audio"
+                                    value=""
+                                    onChange={(result) => {
+                                        handleFieldChange('audio_publicId', result.publicId);
+                                        handleFieldChange('audio_url', result.accessUrl);
+                                        handleFieldChange('audio_fileName', result.fileName);
+                                        handleFieldChange('audio_fileSize', result.fileSize);
                                     }}
-                                    maxSizeMB={200}
-                                    uploading={false}
+                                    label="Upload Audio"
+                                    entityId={slide.id}
                                 />
                             )}
                         </div>

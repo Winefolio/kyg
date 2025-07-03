@@ -109,8 +109,8 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
           </motion.div>
 
           {/* Wine Showcase */}
-          <div className="bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/20 p-8 mb-8 shadow-2xl">
-            <div className="flex flex-col lg:flex-row items-center space-y-6 lg:space-y-0 lg:space-x-8">
+          <div className="bg-white/5 backdrop-blur-2xl rounded-2xl sm:rounded-3xl border border-white/20 p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8 shadow-2xl">
+            <div className="flex flex-col lg:flex-row items-center space-y-4 sm:space-y-6 lg:space-y-0 lg:space-x-8">
               {/* Wine Image */}
               <motion.div
                 className="flex-shrink-0"
@@ -120,18 +120,18 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
               >
                 {currentWine.wineImageUrl ? (
                   <div className="relative">
-                    <div className="w-48 h-64 rounded-2xl overflow-hidden shadow-2xl border-4 border-white/10">
+                    <div className="w-32 h-44 sm:w-40 sm:h-52 lg:w-48 lg:h-64 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 sm:border-4 border-white/10">
                       <img 
                         src={currentWine.wineImageUrl} 
                         alt={currentWine.wineName}
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-3xl blur-xl -z-10" />
+                    <div className="absolute -inset-2 sm:-inset-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-2xl sm:rounded-3xl blur-xl -z-10" />
                   </div>
                 ) : (
-                  <div className="w-48 h-64 rounded-2xl bg-gradient-to-br from-purple-600/30 to-pink-600/30 flex items-center justify-center border-4 border-white/10">
-                    <Wine className="w-16 h-16 text-white/60" />
+                  <div className="w-32 h-44 sm:w-40 sm:h-52 lg:w-48 lg:h-64 rounded-xl sm:rounded-2xl bg-gradient-to-br from-purple-600/30 to-pink-600/30 flex items-center justify-center border-2 sm:border-4 border-white/10">
+                    <Wine className="w-12 sm:w-16 h-12 sm:h-16 text-white/60" />
                   </div>
                 )}
               </motion.div>
@@ -139,7 +139,7 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
               {/* Wine Details */}
               <div className="flex-1 text-center lg:text-left space-y-4">
                 <motion.h1
-                  className="text-4xl lg:text-5xl font-bold text-white leading-tight"
+                  className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-white leading-tight"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.7, duration: 0.6 }}
@@ -150,7 +150,7 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
                 <AnimatePresence>
                   {showDetails && currentWine.wineDescription && (
                     <motion.p
-                      className="text-lg text-white/80 leading-relaxed max-w-lg"
+                      className="text-sm sm:text-base lg:text-lg text-white/80 leading-relaxed max-w-lg mx-auto lg:mx-0"
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.6 }}
@@ -182,7 +182,7 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
           {/* Next Wine Preview or Completion */}
           {nextWine ? (
             <motion.div
-              className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-6 mb-8"
+              className="bg-white/5 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-white/10 p-4 sm:p-6 mb-6 sm:mb-8"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.2, duration: 0.6 }}
@@ -191,7 +191,7 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
                 <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full flex items-center justify-center">
                   <ChevronRight className="w-4 h-4 text-white" />
                 </div>
-                <h3 className="text-lg font-semibold text-white">Up Next</h3>
+                <h3 className="text-base sm:text-lg font-semibold text-white">Up Next</h3>
               </div>
               
               <div className="flex items-center space-x-4">
@@ -205,7 +205,7 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
                   </div>
                 )}
                 <div className="flex-1">
-                  <h4 className="text-xl font-medium text-white mb-1">
+                  <h4 className="text-base sm:text-lg lg:text-xl font-medium text-white mb-1">
                     {nextWine.wineName}
                   </h4>
                   {nextWine.position > 0 && <p className="text-white/60 text-sm">Wine {nextWine.position}</p>}
@@ -219,7 +219,7 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
             </motion.div>
           ) : (
             <motion.div
-              className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-6 text-center mb-8"
+              className="bg-white/5 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-white/10 p-4 sm:p-6 text-center mb-6 sm:mb-8"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.2, duration: 0.6 }}
@@ -247,9 +247,9 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
             <Button
               onClick={onContinue}
               size="lg"
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 shadow-2xl px-8 py-4 text-lg font-medium rounded-2xl transition-all duration-300 transform hover:scale-105"
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0 shadow-2xl px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 lg:py-4 text-sm sm:text-base lg:text-lg font-medium rounded-xl sm:rounded-2xl transition-all duration-300 transform hover:scale-105 min-h-[44px]"
             >
-              <PlayCircle className="w-6 h-6 mr-3" />
+              <PlayCircle className="w-4 sm:w-5 lg:w-6 h-4 sm:h-5 lg:h-6 mr-2 sm:mr-3" />
               {nextWine ? `Continue to ${nextWine.wineName}` : "View Your Results"}
             </Button>
           </motion.div>

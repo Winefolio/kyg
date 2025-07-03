@@ -30,8 +30,18 @@
       "Bash(npm config:*)",
       "Bash(/home/runner/workspace/.config/npm/node_global/bin/claude-code settings set autoUpdate true)",
       "Bash(npm run:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(tree:*)",
+      "Bash(git checkout:*)",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__get_logs",
+      "mcp__supabase__apply_migration",
+      "Bash(mv:*)"
     ],
     "deny": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }

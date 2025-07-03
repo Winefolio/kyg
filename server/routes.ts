@@ -110,27 +110,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Package not found" });
       }
 
-      // Check if participant is host
+      // Check if participant is host and get session wine selections
       let isHost = false;
-      if (participantId) {
-        const participant = await storage.getParticipantById(participantId as string);
-        isHost = participant?.isHost || false;
+      let participant = null;
+      if (participantId && participantId !== 'undefined' && participantId !== 'null') {
+        try {
+          participant = await storage.getParticipantById(participantId as string);
+          if (participant) {
+            isHost = participant.isHost || false;
+          }
+        } catch (error) {
+          console.error(`Error fetching participant ${participantId}:`, error);
+          // Continue without participant data
+        }
       }
 
       // Check if this request is from a session that has wine selections
       let wines = await storage.getPackageWines(pkg.id);
-      if (participantId) {
-        const participant = await storage.getParticipantById(participantId as string);
-        if (participant?.sessionId) {
-          // Check if this session has custom wine selections
-          const sessionWineSelections = await storage.getSessionWineSelections(participant.sessionId);
-          if (sessionWineSelections.length > 0) {
-            // Use session-specific wine selections, ordered by host preference
-            wines = sessionWineSelections
-              .filter(selection => selection.isIncluded)
-              .sort((a, b) => a.position - b.position)
-              .map(selection => selection.wine);
-          }
+      if (participant?.sessionId) {
+        // Check if this session has custom wine selections
+        const sessionWineSelections = await storage.getSessionWineSelections(participant.sessionId);
+        if (sessionWineSelections.length > 0) {
+          // Use session-specific wine selections, ordered by host preference
+          wines = sessionWineSelections
+            .filter(selection => selection.isIncluded)
+            .sort((a, b) => a.position - b.position)
+            .map(selection => selection.wine);
         }
       }
 
@@ -295,13 +300,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/sessions/:sessionIdOrShortCode/participants", async (req, res) => {
     try {
       const { sessionIdOrShortCode } = req.params; // This can be either UUID or short_code
+      
+      // Enhanced logging for debugging
+      console.log(`[JOIN_ATTEMPT] Starting join process with identifier: ${sessionIdOrShortCode}`);
+      console.log(`[JOIN_ATTEMPT] Request body:`, JSON.stringify(req.body, null, 2));
+      
+      // Validate the identifier parameter
+      if (!sessionIdOrShortCode || sessionIdOrShortCode === 'undefined' || sessionIdOrShortCode === 'null') {
+        console.error(`[JOIN_ERROR] Invalid session identifier provided: ${sessionIdOrShortCode}`);
+        return res.status(400).json({ message: "Invalid session identifier. Please provide a valid session ID or code." });
+      }
 
       // 1. Fetch the session using the provided identifier
       // storage.getSessionById handles both UUIDs and short_codes
+      console.log(`[JOIN_ATTEMPT] Looking up session with identifier: ${sessionIdOrShortCode}`);
       const session = await storage.getSessionById(sessionIdOrShortCode);
+      
       if (!session) {
         console.log(`[JOIN_ATTEMPT_FAIL] Session not found with identifier: ${sessionIdOrShortCode}`);
-        return res.status(404).json({ message: "Session not found" });
+        return res.status(404).json({ message: "Session not found. Please check the session code and try again." });
+      }
+      
+      console.log(`[JOIN_ATTEMPT] Found session: ${session.id} (short_code: ${session.short_code})`);
+      
+      // Validate session.id is a proper UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!session.id || !uuidRegex.test(session.id)) {
+        console.error(`[JOIN_ERROR] Invalid session UUID format: ${session.id}`);
+        return res.status(500).json({ message: "Internal error: Invalid session ID format" });
       }
 
       // 2. Check session status
@@ -312,11 +338,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 3. Parse participant data from request body
       // Omit sessionId from initial parsing since we'll set it correctly
-      const participantInputData = insertParticipantSchema
-        .omit({ sessionId: true })
-        .parse(req.body);
+      let participantInputData;
+      try {
+        participantInputData = insertParticipantSchema
+          .omit({ sessionId: true })
+          .parse(req.body);
+        console.log(`[JOIN_ATTEMPT] Parsed participant data:`, JSON.stringify(participantInputData, null, 2));
+      } catch (parseError) {
+        console.error(`[JOIN_ERROR] Failed to parse participant data:`, parseError);
+        if (parseError instanceof z.ZodError) {
+          return res.status(400).json({ 
+            message: "Invalid participant data", 
+            errors: parseError.errors 
+          });
+        }
+        throw parseError;
+      }
 
       // 4. Verify active host using the actual session UUID
+      console.log(`[JOIN_ATTEMPT] Checking for active host in session ${session.id}`);
       const currentParticipants = await storage.getParticipantsBySessionId(session.id);
       const hasActiveHost = currentParticipants.some(p => p.isHost);
       
@@ -326,10 +366,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 5. Create the participant using the actual session UUID
-      const newParticipant = await storage.createParticipant({
+      const participantPayload = {
         ...participantInputData,
         sessionId: session.id  // CRITICAL FIX: Use actual session UUID, not short code
-      });
+      };
+      
+      console.log(`[JOIN_ATTEMPT] Creating participant with payload:`, JSON.stringify(participantPayload, null, 2));
+      
+      let newParticipant;
+      try {
+        newParticipant = await storage.createParticipant(participantPayload);
+      } catch (dbError: any) {
+        // Enhanced database error logging
+        console.error(`[JOIN_ERROR_DB] Database error during participant creation:`, {
+          error: dbError,
+          errorMessage: dbError?.message,
+          errorCode: dbError?.code,
+          errorDetail: dbError?.detail,
+          errorTable: dbError?.table,
+          errorColumn: dbError?.column,
+          errorConstraint: dbError?.constraint,
+          participantPayload: participantPayload,
+          sessionId: session.id,
+          sessionShortCode: session.short_code
+        });
+        
+        // Rethrow to be caught by outer catch block
+        throw dbError;
+      }
+      
+      if (!newParticipant || !newParticipant.id) {
+        console.error(`[JOIN_ERROR] Failed to create participant - no participant returned`);
+        return res.status(500).json({ message: "Failed to create participant. Please try again." });
+      }
 
       // 6. Update participant count using the actual session UUID
       const updatedParticipantsList = await storage.getParticipantsBySessionId(session.id);
@@ -346,49 +415,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Log the full error for debugging
       console.error(`[JOIN_ERROR] Critical error in /api/sessions/${req.params.sessionIdOrShortCode}/participants:`, error);
+      console.error(`[JOIN_ERROR] Error stack:`, error instanceof Error ? error.stack : 'No stack trace');
       
       // Handle specific database errors
       if (error && typeof error === 'object' && 'code' in error) {
         const dbError = error as any;
-        if (dbError.code === '22P02' || dbError.code === '23503') {
-          console.error("[JOIN_ERROR_DB] Database type or constraint violation:", dbError.detail || dbError.message);
-          return res.status(500).json({ message: "Database error: Could not correctly link participant to session due to data mismatch." });
+        
+        // PostgreSQL error codes
+        if (dbError.code === '22P02') {
+          // Invalid text representation (e.g., invalid UUID format)
+          console.error("[JOIN_ERROR_DB] Invalid UUID format:", dbError.detail || dbError.message);
+          return res.status(500).json({ 
+            message: "Database error: Invalid session ID format. This may be due to using a short code where a UUID is expected.",
+            errorCode: "INVALID_UUID_FORMAT"
+          });
+        }
+        
+        if (dbError.code === '23503') {
+          // Foreign key violation
+          console.error("[JOIN_ERROR_DB] Foreign key constraint violation:", dbError.detail || dbError.message);
+          return res.status(500).json({ 
+            message: "Database error: The session ID does not exist or is invalid. Please ensure you're using a valid session.",
+            errorCode: "INVALID_SESSION_REFERENCE"
+          });
+        }
+        
+        if (dbError.code === '23505') {
+          // Unique constraint violation
+          console.error("[JOIN_ERROR_DB] Unique constraint violation:", dbError.detail || dbError.message);
+          return res.status(409).json({ 
+            message: "You may have already joined this session. Please refresh and try again.",
+            errorCode: "DUPLICATE_PARTICIPANT"
+          });
         }
       }
       
-      res.status(500).json({ message: "Internal server error while attempting to join session." });
+      // Generic error response with more context
+      res.status(500).json({ 
+        message: "Internal server error while attempting to join session. Please try again or contact support.",
+        errorCode: "INTERNAL_ERROR",
+        timestamp: new Date().toISOString()
+      });
     }
   });
 
   // Get session participants
-  app.get("/api/sessions/:sessionId/participants", async (req, res) => {
+  app.get("/api/sessions/:sessionIdOrShortCode/participants", async (req, res) => {
     try {
-      const { sessionId } = req.params;
-      const participants = await storage.getParticipantsBySessionId(sessionId);
+      const { sessionIdOrShortCode } = req.params;
+      
+      // First, we need to resolve the session ID if a short code was provided
+      // This mirrors the logic in the POST endpoint
+      const session = await storage.getSessionById(sessionIdOrShortCode);
+      
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      
+      // Now use the actual session UUID to get participants
+      const participants = await storage.getParticipantsBySessionId(session.id);
       res.json(participants);
     } catch (error) {
+      console.error("[GET_PARTICIPANTS_ERROR] Failed to get participants:", {
+        sessionIdOrShortCode: req.params.sessionIdOrShortCode,
+        error: error instanceof Error ? error.message : error
+      });
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
   // Update session status
-  app.patch("/api/sessions/:sessionId/status", async (req, res) => {
+  app.patch("/api/sessions/:sessionIdOrShortCode/status", async (req, res) => {
     try {
-      const { sessionId } = req.params;
+      const { sessionIdOrShortCode } = req.params;
       const { status } = req.body;
       
       if (!status || typeof status !== 'string') {
         return res.status(400).json({ message: "Invalid status provided in request body." });
       }
+      
+      // Resolve to actual session ID first
+      const session = await storage.getSessionById(sessionIdOrShortCode);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found." });
+      }
 
-      const updatedSession = await storage.updateSessionStatus(sessionId, status);
+      const updatedSession = await storage.updateSessionStatus(session.id, status);
       if (!updatedSession) {
         return res.status(404).json({ message: "Session not found or failed to update." });
       }
       
       res.json(updatedSession);
     } catch (error: any) {
-      console.error(`Error updating session ${req.params.sessionId} status:`, error);
+      console.error(`Error updating session ${req.params.sessionIdOrShortCode} status:`, error);
       if (error.message?.includes('Invalid session status')) {
         return res.status(400).json({ message: error.message });
       }
@@ -433,12 +552,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/sessions/:sessionId/wine-selections", async (req, res) => {
+  app.put("/api/sessions/:sessionIdOrShortCode/wine-selections", async (req, res) => {
     try {
-      const { sessionId } = req.params;
+      const { sessionIdOrShortCode } = req.params;
       const { selections } = req.body;
       
-      const updatedSelections = await storage.updateSessionWineSelections(sessionId, selections);
+      // Resolve to actual session ID first
+      const session = await storage.getSessionById(sessionIdOrShortCode);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found." });
+      }
+      
+      const updatedSelections = await storage.updateSessionWineSelections(session.id, selections);
       res.json(updatedSelections);
     } catch (error) {
       console.error("Error updating session wine selections:", error);
@@ -551,9 +676,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/participants/:participantId/responses", async (req, res) => {
     try {
       const { participantId } = req.params;
+      
+      // Validate participantId
+      if (!participantId || participantId === 'undefined' || participantId === 'null') {
+        return res.status(400).json({ message: "Invalid participant ID" });
+      }
+      
       const responses = await storage.getResponsesByParticipantId(participantId);
       res.json(responses);
     } catch (error) {
+      console.error("Error fetching participant responses:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -586,17 +718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get participants for a session
-  app.get("/api/sessions/:sessionId/participants", async (req, res) => {
-    try {
-      const { sessionId } = req.params;
-      const participants = await storage.getParticipantsBySessionId(sessionId);
-      res.json(participants);
-    } catch (error) {
-      console.error("Error fetching participants:", error);
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
+  // Note: Participants endpoint is already defined above with proper sessionIdOrShortCode handling
 
   // Get aggregated analytics for a session
   app.get("/api/sessions/:sessionId/analytics", async (req, res) => {
@@ -713,6 +835,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/participants/:participantId", async (req, res) => {
     try {
       const { participantId } = req.params;
+      
+      // Validate participantId
+      if (!participantId || participantId === 'undefined' || participantId === 'null') {
+        return res.status(400).json({ message: "Invalid participant ID" });
+      }
+      
       const participant = await storage.getParticipantById(participantId);
       
       if (!participant) {
@@ -1432,25 +1560,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate unique public ID
       const publicId = await storage.generateUniqueMediaPublicId();
       
-      // Create media record in database
-      const mediaRecord = await storage.createMedia({
-        publicId,
-        sommelierId: null, // TODO: Add when auth is implemented
-        entityType: entityType as 'slide' | 'wine' | 'package',
-        entityId: entityId || null,
-        mediaType: mediaType as 'video' | 'audio' | 'image',
-        fileName: originalname,
-        mimeType: mimetype,
-        fileSize: buffer.length,
-        storageUrl,
-        thumbnailUrl: null, // TODO: Generate thumbnails for images/videos
-        duration: null, // TODO: Extract duration for audio/video
-        metadata: {
-          uploadedAt: new Date().toISOString(),
-          originalEntityId: uploadEntityId
-        },
-        isPublic: false
-      });
+      // Create media record in database with error recovery
+      let mediaRecord;
+      try {
+        mediaRecord = await storage.createMedia({
+          publicId,
+          sommelierId: null, // TODO: Add when auth is implemented
+          entityType: entityType as 'slide' | 'wine' | 'package',
+          entityId: entityId || null,
+          mediaType: mediaType as 'video' | 'audio' | 'image',
+          fileName: originalname,
+          mimeType: mimetype,
+          fileSize: buffer.length,
+          storageUrl,
+          thumbnailUrl: null, // TODO: Generate thumbnails for images/videos
+          duration: null, // TODO: Extract duration for audio/video
+          metadata: {
+            uploadedAt: new Date().toISOString(),
+            originalEntityId: uploadEntityId
+          },
+          isPublic: false
+        });
+      } catch (dbError: any) {
+        // Check if error is due to missing media table
+        if (dbError.message?.includes('relation "media" does not exist')) {
+          console.error('[MEDIA_UPLOAD] CRITICAL ERROR: Media table does not exist!');
+          console.error('[MEDIA_UPLOAD] Run "npm run db:push" to create the media table');
+          
+          // Return a helpful error response
+          return res.status(500).json({
+            message: "Database schema is out of sync. Media table is missing.",
+            error: "Please contact your administrator to run database migrations.",
+            technicalDetails: "Run 'npm run db:push' to apply migrations"
+          });
+        }
+        
+        // Re-throw other database errors
+        throw dbError;
+      }
 
       res.json({
         publicId: mediaRecord.publicId,

@@ -102,18 +102,32 @@ export default function SessionJoin() {
 
     try {
       if (sessionIdFromUrl) {
+        // Enhanced logging for debugging
+        console.log('[CLIENT_JOIN] Attempting to join session with:', {
+          sessionIdFromUrl,
+          sessionIdType: typeof sessionIdFromUrl,
+          sessionIdLength: sessionIdFromUrl?.length,
+          isUUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionIdFromUrl),
+          isShortCode: sessionIdFromUrl?.length === 6 && /^[A-Z0-9]{6}$/.test(sessionIdFromUrl),
+          existingSession: existingSession
+        });
+        
         // Joining an existing session via sessionId
         if (!existingSession) {
           throw new Error('Session not found');
         }
 
         // Add participant to existing session
+        const participantData = {
+          ...data,
+          isHost: false // Participants joining via link are not hosts
+        };
+        
+        console.log('[CLIENT_JOIN] Sending participant data:', participantData);
+        
         const participant = await joinSessionMutation.mutateAsync({
           sessionId: sessionIdFromUrl,
-          participant: {
-            ...data,
-            isHost: false // Participants joining via link are not hosts
-          }
+          participant: participantData
         });
 
         triggerHaptic('success');
@@ -148,6 +162,38 @@ export default function SessionJoin() {
     } catch (error) {
       console.error('Error joining session:', error);
       triggerHaptic('error');
+      
+      // Display user-friendly error messages based on the error
+      let errorMessage = 'Failed to join session. Please try again.';
+      
+      if (error instanceof Error) {
+        // Parse error message from API response
+        if (error.message.includes('500:')) {
+          try {
+            const errorData = JSON.parse(error.message.substring(error.message.indexOf('{'), error.message.lastIndexOf('}') + 1));
+            errorMessage = errorData.message || errorMessage;
+            
+            // Log additional error details for debugging
+            console.error('Error details:', {
+              errorCode: errorData.errorCode,
+              timestamp: errorData.timestamp,
+              fullError: error.message
+            });
+          } catch (parseError) {
+            // If parsing fails, use a generic message
+            console.error('Failed to parse error response:', parseError);
+          }
+        } else if (error.message.includes('404:')) {
+          errorMessage = 'Session not found. Please check the session code and try again.';
+        } else if (error.message.includes('400:')) {
+          errorMessage = 'Invalid session or participant data. Please check your information and try again.';
+        } else if (error.message.includes('409:')) {
+          errorMessage = 'You may have already joined this session. Please refresh and try again.';
+        }
+      }
+      
+      // Show error to user (you might want to add a toast notification here)
+      alert(errorMessage);
     } finally {
       setIsJoining(false);
     }

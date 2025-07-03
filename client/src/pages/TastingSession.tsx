@@ -419,7 +419,7 @@ export default function TastingSession() {
             isFirstWine
           });
           setShowingWineIntroduction(true);
-        }, 2500);
+        }, 0);
       } 
       // Check if we're transitioning to a new section within the same wine
       // ONLY trigger section transition when completing the LAST slide of current section
@@ -545,15 +545,15 @@ export default function TastingSession() {
             initial={{ opacity: 0, y: isPackageIntro ? 40 : 20, scale: isPackageIntro ? 0.9 : 1 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={isPackageIntro ? TRANSITION_DURATIONS.packageIntroAnimation : undefined}
-            className="bg-gradient-card backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl text-center"
+            className="bg-gradient-card backdrop-blur-xl rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 border border-white/20 shadow-2xl text-center"
           >
             {isPackageIntro && (
-              <div className="mb-6">
+              <div className="mb-3 sm:mb-4">
                 {currentSlide.payloadJson.package_image || currentSlide.payloadJson.background_image ? (
                   <img 
                     src={currentSlide.payloadJson.package_image || currentSlide.payloadJson.background_image} 
                     alt={currentSlide.payloadJson.package_name || "Package"} 
-                    className="w-40 h-40 mx-auto rounded-xl object-cover shadow-2xl border-4 border-white/20"
+                    className="w-24 h-24 sm:w-32 sm:h-32 lg:w-40 lg:h-40 mx-auto rounded-xl object-cover shadow-2xl border-2 sm:border-4 border-white/20"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
@@ -569,11 +569,11 @@ export default function TastingSession() {
             )}
             
             {isWineIntro && wineImage && (
-              <div className="mb-6">
+              <div className="mb-3 sm:mb-4">
                 <img 
                   src={wineImage} 
                   alt={currentSlide.payloadJson.wine_name || "Wine"} 
-                  className="w-32 h-32 mx-auto rounded-lg object-cover shadow-lg"
+                  className="w-20 h-20 sm:w-24 sm:h-24 lg:w-32 lg:h-32 mx-auto rounded-lg object-cover shadow-lg"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
@@ -582,34 +582,34 @@ export default function TastingSession() {
               </div>
             )}
             
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-2 sm:mb-3">
               <DynamicTextRenderer text={currentSlide.payloadJson.title} />
             </h2>
             
             {currentSlide.payloadJson.description && (
-              <p className="text-white/80 text-lg leading-relaxed mb-6 max-w-2xl mx-auto">
+              <p className="text-white/80 text-sm sm:text-base lg:text-lg leading-relaxed mb-3 sm:mb-4 max-w-2xl mx-auto">
                 <DynamicTextRenderer text={currentSlide.payloadJson.description} />
               </p>
             )}
             
             {isWineIntro && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 text-sm">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-3 sm:mt-4 text-xs sm:text-sm">
                 {currentSlide.payloadJson.wine_type && (
-                  <div className="bg-white/10 rounded-lg p-3">
-                    <p className="text-white/60 mb-1">Type</p>
-                    <p className="text-white font-medium">{currentSlide.payloadJson.wine_type}</p>
+                  <div className="bg-white/10 rounded-lg p-2 sm:p-3">
+                    <p className="text-white/60 text-[10px] sm:text-xs">Type</p>
+                    <p className="text-white font-medium text-xs sm:text-sm">{currentSlide.payloadJson.wine_type}</p>
                   </div>
                 )}
                 {currentSlide.payloadJson.wine_region && (
-                  <div className="bg-white/10 rounded-lg p-3">
-                    <p className="text-white/60 mb-1">Region</p>
-                    <p className="text-white font-medium">{currentSlide.payloadJson.wine_region}</p>
+                  <div className="bg-white/10 rounded-lg p-2 sm:p-3">
+                    <p className="text-white/60 text-[10px] sm:text-xs">Region</p>
+                    <p className="text-white font-medium text-xs sm:text-sm">{currentSlide.payloadJson.wine_region}</p>
                   </div>
                 )}
                 {currentSlide.payloadJson.wine_vintage && (
-                  <div className="bg-white/10 rounded-lg p-3">
-                    <p className="text-white/60 mb-1">Vintage</p>
-                    <p className="text-white font-medium">{currentSlide.payloadJson.wine_vintage}</p>
+                  <div className="bg-white/10 rounded-lg p-2 sm:p-3">
+                    <p className="text-white/60 text-[10px] sm:text-xs">Vintage</p>
+                    <p className="text-white font-medium text-xs sm:text-sm">{currentSlide.payloadJson.wine_vintage}</p>
                   </div>
                 )}
               </div>
@@ -1297,8 +1297,8 @@ export default function TastingSession() {
                 disabled={isNavigating}
                 className={
                   currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro
-                    ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold px-4 sm:px-6 md:px-8 py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 transform hover:scale-105 active:scale-100 text-sm sm:text-base"
-                    : "text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                    ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold px-3 sm:px-4 md:px-6 py-1.5 sm:py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 transform hover:scale-105 active:scale-100 text-[14px] sm:text-sm md:text-base min-h-[44px] flex items-center justify-center"
+                    : "text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed px-3 sm:px-4 py-1.5 sm:py-2 text-[14px] sm:text-sm min-h-[44px] flex items-center justify-center"
                 }
               >
                 <span className="hidden sm:inline">

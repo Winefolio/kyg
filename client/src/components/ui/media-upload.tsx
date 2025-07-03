@@ -8,7 +8,7 @@ import { apiRequest } from '@/lib/queryClient';
 
 interface MediaUploadProps {
   value?: string;
-  onChange: (mediaUrl: string) => void;
+  onChange: (result: UploadResult) => void;
   accept: 'image' | 'video' | 'audio' | 'all';
   label?: string;
   placeholder?: string;
@@ -18,7 +18,8 @@ interface MediaUploadProps {
 }
 
 interface UploadResult {
-  url: string;
+  publicId: string;
+  accessUrl: string;
   mediaType: 'image' | 'video' | 'audio';
   fileName: string;
   fileSize: number;
@@ -205,7 +206,7 @@ export function MediaUpload({
       setUploadProgress(100);
 
       setUploadedFile(result);
-      onChange(result.url);
+      onChange(result);
       
       setTimeout(() => {
         setIsUploading(false);

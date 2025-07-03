@@ -36,13 +36,13 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
       case 'wine_glass_fill':
         return (
           <motion.div
-            className="relative w-32 h-32 mx-auto mb-8"
+            className="relative w-20 h-20 sm:w-24 sm:h-24 lg:w-32 lg:h-32 mx-auto mb-6 sm:mb-8"
             initial={{ opacity: 0, scale: 0.5 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
             {/* Wine glass outline */}
-            <Wine className="w-32 h-32 text-white/30 absolute inset-0" />
+            <Wine className="w-20 h-20 sm:w-24 sm:h-24 lg:w-32 lg:h-32 text-white/30 absolute inset-0" />
             
             {/* Wine fill animation */}
             <motion.div
@@ -93,7 +93,7 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
                     delay: i * 0.2,
                   }}
                 >
-                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-amber-300" />
                 </motion.div>
               ))}
             </motion.div>
@@ -145,9 +145,9 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
   };
 
   return (
-    <div className="h-[100dvh] relative overflow-hidden">
+    <div className="min-h-[100dvh] relative overflow-auto">
       {/* Background with image support */}
-      <div className="absolute inset-0">
+      <div className="fixed inset-0">
         {payload.backgroundImage ? (
           <>
             <img 
@@ -165,7 +165,7 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
       </div>
 
       {/* Animated particles */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="fixed inset-0 overflow-hidden">
         {[...Array(15)].map((_, i) => (
           <motion.div
             key={i}
@@ -190,9 +190,9 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
       </div>
 
       {/* Content */}
-      <div className="relative z-10 h-full flex items-center justify-center p-6">
+      <div className="relative z-10 min-h-[100dvh] flex items-center justify-center p-4 sm:p-6">
         <motion.div
-          className="max-w-2xl w-full text-center"
+          className="max-w-2xl w-full text-center py-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
@@ -204,7 +204,7 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
 
           {/* Title */}
           <motion.h1
-            className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4"
+            className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-3 sm:mb-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}
@@ -215,7 +215,7 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
           {/* Description */}
           {payload.description && (
             <motion.p
-              className="text-xl text-white/80 mb-8 max-w-lg mx-auto"
+              className="text-base sm:text-lg lg:text-xl text-white/80 mb-6 sm:mb-8 max-w-lg mx-auto px-4 sm:px-0"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 0.6 }}
@@ -234,10 +234,10 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
               <Button
                 onClick={onContinue}
                 size="lg"
-                className="bg-white text-purple-900 hover:bg-white/90 shadow-2xl"
+                className="bg-white text-purple-900 hover:bg-white/90 shadow-2xl px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base min-h-[44px]"
               >
                 Continue
-                <ArrowRight className="w-5 h-5 ml-2" />
+                <ArrowRight className="w-4 sm:w-5 h-4 sm:h-5 ml-2" />
               </Button>
             ) : autoAdvance && (
               <div className="flex items-center justify-center space-x-2 text-white/60">
