@@ -36,7 +36,8 @@
       "mcp__supabase__execute_sql",
       "mcp__supabase__get_logs",
       "mcp__supabase__apply_migration",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "mcp__supabase__list_tables"
     ],
     "deny": []
   },

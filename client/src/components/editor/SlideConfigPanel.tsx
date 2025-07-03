@@ -209,6 +209,7 @@ export function SlideConfigPanel({
                                     }}
                                     label="Upload Video"
                                     entityId={slide.id}
+                                    entityType="slide"
                                 />
                             )}
                         </div>
@@ -262,6 +263,7 @@ export function SlideConfigPanel({
                                     }}
                                     label="Upload Audio"
                                     entityId={slide.id}
+                                    entityType="slide"
                                 />
                             )}
                         </div>

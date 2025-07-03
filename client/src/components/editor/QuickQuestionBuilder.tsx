@@ -509,6 +509,7 @@ export function QuickQuestionBuilder({
               label="Video File"
               placeholder="No video selected"
               entityId={tempQuestionId}
+              entityType="slide"
             />
 
             <div className="space-y-3">
@@ -567,6 +568,7 @@ export function QuickQuestionBuilder({
               label="Audio File"
               placeholder="No audio selected"
               entityId={tempQuestionId}
+              entityType="slide"
             />
 
             <div className="flex items-center justify-between">

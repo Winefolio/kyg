@@ -811,7 +811,102 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     
-    return result[0];
+    const newSlide = result[0];
+    
+    // Check for orphaned media records that need to be linked to this slide
+    // Look for temporary IDs in the payload that might have associated media
+    const payloadStr = JSON.stringify(slide.payloadJson);
+    const tempIdPattern = /temp-question-\d+/g;
+    const tempIds = payloadStr.match(tempIdPattern) || [];
+    
+    if (tempIds.length > 0) {
+      console.log(`[SLIDE_CREATE] Found temporary IDs in payload, checking for orphaned media: ${tempIds.join(', ')}`);
+      
+      for (const tempId of tempIds) {
+        await this.updateMediaEntityId(tempId, newSlide.id, 'slide');
+      }
+    }
+    
+    // Also check for media with publicId references in the payload
+    if (slide.payloadJson) {
+      const publicIds: string[] = [];
+      
+      // Check for video/audio publicId fields
+      if (slide.payloadJson.video_publicId) publicIds.push(slide.payloadJson.video_publicId);
+      if (slide.payloadJson.audio_publicId) publicIds.push(slide.payloadJson.audio_publicId);
+      
+      if (publicIds.length > 0) {
+        console.log(`[SLIDE_CREATE] Found media publicIds in payload, updating entity references: ${publicIds.join(', ')}`);
+        
+        for (const publicId of publicIds) {
+          await this.updateMediaByPublicId(publicId, newSlide.id);
+        }
+      }
+    }
+    
+    return newSlide;
+  }
+
+  async updateMediaEntityId(originalEntityId: string, newEntityId: string, entityType: 'slide' | 'wine' | 'package'): Promise<void> {
+    try {
+      // Find media records with the temporary ID in metadata
+      const orphanedMedia = await db
+        .select()
+        .from(media)
+        .where(
+          and(
+            eq(media.entityType, entityType),
+            eq(db.sql`metadata->>'originalEntityId'`, originalEntityId)
+          )
+        );
+      
+      if (orphanedMedia.length > 0) {
+        console.log(`[MEDIA_UPDATE] Found ${orphanedMedia.length} orphaned media records for ${originalEntityId}`);
+        
+        // Update each media record with the real entity ID
+        for (const record of orphanedMedia) {
+          await db
+            .update(media)
+            .set({ 
+              entityId: newEntityId,
+              metadata: {
+                ...record.metadata,
+                originalEntityId,
+                updatedAt: new Date().toISOString(),
+                linkedAt: new Date().toISOString()
+              }
+            })
+            .where(eq(media.id, record.id));
+          
+          console.log(`[MEDIA_UPDATE] Updated media ${record.publicId} from temp ID ${originalEntityId} to slide ${newEntityId}`);
+        }
+      }
+    } catch (error) {
+      console.error(`[MEDIA_UPDATE] Error updating media records:`, error);
+      // Don't throw - this is a best-effort operation
+    }
+  }
+
+  async updateMediaByPublicId(publicId: string, newEntityId: string): Promise<void> {
+    try {
+      const result = await db
+        .update(media)
+        .set({ 
+          entityId: newEntityId,
+          metadata: db.sql`jsonb_set(metadata, '{linkedAt}', to_jsonb(now()::text))`
+        })
+        .where(
+          and(
+            eq(media.publicId, publicId),
+            eq(media.entityId, null) // Only update if not already linked
+          )
+        );
+      
+      console.log(`[MEDIA_UPDATE] Updated media ${publicId} to entity ${newEntityId}`);
+    } catch (error) {
+      console.error(`[MEDIA_UPDATE] Error updating media by publicId:`, error);
+      // Don't throw - this is a best-effort operation
+    }
   }
 
   // Session methods

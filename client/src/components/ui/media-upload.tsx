@@ -15,6 +15,7 @@ interface MediaUploadProps {
   className?: string;
   disabled?: boolean;
   entityId: string; // slide ID, wine ID, or package ID for file organization
+  entityType?: 'slide' | 'wine' | 'package'; // Type of entity for proper categorization
 }
 
 interface UploadResult {
@@ -33,7 +34,8 @@ export function MediaUpload({
   placeholder = "No file selected",
   className = "",
   disabled = false,
-  entityId
+  entityId,
+  entityType = 'slide'
 }: MediaUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -193,6 +195,7 @@ export function MediaUpload({
       const formData = new FormData();
       formData.append('file', file);
       formData.append('entityId', entityId);
+      formData.append('entityType', entityType);
 
       // Simulate progress (since fetch doesn't provide upload progress)
       const progressInterval = setInterval(() => {

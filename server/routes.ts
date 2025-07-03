@@ -1531,13 +1531,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For production uploads with Supabase
       const { entityId, entityType } = req.body; // slide ID, wine ID, or package ID
 
-      // For package creation, we might not have an entity ID yet
-      if (!entityId && entityType !== 'package-temp') {
-        return res.status(400).json({ message: "Entity ID is required" });
+      // Validate entityType
+      if (!entityType || !['slide', 'wine', 'package'].includes(entityType)) {
+        return res.status(400).json({ message: "Valid entity type (slide, wine, or package) is required" });
       }
 
-      // Use temporary ID for package uploads during creation
-      const uploadEntityId = entityId || `package-temp-${Date.now()}`;
+      // Check if entityId is a temporary ID (not a valid UUID)
+      const isTemporaryId = entityId && !entityId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      
+      // For temporary IDs or missing IDs, we'll store NULL in entity_id and keep the temp ID in metadata
+      const dbEntityId = (!entityId || isTemporaryId) ? null : entityId;
+      const originalEntityId = entityId || `${entityType}-temp-${Date.now()}`;
 
       // Validate file type
       let mediaType = getMediaType(mimetype);
@@ -1555,7 +1559,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Upload to Supabase Storage
-      const storageUrl = await uploadMediaFile(buffer, originalname, mimetype, uploadEntityId);
+      const storageUrl = await uploadMediaFile(buffer, originalname, mimetype, originalEntityId);
       
       // Generate unique public ID
       const publicId = await storage.generateUniqueMediaPublicId();
@@ -1567,7 +1571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           publicId,
           sommelierId: null, // TODO: Add when auth is implemented
           entityType: entityType as 'slide' | 'wine' | 'package',
-          entityId: entityId || null,
+          entityId: dbEntityId, // NULL for temporary IDs
           mediaType: mediaType as 'video' | 'audio' | 'image',
           fileName: originalname,
           mimeType: mimetype,
@@ -1577,7 +1581,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           duration: null, // TODO: Extract duration for audio/video
           metadata: {
             uploadedAt: new Date().toISOString(),
-            originalEntityId: uploadEntityId
+            originalEntityId: originalEntityId, // Store temp ID here for later reference
+            isTemporary: isTemporaryId || !entityId
           },
           isPublic: false
         });
