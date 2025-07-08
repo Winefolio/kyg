@@ -12,7 +12,8 @@ import {
   type InsertSession
 } from "@shared/schema";
 import { z } from "zod";
-import { reorderSlidesForWine } from './slide-reorder-fix';
+// Note: Removed problematic reorderSlidesForWineSimple function
+// Now using proven storage.batchUpdateSlidePositions instead
 import { registerMediaProxyRoutes } from './routes/media-proxy';
 
 // Configure multer for file uploads with comprehensive image support
@@ -1222,77 +1223,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Updates must be an array" });
       }
       
-      console.log(`📋 Processing ${updates.length} slide position updates`);
-      
-      // Validate updates
-      if (updates.some(u => !u.slideId || typeof u.position !== 'number')) {
-        return res.status(400).json({ message: "Invalid update format. Each update must have slideId and position." });
-      }
-      
-      // Group updates by wine to handle each wine's slides separately
-      const updatesByWine = new Map<string, typeof updates>();
-      
-      // First, get all slides to know their wine IDs
-      const slideIds = updates.map(u => u.slideId);
-      const allSlides = await Promise.all(
-        slideIds.map(id => storage.getSlideById(id))
-      );
-      
-      // Check if all slides were found
-      const missingSlides = slideIds.filter((id, index) => !allSlides[index]);
-      if (missingSlides.length > 0) {
-        console.error(`Missing slides: ${missingSlides.join(', ')}`);
-        return res.status(400).json({ message: `Slides not found: ${missingSlides.join(', ')}` });
-      }
-      
-      // Group updates by wine
-      updates.forEach((update, index) => {
-        const slide = allSlides[index];
-        if (slide) {
-          const wineId = slide.packageWineId;
-          if (!updatesByWine.has(wineId)) {
-            updatesByWine.set(wineId, []);
-          }
-          updatesByWine.get(wineId)!.push(update);
-        }
+      console.log(`📋 Processing ${updates.length} slide position updates:`, {
+        updates: updates.map(u => ({ slideId: u.slideId, position: u.position, packageWineId: u.packageWineId })),
+        timestamp: new Date().toISOString()
       });
       
-      // Process each wine's updates separately using the tested reorder function
-      for (const [wineId, wineUpdates] of Array.from(updatesByWine.entries())) {
-        console.log(`🍷 Processing ${wineUpdates.length} position updates for wine ${wineId}`);
+      // Validate updates
+      if (updates.some(u => !u.slideId || typeof u.position !== 'number' || !u.packageWineId)) {
+        console.error(`❌ Invalid update format detected:`, {
+          invalidUpdates: updates.filter(u => !u.slideId || typeof u.position !== 'number' || !u.packageWineId),
+          allUpdates: updates
+        });
+        return res.status(400).json({ message: "Invalid update format. Each update must have slideId, position, and packageWineId." });
+      }
+      
+      // Use the proven storage layer method for reliable slide reordering
+      console.log(`🔄 Using storage.batchUpdateSlidePositions for reliable constraint handling`);
+      
+      try {
+        await storage.batchUpdateSlidePositions(updates);
+        console.log(`✅ Successfully updated ${updates.length} slide positions using storage layer`);
+      } catch (storageError: any) {
+        console.error(`❌ Storage layer error:`, {
+          error: storageError.message,
+          errorCode: storageError.code,
+          errorDetail: storageError.detail,
+          constraint: storageError.constraint,
+          updates: updates.map(u => ({ slideId: u.slideId, position: u.position, packageWineId: u.packageWineId }))
+        });
         
-        try {
-          await reorderSlidesForWine(wineId, wineUpdates);
-          console.log(`   ✅ Successfully updated positions for wine ${wineId}`);
-        } catch (wineError: any) {
-          console.error(`Error processing wine ${wineId}:`, wineError);
-          
-          // Check if it's a duplicate key error
-          if (wineError.code === '23505' || wineError.message?.includes('duplicate key')) {
-            throw new Error(`Position conflict for wine ${wineId}. ${wineError.detail || wineError.message}`);
-          }
-          
-          throw wineError;
+        // Check if it's a duplicate key error
+        if (storageError.code === '23505' || storageError.message?.includes('duplicate key')) {
+          throw new Error(`Position conflict detected. ${storageError.detail || storageError.message}`);
         }
+        
+        throw storageError;
       }
       
       res.json({ message: "Slides reordered successfully" });
     } catch (error: any) {
-      console.error("Error reordering slides:", error);
+      console.error("❌ CRITICAL ERROR in slide reordering:", {
+        error: error.message,
+        errorCode: error.code,
+        errorDetail: error.detail,
+        constraint: error.constraint,
+        stack: error.stack,
+        timestamp: new Date().toISOString(),
+        requestBody: req.body,
+        userAgent: req.get('User-Agent'),
+        slideCount: req.body?.updates?.length || 0,
+        wineIds: [...new Set(req.body?.updates?.map((u: any) => u.packageWineId) || [])]
+      });
       
-      // Check for specific database constraint errors
-      if (error.code === '23505' || error.constraint === 'slides_package_wine_id_position_key') {
+      // Handle specific database constraint errors with detailed guidance
+      if (error.code === '23505' || error.constraint?.includes('position') || error.message?.includes('duplicate key')) {
+        console.error("🚨 DATABASE CONSTRAINT VIOLATION (409):", {
+          constraintCode: error.code,
+          constraintName: error.constraint,
+          errorDetail: error.detail,
+          affectedUpdates: req.body?.updates || [],
+          guidance: "This indicates multiple slides are trying to use the same position within a wine"
+        });
+        
         return res.status(409).json({ 
-          message: "Position conflict detected. Another slide already has this position.", 
+          message: "Position conflict detected. Multiple slides cannot have the same position within the same wine.", 
           error: "DUPLICATE_POSITION",
-          details: error.detail || 'Duplicate key violation'
+          details: error.detail || 'Unique constraint violation on slide positions',
+          guidance: "Please refresh the page and try reordering again. If the issue persists, contact support."
         });
       }
       
+      // Handle validation errors
+      if (error.message?.includes('Invalid update format') || error.message?.includes('packageWineId')) {
+        console.error("🚨 DATA VALIDATION ERROR (400):", {
+          validationError: error.message,
+          updates: req.body?.updates || [],
+          missingFields: req.body?.updates?.filter((u: any) => !u.slideId || !u.position || !u.packageWineId) || []
+        });
+        
+        return res.status(400).json({
+          message: "Invalid slide data format",
+          error: "VALIDATION_ERROR", 
+          details: error.message,
+          guidance: "Each slide update must include slideId, position, and packageWineId"
+        });
+      }
+      
+      // Handle network/database connection errors
+      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.message?.includes('connection')) {
+        console.error("🚨 DATABASE CONNECTION ERROR (503):", {
+          connectionError: error.message,
+          errorCode: error.code,
+          guidance: "Database connection failed"
+        });
+        
+        return res.status(503).json({
+          message: "Database temporarily unavailable",
+          error: "DATABASE_CONNECTION_ERROR",
+          details: "Please try again in a moment",
+          guidance: "This is usually a temporary issue. Please refresh and try again."
+        });
+      }
+      
+      // Log all other 500 errors with comprehensive context
+      console.error("💥 RETURNING 500 ERROR - UNKNOWN ISSUE:", {
+        errorMessage: error.message || "Internal server error",
+        errorCode: error.code || 'UNKNOWN_ERROR',
+        errorDetails: error.detail || error.constraint || 'Unknown error',
+        requestData: req.body,
+        timestamp: new Date().toISOString(),
+        guidance: "This is an unexpected error that needs investigation"
+      });
+      
       res.status(500).json({ 
-        message: error.message || "Internal server error", 
+        message: "An unexpected error occurred while reordering slides", 
         error: error.code || 'UNKNOWN_ERROR',
-        details: error.detail || error.constraint || 'Unknown error'
+        details: error.message || 'Internal server error',
+        guidance: "Please refresh the page and try again. If the issue persists, contact support with the timestamp: " + new Date().toISOString()
       });
     }
   });

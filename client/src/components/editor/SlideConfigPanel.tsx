@@ -7,12 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, Loader2 } from "lucide-react";
+import { Trash2, Loader2, FileAudio, FileVideo, X } from "lucide-react";
 import type { Slide } from "@shared/schema";
 import { QuestionConfigForm } from "./QuestionConfigForm";
 import { InterludeConfigForm } from "./InterludeConfigForm";
 import { MediaFileDisplay } from "./MediaFileDisplay";
 import { MediaUpload } from "@/components/ui/media-upload";
+import { VideoPlayer } from "@/components/ui/video-player";
+import { AudioPlayer } from "@/components/ui/audio-player";
 
 interface SlideConfigPanelProps {
     slide: Slide;
@@ -21,6 +23,7 @@ interface SlideConfigPanelProps {
         updates: Partial<Pick<Slide, "payloadJson" | "section_type">>,
     ) => void;
     onDelete: (slideId: string) => void;
+    onPreviewUpdate?: (slideId: string, livePayload: any) => void;
 }
 
 // Debounce helper
@@ -56,6 +59,7 @@ export function SlideConfigPanel({
     slide,
     onUpdate,
     onDelete,
+    onPreviewUpdate,
 }: SlideConfigPanelProps) {
     const payload = slide.payloadJson as any;
     const [localPayload, setLocalPayload] = useState(payload);
@@ -76,8 +80,13 @@ export function SlideConfigPanel({
     const handlePayloadChange = useCallback((newPayload: any) => {
         setLocalPayload(newPayload);
         setIsSaving(true);
+        // Trigger immediate preview update
+        if (onPreviewUpdate) {
+            onPreviewUpdate(slide.id, newPayload);
+        }
+        // Trigger debounced save
         debouncedUpdate({ payloadJson: newPayload });
-    }, [debouncedUpdate]);
+    }, [debouncedUpdate, onPreviewUpdate, slide.id]);
 
     const handleFieldChange = useCallback((field: string, value: any) => {
         const newPayload = { ...localPayload, [field]: value };
@@ -141,6 +150,10 @@ export function SlideConfigPanel({
                                 value={slide.section_type || 'deep_dive'}
                                 onValueChange={(value: string) => {
                                     setIsSaving(true);
+                                    // Trigger immediate preview update for section type change
+                                    if (onPreviewUpdate) {
+                                        onPreviewUpdate(slide.id, { ...localPayload, section_type: value });
+                                    }
                                     onUpdate(slide.id, { section_type: value });
                                     setTimeout(() => setIsSaving(false), 500);
                                 }}
@@ -183,20 +196,37 @@ export function SlideConfigPanel({
                     <CardContent className="space-y-4">
                         <div>
                             <Label className="text-white/80">Video File</Label>
-                            {localPayload.video_publicId ? (
-                                <MediaFileDisplay
-                                    mediaType="video"
-                                    fileName={localPayload.video_fileName}
-                                    fileSize={localPayload.video_fileSize}
-                                    publicId={localPayload.video_publicId}
-                                    onReplace={() => {
-                                        // Clear existing media to show upload component
-                                        handleFieldChange('video_publicId', '');
-                                        handleFieldChange('video_url', '');
-                                        handleFieldChange('video_fileName', '');
-                                        handleFieldChange('video_fileSize', 0);
-                                    }}
-                                />
+                            {(localPayload.video_publicId || localPayload.video_url) ? (
+                                <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-8 h-8 bg-purple-600/20 rounded-full flex items-center justify-center flex-shrink-0">
+                                                <FileVideo className="w-4 h-4 text-purple-400" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-white font-medium text-sm truncate">
+                                                    {localPayload.video_fileName || `video_${localPayload.video_publicId || 'legacy'}`}
+                                                </p>
+                                                <p className="text-white/60 text-xs">
+                                                    {localPayload.video_fileSize ? `${Math.round(localPayload.video_fileSize / (1024*1024))} MB` : 'Video file'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            onClick={() => {
+                                                handleFieldChange('video_publicId', '');
+                                                handleFieldChange('video_url', '');
+                                                handleFieldChange('video_fileName', '');
+                                                handleFieldChange('video_fileSize', 0);
+                                            }}
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-white/60 hover:text-white hover:bg-white/10"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </Button>
+                                    </div>
+                                </div>
                             ) : (
                                 <MediaUpload
                                     accept="video"
@@ -223,6 +253,22 @@ export function SlideConfigPanel({
                             />
                             <Label htmlFor="autoplay" className="text-white/80">Autoplay video</Label>
                         </div>
+                        
+                        {/* Video Preview Below Settings */}
+                        {(localPayload.video_publicId || localPayload.video_url) && (
+                            <div>
+                                <Label className="text-white/80 text-sm mb-2 block">Preview</Label>
+                                <div className="bg-black/20 rounded-lg overflow-hidden">
+                                    <VideoPlayer
+                                        src={localPayload.video_publicId ? `/api/media/${localPayload.video_publicId}/file` : localPayload.video_url}
+                                        title={localPayload.video_fileName}
+                                        className="w-full h-32"
+                                        controls={true}
+                                        autoplay={false}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             )}
@@ -237,20 +283,37 @@ export function SlideConfigPanel({
                     <CardContent className="space-y-4">
                         <div>
                             <Label className="text-white/80">Audio File</Label>
-                            {localPayload.audio_publicId ? (
-                                <MediaFileDisplay
-                                    mediaType="audio"
-                                    fileName={localPayload.audio_fileName}
-                                    fileSize={localPayload.audio_fileSize}
-                                    publicId={localPayload.audio_publicId}
-                                    onReplace={() => {
-                                        // Clear existing media to show upload component
-                                        handleFieldChange('audio_publicId', '');
-                                        handleFieldChange('audio_url', '');
-                                        handleFieldChange('audio_fileName', '');
-                                        handleFieldChange('audio_fileSize', 0);
-                                    }}
-                                />
+                            {(localPayload.audio_publicId || localPayload.audio_url) ? (
+                                <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-8 h-8 bg-purple-600/20 rounded-full flex items-center justify-center flex-shrink-0">
+                                                <FileAudio className="w-4 h-4 text-purple-400" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-white font-medium text-sm truncate">
+                                                    {localPayload.audio_fileName || `audio_${localPayload.audio_publicId || 'legacy'}`}
+                                                </p>
+                                                <p className="text-white/60 text-xs">
+                                                    {localPayload.audio_fileSize ? `${Math.round(localPayload.audio_fileSize / 1024)} KB` : 'Audio file'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <Button
+                                            onClick={() => {
+                                                handleFieldChange('audio_publicId', '');
+                                                handleFieldChange('audio_url', '');
+                                                handleFieldChange('audio_fileName', '');
+                                                handleFieldChange('audio_fileSize', 0);
+                                            }}
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-white/60 hover:text-white hover:bg-white/10"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </Button>
+                                    </div>
+                                </div>
                             ) : (
                                 <MediaUpload
                                     accept="audio"
@@ -277,6 +340,23 @@ export function SlideConfigPanel({
                             />
                             <Label htmlFor="autoplay-audio" className="text-white/80">Autoplay audio</Label>
                         </div>
+                        
+                        {/* Audio Preview Below Settings */}
+                        {(localPayload.audio_publicId || localPayload.audio_url) && (
+                            <div>
+                                <Label className="text-white/80 text-sm mb-2 block">Preview</Label>
+                                <div className="bg-black/20 rounded-lg p-3 flex justify-center">
+                                    <div className="w-full max-w-md">
+                                        <AudioPlayer
+                                            src={localPayload.audio_publicId ? `/api/media/${localPayload.audio_publicId}/file` : localPayload.audio_url}
+                                            title={localPayload.audio_fileName}
+                                            className="w-full scale-75 origin-center"
+                                            autoplay={false}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             )}

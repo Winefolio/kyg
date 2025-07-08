@@ -29,6 +29,7 @@ export default function Gateway() {
   const [hostDisplayName, setHostDisplayName] = useState("");
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [sessionValidationError, setSessionValidationError] = useState<string | null>(null);
   const { triggerHaptic } = useHaptics();
   const { activeSession, endSession } = useSessionPersistence();
 
@@ -38,6 +39,13 @@ export default function Gateway() {
       setShowRestoreModal(true);
     }
   }, [activeSession]);
+
+  // Clear validation error when session ID changes
+  useEffect(() => {
+    if (sessionValidationError && sessionId) {
+      setSessionValidationError(null);
+    }
+  }, [sessionId]);
 
   // Mutation for creating a new session (host flow)
   const createSessionMutation = useMutation({
@@ -65,12 +73,47 @@ export default function Gateway() {
     },
   });
 
-  const handleJoinSession = () => {
-    if (sessionId.trim().length >= 4) {
+  // Mutation for validating session before joining
+  const validateSessionMutation = useMutation({
+    mutationFn: async (sessionCode: string) => {
+      const response = await fetch(`/api/sessions/${sessionCode}`, {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error("Session not found. Please check your code and try again.");
+        }
+        throw new Error("Failed to validate session");
+      }
+
+      const session = await response.json();
+      
+      // Check if session is active
+      if (session.status !== 'active') {
+        throw new Error("Session is not active. Please check with the host.");
+      }
+
+      return session;
+    },
+    onSuccess: (session) => {
       triggerHaptic("success");
+      setSessionValidationError(null);
+      // Redirect with the validated session ID
       setLocation(
         `/join?sessionId=${encodeURIComponent(sessionId.trim().toUpperCase())}`,
       );
+    },
+    onError: (error: Error) => {
+      triggerHaptic("error");
+      setSessionValidationError(error.message);
+    },
+  });
+
+  const handleJoinSession = () => {
+    if (sessionId.trim().length >= 4) {
+      setSessionValidationError(null);
+      validateSessionMutation.mutate(sessionId.trim().toUpperCase());
     }
   };
 
@@ -88,7 +131,8 @@ export default function Gateway() {
     if (userMode === "join") {
       setSessionId(scannedData);
       setShowQRScanner(false);
-      handleJoinSession();
+      setSessionValidationError(null);
+      validateSessionMutation.mutate(scannedData.trim().toUpperCase());
     }
   };
 
@@ -98,6 +142,7 @@ export default function Gateway() {
     setSessionId("");
     setPackageCode("");
     setHostDisplayName("");
+    setSessionValidationError(null);
   };
 
   const handleRestoreSession = () => {
@@ -183,6 +228,8 @@ export default function Gateway() {
                   handleJoinSession={handleJoinSession}
                   setShowQRScanner={setShowQRScanner}
                   triggerHaptic={triggerHaptic}
+                  isValidating={validateSessionMutation.isPending}
+                  validationError={sessionValidationError}
                 />
               </motion.div>
             )}

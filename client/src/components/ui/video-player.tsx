@@ -80,10 +80,22 @@ export function VideoPlayer({
 
   const handleCanPlay = () => {
     setIsLoading(false);
-    if (video) {
+    if (video && video.duration && !isNaN(video.duration)) {
       setDuration(video.duration);
     }
     onCanPlay?.();
+  };
+
+  const handleLoadedMetadata = () => {
+    if (video && video.duration && !isNaN(video.duration)) {
+      setDuration(video.duration);
+    }
+  };
+
+  const handleDurationChange = () => {
+    if (video && video.duration && !isNaN(video.duration)) {
+      setDuration(video.duration);
+    }
   };
 
   const handleError = () => {
@@ -96,6 +108,11 @@ export function VideoPlayer({
   const handleTimeUpdate = () => {
     if (video) {
       setCurrentTime(video.currentTime);
+      
+      // Make sure duration is set if it wasn't before
+      if (video.duration && !isNaN(video.duration) && duration === 0) {
+        setDuration(video.duration);
+      }
       
       // Update buffered percentage
       if (video.buffered.length > 0 && video.duration > 0) {
@@ -126,8 +143,8 @@ export function VideoPlayer({
   };
 
   const handleSeek = (percentage: number) => {
-    if (video && duration) {
-      const newTime = (percentage / 100) * duration;
+    if (video && duration > 0) {
+      const newTime = Math.max(0, Math.min((percentage / 100) * duration, duration));
       video.currentTime = newTime;
       setCurrentTime(newTime);
     }
@@ -174,6 +191,9 @@ export function VideoPlayer({
   };
 
   const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds) || !isFinite(seconds)) {
+      return '0:00';
+    }
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -198,6 +218,8 @@ export function VideoPlayer({
         preload="metadata"
         onLoadStart={handleLoadStart}
         onCanPlay={handleCanPlay}
+        onLoadedMetadata={handleLoadedMetadata}
+        onDurationChange={handleDurationChange}
         onError={handleError}
         onTimeUpdate={handleTimeUpdate}
         onPlay={handlePlay}
@@ -304,13 +326,13 @@ export function VideoPlayer({
                   {/* Playback Progress */}
                   <div
                     className="absolute inset-y-0 left-0 bg-purple-500 transition-all duration-150"
-                    style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
+                    style={{ width: duration > 0 ? `${Math.min(100, Math.max(0, (currentTime / duration) * 100))}%` : '0%' }}
                   />
                   
                   {/* Progress Handle */}
                   <div
                     className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg transition-all duration-150"
-                    style={{ left: duration ? `calc(${(currentTime / duration) * 100}% - 6px)` : '-6px' }}
+                    style={{ left: duration > 0 ? `calc(${Math.min(100, Math.max(0, (currentTime / duration) * 100))}% - 6px)` : '-6px' }}
                   />
                 </div>
               </div>

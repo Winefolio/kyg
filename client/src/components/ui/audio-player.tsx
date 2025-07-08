@@ -55,10 +55,22 @@ export function AudioPlayer({
 
   const handleCanPlay = () => {
     setIsLoading(false);
-    if (audio) {
+    if (audio && audio.duration && !isNaN(audio.duration)) {
       setDuration(audio.duration);
     }
     onCanPlay?.();
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audio && audio.duration && !isNaN(audio.duration)) {
+      setDuration(audio.duration);
+    }
+  };
+
+  const handleDurationChange = () => {
+    if (audio && audio.duration && !isNaN(audio.duration)) {
+      setDuration(audio.duration);
+    }
   };
 
   const handleError = () => {
@@ -71,6 +83,11 @@ export function AudioPlayer({
   const handleTimeUpdate = () => {
     if (audio) {
       setCurrentTime(audio.currentTime);
+      
+      // Make sure duration is set if it wasn't before
+      if (audio.duration && !isNaN(audio.duration) && duration === 0) {
+        setDuration(audio.duration);
+      }
       
       // Update buffered percentage
       if (audio.buffered.length > 0 && audio.duration > 0) {
@@ -106,8 +123,8 @@ export function AudioPlayer({
   };
 
   const handleSeek = (percentage: number) => {
-    if (audio && duration) {
-      const newTime = (percentage / 100) * duration;
+    if (audio && duration > 0) {
+      const newTime = Math.max(0, Math.min((percentage / 100) * duration, duration));
       audio.currentTime = newTime;
       setCurrentTime(newTime);
     }
@@ -144,6 +161,9 @@ export function AudioPlayer({
   };
 
   const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds) || !isFinite(seconds)) {
+      return '0:00';
+    }
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -191,6 +211,8 @@ export function AudioPlayer({
         preload="metadata"
         onLoadStart={handleLoadStart}
         onCanPlay={handleCanPlay}
+        onLoadedMetadata={handleLoadedMetadata}
+        onDurationChange={handleDurationChange}
         onError={handleError}
         onTimeUpdate={handleTimeUpdate}
         onPlay={handlePlay}
@@ -297,13 +319,13 @@ export function AudioPlayer({
                 {/* Playback Progress */}
                 <div
                   className="absolute inset-y-0 left-0 bg-purple-400 transition-all duration-150"
-                  style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
+                  style={{ width: duration > 0 ? `${Math.min(100, Math.max(0, (currentTime / duration) * 100))}%` : '0%' }}
                 />
                 
                 {/* Progress Handle */}
                 <div
                   className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg transition-all duration-150"
-                  style={{ left: duration ? `calc(${(currentTime / duration) * 100}% - 8px)` : '-8px' }}
+                  style={{ left: duration > 0 ? `calc(${Math.min(100, Math.max(0, (currentTime / duration) * 100))}% - 8px)` : '-8px' }}
                 />
               </div>
               <div className="flex justify-between text-xs text-white/60">

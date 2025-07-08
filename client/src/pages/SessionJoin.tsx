@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -199,8 +199,40 @@ export default function SessionJoin() {
     }
   };
 
+  // Check if we're trying to join a session that doesn't exist
+  useEffect(() => {
+    if (sessionIdFromUrl && !sessionLoading && !existingSession) {
+      // Session not found - redirect back to gateway with error
+      setTimeout(() => {
+        triggerHaptic('error');
+        setLocation('/');
+      }, 2000);
+    }
+  }, [sessionIdFromUrl, sessionLoading, existingSession, triggerHaptic, setLocation]);
+
   if (packageLoading || sessionLoading || slidesLoading) {
     return <LoadingOverlay isVisible={true} message="Loading session details..." />;
+  }
+
+  // Show error state if session not found
+  if (sessionIdFromUrl && !existingSession) {
+    return (
+      <div className="min-h-screen bg-gradient-primary p-6 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-500/20 backdrop-blur-xl rounded-3xl p-8 border border-red-500/30 shadow-2xl max-w-md w-full text-center"
+        >
+          <h2 className="text-2xl font-bold text-white mb-4">Session Not Found</h2>
+          <p className="text-white/80 mb-6">
+            The session code "{sessionIdFromUrl}" does not exist or has expired.
+          </p>
+          <p className="text-white/60 text-sm">
+            Redirecting you back to the homepage...
+          </p>
+        </motion.div>
+      </div>
+    );
   }
 
   return (

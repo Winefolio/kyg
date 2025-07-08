@@ -1,6 +1,6 @@
 // client/pages/PackageEditor.tsx
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
@@ -14,16 +14,19 @@ import { SLIDE_TEMPLATES } from '@/lib/wineTemplates';
 import { 
   ArrowLeft, Save, PlusCircle, Edit3, Trash2, Wine, HelpCircle, 
   Video, Eye, Settings, ChevronRight, ChevronDown, Menu, X, Monitor, Smartphone, Plus, Sparkles, GripVertical,
-  ArrowUp, ArrowDown, Package as PackageIcon
+  ArrowUp, ArrowDown, Package as PackageIcon, ChevronLeft, ChevronUp, ChevronDown as ChevronDownIcon
 } from 'lucide-react';
 import type { Package, PackageWine, Slide, GenericQuestion } from "@shared/schema";
 import { WineModal } from '@/components/WineModal';
 import { SlidePreview } from '@/components/SlidePreview';
 import { SlideConfigPanel } from '@/components/editor/SlideConfigPanel';
+import { SlidePreviewPanel } from '@/components/editor/SlidePreviewPanel';
 import { QuickQuestionBuilder } from '@/components/editor/QuickQuestionBuilder';
 import { SimpleCopyButton } from '@/components/editor/SimpleCopyButton';
 import { PackageIntroCard } from '@/components/editor/PackageIntroCard';
+import { DraggableSlideList } from '@/components/editor/DraggableSlideList';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 // Section details for organizing slides
 const sectionDetails = {
@@ -33,6 +36,35 @@ const sectionDetails = {
 };
 
 type EditorData = Package & { wines: PackageWine[]; slides: Slide[] };
+
+// Debounce helper hook
+function useDebounce<T extends (...args: any[]) => any>(
+  callback: T,
+  delay: number
+): T {
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+
+  const debouncedCallback = useCallback((...args: Parameters<T>) => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    const newTimer = setTimeout(() => {
+      callback(...args);
+    }, delay);
+    setDebounceTimer(newTimer);
+  }, [callback, delay, debounceTimer]) as T;
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+    };
+  }, [debounceTimer]);
+
+  return debouncedCallback;
+}
 
 export default function PackageEditor() {
   const { code } = useParams<{ code: string }>();
@@ -51,13 +83,33 @@ export default function PackageEditor() {
   const [expandedWines, setExpandedWines] = useState<Set<string>>(new Set());
   const [quickBuilderOpen, setQuickBuilderOpen] = useState(false);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
-  const dataLoadedRef = useRef(false);
   const [currentWineContext, setCurrentWineContext] = useState<{
     wineId: string;
     wineName: string;
     wineType: string;
     sectionType: 'intro' | 'deep_dive' | 'ending';
   } | null>(null);
+  const [pendingReorders, setPendingReorders] = useState<Map<string, { slideId: string; position: number; packageWineId: string }>>(new Map());
+  const [pendingContentChanges, setPendingContentChanges] = useState<Set<string>>(new Set());
+  const [activelyMovingSlide, setActivelyMovingSlide] = useState<string | null>(null);
+  const [operationQueue, setOperationQueue] = useState<Array<{ slideId: string; position: number; packageWineId: string }>[]>([]);
+  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
+  const [livePreviewData, setLivePreviewData] = useState<Map<string, any>>(new Map());
+  const [buttonStates, setButtonStates] = useState<Map<string, 'idle' | 'blocked' | 'processing'>>(new Map());
+  const [isPreviewCollapsed, setIsPreviewCollapsed] = useState(() => {
+    // Initialize based on screen size if available
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 1024; // Start collapsed on mobile
+    }
+    return false;
+  });
+  const [isMobileView, setIsMobileView] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 1024;
+    }
+    return false;
+  });
+  const originalSlidesRef = useRef<Slide[]>([]);
 
   const { data: editorData, isLoading, error } = useQuery<EditorData>({
     queryKey: [`/api/packages/${code}/editor`],
@@ -69,28 +121,86 @@ export default function PackageEditor() {
   });
 
   useEffect(() => {
-    // Only sync from server on initial load or when we don't have unsaved changes
-    if (editorData && !dataLoadedRef.current) {
+    // Sync from server data when it changes
+    if (editorData) {
       const sortedWines = [...(editorData.wines || [])].sort((a, b) => a.position - b.position);
       const sortedSlides = [...(editorData.slides || [])].sort((a, b) => a.position - b.position);
 
       setWines(sortedWines);
       setSlides(sortedSlides);
-      setLocalSlides(sortedSlides); // Set localSlides for UI rendering
-      dataLoadedRef.current = true; // Mark as loaded
+      
+      // Only update localSlides if we don't have pending changes
+      if (pendingReorders.size === 0 && pendingContentChanges.size === 0) {
+        setLocalSlides(sortedSlides);
+        originalSlidesRef.current = sortedSlides;
+      }
 
-      if (sortedWines.length > 0) {
+      // Clean up live preview data for slides that no longer exist
+      setLivePreviewData(prev => {
+        const newMap = new Map();
+        const existingSlideIds = new Set(sortedSlides.map(s => s.id));
+        prev.forEach((data, slideId) => {
+          if (existingSlideIds.has(slideId)) {
+            newMap.set(slideId, data);
+          }
+        });
+        return newMap;
+      });
+
+      // Only set initial expansion and active slide if none are set
+      if (expandedWines.size === 0 && sortedWines.length > 0) {
         const firstWineId = sortedWines[0].id;
         setExpandedWines(new Set([firstWineId]));
         const firstWineSlides = sortedSlides.filter(s => s.packageWineId === firstWineId);
-        if (firstWineSlides.length > 0) {
+        if (firstWineSlides.length > 0 && !activeSlideId) {
           setActiveSlideId(firstWineSlides[0].id);
         }
       }
     }
   }, [editorData]);
 
+  // Responsive detection
+  useEffect(() => {
+    const checkMobile = () => {
+      const isMobile = window.innerWidth < 1024;
+      const wasMobile = isMobileView;
+      
+      setIsMobileView(isMobile);
+      
+      // Only auto-collapse when switching FROM desktop TO mobile
+      // (but don't interfere if user manually toggled on mobile)
+      if (!wasMobile && isMobile) {
+        setIsPreviewCollapsed(true);
+      }
+      // When switching from mobile to desktop, expand preview
+      else if (wasMobile && !isMobile) {
+        setIsPreviewCollapsed(false);
+      }
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, [isMobileView]); // Only depend on isMobileView, not isPreviewCollapsed
+
   const activeSlide = localSlides.find(s => s.id === activeSlideId);
+
+  // Navigation functions for preview
+  const navigateToSlide = (direction: 'prev' | 'next') => {
+    if (!activeSlide) return;
+
+    const currentWineSlides = localSlides
+      .filter(s => s.packageWineId === activeSlide.packageWineId)
+      .sort((a, b) => a.position - b.position);
+    
+    const currentIndex = currentWineSlides.findIndex(s => s.id === activeSlideId);
+    
+    if (direction === 'prev' && currentIndex > 0) {
+      setActiveSlideId(currentWineSlides[currentIndex - 1].id);
+    } else if (direction === 'next' && currentIndex < currentWineSlides.length - 1) {
+      setActiveSlideId(currentWineSlides[currentIndex + 1].id);
+    }
+  };
 
   // --- MUTATIONS ---
   const createWineMutation = useMutation({
@@ -105,11 +215,13 @@ export default function PackageEditor() {
         title: "🍷 Wine created successfully", 
         description: `${newWine.wineName} is ready for content`
       });
-      // Invalidate and reset data loaded flag to get fresh data
-      dataLoadedRef.current = false;
       
       // Auto-expand the newly created wine to show its sections
-      setExpandedWines(prev => new Set([...prev, newWine.id]));
+      setExpandedWines(prev => {
+        const newSet = new Set(prev);
+        newSet.add(newWine.id);
+        return newSet;
+      });
       
       queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
       setIsWineModalOpen(false);
@@ -139,7 +251,6 @@ export default function PackageEditor() {
   const createSlideMutation = useMutation({
     mutationFn: (slideData: any) => apiRequest('POST', '/api/slides', slideData),
     onSuccess: () => {
-      dataLoadedRef.current = false; // Reset to reload fresh data
       queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
       toast({ title: "Slide created successfully" });
     },
@@ -149,7 +260,12 @@ export default function PackageEditor() {
   const updateSlideMutation = useMutation({
     mutationFn: ({ slideId, data }: { slideId: string; data: any }) => apiRequest('PATCH', `/api/slides/${slideId}`, data),
     onSuccess: () => {
-      dataLoadedRef.current = false; // Reset to reload fresh data
+      // Remove from pending content changes on successful save
+      setPendingContentChanges(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(activeSlideId || '');
+        return newSet;
+      });
       queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
       toast({ title: "Slide updated successfully" });
     },
@@ -159,7 +275,6 @@ export default function PackageEditor() {
   const deleteSlideMutation = useMutation({
     mutationFn: (slideId: string) => apiRequest('DELETE', `/api/slides/${slideId}`),
     onSuccess: () => {
-      dataLoadedRef.current = false; // Reset to reload fresh data
       queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
       toast({ title: "Slide deleted successfully" });
       setActiveSlideId(null); // Clear selection when slide is deleted
@@ -175,32 +290,305 @@ export default function PackageEditor() {
         title: "Slide order updated", 
         description: "Changes saved successfully",
       });
-      // Refresh data to ensure consistency
-      dataLoadedRef.current = false;
-      queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+      // Clear all pending state after successful save
+      setPendingReorders(new Map());
+      setPendingContentChanges(new Set());
+      setActivelyMovingSlide(null);
+      setHasUnsavedChanges(false);
+      setIsSavingOrder(false);
+      // Force immediate query invalidation to get fresh data
+      queryClient.invalidateQueries({ 
+        queryKey: [`/api/packages/${code}/editor`],
+        exact: true 
+      });
     },
     onError: (error: any) => {
+      console.error('❌ Slide reorder mutation failed:', error);
+      
+      // Parse error response for better user feedback
+      let errorMessage = "Please try again";
+      let errorTitle = "Error updating slide order";
+      
+      if (error?.response?.data) {
+        const errorData = error.response.data;
+        if (errorData.error === "DUPLICATE_POSITION") {
+          errorTitle = "Position Conflict";
+          errorMessage = "Multiple slides cannot have the same position. Refreshing data...";
+        } else if (errorData.error === "VALIDATION_ERROR") {
+          errorTitle = "Invalid Data";
+          errorMessage = errorData.details || "Invalid slide data format";
+        } else if (errorData.error === "DATABASE_CONNECTION_ERROR") {
+          errorTitle = "Connection Issue";
+          errorMessage = "Database temporarily unavailable. Please try again.";
+        } else if (errorData.guidance) {
+          errorMessage = errorData.guidance;
+        }
+      }
+      
       toast({ 
-        title: "Error updating slide order", 
-        description: error.message || "Please try again", 
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive" 
       });
-      // Revert local changes on error
-      if (editorData) {
-        setLocalSlides([...editorData.slides]);
-        setSlides([...editorData.slides]);
+      setIsSavingOrder(false);
+      
+      // Revert to original state on error
+      if (originalSlidesRef.current.length > 0) {
+        const sortedOriginal = [...originalSlidesRef.current].sort((a, b) => a.position - b.position);
+        setLocalSlides(sortedOriginal);
+        setSlides(sortedOriginal);
+        setPendingReorders(new Map());
+        setActivelyMovingSlide(null);
+        setHasUnsavedChanges(false);
+        
+        // Force data refresh to get latest server state
+        queryClient.invalidateQueries({ 
+          queryKey: [`/api/packages/${code}/editor`],
+          exact: true 
+        });
+        
+        toast({
+          title: "Changes reverted",
+          description: "Your changes have been reverted and data refreshed",
+        });
       }
     },
   });
 
+  // Enhanced validation function for slide updates
+  const validateSlideUpdates = (updates: Array<{ slideId: string; position: number; packageWineId: string }>) => {
+    const errors: string[] = [];
+    
+    // Check for required fields
+    updates.forEach((update, index) => {
+      if (!update.slideId) errors.push(`Update ${index + 1}: Missing slideId`);
+      if (typeof update.position !== 'number' || update.position < 0) errors.push(`Update ${index + 1}: Invalid position`);
+      if (!update.packageWineId) errors.push(`Update ${index + 1}: Missing packageWineId`);
+    });
+    
+    // Check for duplicate positions within same wine
+    const positionsByWine = new Map<string, Set<number>>();
+    updates.forEach((update, index) => {
+      if (!positionsByWine.has(update.packageWineId)) {
+        positionsByWine.set(update.packageWineId, new Set());
+      }
+      const winePositions = positionsByWine.get(update.packageWineId)!;
+      if (winePositions.has(update.position)) {
+        errors.push(`Update ${index + 1}: Duplicate position ${update.position} for wine ${update.packageWineId}`);
+      }
+      winePositions.add(update.position);
+    });
+    
+    // Check for valid slide IDs
+    const validSlideIds = new Set(localSlides.map(s => s.id));
+    updates.forEach((update, index) => {
+      if (!validSlideIds.has(update.slideId)) {
+        errors.push(`Update ${index + 1}: Invalid slideId ${update.slideId}`);
+      }
+    });
+    
+    // Enhanced conflict detection with the new position system
+    const allExistingPositions = new Set(localSlides.map(s => s.position));
+    updates.forEach((update, index) => {
+      // Check for conflicts with existing positions ACROSS ALL SLIDES
+      const existingSlideWithPosition = localSlides.find(s => 
+        s.position === update.position && 
+        s.id !== update.slideId
+      );
+      if (existingSlideWithPosition) {
+        errors.push(`Update ${index + 1}: Position ${update.position} already occupied by slide ${existingSlideWithPosition.id}`);
+      }
+      
+      // Check for legacy position ranges that should not be used
+      if (update.position < 100000) {
+        errors.push(`Update ${index + 1}: Position ${update.position} is in legacy range, use positions >= 100000`);
+      }
+      
+      // Check for proper gap-based positioning (positions should be multiples of 1000 + base)
+      if ((update.position - 100000) % 1000 !== 0 && update.position >= 100000) {
+        errors.push(`Update ${index + 1}: Position ${update.position} doesn't follow gap-based system (should be 100000 + n*1000)`);
+      }
+    });
+    
+    return errors;
+  };
+
+  // Sequential operation queue processor to prevent race conditions
+  const processOperationQueue = useCallback(async () => {
+    if (isProcessingQueue || operationQueue.length === 0) return;
+    
+    setIsProcessingQueue(true);
+    console.log(`🔄 Processing operation queue with ${operationQueue.length} operations`);
+    
+    try {
+      // Process all queued operations sequentially
+      for (const updates of operationQueue) {
+        console.log('🔍 Validating queued operation:', updates);
+        
+        // Validate each operation before processing
+        const validationErrors = validateSlideUpdates(updates);
+        if (validationErrors.length > 0) {
+          console.error('❌ Queue validation failed:', validationErrors);
+          toast({
+            title: "Validation Error",
+            description: `Invalid slide data: ${validationErrors[0]}`,
+            variant: "destructive"
+          });
+          continue; // Skip this operation and continue with next
+        }
+        
+        // Execute the operation
+        console.log('✅ Executing validated operation:', updates);
+        await new Promise<void>((resolve, reject) => {
+          reorderSlidesMutation.mutate(updates, {
+            onSuccess: () => {
+              console.log('✅ Queue operation completed successfully');
+              resolve();
+            },
+            onError: (error) => {
+              console.error('❌ Queue operation failed:', error);
+              reject(error);
+            }
+          });
+        });
+      }
+      
+      // Clear the queue after successful processing
+      setOperationQueue([]);
+      setPendingReorders(new Map());
+      setActivelyMovingSlide(null);
+      setHasUnsavedChanges(false);
+      
+      console.log('✅ All queue operations completed successfully');
+      
+    } catch (error) {
+      console.error('❌ Queue processing failed:', error);
+      
+      // Enhanced error recovery based on error type
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      if (errorMessage.includes('position') && errorMessage.includes('already exists')) {
+        // Position conflict error - refresh data and retry with new positions
+        console.log('🔄 Position conflict detected, refreshing data and regenerating positions');
+        queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+        
+        toast({
+          title: "Position Conflict Resolved",
+          description: "Slide positions were updated automatically. Please try your operation again.",
+          variant: "default"
+        });
+      } else if (errorMessage.includes('UNKNOWN_ERROR') || errorMessage.includes('500')) {
+        // Server error - clear queue and suggest refresh
+        toast({
+          title: "Server Error",
+          description: "A server error occurred. Please refresh the page and try again.",
+          variant: "destructive"
+        });
+      } else {
+        // Generic error handling
+        toast({
+          title: "Operation Failed",
+          description: `Failed to process slide reorders: ${errorMessage}. Please try again.`,
+          variant: "destructive"
+        });
+      }
+      
+      // Clear queue state to prevent infinite retries
+      setOperationQueue([]);
+      setPendingReorders(new Map());
+      setActivelyMovingSlide(null);
+      
+    } finally {
+      setIsProcessingQueue(false);
+      setIsSavingOrder(false);
+    }
+  }, [isProcessingQueue, operationQueue, reorderSlidesMutation, toast]);
+  
+  // Auto-process queue when new operations are added
+  useEffect(() => {
+    if (operationQueue.length > 0 && !isProcessingQueue) {
+      // Small delay to allow batching of rapid operations
+      const timer = setTimeout(() => {
+        processOperationQueue();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [operationQueue, isProcessingQueue, processOperationQueue]);
+
+  // Queue-based reorder function to prevent race conditions
+  const queueSlideReorder = useCallback((updates: Array<{ slideId: string; position: number; packageWineId: string }>) => {
+    if (updates.length === 0) return;
+    
+    // Prevent new operations while queue is processing
+    if (isProcessingQueue) {
+      console.log('⏳ Operation already in progress, skipping duplicate request');
+      toast({
+        title: "Operation in Progress",
+        description: "Please wait for the current reorder to complete",
+        variant: "default"
+      });
+      return;
+    }
+    
+    console.log('📥 Queueing slide reorder operation:', updates);
+    
+    // Add to operation queue (replace any existing operations to prevent buildup)
+    setOperationQueue([updates]);
+    setIsSavingOrder(true);
+    
+    // Clear actively moving slide indicator after a brief delay for visual feedback
+    setTimeout(() => {
+      console.log('⏰ Clearing active moving slide after timeout (500ms)');
+      setActivelyMovingSlide(null);
+    }, 500);
+  }, [isProcessingQueue, toast]);
+
   // --- HELPER FUNCTIONS ---
   const getNextPositionForWine = (wineId: string): number => {
     const wineSlides = localSlides.filter(s => s.packageWineId === wineId);
-    if (wineSlides.length === 0) return 10;
     
-    const maxPosition = Math.max(...wineSlides.map(s => s.position));
-    // Round up to next multiple of 10 for clean gaps
-    return Math.ceil((maxPosition + 1) / 10) * 10;
+    // Get ALL positions across the entire package to prevent conflicts
+    const allPositions = new Set(localSlides.map(s => s.position));
+    
+    let basePosition: number;
+    
+    if (wineSlides.length === 0) {
+      // Start at 100000 for new wines to avoid all existing conflicts
+      basePosition = 100000;
+    } else {
+      // Find max position for this wine and add large gap
+      const maxWinePosition = Math.max(...wineSlides.map(s => s.position));
+      basePosition = maxWinePosition + 1000;
+    }
+    
+    // Ensure the position is unique across ALL slides
+    let position = basePosition;
+    while (allPositions.has(position)) {
+      position += 1000; // Keep incrementing by 1000 until unique
+    }
+    
+    return position;
+  };
+
+  // Generate conflict-free positions for a sequence of slides
+  const generateConflictFreePositions = (slides: Slide[], startPosition: number): number[] => {
+    const allPositions = new Set(localSlides.map(s => s.position));
+    const positions: number[] = [];
+    
+    let currentPosition = startPosition;
+    
+    for (let i = 0; i < slides.length; i++) {
+      // Find next available position
+      while (allPositions.has(currentPosition)) {
+        currentPosition += 1000;
+      }
+      
+      positions.push(currentPosition);
+      allPositions.add(currentPosition); // Mark as used for next iteration
+      currentPosition += 1000; // Increment for next slide
+    }
+    
+    return positions;
   };
 
   // --- HANDLER FUNCTIONS ---
@@ -272,8 +660,60 @@ export default function PackageEditor() {
   };
 
   const handleSlideUpdate = (slideId: string, data: any) => {
-    updateSlideMutation.mutate({ slideId, data });
+    // Track content changes
+    setPendingContentChanges(prev => {
+      const newSet = new Set(prev);
+      newSet.add(slideId);
+      return newSet;
+    });
+    setHasUnsavedChanges(true);
+    
+    // Update with success/error handling
+    updateSlideMutation.mutate(
+      { slideId, data },
+      {
+        onSuccess: () => {
+          // Remove from pending changes on success
+          setPendingContentChanges(prev => {
+            const next = new Set(prev);
+            next.delete(slideId);
+            return next;
+          });
+          // Check if we still have unsaved changes
+          if (pendingReorders.size === 0 && pendingContentChanges.size === 1) {
+            setHasUnsavedChanges(false);
+          }
+        },
+        onError: () => {
+          // Keep in pending changes on error
+          toast({
+            title: "Failed to save slide changes",
+            description: "Please try again",
+            variant: "destructive"
+          });
+        }
+      }
+    );
   };
+
+  const handlePreviewUpdate = useCallback((slideId: string, livePayload: any) => {
+    setLivePreviewData(prev => {
+      const newMap = new Map(prev);
+      newMap.set(slideId, livePayload);
+      return newMap;
+    });
+  }, []);
+
+  const getSlideWithLivePreview = useCallback((slide: Slide): Slide => {
+    const livePayload = livePreviewData.get(slide.id);
+    if (livePayload) {
+      return {
+        ...slide,
+        payloadJson: livePayload
+      };
+    }
+    return slide;
+  }, [livePreviewData]);
 
   const handleSlideDelete = (slideId: string) => {
     const slide = localSlides.find(s => s.id === slideId);
@@ -305,12 +745,33 @@ export default function PackageEditor() {
       }
     }
     
+    // Clean up live preview data for the deleted slide
+    setLivePreviewData(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(slideId);
+      return newMap;
+    });
+    
     deleteSlideMutation.mutate(slideId);
   };
 
   const handleSlideReorder = (slideId: string, direction: 'up' | 'down') => {
     const slide = localSlides.find(s => s.id === slideId);
     if (!slide) return;
+    
+    // Prevent operations while queue is processing
+    if (isProcessingQueue) {
+      toast({
+        title: "Operation in Progress",
+        description: "Please wait for the current operation to complete",
+        variant: "default"
+      });
+      return;
+    }
+    
+    // Mark this slide as actively being moved
+    console.log(`🔄 Setting active moving slide: ${slideId} (${slide.type} in ${slide.section_type} section, moving ${direction})`);
+    setActivelyMovingSlide(slideId);
     
     // Check if this is a welcome slide in intro section
     const isWelcomeSlide = slide.type === 'interlude' && 
@@ -320,11 +781,29 @@ export default function PackageEditor() {
     
     // Prevent moving welcome slide down from position 1
     if (isWelcomeSlide && direction === 'down' && slide.position === 1) {
+      console.log(`🚫 Blocking welcome slide movement: ${slideId} - welcome slide cannot move down from position 1`);
+      
+      // Show visual feedback for blocked action
+      const buttonKey = `${slideId}-${direction}`;
+      setButtonStates(prev => new Map(prev).set(buttonKey, 'blocked'));
+      
+      // Show toast feedback
       toast({ 
         title: "Cannot move welcome slide", 
         description: "Welcome slides must remain at the beginning of the intro section",
         variant: "destructive" 
       });
+      
+      // Clear blocked state after 1.5 seconds
+      setTimeout(() => {
+        setButtonStates(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(buttonKey);
+          return newMap;
+        });
+        setActivelyMovingSlide(null);
+      }, 1500);
+      
       return;
     }
     
@@ -334,8 +813,43 @@ export default function PackageEditor() {
       .sort((a, b) => a.position - b.position);
     
     const sectionIndex = sectionSlides.findIndex(s => s.id === slideId);
-    if ((direction === 'up' && sectionIndex === 0) || 
-        (direction === 'down' && sectionIndex === sectionSlides.length - 1)) {
+    
+    // Check if movement is blocked by section boundaries
+    const isFirstInSection = sectionIndex === 0;
+    const isLastInSection = sectionIndex === sectionSlides.length - 1;
+    const isMovingUpFromFirst = direction === 'up' && isFirstInSection;
+    const isMovingDownFromLast = direction === 'down' && isLastInSection;
+    
+    if (isMovingUpFromFirst || isMovingDownFromLast) {
+      // Provide helpful feedback to user about why the move isn't allowed
+      const sectionName = slide.section_type === 'intro' ? 'Introduction' : 
+                         slide.section_type === 'deep_dive' ? 'Deep Dive' : 'Ending';
+      const moveDirection = direction === 'up' ? 'up' : 'down';
+      const boundary = direction === 'up' ? 'beginning' : 'end';
+      
+      console.log(`🚫 Blocking section boundary movement: ${slideId} - ${slide.type} slide cannot move ${moveDirection}, already at ${boundary} of ${sectionName} section`);
+      
+      // Show visual feedback for blocked action
+      const buttonKey = `${slideId}-${direction}`;
+      setButtonStates(prev => new Map(prev).set(buttonKey, 'blocked'));
+      
+      // Show toast feedback
+      toast({
+        title: "Movement Limited",
+        description: `Cannot move ${moveDirection} - slide is at the ${boundary} of the ${sectionName} section`,
+        variant: "default"
+      });
+      
+      // Clear blocked state after 1.5 seconds
+      setTimeout(() => {
+        setButtonStates(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(buttonKey);
+          return newMap;
+        });
+        setActivelyMovingSlide(null);
+      }, 1500);
+      
       return;
     }
     
@@ -373,12 +887,21 @@ export default function PackageEditor() {
     reorderedSlides.splice(wineSlideIndex, 1);
     reorderedSlides.splice(wineTargetIndex, 0, slide);
     
-    // Assign clean sequential positions (10, 20, 30, etc.) to avoid conflicts
-    const updates: Array<{ slideId: string; position: number }> = [];
+    // Assign conflict-free positions using the new generation function
+    const updates: Array<{ slideId: string; position: number; packageWineId: string }> = [];
+    
+    // Generate conflict-free positions starting from 100000+ to avoid all conflicts
+    const startPosition = 100000;
+    const newPositions = generateConflictFreePositions(reorderedSlides, startPosition);
+    
     reorderedSlides.forEach((reorderedSlide, index) => {
-      const newPosition = (index + 1) * 10;
+      const newPosition = newPositions[index];
       if (reorderedSlide.position !== newPosition) {
-        updates.push({ slideId: reorderedSlide.id, position: newPosition });
+        updates.push({ 
+          slideId: reorderedSlide.id, 
+          position: newPosition, 
+          packageWineId: reorderedSlide.packageWineId! 
+        });
       }
     });
     
@@ -395,37 +918,94 @@ export default function PackageEditor() {
     setLocalSlides(newLocalSlides);
     setHasUnsavedChanges(true);
     
-    // Immediately save the changes to database - much more reliable than complex state management
+    // Update pending reorders map
+    const newPendingReorders = new Map(pendingReorders);
+    updates.forEach(update => {
+      newPendingReorders.set(update.slideId, update);
+    });
+    setPendingReorders(newPendingReorders);
+    
+    // Use queue-based save for successful movements
     if (updates.length > 0) {
-      console.log('🔄 Immediately saving slide order changes:', updates);
+      console.log(`✅ Queueing slide reorder changes for ${updates.length} slides:`, updates.map(u => `${u.slideId} -> pos ${u.position}`));
       
-      // Reset unsaved changes flag since we're saving immediately
-      setHasUnsavedChanges(false);
-      
-      // Save to database right away
-      reorderSlidesMutation.mutate(updates);
+      // Convert map values to array for the queue-based function
+      const allUpdates = Array.from(newPendingReorders.values());
+      queueSlideReorder(allUpdates);
+    } else {
+      console.log(`⚠️ No position updates needed for slide ${slideId} movement ${direction}`);
+    }
+  };
+
+  // Handle drag-and-drop reordering
+  const handleDragReorder = (reorderedSlides: Slide[], wineId: string) => {
+    // Prevent operations while queue is processing
+    if (isProcessingQueue) {
+      toast({
+        title: "Operation in Progress", 
+        description: "Please wait for the current operation to complete",
+        variant: "default"
+      });
+      return;
+    }
+    
+    // Get all slides for this wine in their new order
+    const otherSlides = localSlides.filter(s => s.packageWineId !== wineId);
+    
+    // Assign conflict-free positions to reordered slides
+    const updates: Array<{ slideId: string; position: number; packageWineId: string }> = [];
+    
+    // Generate conflict-free positions starting from 100000+ to avoid all conflicts
+    const startPosition = 100000;
+    const newPositions = generateConflictFreePositions(reorderedSlides, startPosition);
+    
+    reorderedSlides.forEach((slide, index) => {
+      const newPosition = newPositions[index];
+      if (slide.position !== newPosition && slide.packageWineId) {
+        updates.push({ 
+          slideId: slide.id, 
+          position: newPosition, 
+          packageWineId: slide.packageWineId 
+        });
+      }
+    });
+    
+    // Update local state with new conflict-free positions
+    const updatedWineSlides = reorderedSlides.map((slide, index) => ({
+      ...slide,
+      position: newPositions[index]
+    }));
+    
+    // Combine with other wines' slides
+    const newLocalSlides = [...otherSlides, ...updatedWineSlides].sort((a, b) => a.position - b.position);
+    
+    // Set local state and mark as having changes
+    setLocalSlides(newLocalSlides);
+    setHasUnsavedChanges(true);
+    
+    // Update pending reorders map
+    const newPendingReorders = new Map(pendingReorders);
+    updates.forEach(update => {
+      newPendingReorders.set(update.slideId, update);
+    });
+    setPendingReorders(newPendingReorders);
+    
+    // Use queue-based save
+    if (updates.length > 0) {
+      console.log('🔄 Queueing drag-and-drop reorder changes:', updates);
+      const allUpdates = Array.from(newPendingReorders.values());
+      queueSlideReorder(allUpdates);
     }
   };
 
   // Save all slide order changes
   const handleSaveSlideOrder = useCallback(async () => {
-    if (!hasUnsavedChanges) return;
+    if (!hasUnsavedChanges || pendingReorders.size === 0) return;
     
     setIsSavingOrder(true);
     
-    // Calculate all position updates needed - RESPECT current positions in localSlides
-    const updates: { slideId: string; position: number }[] = [];
-    
-    // Check what slides have changed from the original slides state
-    localSlides.forEach(localSlide => {
-      const originalSlide = slides.find(s => s.id === localSlide.id);
-      if (originalSlide && originalSlide.position !== localSlide.position) {
-        updates.push({ 
-          slideId: localSlide.id, 
-          position: localSlide.position 
-        });
-      }
-    });
+    // Get all pending updates
+    const updates = Array.from(pendingReorders.values());
     
     // Add validation - check for duplicate positions within same wine
     const positionsByWine = new Map<string, Set<number>>();
@@ -433,6 +1013,7 @@ export default function PackageEditor() {
     
     localSlides.forEach(slide => {
       const wineId = slide.packageWineId;
+      if (!wineId) return; // Skip package-level slides
       if (!positionsByWine.has(wineId)) {
         positionsByWine.set(wineId, new Set());
       }
@@ -462,7 +1043,7 @@ export default function PackageEditor() {
       setIsSavingOrder(false);
       toast({ title: "No changes to save" });
     }
-  }, [hasUnsavedChanges, localSlides, slides, reorderSlidesMutation, toast]);
+  }, [hasUnsavedChanges, pendingReorders, localSlides, reorderSlidesMutation, toast]);
 
   // Development invariant checks
   useEffect(() => {
@@ -490,6 +1071,23 @@ export default function PackageEditor() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [hasUnsavedChanges, handleSaveSlideOrder]);
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const hasAnyUnsavedChanges = hasUnsavedChanges || pendingReorders.size > 0 || pendingContentChanges.size > 0;
+      
+      if (hasAnyUnsavedChanges) {
+        // Standard way to trigger the browser's confirmation dialog
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges, pendingReorders, pendingContentChanges]);
 
   const handleQuickAddQuestion = (wineId: string, sectionType: 'intro' | 'deep_dive' | 'ending') => {
     const wine = wines.find(w => w.id === wineId);
@@ -574,7 +1172,7 @@ export default function PackageEditor() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            {hasUnsavedChanges && (
+            {(hasUnsavedChanges || pendingContentChanges.size > 0) && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -591,7 +1189,7 @@ export default function PackageEditor() {
                   {isSavingOrder ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                      Saving...
+                      Saving {pendingReorders.size} changes...
                     </>
                   ) : (
                     <>
@@ -601,7 +1199,13 @@ export default function PackageEditor() {
                   )}
                 </Button>
                 <Badge className="absolute -top-2 -right-2 bg-red-500 text-white animate-bounce">
-                  Unsaved
+                  {(() => {
+                    const totalChanges = pendingReorders.size + pendingContentChanges.size;
+                    if (totalChanges > 0) {
+                      return `${totalChanges} change${totalChanges > 1 ? 's' : ''}`;
+                    }
+                    return 'Unsaved';
+                  })()}
                 </Badge>
               </motion.div>
             )}
@@ -858,95 +1462,27 @@ export default function PackageEditor() {
                                           Create a Question
                                         </Button>
                                       </div>
-                                      <div className="pl-3 space-y-1.5">
-                                        {sectionSlides.length > 0 ? (
-                                          sectionSlides.map(slide => {
-                                            const isWelcomeSlide = slide.type === 'interlude' && 
-                                              ((slide.payloadJson as any)?.is_welcome || 
-                                               (slide.payloadJson as any)?.title?.toLowerCase().includes('welcome'));
-                                            
-                                            const slideIndex = sectionSlides.findIndex(s => s.id === slide.id);
-                                            const canMoveUp = slideIndex > 0;
-                                            const canMoveDown = slideIndex < sectionSlides.length - 1;
-                                            
-                                            return (
-                                              <div 
-                                                key={slide.id} 
-                                                className={`group relative rounded-lg transition-all duration-200 border ${
-                                                  activeSlideId === slide.id 
-                                                    ? 'bg-gradient-to-r from-purple-600/40 to-purple-700/30 border-purple-500/50 shadow-lg shadow-purple-900/25' 
-                                                    : isWelcomeSlide
-                                                    ? 'bg-gradient-to-r from-amber-900/20 to-amber-800/10 border-amber-500/20 hover:border-amber-500/40'
-                                                    : hasUnsavedChanges
-                                                    ? 'border-amber-500/30 bg-amber-500/5'
-                                                    : 'border-transparent hover:bg-white/8 hover:border-white/10 hover:shadow-md'
-                                                }`}
-                                              >
-                                                <div 
-                                                  className="p-2.5 cursor-pointer flex items-center"
-                                                  onClick={() => setActiveSlideId(slide.id)}
-                                                >
-                                                  <GripVertical className="w-3.5 h-3.5 text-white/30 mr-2 flex-shrink-0" />
-                                                  <div className={`w-1.5 h-1.5 rounded-full mr-2.5 transition-colors ${
-                                                    activeSlideId === slide.id 
-                                                      ? 'bg-purple-300' 
-                                                      : isWelcomeSlide 
-                                                      ? 'bg-amber-400' 
-                                                      : 'bg-white/40 group-hover:bg-white/60'
-                                                  }`} />
-                                                  <div className="flex items-center flex-1 min-w-0">
-                                                    {isWelcomeSlide && (
-                                                      <>
-                                                        <Sparkles className="w-3 h-3 mr-1.5 text-amber-400 flex-shrink-0" />
-                                                        <Badge className="mr-2 px-1.5 py-0 text-[10px] bg-amber-500/20 text-amber-300 border-amber-500/40">
-                                                          Welcome
-                                                        </Badge>
-                                                      </>
-                                                    )}
-                                                    <p className="text-sm font-medium text-white truncate">
-                                                      {(slide.payloadJson as any)?.title || 'Untitled Slide'}
-                                                    </p>
-                                                  </div>
-                                                  
-                                                  {/* Reorder buttons */}
-                                                  <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Button
-                                                      size="sm"
-                                                      variant="ghost"
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleSlideReorder(slide.id, 'up');
-                                                      }}
-                                                      disabled={!canMoveUp}
-                                                      className="h-6 w-6 p-0 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
-                                                      title="Move up"
-                                                    >
-                                                      <ArrowUp className="w-3 h-3" />
-                                                    </Button>
-                                                    <Button
-                                                      size="sm"
-                                                      variant="ghost"
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleSlideReorder(slide.id, 'down');
-                                                      }}
-                                                      disabled={!canMoveDown}
-                                                      className="h-6 w-6 p-0 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
-                                                      title="Move down"
-                                                    >
-                                                      <ArrowDown className="w-3 h-3" />
-                                                    </Button>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            );
-                                          })
-                                        ) : (
+                                      {sectionSlides.length > 0 ? (
+                                        <DraggableSlideList
+                                          slides={sectionSlides}
+                                          activeSlideId={activeSlideId}
+                                          pendingReorders={pendingReorders}
+                                          pendingContentChanges={pendingContentChanges}
+                                          activelyMovingSlide={activelyMovingSlide}
+                                          isProcessingQueue={isProcessingQueue}
+                                          buttonStates={buttonStates}
+                                          onSlideClick={setActiveSlideId}
+                                          onSlideReorder={(newOrder) => handleDragReorder(newOrder, wine.id)}
+                                          onSlideDelete={handleSlideDelete}
+                                          onSlideMove={handleSlideReorder}
+                                        />
+                                      ) : (
+                                        <div className="pl-3">
                                           <div className="px-3 py-2 text-xs text-white/50 italic bg-white/5 rounded-lg border border-dashed border-white/20">
                                             No slides in this section
                                           </div>
-                                        )}
-                                      </div>
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -991,54 +1527,285 @@ export default function PackageEditor() {
         </AnimatePresence>
 
         {/* Main Content Area */}
-        <div className="flex-1 p-6 overflow-y-auto">
-          {activeSlide ? (() => {
-            const currentWine = wines.find(w => w.id === activeSlide.packageWineId);
-            const wineSlides = localSlides.filter(s => s.packageWineId === activeSlide.packageWineId);
-            const slideNumber = wineSlides.findIndex(s => s.id === activeSlide.id) + 1;
-            const totalSlidesInWine = wineSlides.length;
-            
-            return (
-              <motion.div key={activeSlide.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                {/* Enhanced Breadcrumb Navigation */}
-                <div className="mb-6">
-                  <div className="flex items-center space-x-2 text-white/60 text-sm mb-3">
-                    <span className="text-white/80 font-medium">{editorData.name}</span>
-                    <ChevronRight className="w-4 h-4" />
-                    <span className="text-white/80 font-medium">{currentWine?.wineName}</span>
-                    <ChevronRight className="w-4 h-4" />
-                    <span className="text-white/80 font-medium">
-                      {sectionDetails[activeSlide.section_type as keyof typeof sectionDetails]?.icon || sectionDetails.deep_dive.icon} {sectionDetails[activeSlide.section_type as keyof typeof sectionDetails]?.title || sectionDetails.deep_dive.title}
-                    </span>
-                    <ChevronRight className="w-4 h-4" />
-                    <span className="text-purple-300 font-medium">Slide {slideNumber} of {totalSlidesInWine}</span>
-                  </div>
-                  
-                  {/* Slide Title and Type */}
-                  <div className="bg-gradient-to-r from-purple-900/30 to-transparent rounded-lg p-4 border border-purple-500/20">
-                    <h2 className="text-2xl font-bold text-white mb-1">
-                      {(activeSlide.payloadJson as any)?.title || 'Untitled Slide'}
-                    </h2>
-                    <div className="flex items-center space-x-3">
-                      <Badge className="bg-purple-600/20 text-purple-300">
-                        {activeSlide.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </Badge>
-                      <span className="text-white/50 text-sm">
-                        Position: {activeSlide.position}
-                      </span>
+        <div className={cn(
+          "flex-1 overflow-hidden",
+          isMobileView ? "flex flex-col" : "flex"
+        )}>
+          {/* Editor Panel */}
+          <div className={cn(
+            "p-6 overflow-y-auto",
+            isMobileView ? "flex-1" : `${isPreviewCollapsed ? 'flex-1' : 'flex-1'}`
+          )}>
+            {activeSlide ? (() => {
+              const currentWine = wines.find(w => w.id === activeSlide.packageWineId);
+              const wineSlides = localSlides.filter(s => s.packageWineId === activeSlide.packageWineId);
+              const slideNumber = wineSlides.findIndex(s => s.id === activeSlide.id) + 1;
+              const totalSlidesInWine = wineSlides.length;
+              
+              return (
+                <motion.div key={activeSlide.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                  {/* Enhanced Breadcrumb Navigation */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-2 text-white/60 text-sm">
+                        <span className="text-white/80 font-medium">{editorData.name}</span>
+                        <ChevronRight className="w-4 h-4" />
+                        <span className="text-white/80 font-medium">{currentWine?.wineName}</span>
+                        <ChevronRight className="w-4 h-4" />
+                        <span className="text-white/80 font-medium">
+                          {sectionDetails[activeSlide.section_type as keyof typeof sectionDetails]?.icon || sectionDetails.deep_dive.icon} {sectionDetails[activeSlide.section_type as keyof typeof sectionDetails]?.title || sectionDetails.deep_dive.title}
+                        </span>
+                        <ChevronRight className="w-4 h-4" />
+                        <span className="text-purple-300 font-medium">Slide {slideNumber} of {totalSlidesInWine}</span>
+                      </div>
+                      
+                    </div>
+                    
+                    {/* Slide Title and Type */}
+                    <div className="bg-gradient-to-r from-purple-900/30 to-transparent rounded-lg p-4 border border-purple-500/20">
+                      <h2 className="text-2xl font-bold text-white mb-1">
+                        {(activeSlide.payloadJson as any)?.title || 'Untitled Slide'}
+                      </h2>
+                      <div className="flex items-center space-x-3">
+                        <Badge className="bg-purple-600/20 text-purple-300">
+                          {activeSlide.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </Badge>
+                        <span className="text-white/50 text-sm">
+                          Position: {activeSlide.position}
+                        </span>
+                      </div>
                     </div>
                   </div>
+                  
+                  <SlideConfigPanel
+                    slide={activeSlide}
+                    onUpdate={handleSlideUpdate}
+                    onDelete={handleSlideDelete}
+                    onPreviewUpdate={handlePreviewUpdate}
+                  />
+                </motion.div>
+              );
+            })() : (
+              <div className="flex items-center justify-center h-full"><div className="text-center"><Settings className="h-12 w-12 text-white/40 mx-auto mb-4" /><h3 className="text-lg font-medium text-white mb-2">Select a Wine or Slide</h3><p className="text-white/60">Choose an item from the sidebar to begin editing.</p></div></div>
+            )}
+          </div>
+
+          {/* Mobile Preview Section - Slides up from bottom */}
+          <AnimatePresence>
+            {isMobileView && activeSlide && !isPreviewCollapsed && (
+              <motion.div
+                initial={{ y: "100%", opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: "100%", opacity: 0 }}
+                transition={{ duration: 0.4, ease: "easeInOut" }}
+                className="fixed inset-x-0 bottom-0 top-0 z-50 bg-gradient-to-br from-black/95 to-purple-900/95 backdrop-blur-xl border-t border-white/20 shadow-2xl flex flex-col"
+              >
+              <div className="p-4 border-b border-white/10 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <motion.div
+                      animate={{ 
+                        scale: [1, 1.1, 1],
+                        rotate: [0, 5, -5, 0]
+                      }}
+                      transition={{ 
+                        duration: 2,
+                        repeat: Infinity,
+                        repeatDelay: 3
+                      }}
+                    >
+                      <Eye className="w-4 h-4 text-purple-400" />
+                    </motion.div>
+                    <h3 className="text-sm font-medium text-white/90">Live Preview</h3>
+                    <Badge variant="outline" className="text-xs border-purple-400/40 text-purple-300 bg-purple-600/10">
+                      Real-time
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsPreviewCollapsed(!isPreviewCollapsed)}
+                    className="h-8 w-8 p-0 text-white/60 hover:text-white hover:bg-white/10 rounded-full"
+                  >
+                    <motion.div
+                      animate={{ rotate: isPreviewCollapsed ? 0 : 180 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <ChevronDownIcon className="w-4 h-4" />
+                    </motion.div>
+                  </Button>
                 </div>
-                
-                <SlideConfigPanel
-                  slide={activeSlide}
-                  onUpdate={handleSlideUpdate}
-                  onDelete={handleSlideDelete}
-                />
+              </div>
+              
+              {/* Mobile Navigation Controls */}
+                  {(() => {
+                    const wineSlides = localSlides.filter(s => s.packageWineId === activeSlide.packageWineId).sort((a, b) => a.position - b.position);
+                    const currentIndex = wineSlides.findIndex(s => s.id === activeSlideId);
+                    const canGoPrev = currentIndex > 0;
+                    const canGoNext = currentIndex < wineSlides.length - 1;
+                    
+                    return (
+                      <div className="p-3 border-b border-white/10 bg-black/10 flex-shrink-0">
+                        <div className="flex items-center justify-between">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigateToSlide('prev')}
+                            disabled={!canGoPrev}
+                            className="h-8 px-3 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+                          >
+                            <ChevronLeft className="w-4 h-4 mr-1" />
+                            Previous
+                          </Button>
+                          <div className="text-xs text-white/60 font-medium">
+                            Slide {currentIndex + 1} of {wineSlides.length}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigateToSlide('next')}
+                            disabled={!canGoNext}
+                            className="h-8 px-3 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+                          >
+                            Next
+                            <ChevronRight className="w-4 h-4 ml-1" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  
+                <div className="flex-1 overflow-y-auto">
+                  <div className="pt-4 pb-6 px-2 h-full">
+                    <SlidePreviewPanel 
+                      activeSlide={activeSlide ? getSlideWithLivePreview(activeSlide) : undefined} 
+                    />
+                  </div>
+                </div>
               </motion.div>
-            );
-          })() : (
-            <div className="flex items-center justify-center h-full"><div className="text-center"><Settings className="h-12 w-12 text-white/40 mx-auto mb-4" /><h3 className="text-lg font-medium text-white mb-2">Select a Wine or Slide</h3><p className="text-white/60">Choose an item from the sidebar to begin editing.</p></div></div>
+            )}
+          </AnimatePresence>
+
+          {/* Live Preview Panel - Responsive */}
+          {!isMobileView && !isPreviewCollapsed && (
+            <div className="w-80 border-l border-white/10 bg-gradient-to-br from-black/20 to-purple-900/20 backdrop-blur-sm">
+              <div className="p-4 border-b border-white/10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Eye className="w-4 h-4 text-white/70" />
+                    <h3 className="text-sm font-medium text-white/90">Live Preview</h3>
+                    <Badge variant="outline" className="text-xs border-white/30 text-white/60">
+                      Real-time
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsPreviewCollapsed(true)}
+                    className="h-6 w-6 p-0 text-white/60 hover:text-white hover:bg-white/10"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Navigation Controls */}
+              {activeSlide && (() => {
+                const wineSlides = localSlides.filter(s => s.packageWineId === activeSlide.packageWineId).sort((a, b) => a.position - b.position);
+                const currentIndex = wineSlides.findIndex(s => s.id === activeSlideId);
+                const canGoPrev = currentIndex > 0;
+                const canGoNext = currentIndex < wineSlides.length - 1;
+                
+                return (
+                  <div className="p-3 border-b border-white/10 bg-black/10">
+                    <div className="flex items-center justify-between">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigateToSlide('prev')}
+                        disabled={!canGoPrev}
+                        className="h-8 px-2 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+                      >
+                        <ChevronLeft className="w-4 h-4 mr-1" />
+                        Prev
+                      </Button>
+                      <div className="text-xs text-white/60 font-medium">
+                        {currentIndex + 1} of {wineSlides.length}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigateToSlide('next')}
+                        disabled={!canGoNext}
+                        className="h-8 px-2 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+                      >
+                        Next
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })()}
+              
+              <div className="h-full pb-16">
+                <SlidePreviewPanel 
+                  activeSlide={activeSlide ? getSlideWithLivePreview(activeSlide) : undefined} 
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Preview Collapse Button (Desktop) */}
+          {!isMobileView && isPreviewCollapsed && (
+            <div className="w-12 border-l border-white/10 bg-gradient-to-br from-black/20 to-purple-900/20 backdrop-blur-sm flex flex-col items-center justify-start pt-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsPreviewCollapsed(false)}
+                className="h-8 w-8 p-0 text-white/60 hover:text-white hover:bg-white/10 mb-2"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <div className="text-xs text-white/60 font-medium transform -rotate-90 mt-8">
+                Preview
+              </div>
+            </div>
+          )}
+
+          {/* Floating Preview Toggle for Mobile */}
+          {isMobileView && activeSlide && (
+            <motion.div
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.3, duration: 0.3 }}
+              className="fixed bottom-6 right-6 z-50"
+            >
+              <Button
+                onClick={() => setIsPreviewCollapsed(!isPreviewCollapsed)}
+                className={cn(
+                  "w-16 h-16 rounded-full shadow-2xl transition-all duration-300 flex items-center justify-center",
+                  isPreviewCollapsed 
+                    ? "bg-purple-600 hover:bg-purple-700 text-white shadow-purple-600/25 shadow-2xl" 
+                    : "bg-purple-600 hover:bg-purple-700 text-white shadow-purple-600/25"
+                )}
+              >
+                <motion.div
+                  animate={{ 
+                    rotate: isPreviewCollapsed ? 0 : 180
+                  }}
+                  transition={{ 
+                    duration: 0.4, 
+                    ease: "easeInOut"
+                  }}
+                >
+                  {isPreviewCollapsed ? (
+                    <Eye className="w-7 h-7" />
+                  ) : (
+                    <X className="w-7 h-7" />
+                  )}
+                </motion.div>
+              </Button>
+            </motion.div>
           )}
         </div>
       </div>

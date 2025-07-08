@@ -37,7 +37,9 @@
       "mcp__supabase__get_logs",
       "mcp__supabase__apply_migration",
       "Bash(mv:*)",
-      "mcp__supabase__list_tables"
+      "mcp__supabase__list_tables",
+      "Bash(PORT=5173 npm run dev)",
+      "Bash(npx tsc:*)"
     ],
     "deny": []
   },

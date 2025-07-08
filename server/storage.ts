@@ -1477,28 +1477,134 @@ export class DatabaseStorage implements IStorage {
         const slidePayload = slide.payloadJson as any;
 
         let comparison = null;
-        if (participantResponse && slideAnalytics) {
+        
+        // Always create a comparison object if user has answered, even without group data
+        if (participantResponse) {
           if (slidePayload.question_type === "scale") {
             const userAnswer = typeof participantResponse.answerJson === "number" 
               ? participantResponse.answerJson 
               : (participantResponse.answerJson as any)?.value || 0;
             
-            comparison = {
-              yourAnswer: userAnswer,
-              groupAverage: slideAnalytics.aggregatedData.averageScore || 0,
-              differenceFromGroup: userAnswer - (slideAnalytics.aggregatedData.averageScore || 0),
-              alignment: Math.abs(userAnswer - (slideAnalytics.aggregatedData.averageScore || 0)) <= 1 ? "close" : "different"
-            };
+            if (slideAnalytics && slideAnalytics.aggregatedData.averageScore !== undefined) {
+              // Group data available - calculate comparison
+              const groupAverage = slideAnalytics.aggregatedData.averageScore;
+              const difference = Math.abs(userAnswer - groupAverage);
+              
+              // More nuanced alignment calculation
+              let alignment: string;
+              let alignmentLevel: string;
+              if (difference === 0) {
+                alignment = "perfect";
+                alignmentLevel = "Perfectly Aligned";
+              } else if (difference <= 1) {
+                alignment = "close";
+                alignmentLevel = "Closely Aligned";
+              } else if (difference <= 2) {
+                alignment = "somewhat";
+                alignmentLevel = "Somewhat Aligned";
+              } else if (difference <= 4) {
+                alignment = "different";
+                alignmentLevel = "Different";
+              } else {
+                alignment = "unique";
+                alignmentLevel = "Unique Perspective";
+              }
+              
+              comparison = {
+                yourAnswer: userAnswer,
+                groupAverage: groupAverage,
+                differenceFromGroup: userAnswer - groupAverage,
+                alignment: alignment,
+                alignmentLevel: alignmentLevel,
+                percentageMatch: Math.max(0, 100 - (difference * 10)), // 0-100% match score
+                hasGroupData: true
+              };
+            } else {
+              // No group data - show skeleton with user's answer only
+              comparison = {
+                yourAnswer: userAnswer,
+                groupAverage: null,
+                differenceFromGroup: null,
+                alignment: "no_data",
+                alignmentLevel: "No Group Data Yet",
+                percentageMatch: null,
+                hasGroupData: false
+              };
+            }
           } else if (slidePayload.question_type === "multiple_choice") {
             const userSelections = (participantResponse.answerJson as any)?.selected || [];
-            const mostPopular = slideAnalytics.aggregatedData.optionsSummary
-              ?.sort((a: any, b: any) => b.percentage - a.percentage)[0];
+            const userSelectionsArray = Array.isArray(userSelections) ? userSelections : [userSelections];
+            const optionsSummary = slideAnalytics?.aggregatedData?.optionsSummary || [];
             
-            comparison = {
-              yourAnswer: Array.isArray(userSelections) ? userSelections : [userSelections],
-              mostPopular: mostPopular?.optionText || "N/A",
-              alignment: Array.isArray(userSelections) && userSelections.includes(mostPopular?.optionId) ? "agrees" : "unique"
-            };
+            if (optionsSummary.length === 0 || !slideAnalytics) {
+              // No group data - show skeleton with user's answer only
+              // Get option text from slide payload
+              const options = slidePayload.options || [];
+              const userAnswerTexts = userSelectionsArray.map((id: string) => {
+                const option = options.find((opt: any) => opt.id === id);
+                return option?.text || id;
+              });
+              
+              comparison = {
+                yourAnswer: userSelectionsArray,
+                yourAnswerText: userAnswerTexts,
+                mostPopular: "No group data yet",
+                mostPopularPercentage: 0,
+                alignment: "no_data",
+                alignmentLevel: "No Group Data Yet",
+                consensusScore: 0,
+                hasGroupData: false
+              };
+            } else {
+              // Sort options by popularity
+              const sortedOptions = optionsSummary.sort((a: any, b: any) => b.percentage - a.percentage);
+              const topTwoOptions = sortedOptions.slice(0, 2);
+              const top50PercentOptions = sortedOptions.filter((opt: any) => opt.percentage >= 10); // At least 10% popularity
+              
+              // Calculate alignment score
+              let matchedPopularChoices = 0;
+              let totalPopularityMatched = 0;
+              
+              userSelectionsArray.forEach((userChoice: string) => {
+                const matchedOption = sortedOptions.find((opt: any) => opt.optionId === userChoice);
+                if (matchedOption) {
+                  totalPopularityMatched += matchedOption.percentage;
+                  if (topTwoOptions.find(opt => opt.optionId === userChoice)) {
+                    matchedPopularChoices++;
+                  }
+                }
+              });
+              
+              // Determine alignment level
+              let alignment: string;
+              let alignmentLevel: string;
+              
+              if (matchedPopularChoices >= 2) {
+                alignment = "strong_consensus";
+                alignmentLevel = "Strong Consensus";
+              } else if (userSelectionsArray.includes(sortedOptions[0]?.optionId)) {
+                alignment = "agrees";
+                alignmentLevel = "Aligned";
+              } else if (userSelectionsArray.some((choice: string) => 
+                top50PercentOptions.find((opt: any) => opt.optionId === choice))) {
+                alignment = "partial";
+                alignmentLevel = "Partial Alignment";
+              } else {
+                alignment = "unique";
+                alignmentLevel = "Unique Taste";
+              }
+              
+              comparison = {
+                yourAnswer: userSelectionsArray,
+                mostPopular: sortedOptions[0]?.optionText || "N/A",
+                mostPopularPercentage: sortedOptions[0]?.percentage || 0,
+                alignment: alignment,
+                alignmentLevel: alignmentLevel,
+                consensusScore: Math.round(totalPopularityMatched), // Total % popularity of user's choices
+                matchedPopularChoices: matchedPopularChoices,
+                hasGroupData: true
+              };
+            }
           }
         }
 
