@@ -263,7 +263,23 @@ export default function TastingSession() {
       return sectionType === 'ending' || sectionType === 'conclusion';
     }).sort((a, b) => a.position - b.position);
     
-
+    // Debug logging for ending slides
+    if (wine && endingSlides.length === 0) {
+      console.warn(`⚠️ No ending slides found for wine: ${wine.wineName}`, {
+        wineId: wine.id,
+        totalSlides: wineSlides.length,
+        sections: wineSlides.map(s => s.section_type || s.payloadJson?.section_type || 'unknown')
+      });
+    } else if (wine && endingSlides.length > 0) {
+      console.log(`✅ Found ${endingSlides.length} ending slides for wine: ${wine.wineName}`, {
+        wineId: wine.id,
+        endingSlides: endingSlides.map(s => ({
+          title: (s.payloadJson as any)?.title || 'Untitled',
+          position: s.position,
+          section: s.section_type
+        }))
+      });
+    }
     
     // Combine in proper order: Intro → Deep Dive → Ending
     acc[wineId] = [...introSlides, ...deepDiveSlides, ...endingSlides];
@@ -276,6 +292,17 @@ export default function TastingSession() {
     .flatMap(wine => sortedSlidesByWine[wine.id] || []);
   
   const slides = [...packageIntroSlides, ...wineSlides];
+  
+  // Debug: Log total slides and section breakdown
+  console.log(`📊 Total slides loaded: ${slides.length}`, {
+    packageIntroSlides: packageIntroSlides.length,
+    wineSlides: wineSlides.length,
+    slidesBySection: slides.reduce((acc, slide) => {
+      const section = slide.section_type || slide.payloadJson?.section_type || 'unknown';
+      acc[section] = (acc[section] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
+  });
     
   const currentSlide = slides[currentSlideIndex];
   const currentWine = currentSlide ? wines.find(w => w.id === currentSlide.packageWineId) : null;
@@ -380,6 +407,12 @@ export default function TastingSession() {
 
   // Navigation functions
   const goToNextSlide = async () => {
+    console.log(`📍 Navigation: Current slide ${currentSlideIndex + 1}/${slides.length}`, {
+      currentSlide: currentSlide?.payloadJson?.title || 'Unknown',
+      currentSection: currentSlide?.section_type,
+      isLastSlide: currentSlideIndex >= slides.length - 1
+    });
+    
     if (currentSlideIndex < slides.length - 1) {
       const nextSlide = slides[currentSlideIndex + 1];
       const nextWine = wines.find(w => w.id === nextSlide.packageWineId);

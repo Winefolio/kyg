@@ -29,7 +29,7 @@ import {
   wineCharacteristics,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, inArray, desc, gte, lt } from "drizzle-orm";
+import { eq, and, inArray, desc, gte, lt, asc } from "drizzle-orm";
 import crypto from "crypto";
 
 // Utility function to generate unique short codes
@@ -151,6 +151,7 @@ export interface IStorage {
   
   // Batch operations
   batchUpdateSlidePositions(updates: { slideId: string; position: number; packageWineId?: string }[]): Promise<void>;
+  normalizeSlidePositions(packageWineId: string): Promise<void>;
   
   // Slide duplication
   duplicateWineSlides(sourceWineId: string, targetWineId: string, replaceExisting: boolean): Promise<{ count: number; slides: Slide[] }>;
@@ -2539,6 +2540,30 @@ export class DatabaseStorage implements IStorage {
     });
   }
   
+  // NEW: Normalize slide positions for a wine to ensure clean sequential numbering
+  async normalizeSlidePositions(packageWineId: string): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Get all slides for this wine ordered by current position
+      const wineSlides = await tx
+        .select({
+          id: slides.id,
+          position: slides.position
+        })
+        .from(slides)
+        .where(eq(slides.packageWineId, packageWineId))
+        .orderBy(asc(slides.position));
+
+      // Renumber slides sequentially starting from 1
+      for (let i = 0; i < wineSlides.length; i++) {
+        const newPosition = i + 1;
+        await tx
+          .update(slides)
+          .set({ position: newPosition })
+          .where(eq(slides.id, wineSlides[i].id));
+      }
+    });
+  }
+  
   // NEW: Batch update slide positions with proper constraint handling
   async batchUpdateSlidePositions(updates: { slideId: string; position: number; packageWineId?: string }[]) {
     if (updates.length === 0) return;
@@ -2599,6 +2624,9 @@ export class DatabaseStorage implements IStorage {
             })
             .where(eq(slides.id, update.slideId));
         }
+        
+        // After successful batch update, normalize positions for this wine
+        await this.normalizeSlidePositions(wineId);
       });
     }
   }
@@ -2706,12 +2734,22 @@ export class DatabaseStorage implements IStorage {
 
             duplicatedSlides.push(createdSlide);
           } catch (error) {
-            // If position conflict still occurs, use a unique timestamp-based position
+            // If position conflict still occurs, find the next available position
             if (error instanceof Error && error.message.includes('duplicate key')) {
-              const fallbackPosition = Date.now() % 1000000; // Use timestamp as fallback
+              console.warn(`Position conflict for slide ${sourceSlide.type} at position ${newPosition}, finding next available position`);
+              
+              // Find the highest position currently in use for this wine
+              const currentSlides = await tx.select({ position: slides.position })
+                .from(slides)
+                .where(eq(slides.packageWineId, targetWineId))
+                .orderBy(desc(slides.position))
+                .limit(1);
+              
+              const nextAvailablePosition = (currentSlides[0]?.position || 0) + 1;
+              
               const fallbackSlideData = {
                 ...newSlideData,
-                position: fallbackPosition
+                position: nextAvailablePosition
               };
               
               const [createdSlide] = await tx.insert(slides)
@@ -2719,6 +2757,7 @@ export class DatabaseStorage implements IStorage {
                 .returning();
 
               duplicatedSlides.push(createdSlide);
+              console.log(`Assigned fallback position ${nextAvailablePosition} to slide ${sourceSlide.type}`);
             } else {
               throw error;
             }
@@ -2727,6 +2766,9 @@ export class DatabaseStorage implements IStorage {
       });
 
       console.log(`✅ Duplicated ${duplicatedSlides.length} slides from wine ${sourceWineId} to wine ${targetWineId}`);
+      
+      // Normalize positions after duplication to ensure clean sequential numbering
+      await this.normalizeSlidePositions(targetWineId);
       
       return {
         count: duplicatedSlides.length,
