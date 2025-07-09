@@ -9,6 +9,7 @@ import { TooltipInfoPanel } from '@/components/ui/TooltipInfoPanel';
 import { Progress } from '@/components/ui/progress';
 import { useGlossarySafe } from '@/contexts/GlossaryContext';
 import { useHaptics } from '@/hooks/useHaptics';
+import { useDebounce } from '@/hooks/useDebounce';
 import { Info, BookOpen } from 'lucide-react';
 import { ModernButton } from '@/components/ui/modern-button';
 
@@ -34,6 +35,39 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
   const terms = glossaryContext?.terms || [];
   const { triggerHaptic } = useHaptics();
   
+  // Debounce the value to reduce the number of onChange calls
+  const debouncedValue = useDebounce(localValue, 300);
+  
+  // MASSIVE DEBUG LOGGING - Component Lifecycle
+  useEffect(() => {
+    console.log('🟢 [TextQuestion MOUNT] Component mounted:', {
+      questionTitle: question.title,
+      initialValue: value,
+      timestamp: new Date().toISOString(),
+      componentId: Math.random().toString(36).substring(7)
+    });
+    
+    return () => {
+      console.log('🔴 [TextQuestion UNMOUNT] Component unmounting:', {
+        questionTitle: question.title,
+        finalValue: localValue,
+        isFocused,
+        activeElement: document.activeElement?.tagName,
+        timestamp: new Date().toISOString()
+      });
+    };
+  }, []);
+  
+  // Log every render
+  console.log('🔄 [TextQuestion RENDER]:', {
+    questionTitle: question.title,
+    localValue,
+    isFocused,
+    isInfoPanelOpen,
+    debouncedValue,
+    timestamp: new Date().toISOString()
+  });
+  
   // Extract all relevant glossary terms from the current slide content
   const relevantTerms = useMemo(() => {
     const allText = [question.title, question.description || ''].join(' ');
@@ -42,16 +76,42 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
   
   // Sync with external value
   useEffect(() => {
+    console.log('📥 [TextQuestion SYNC] External value changed:', {
+      oldValue: localValue,
+      newValue: value,
+      timestamp: new Date().toISOString()
+    });
     setLocalValue(value);
   }, [value]);
+  
+  // Call onChange when debounced value changes
+  useEffect(() => {
+    if (debouncedValue !== value) {
+      console.log('⏱️ [TextQuestion DEBOUNCE] Debounced onChange triggered:', {
+        debouncedValue,
+        previousValue: value,
+        timestamp: new Date().toISOString()
+      });
+      onChange(debouncedValue);
+    }
+  }, [debouncedValue, onChange, value]);
 
   const handleChange = (newValue: string) => {
+    console.log('✏️ [TextQuestion INPUT] handleChange called:', {
+      currentValue: localValue,
+      newValue,
+      valueLength: newValue.length,
+      isFocused,
+      timestamp: new Date().toISOString()
+    });
+    
     // Respect maxLength if provided
     if (question.maxLength && newValue.length > question.maxLength) {
+      console.log('🚫 [TextQuestion LIMIT] Max length reached:', question.maxLength);
       return;
     }
     setLocalValue(newValue);
-    onChange(newValue);
+    // onChange is now triggered by the debounced value effect
   };
 
   const characterCount = localValue.length;
@@ -114,8 +174,21 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
               <Textarea
                 value={localValue}
                 onChange={(e) => handleChange(e.target.value)}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
+                onFocus={() => {
+                  console.log('🎯 [TextQuestion FOCUS] Textarea focused:', {
+                    timestamp: new Date().toISOString(),
+                    previousActiveElement: document.activeElement?.tagName
+                  });
+                  setIsFocused(true);
+                }}
+                onBlur={() => {
+                  console.log('👋 [TextQuestion BLUR] Textarea blurred:', {
+                    timestamp: new Date().toISOString(),
+                    newActiveElement: document.activeElement?.tagName,
+                    finalValue: localValue
+                  });
+                  setIsFocused(false);
+                }}
                 placeholder={question.placeholder || "Type your answer here..."}
                 rows={question.rows || 4}
                 className={`
