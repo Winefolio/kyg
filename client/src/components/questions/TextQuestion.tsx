@@ -58,6 +58,15 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
     };
   }, []);
   
+  // Debug every render
+  console.log('🔄 [TextQuestion RENDER]:', {
+    questionTitle: question.title,
+    currentValue: value,
+    localValue,
+    isFocused,
+    timestamp: new Date().toISOString()
+  });
+  
   // Log every render
   console.log('🔄 [TextQuestion RENDER]:', {
     questionTitle: question.title,

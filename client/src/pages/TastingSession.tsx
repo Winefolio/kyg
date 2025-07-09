@@ -389,8 +389,16 @@ export default function TastingSession() {
     currentSlideId: currentSlide?.id,
     currentSlideType: currentSlide?.type,
     currentSlideTitle: currentSlide?.payloadJson?.title,
+    isNavigating,
+    isSaving,
     timestamp: new Date().toISOString()
   });
+  
+  // Prevent rendering if slides aren't loaded yet or if we're in an invalid state
+  if (!slides || slides.length === 0 || !currentSlide) {
+    console.log('⚠️ [RENDER GUARD] Preventing render due to missing slides or currentSlide');
+    return <LoadingOverlay />;
+  }
   
   const currentWine = currentSlide && wines ? wines.find(w => w.id === currentSlide.packageWineId) : null;
   const isPackageLevelSlide = currentSlide && currentSlide.packageId && !currentSlide.packageWineId;
@@ -476,10 +484,9 @@ export default function TastingSession() {
     
     if (!slides || slides.length === 0) return;
     
-    // Prevent navigation if save is in progress
+    // Don't block navigation for saves - let them happen in background
     if (isSaving) {
-      console.log('🛑 [NAVIGATION BLOCKED] Save in progress');
-      return;
+      console.log('⚠️ [NAVIGATION WITH SAVE] Navigation proceeding while save in progress');
     }
     
     // Check if we're dealing with a text question
@@ -562,28 +569,20 @@ export default function TastingSession() {
           activeElement.blur();
         }
         
-        // Check if we're leaving a text question
-        const isLeavingTextQuestion = currentSlide?.type === 'question' && 
-          (currentSlide?.payloadJson?.questionType === 'text' || 
-           currentSlide?.payloadJson?.question_type === 'text');
+        // Standard navigation for all slide types
+        setIsNavigating(true);
+        triggerHaptic('success');
         
-        if (isLeavingTextQuestion) {
-          console.log('🚨 [TEXT NAVIGATION] Special handling for text question navigation');
-          // For text questions, add a small delay to ensure save completes
-          setTimeout(() => {
-            setCurrentSlideIndex(currentSlideIndex + 1);
-            setCompletedSlides(prev => [...prev, currentSlideIndex]);
-          }, 100); // Small delay to ensure save completes
-        } else {
-          setIsNavigating(true);
-          triggerHaptic('success');
-          
-          setTimeout(() => {
-            setCurrentSlideIndex(currentSlideIndex + 1);
-            setCompletedSlides(prev => [...prev, currentSlideIndex]);
-            setIsNavigating(false);
-          }, TRANSITION_DURATIONS.slideNavigation);
-        }
+        // Use a shorter delay for text questions to prevent race conditions
+        const navigationDelay = (currentSlide?.type === 'question' && 
+          (currentSlide?.payloadJson?.questionType === 'text' || 
+           currentSlide?.payloadJson?.question_type === 'text')) ? 50 : TRANSITION_DURATIONS.slideNavigation;
+        
+        setTimeout(() => {
+          setCurrentSlideIndex(currentSlideIndex + 1);
+          setCompletedSlides(prev => [...prev, currentSlideIndex]);
+          setIsNavigating(false);
+        }, navigationDelay);
       }
     }
   };
@@ -663,6 +662,7 @@ export default function TastingSession() {
       timestamp: new Date().toISOString()
     });
     
+    // Update answers state immediately for UI responsiveness
     setAnswers(prev => {
       const newAnswers = { ...prev, [slideId]: answer };
       console.log('📝 [STATE UPDATE] Answers state updated:', {
@@ -673,6 +673,7 @@ export default function TastingSession() {
       return newAnswers;
     });
     
+    // Save response in background without blocking UI
     if (participantId) {
       setIsSaving(true);
       try {
@@ -681,7 +682,8 @@ export default function TastingSession() {
       } catch (error) {
         console.error('❌ [SAVE ERROR] Error saving response:', error);
       } finally {
-        setIsSaving(false);
+        // Use setTimeout to ensure isSaving is updated after any pending state changes
+        setTimeout(() => setIsSaving(false), 0);
       }
     }
   };
@@ -706,6 +708,9 @@ export default function TastingSession() {
       currentSlideId: currentSlide?.id,
       currentSlideType: currentSlide?.type,
       currentSlideIndex,
+      totalSlides: slides?.length,
+      isNavigating,
+      isSaving,
       timestamp: new Date().toISOString()
     });
     
@@ -1462,6 +1467,13 @@ export default function TastingSession() {
                   transition={{ duration: 0.2 }}
                   className="min-h-full flex flex-col justify-center max-w-2xl mx-auto w-full"
                   style={{ position: 'relative' }}
+                  onAnimationComplete={() => {
+                    console.log('🎬 [ANIMATION] Slide animation complete:', {
+                      slideId: currentSlide.id,
+                      slideIndex: currentSlideIndex,
+                      timestamp: new Date().toISOString()
+                    });
+                  }}
                 >
                   <DebugErrorBoundary name="SlideContent">
                     {renderSlideContent()}
