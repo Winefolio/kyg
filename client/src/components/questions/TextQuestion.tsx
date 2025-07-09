@@ -93,7 +93,7 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
     setLocalValue(value);
   }, [value]);
   
-  // Call onChange when debounced value changes
+  // Call onChange when debounced value changes - with additional safety checks
   useEffect(() => {
     if (debouncedValue !== value) {
       console.log('⏱️ [TextQuestion DEBOUNCE] Debounced onChange triggered:', {
@@ -101,7 +101,10 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
         previousValue: value,
         timestamp: new Date().toISOString()
       });
-      onChange(debouncedValue);
+      // Use requestAnimationFrame to ensure DOM is updated before onChange
+      requestAnimationFrame(() => {
+        onChange(debouncedValue);
+      });
     }
   }, [debouncedValue, onChange, value]);
 

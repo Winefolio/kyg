@@ -395,8 +395,20 @@ export default function TastingSession() {
   });
   
   // Prevent rendering if slides aren't loaded yet or if we're in an invalid state
-  if (!slides || slides.length === 0 || !currentSlide) {
-    console.log('⚠️ [RENDER GUARD] Preventing render due to missing slides or currentSlide');
+  if (!slides || slides.length === 0) {
+    console.log('⚠️ [RENDER GUARD] Preventing render due to missing slides');
+    return <LoadingOverlay />;
+  }
+  
+  // Handle case where currentSlideIndex is out of bounds
+  if (currentSlideIndex >= slides.length || currentSlideIndex < 0) {
+    console.log('⚠️ [RENDER GUARD] currentSlideIndex out of bounds:', {
+      currentSlideIndex,
+      slidesLength: slides.length,
+      timestamp: new Date().toISOString()
+    });
+    // Reset to valid index instead of showing loading
+    setCurrentSlideIndex(Math.min(currentSlideIndex, slides.length - 1));
     return <LoadingOverlay />;
   }
   
@@ -715,11 +727,16 @@ export default function TastingSession() {
     });
     
     if (!currentSlide) {
-      console.log('⚠️ [RENDER SLIDE] No current slide, returning null');
-      return null;
+      console.log('⚠️ [RENDER SLIDE] No current slide, returning fallback content');
+      return (
+        <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl text-center">
+          <p className="text-white">No slide data available</p>
+          <p className="text-white/60 text-sm mt-2">Slide index: {currentSlideIndex}</p>
+        </div>
+      );
     }
 
-    console.log('🔀 [RENDER SLIDE] Entering switch for type:', currentSlide.type);
+    console.log('🔀 [RENDER SLIDE] Entering switch for type:', currentSlide.type, 'with payload:', currentSlide.payloadJson);
     
     switch (currentSlide.type) {
       case 'interlude':
@@ -1457,30 +1474,11 @@ export default function TastingSession() {
 
           {/* Main slide content */}
           <div className="flex-grow overflow-y-auto p-3">
-            <AnimatePresence mode="wait">
-              {currentSlide && (
-                <motion.div
-                  key={`slide-${currentSlideIndex}-${currentSlide.id}`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.2 }}
-                  className="min-h-full flex flex-col justify-center max-w-2xl mx-auto w-full"
-                  style={{ position: 'relative' }}
-                  onAnimationComplete={() => {
-                    console.log('🎬 [ANIMATION] Slide animation complete:', {
-                      slideId: currentSlide.id,
-                      slideIndex: currentSlideIndex,
-                      timestamp: new Date().toISOString()
-                    });
-                  }}
-                >
-                  <DebugErrorBoundary name="SlideContent">
-                    {renderSlideContent()}
-                  </DebugErrorBoundary>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <div key={`slide-wrapper-${currentSlideIndex}`} className="min-h-full flex flex-col justify-center max-w-2xl mx-auto w-full">
+              <DebugErrorBoundary name="SlideContent">
+                {renderSlideContent()}
+              </DebugErrorBoundary>
+            </div>
           </div>
 
           {/* Navigation footer */}
