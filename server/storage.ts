@@ -2585,66 +2585,120 @@ export class DatabaseStorage implements IStorage {
   async batchUpdateSlidePositions(updates: { slideId: string; position: number; packageWineId?: string }[]) {
     if (updates.length === 0) return;
     
-    // Group by wine to handle constraints
-    const updatesByWine = new Map<string, typeof updates>();
+    console.log(`🔄 Starting optimized batch update for ${updates.length} slides`);
     
-    // First get all slides to know their wine IDs
-    const slideData = await Promise.all(
-      updates.map(u => this.getSlideById(u.slideId))
-    );
+    // Use single atomic transaction for all updates with deadlock retry
+    const maxRetries = 3;
+    let retryCount = 0;
     
-    // Group updates
-    updates.forEach((update, index) => {
-      const slide = slideData[index];
-      if (slide) {
-        const targetWineId = update.packageWineId || slide.packageWineId;
-        if (!targetWineId) return; // Skip slides without wine assignment
-        if (!updatesByWine.has(targetWineId)) {
-          updatesByWine.set(targetWineId, []);
+    while (retryCount <= maxRetries) {
+      try {
+        await db.transaction(async (tx) => {
+          // Get all affected slides in single query
+          const slideIds = updates.map(u => u.slideId);
+          const existingSlides = await tx
+            .select()
+            .from(slides)
+            .where(inArray(slides.id, slideIds));
+          
+          console.log(`📊 Found ${existingSlides.length} existing slides to update`);
+          
+          // Group updates by target wine ID
+          const updatesByWine = new Map<string, Array<{ slideId: string; position: number; packageWineId?: string; existingSlide: any }>>();
+          
+          updates.forEach(update => {
+            const existingSlide = existingSlides.find(s => s.id === update.slideId);
+            if (!existingSlide) {
+              console.warn(`⚠️ Slide ${update.slideId} not found, skipping`);
+              return;
+            }
+            
+            const targetWineId = update.packageWineId || existingSlide.packageWineId;
+            if (!targetWineId) {
+              console.warn(`⚠️ No wine ID for slide ${update.slideId}, skipping`);
+              return;
+            }
+            
+            if (!updatesByWine.has(targetWineId)) {
+              updatesByWine.set(targetWineId, []);
+            }
+            updatesByWine.get(targetWineId)!.push({ ...update, existingSlide });
+          });
+          
+          console.log(`🍷 Processing ${updatesByWine.size} wine groups`);
+          
+          // Process all wines in single transaction using gap-based positioning
+          for (const [wineId, wineUpdates] of Array.from(updatesByWine.entries())) {
+            console.log(`🔄 Processing wine ${wineId} with ${wineUpdates.length} slides`);
+            
+            // Use large gap-based positioning to minimize constraint conflicts
+            const GAP_SIZE = 1000;
+            const BASE_POSITION = 100000;
+            
+            // Sort updates by target position to maintain order
+            const sortedUpdates = [...wineUpdates].sort((a, b) => a.position - b.position);
+            
+            // Calculate temp positions with large gaps
+            const tempPositions = sortedUpdates.map((_, index) => BASE_POSITION + (index * GAP_SIZE));
+            
+            // First pass: Move all slides to temporary positions with large gaps
+            // This avoids constraint violations during the reordering process
+            for (let i = 0; i < sortedUpdates.length; i++) {
+              const update = sortedUpdates[i];
+              const tempPosition = tempPositions[i];
+              
+              await tx
+                .update(slides)
+                .set({ 
+                  position: tempPosition,
+                  ...(update.packageWineId && { packageWineId: update.packageWineId })
+                })
+                .where(eq(slides.id, update.slideId));
+            }
+            
+            // Second pass: Move to final positions using gap-based system
+            for (let i = 0; i < sortedUpdates.length; i++) {
+              const update = sortedUpdates[i];
+              // Use gap-based final positions to allow easy future insertions
+              const finalPosition = update.position * GAP_SIZE;
+              
+              await tx
+                .update(slides)
+                .set({ position: finalPosition })
+                .where(eq(slides.id, update.slideId));
+            }
+            
+            console.log(`✅ Completed wine ${wineId} updates`);
+          }
+          
+          console.log(`✅ All slide positions updated successfully`);
+        });
+        
+        // If we reach here, transaction succeeded
+        break;
+        
+      } catch (error: any) {
+        retryCount++;
+        
+        // Check if it's a deadlock or serialization failure
+        const isRetryableError = 
+          error.code === '40001' || // serialization_failure
+          error.code === '40P01' || // deadlock_detected
+          error.message?.includes('deadlock') ||
+          error.message?.includes('serialization');
+        
+        if (isRetryableError && retryCount <= maxRetries) {
+          console.warn(`⚠️ Retryable error on attempt ${retryCount}/${maxRetries}: ${error.message}`);
+          // Exponential backoff: wait 100ms, 400ms, 1600ms
+          const backoffMs = Math.pow(4, retryCount - 1) * 100;
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+          continue;
         }
-        updatesByWine.get(targetWineId)!.push(update);
+        
+        // Non-retryable error or max retries exceeded
+        console.error(`❌ Failed to update slide positions after ${retryCount} attempts:`, error);
+        throw error;
       }
-    });
-    
-    // Process each wine in a transaction
-    for (const [wineId, wineUpdates] of Array.from(updatesByWine.entries())) {
-      await db.transaction(async (tx) => {
-        // Get all current slides for this wine
-        const currentSlides = await tx
-          .select()
-          .from(slides)
-          .where(eq(slides.packageWineId, wineId));
-        
-        // Find max position
-        const maxPosition = Math.max(...currentSlides.map(s => s.position), 0);
-        const tempOffset = Math.max(maxPosition + 10000, 100000);
-        
-        // Sort updates by target position
-        const sortedUpdates = [...wineUpdates].sort((a, b) => a.position - b.position);
-        
-        // First pass: move to temp positions
-        for (let i = 0; i < sortedUpdates.length; i++) {
-          const update = sortedUpdates[i];
-          await tx
-            .update(slides)
-            .set({ position: tempOffset + i })
-            .where(eq(slides.id, update.slideId));
-        }
-        
-        // Second pass: move to final positions
-        for (const update of sortedUpdates) {
-          await tx
-            .update(slides)
-            .set({ 
-              position: update.position,
-              ...(update.packageWineId && { packageWineId: update.packageWineId })
-            })
-            .where(eq(slides.id, update.slideId));
-        }
-        
-        // After successful batch update, normalize positions for this wine
-        await this.normalizeSlidePositions(wineId);
-      });
     }
   }
 

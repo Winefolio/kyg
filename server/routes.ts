@@ -1218,9 +1218,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Reorder slides - Fixed version with proper constraint handling
   app.put("/api/slides/reorder", async (req, res) => {
+    console.log(`🔥 SLIDE REORDER ENDPOINT HIT!`, {
+      method: req.method,
+      url: req.url,
+      headers: req.headers,
+      bodyType: typeof req.body,
+      bodyKeys: req.body ? Object.keys(req.body) : 'no body',
+      timestamp: new Date().toISOString()
+    });
+    
     try {
       const { updates } = req.body;
       if (!Array.isArray(updates)) {
+        console.error(`❌ Updates is not an array:`, { updates, type: typeof updates });
         return res.status(400).json({ message: "Updates must be an array" });
       }
       

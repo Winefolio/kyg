@@ -23,7 +23,15 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
       );
     `);
     
-    const mediaTableExists = mediaTableCheck.rows[0]?.exists;
+    // Handle different response structures from different database clients
+    let mediaTableExists = false;
+    if (mediaTableCheck.rows && mediaTableCheck.rows[0]) {
+      mediaTableExists = mediaTableCheck.rows[0].exists;
+    } else if (Array.isArray(mediaTableCheck) && mediaTableCheck[0]) {
+      mediaTableExists = mediaTableCheck[0].exists;
+    } else {
+      console.warn('[DB_CHECK] Unexpected database response structure:', mediaTableCheck);
+    }
     
     if (!mediaTableExists) {
       console.error('[DB_CHECK] ❌ CRITICAL: Media table is missing!');
