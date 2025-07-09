@@ -569,9 +569,11 @@ export default function TastingSession() {
         
         if (isLeavingTextQuestion) {
           console.log('🚨 [TEXT NAVIGATION] Special handling for text question navigation');
-          // For text questions, update immediately without animation delay
-          setCurrentSlideIndex(currentSlideIndex + 1);
-          setCompletedSlides(prev => [...prev, currentSlideIndex]);
+          // For text questions, add a small delay to ensure save completes
+          setTimeout(() => {
+            setCurrentSlideIndex(currentSlideIndex + 1);
+            setCompletedSlides(prev => [...prev, currentSlideIndex]);
+          }, 100); // Small delay to ensure save completes
         } else {
           setIsNavigating(true);
           triggerHaptic('success');
