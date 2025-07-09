@@ -171,7 +171,7 @@ export function useSessionPersistence() {
   }, []);
 
   // Save response with offline support - ONLY if session is active
-  const saveResponse = async (participantId: string, slideId: string, answerJson: any) => {
+  const saveResponse = async (participantId: string, slideId: string, answerJson: any): Promise<void> => {
     // Only save if we have an active session
     if (!activeSession || activeSession.participantId !== participantId) {
       console.warn('Cannot save response: no active session');
@@ -218,6 +218,8 @@ export function useSessionPersistence() {
         setSyncStatus('synced');
       } catch (error) {
         setSyncStatus('pending');
+        // Don't throw - we've saved offline, so this is recoverable
+        console.warn('Failed to sync response, saved offline:', error);
       }
     } else {
       setSyncStatus('offline');
