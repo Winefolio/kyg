@@ -2586,6 +2586,21 @@ export class DatabaseStorage implements IStorage {
     if (updates.length === 0) return;
     
     console.log(`🔄 Starting optimized batch update for ${updates.length} slides`);
+    console.log('📊 Updates to process:', updates.map(u => `${u.slideId.slice(0, 8)}... -> pos ${u.position}`));
+    
+    // Validate: Check for duplicate positions within the same update batch
+    const positionsByWine = new Map<string, Set<number>>();
+    for (const update of updates) {
+      const wineId = update.packageWineId || 'unknown';
+      if (!positionsByWine.has(wineId)) {
+        positionsByWine.set(wineId, new Set());
+      }
+      const winePositions = positionsByWine.get(wineId)!;
+      if (winePositions.has(update.position)) {
+        throw new Error(`Duplicate position ${update.position} detected for wine ${wineId} in update batch`);
+      }
+      winePositions.add(update.position);
+    }
     
     // Use single atomic transaction for all updates with deadlock retry
     const maxRetries = 3;
@@ -2631,41 +2646,56 @@ export class DatabaseStorage implements IStorage {
           for (const [wineId, wineUpdates] of Array.from(updatesByWine.entries())) {
             console.log(`🔄 Processing wine ${wineId} with ${wineUpdates.length} slides`);
             
+            // Collect all positions that will be used by the updates
+            const targetPositions = new Set(wineUpdates.map(u => u.position));
+            
+            // Find ALL slides that currently occupy these target positions
+            const slidesAtTargetPositions = await tx
+              .select()
+              .from(slides)
+              .where(
+                and(
+                  eq(slides.packageWineId, wineId),
+                  inArray(slides.position, Array.from(targetPositions))
+                )
+              );
+            
+            console.log(`🎯 Found ${slidesAtTargetPositions.length} slides at target positions that need to be moved`);
+            
             // Use large gap-based positioning to minimize constraint conflicts
             const GAP_SIZE = 1000;
-            const BASE_POSITION = 100000;
+            // Use a very high range for temporary positions to avoid any conflicts
+            const TEMP_BASE_POSITION = 900000000;
             
-            // Sort updates by target position to maintain order
-            const sortedUpdates = [...wineUpdates].sort((a, b) => a.position - b.position);
+            // First, move ALL slides that are at target positions to temp positions
+            // This includes slides that might not be in the updates array but are blocking target positions
+            let tempIndex = 0;
+            for (const blockingSlide of slidesAtTargetPositions) {
+              const tempPosition = TEMP_BASE_POSITION + (tempIndex * GAP_SIZE);
+              tempIndex++;
+              
+              await tx
+                .update(slides)
+                .set({ position: tempPosition })
+                .where(eq(slides.id, blockingSlide.id));
+              
+              console.log(`📍 Moved blocking slide ${blockingSlide.id} to temp position ${tempPosition}`);
+            }
             
-            // Calculate temp positions with large gaps
-            const tempPositions = sortedUpdates.map((_, index) => BASE_POSITION + (index * GAP_SIZE));
-            
-            // First pass: Move all slides to temporary positions with large gaps
-            // This avoids constraint violations during the reordering process
-            for (let i = 0; i < sortedUpdates.length; i++) {
-              const update = sortedUpdates[i];
-              const tempPosition = tempPositions[i];
+            // Second pass: Now safely move slides to their final positions
+            for (const update of wineUpdates) {
+              // Frontend already sends gap-based positions, use them directly
+              const finalPosition = update.position;
               
               await tx
                 .update(slides)
                 .set({ 
-                  position: tempPosition,
+                  position: finalPosition,
                   ...(update.packageWineId && { packageWineId: update.packageWineId })
                 })
                 .where(eq(slides.id, update.slideId));
-            }
-            
-            // Second pass: Move to final positions using gap-based system
-            for (let i = 0; i < sortedUpdates.length; i++) {
-              const update = sortedUpdates[i];
-              // Use gap-based final positions to allow easy future insertions
-              const finalPosition = update.position * GAP_SIZE;
               
-              await tx
-                .update(slides)
-                .set({ position: finalPosition })
-                .where(eq(slides.id, update.slideId));
+              console.log(`✅ Moved slide ${update.slideId} to final position ${finalPosition}`);
             }
             
             console.log(`✅ Completed wine ${wineId} updates`);

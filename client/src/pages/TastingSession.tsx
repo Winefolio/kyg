@@ -23,6 +23,7 @@ import { SectionTransition } from "@/components/SectionTransition";
 import { VideoMessageSlide } from "@/components/slides/VideoMessageSlide";
 import { AudioMessageSlide } from "@/components/slides/AudioMessageSlide";
 import { TransitionSlide } from "@/components/slides/TransitionSlide";
+import { DebugErrorBoundary } from "@/components/DebugErrorBoundary";
 import type { Slide, Participant, Session, Package, VideoMessagePayload, AudioMessagePayload, TransitionPayload } from "@shared/schema";
 
 // Configurable transition durations (in milliseconds)
@@ -68,6 +69,7 @@ export default function TastingSession() {
     wine: any;
     isFirstWine: boolean;
   } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const { saveResponse, syncStatus, initializeForSession, endSession } = useSessionPersistence();
   const { triggerHaptic } = useHaptics();
   const queryClient = useQueryClient();
@@ -78,6 +80,33 @@ export default function TastingSession() {
       initializeForSession(sessionId, participantId);
     }
   }, [sessionId, participantId, initializeForSession]);
+  
+  // Log state changes
+  useEffect(() => {
+    console.log('🔄 [STATE CHANGE] currentSlideIndex changed:', {
+      newIndex: currentSlideIndex,
+      timestamp: new Date().toISOString()
+    });
+  }, [currentSlideIndex]);
+  
+  // Monitor focus changes globally
+  useEffect(() => {
+    const handleFocusChange = () => {
+      console.log('🔍 [GLOBAL FOCUS] Focus changed:', {
+        activeElement: document.activeElement?.tagName,
+        isTextarea: document.activeElement?.tagName === 'TEXTAREA',
+        timestamp: new Date().toISOString()
+      });
+    };
+    
+    document.addEventListener('focusin', handleFocusChange);
+    document.addEventListener('focusout', handleFocusChange);
+    
+    return () => {
+      document.removeEventListener('focusin', handleFocusChange);
+      document.removeEventListener('focusout', handleFocusChange);
+    };
+  }, []);
 
   // Get session details including status - handle both session ID and package code
   const { data: currentSession, isLoading: sessionDetailsLoading } = useQuery<Session & { packageCode?: string }>({
@@ -351,7 +380,18 @@ export default function TastingSession() {
     return isLast;
   }
 
+  // CRITICAL STATE CALCULATION - Log everything
   const currentSlide = slides && slides[currentSlideIndex] ? slides[currentSlideIndex] : null;
+  console.log('🔍 [CURRENT SLIDE CALC]:', {
+    currentSlideIndex,
+    slidesLength: slides?.length,
+    currentSlideExists: !!currentSlide,
+    currentSlideId: currentSlide?.id,
+    currentSlideType: currentSlide?.type,
+    currentSlideTitle: currentSlide?.payloadJson?.title,
+    timestamp: new Date().toISOString()
+  });
+  
   const currentWine = currentSlide && wines ? wines.find(w => w.id === currentSlide.packageWineId) : null;
   const isPackageLevelSlide = currentSlide && currentSlide.packageId && !currentSlide.packageWineId;
 
@@ -424,13 +464,30 @@ export default function TastingSession() {
 
   // Navigation functions
   const goToNextSlide = async () => {
+    console.log('🚀 [NAVIGATION START] goToNextSlide called:', {
+      currentSlideIndex,
+      totalSlides: slides?.length,
+      isSaving,
+      isNavigating,
+      activeElement: document.activeElement?.tagName,
+      activeElementClass: document.activeElement?.className,
+      timestamp: new Date().toISOString()
+    });
+    
     if (!slides || slides.length === 0) return;
     
-    console.log(`📍 Navigation: Current slide ${currentSlideIndex + 1}/${slides.length}`, {
-      currentSlide: currentSlide?.payloadJson?.title || 'Unknown',
-      currentSection: currentSlide?.section_type,
-      isLastSlide: currentSlideIndex >= slides.length - 1
-    });
+    // Prevent navigation if save is in progress
+    if (isSaving) {
+      console.log('🛑 [NAVIGATION BLOCKED] Save in progress');
+      return;
+    }
+    
+    // Check if we're dealing with a text question
+    if (currentSlide?.type === 'question' && 
+        (currentSlide?.payloadJson?.questionType === 'text' || 
+         currentSlide?.payloadJson?.question_type === 'text')) {
+      console.log('🔍 [TEXT SLIDE] Navigating from text response slide');
+    }
     
     if (currentSlideIndex < slides.length - 1) {
       const nextSlide = slides[currentSlideIndex + 1];
@@ -496,14 +553,35 @@ export default function TastingSession() {
         setShowSectionTransition(true);
         triggerHaptic('success');
       } else {
-        setIsNavigating(true);
-        triggerHaptic('success');
+        console.log('🎬 [NAVIGATION SIMPLE] No transition needed, moving to next slide');
         
-        setTimeout(() => {
+        // Force blur before navigation
+        const activeElement = document.activeElement;
+        if (activeElement instanceof HTMLElement) {
+          // Force blur - critical for text response navigation bug
+          activeElement.blur();
+        }
+        
+        // Check if we're leaving a text question
+        const isLeavingTextQuestion = currentSlide?.type === 'question' && 
+          (currentSlide?.payloadJson?.questionType === 'text' || 
+           currentSlide?.payloadJson?.question_type === 'text');
+        
+        if (isLeavingTextQuestion) {
+          console.log('🚨 [TEXT NAVIGATION] Special handling for text question navigation');
+          // For text questions, update immediately without animation delay
           setCurrentSlideIndex(currentSlideIndex + 1);
           setCompletedSlides(prev => [...prev, currentSlideIndex]);
-          setIsNavigating(false);
-        }, TRANSITION_DURATIONS.slideNavigation);
+        } else {
+          setIsNavigating(true);
+          triggerHaptic('success');
+          
+          setTimeout(() => {
+            setCurrentSlideIndex(currentSlideIndex + 1);
+            setCompletedSlides(prev => [...prev, currentSlideIndex]);
+            setIsNavigating(false);
+          }, TRANSITION_DURATIONS.slideNavigation);
+        }
       }
     }
   };
@@ -536,6 +614,12 @@ export default function TastingSession() {
 
   const goToPreviousSlide = () => {
     if (currentSlideIndex > 0) {
+      // Prevent navigation if save is in progress
+      if (isSaving) {
+        console.log('[TextResponse Debug] Navigation blocked - save in progress');
+        return;
+      }
+      
       setIsNavigating(true);
       triggerHaptic('selection');
       
@@ -549,6 +633,12 @@ export default function TastingSession() {
 
   const jumpToSlide = (slideIndex: number) => {
     if (slideIndex !== currentSlideIndex) {
+      // Prevent navigation if save is in progress
+      if (isSaving) {
+        console.log('[TextResponse Debug] Navigation blocked - save in progress');
+        return;
+      }
+      
       setIsNavigating(true);
       triggerHaptic('selection');
       
@@ -561,10 +651,36 @@ export default function TastingSession() {
   };
 
   // Handle answer changes
-  const handleAnswerChange = (slideId: string, answer: any) => {
-    setAnswers(prev => ({ ...prev, [slideId]: answer }));
+  const handleAnswerChange = async (slideId: string, answer: any) => {
+    console.log('💾 [ANSWER CHANGE] handleAnswerChange triggered:', { 
+      slideId, 
+      answer, 
+      participantId,
+      currentSlideId: currentSlide?.id,
+      answersBeforeUpdate: { ...answers },
+      timestamp: new Date().toISOString()
+    });
+    
+    setAnswers(prev => {
+      const newAnswers = { ...prev, [slideId]: answer };
+      console.log('📝 [STATE UPDATE] Answers state updated:', {
+        oldAnswers: prev,
+        newAnswers,
+        changedSlideId: slideId
+      });
+      return newAnswers;
+    });
+    
     if (participantId) {
-      saveResponse(participantId, slideId, answer);
+      setIsSaving(true);
+      try {
+        await saveResponse(participantId, slideId, answer);
+        console.log('✅ [SAVE COMPLETE] Response saved successfully');
+      } catch (error) {
+        console.error('❌ [SAVE ERROR] Error saving response:', error);
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -583,8 +699,21 @@ export default function TastingSession() {
 
   // Render current slide content
   const renderSlideContent = () => {
-    if (!currentSlide) return null;
+    console.log('🎨 [RENDER SLIDE] renderSlideContent called:', {
+      currentSlideExists: !!currentSlide,
+      currentSlideId: currentSlide?.id,
+      currentSlideType: currentSlide?.type,
+      currentSlideIndex,
+      timestamp: new Date().toISOString()
+    });
+    
+    if (!currentSlide) {
+      console.log('⚠️ [RENDER SLIDE] No current slide, returning null');
+      return null;
+    }
 
+    console.log('🔀 [RENDER SLIDE] Entering switch for type:', currentSlide.type);
+    
     switch (currentSlide.type) {
       case 'interlude':
         const isPackageIntro = currentSlide.payloadJson.is_package_intro;
@@ -852,6 +981,13 @@ export default function TastingSession() {
         }
 
         if (questionData.questionType === 'text' || questionData.question_type === 'text') {
+          console.log('📝 [RENDER TEXT] Rendering TextQuestion component:', {
+            slideId: currentSlide.id,
+            title: questionData.title || questionData.question,
+            currentValue: answers[currentSlide.id],
+            timestamp: new Date().toISOString()
+          });
+          
           return (
             <TextQuestion
               question={{
@@ -1315,16 +1451,21 @@ export default function TastingSession() {
           {/* Main slide content */}
           <div className="flex-grow overflow-y-auto p-3">
             <AnimatePresence mode="wait">
-              <motion.div
-                key={currentSlide?.id || currentSlideIndex}
-                initial={{ opacity: 0, x: isNavigating ? (currentSlideIndex > 0 ? 30 : -30) : 0, y: 20, scale: 0.95 }}
-                animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
-                exit={{ opacity: 0, x: isNavigating ? (currentSlideIndex < slides.length - 1 ? -30 : 30) : 0, y: -20, scale: 0.95 }}
-                transition={TRANSITION_DURATIONS.slideAnimation}
-                className="min-h-full flex flex-col justify-center max-w-2xl mx-auto w-full"
-              >
-                {renderSlideContent()}
-              </motion.div>
+              {currentSlide && (
+                <motion.div
+                  key={`slide-${currentSlideIndex}-${currentSlide.id}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.2 }}
+                  className="min-h-full flex flex-col justify-center max-w-2xl mx-auto w-full"
+                  style={{ position: 'relative' }}
+                >
+                  <DebugErrorBoundary name="SlideContent">
+                    {renderSlideContent()}
+                  </DebugErrorBoundary>
+                </motion.div>
+              )}
             </AnimatePresence>
           </div>
 
@@ -1334,7 +1475,7 @@ export default function TastingSession() {
               <Button
                 variant="ghost"
                 onClick={goToPreviousSlide}
-                disabled={currentSlideIndex === 0 || isNavigating}
+                disabled={currentSlideIndex === 0 || isNavigating || isSaving}
                 className="text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
@@ -1365,7 +1506,7 @@ export default function TastingSession() {
               <Button
                 variant={currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro ? "default" : "ghost"}
                 onClick={currentSlideIndex >= slides.length - 1 ? handleComplete : goToNextSlide}
-                disabled={isNavigating}
+                disabled={isNavigating || isSaving}
                 className={
                   currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro
                     ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold px-3 sm:px-4 md:px-6 py-1.5 sm:py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 transform hover:scale-105 active:scale-100 text-[14px] sm:text-sm md:text-base min-h-[44px] flex items-center justify-center"
@@ -1373,14 +1514,20 @@ export default function TastingSession() {
                 }
               >
                 <span className="hidden sm:inline">
-                  {currentSlideIndex >= slides.length - 1 ? 'Complete' : 
+                  {isSaving ? 'Saving...' :
+                   currentSlideIndex >= slides.length - 1 ? 'Complete' : 
                    (currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro) ? 'Continue Your Wine Journey' : 'Next'}
                 </span>
                 <span className="sm:hidden">
-                  {currentSlideIndex >= slides.length - 1 ? 'Complete' : 
+                  {isSaving ? 'Saving...' :
+                   currentSlideIndex >= slides.length - 1 ? 'Complete' : 
                    (currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro) ? 'Continue' : 'Next'}
                 </span>
-                <ArrowRight className="w-4 h-4 ml-2" />
+                {isSaving ? (
+                  <div className="w-4 h-4 ml-2 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                ) : (
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                )}
               </Button>
             </div>
           </div>
