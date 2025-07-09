@@ -123,7 +123,37 @@ export default function PackageEditor() {
     // Sync from server data when it changes
     if (editorData) {
       const sortedWines = [...(editorData.wines || [])].sort((a, b) => a.position - b.position);
-      const sortedSlides = [...(editorData.slides || [])].sort((a, b) => a.position - b.position);
+      let sortedSlides = [...(editorData.slides || [])].sort((a, b) => a.position - b.position);
+      
+      // Convert legacy positions to gap-based positions
+      const needsPositionMigration = sortedSlides.some(s => s.position < 100000);
+      if (needsPositionMigration) {
+        console.log('🔄 Migrating legacy slide positions to gap-based system');
+        const slidesByWine = new Map<string, typeof sortedSlides>();
+        
+        // Group slides by wine
+        sortedSlides.forEach(slide => {
+          const wineId = slide.packageWineId!;
+          if (!slidesByWine.has(wineId)) {
+            slidesByWine.set(wineId, []);
+          }
+          slidesByWine.get(wineId)!.push(slide);
+        });
+        
+        // Assign new gap-based positions
+        const updatedSlides: typeof sortedSlides = [];
+        slidesByWine.forEach((wineSlides, wineId) => {
+          const sortedWineSlides = wineSlides.sort((a, b) => a.position - b.position);
+          sortedWineSlides.forEach((slide, index) => {
+            updatedSlides.push({
+              ...slide,
+              position: 100000 + (index * 1000)
+            });
+          });
+        });
+        
+        sortedSlides = updatedSlides.sort((a, b) => a.position - b.position);
+      }
 
       setWines(sortedWines);
       setSlides(sortedSlides);
@@ -284,10 +314,12 @@ export default function PackageEditor() {
   const reorderSlidesMutation = useMutation({
     mutationFn: (updates: { slideId: string; position: number; packageWineId?: string }[]) => 
       apiRequest('PUT', '/api/slides/reorder', { updates }),
-    onSuccess: async () => {
+    onSuccess: () => {
+      // Show subtle success confirmation
       toast({ 
-        title: "Slide order updated", 
-        description: "Changes saved successfully",
+        title: "Saved", 
+        description: "Slide order updated successfully",
+        duration: 2000,
       });
       // Clear all pending state after successful save
       setPendingReorders(new Map());
@@ -296,21 +328,8 @@ export default function PackageEditor() {
       setHasUnsavedChanges(false);
       setIsSavingOrder(false);
       
-      // Force synchronous data refresh to prevent state desync
-      console.log('🔄 Forcing synchronous query refresh after successful reorder');
-      await queryClient.refetchQueries({ 
-        queryKey: [`/api/packages/${code}/editor`],
-        exact: true 
-      });
-      
-      // Get fresh data and update local state immediately
-      const freshData = queryClient.getQueryData([`/api/packages/${code}/editor`]) as any;
-      if (freshData?.slides) {
-        console.log('✅ Updating localSlides with fresh data after reorder');
-        const sortedSlides = freshData.slides.sort((a: any, b: any) => a.position - b.position);
-        setLocalSlides(sortedSlides);
-        originalSlidesRef.current = sortedSlides;
-      }
+      // No need for synchronous refetch - optimistic updates already applied
+      console.log('✅ Slide reorder completed - using optimistic updates');
     },
     onError: (error: any) => {
       console.error('❌ Slide reorder mutation failed:', error);
@@ -342,26 +361,14 @@ export default function PackageEditor() {
       });
       setIsSavingOrder(false);
       
-      // Revert to original state on error
-      if (originalSlidesRef.current.length > 0) {
-        const sortedOriginal = [...originalSlidesRef.current].sort((a, b) => a.position - b.position);
-        setLocalSlides(sortedOriginal);
-        setSlides(sortedOriginal);
-        setPendingReorders(new Map());
-        setActivelyMovingSlide(null);
-        setHasUnsavedChanges(false);
-        
-        // Force data refresh to get latest server state
-        queryClient.invalidateQueries({ 
-          queryKey: [`/api/packages/${code}/editor`],
-          exact: true 
-        });
-        
-        toast({
-          title: "Changes reverted",
-          description: "Your changes have been reverted and data refreshed",
-        });
-      }
+      // Rollback optimistic updates immediately
+      console.log('↩️ Rolling back optimistic updates due to error');
+      setLocalSlides(originalSlidesRef.current);
+      
+      // Reset state without refetch
+      setPendingReorders(new Map());
+      setActivelyMovingSlide(null);
+      setHasUnsavedChanges(false);
     },
   });
 
@@ -413,15 +420,8 @@ export default function PackageEditor() {
         console.warn(`⚠️ Position ${update.position} may conflict with slide ${existingSlideWithPosition.id} - server will validate with fresh data`);
       }
       
-      // Check for legacy position ranges that should not be used
-      if (update.position < 100000) {
-        errors.push(`Update ${index + 1}: Position ${update.position} is in legacy range, use positions >= 100000`);
-      }
-      
-      // Check for proper gap-based positioning (positions should be multiples of 1000 + base)
-      if ((update.position - 100000) % 1000 !== 0 && update.position >= 100000) {
-        errors.push(`Update ${index + 1}: Position ${update.position} doesn't follow gap-based system (should be 100000 + n*1000)`);
-      }
+      // Legacy positions are now handled by automatic migration, so we don't need to error on them
+      // The backend will handle the actual position assignments
     });
     
     return errors;
@@ -455,11 +455,12 @@ export default function PackageEditor() {
     });
   }, [code, queryClient, toast]);
 
-  // Simplified direct slide reorder function
+  // Optimistic slide reorder function with immediate UI updates
   const performSlideReorder = useCallback(async (updates: Array<{ slideId: string; position: number; packageWineId: string }>) => {
     if (updates.length === 0) return;
     
-    // Prevent concurrent operations
+    // Prevent concurrent operations on the same slides
+    const slidesBeingMoved = new Set(updates.map(u => u.slideId));
     if (isProcessingQueue) {
       console.log('⏳ Operation already in progress, skipping duplicate request');
       toast({
@@ -470,7 +471,7 @@ export default function PackageEditor() {
       return;
     }
     
-    console.log('🔄 Starting direct slide reorder:', updates);
+    console.log('🔄 Starting optimistic slide reorder:', updates);
     setIsProcessingQueue(true);
     setIsSavingOrder(true);
     
@@ -482,93 +483,89 @@ export default function PackageEditor() {
         toast({
           title: "Validation Error",
           description: `Invalid slide data: ${validationErrors[0]}. Try refreshing the page.`,
-          variant: "destructive",
-          action: {
-            altText: "Refresh Data",
-            onClick: forceDataRefresh
-          }
+          variant: "destructive"
         });
         return;
       }
       
-      // Execute the reorder mutation directly
-      console.log('🌐 About to make API request to /api/slides/reorder');
+      // Apply optimistic updates immediately for instant UI feedback
+      console.log('⚡ Applying optimistic updates to local state');
+      const optimisticSlides = [...localSlides];
+      updates.forEach(update => {
+        const slideIndex = optimisticSlides.findIndex(s => s.id === update.slideId);
+        if (slideIndex !== -1) {
+          optimisticSlides[slideIndex] = {
+            ...optimisticSlides[slideIndex],
+            position: update.position,
+            packageWineId: update.packageWineId
+          };
+        }
+      });
+      
+      // Sort and apply immediately
+      const sortedOptimisticSlides = optimisticSlides.sort((a, b) => a.position - b.position);
+      setLocalSlides(sortedOptimisticSlides);
+      console.log('✅ Optimistic updates applied - UI should update immediately');
+      
+      // Show brief success indicator
+      toast({
+        title: "Slide moved",
+        description: "Saving changes...",
+        duration: 2000,
+      });
+      
+      // Clear the actively moving slide indicator after a short delay
+      setTimeout(() => {
+        setActivelyMovingSlide(null);
+      }, 300);
+      
+      // Execute the reorder mutation in the background
+      console.log('🌐 Making API request to /api/slides/reorder (background)');
       console.log('📦 Request payload:', { updates });
       
-      await new Promise<void>((resolve, reject) => {
-        reorderSlidesMutation.mutate(updates, {
-          onSuccess: () => {
-            console.log('✅ Slide reorder completed successfully');
-            // Clear pending state
-            setPendingReorders(new Map());
-            setActivelyMovingSlide(null);
-            setHasUnsavedChanges(false);
-            resolve();
-          },
-          onError: (error) => {
-            console.error('❌ Slide reorder failed:', error);
-            console.error('🔍 Error details:', {
-              message: error.message,
-              stack: error.stack,
-              error: error
-            });
-            reject(error);
-          }
-        });
+      // Unblock UI immediately after optimistic updates
+      setIsProcessingQueue(false);
+      setIsSavingOrder(false);
+      
+      // Make the API call asynchronously
+      reorderSlidesMutation.mutate(updates, {
+        onSuccess: () => {
+          console.log('✅ Slide reorder completed successfully (background)');
+          // Clear pending state
+          setPendingReorders(new Map());
+          setHasUnsavedChanges(false);
+          
+          // Update originalSlidesRef to reflect the new state
+          originalSlidesRef.current = sortedOptimisticSlides;
+        },
+        onError: (error) => {
+          console.error('❌ Slide reorder failed (background):', error);
+          // Error handling is done in the mutation's onError callback
+          // which includes rollback logic
+        }
       });
       
     } catch (error) {
-      console.error('❌ Slide reorder failed:', error);
+      console.error('❌ Slide reorder validation failed:', error);
       
-      // Enhanced error handling
+      // Only handle validation errors here (API errors are handled in mutation callbacks)
       const errorMessage = error instanceof Error ? error.message : String(error);
       
-      if (errorMessage.includes('timeout') || errorMessage.includes('57014')) {
-        toast({
-          title: "Request Timeout",
-          description: "The operation took too long. Please try again with fewer slides.",
-          variant: "destructive"
-        });
-      } else if (errorMessage.includes('constraint') || errorMessage.includes('position') || errorMessage.includes('occupied')) {
-        toast({
-          title: "Position Conflict",
-          description: "A position conflict occurred. Click to refresh data and try again.",
-          variant: "destructive",
-          action: {
-            altText: "Refresh Data",
-            onClick: forceDataRefresh
-          }
-        });
-        // Force refresh to resolve conflicts
-        await forceDataRefresh();
-      } else {
-        toast({
-          title: "Operation Failed",
-          description: `Failed to reorder slides: ${errorMessage}. Try refreshing the page.`,
-          variant: "destructive",
-          action: {
-            altText: "Refresh Data",
-            onClick: forceDataRefresh
-          }
-        });
-      }
+      toast({
+        title: "Validation Error",
+        description: `Failed to validate slide data: ${errorMessage}`,
+        variant: "destructive"
+      });
       
-      // Revert local state on error
+      // Revert optimistic updates on validation error
       setLocalSlides(originalSlidesRef.current);
       setPendingReorders(new Map());
       setActivelyMovingSlide(null);
       setHasUnsavedChanges(false);
-      
-    } finally {
       setIsProcessingQueue(false);
       setIsSavingOrder(false);
-      
-      // Clear actively moving slide indicator
-      setTimeout(() => {
-        setActivelyMovingSlide(null);
-      }, 500);
     }
-  }, [isProcessingQueue, toast, reorderSlidesMutation, queryClient, code]);
+  }, [isProcessingQueue, toast, reorderSlidesMutation, localSlides, originalSlidesRef, forceDataRefresh, validateSlideUpdates]);
 
   // --- HELPER FUNCTIONS ---
   const getNextPositionForWine = (wineId: string): number => {
@@ -903,23 +900,68 @@ export default function PackageEditor() {
     reorderedSlides.splice(wineSlideIndex, 1);
     reorderedSlides.splice(wineTargetIndex, 0, slide);
     
-    // Assign conflict-free positions using the new generation function
-    const updates: Array<{ slideId: string; position: number; packageWineId: string }> = [];
+    // Check if slides have legacy positions that need migration
+    const hasLegacyPositions = allWineSlides.some(s => s.position < 100000);
     
-    // Generate conflict-free positions starting from 100000+ to avoid all conflicts
-    const startPosition = 100000;
-    const newPositions = generateConflictFreePositions(reorderedSlides, startPosition);
+    let updates: Array<{ slideId: string; position: number; packageWineId: string }> = [];
     
-    reorderedSlides.forEach((reorderedSlide, index) => {
-      const newPosition = newPositions[index];
-      if (reorderedSlide.position !== newPosition) {
-        updates.push({ 
-          slideId: reorderedSlide.id, 
-          position: newPosition, 
-          packageWineId: reorderedSlide.packageWineId! 
+    if (hasLegacyPositions) {
+      // If legacy positions exist, assign new gap-based positions to all slides
+      console.log('🔄 Detected legacy positions, converting to gap-based system');
+      
+      // Reorder slides as requested
+      const reorderedSlides = [...allWineSlides];
+      reorderedSlides.splice(wineSlideIndex, 1);
+      reorderedSlides.splice(wineTargetIndex, 0, slide);
+      
+      // Assign new gap-based positions
+      reorderedSlides.forEach((reorderedSlide, index) => {
+        const newPosition = 100000 + (index * 1000);
+        updates.push({
+          slideId: reorderedSlide.id,
+          position: newPosition,
+          packageWineId: reorderedSlide.packageWineId!
+        });
+      });
+    } else {
+      // Smart position assignment - only update positions that need to change
+      // Only update positions for the slides that actually moved
+      if (direction === 'up' && wineTargetIndex >= 0) {
+        // Moving up: only swap positions with the slide above
+        const targetSlide = allWineSlides[wineTargetIndex];
+        const currentSlide = allWineSlides[wineSlideIndex];
+        
+        console.log(`🔄 Swapping positions: ${currentSlide.type} (pos ${currentSlide.position}) ↔️ ${targetSlide.type} (pos ${targetSlide.position})`);
+        
+        updates.push({
+          slideId: currentSlide.id,
+          position: targetSlide.position,
+          packageWineId: currentSlide.packageWineId!
+        });
+        updates.push({
+          slideId: targetSlide.id,
+          position: currentSlide.position,
+          packageWineId: targetSlide.packageWineId!
+        });
+      } else if (direction === 'down' && wineTargetIndex < allWineSlides.length) {
+        // Moving down: only swap positions with the slide below
+        const targetSlide = allWineSlides[wineTargetIndex];
+        const currentSlide = allWineSlides[wineSlideIndex];
+        
+        console.log(`🔄 Swapping positions: ${currentSlide.type} (pos ${currentSlide.position}) ↔️ ${targetSlide.type} (pos ${targetSlide.position})`);
+        
+        updates.push({
+          slideId: currentSlide.id,
+          position: targetSlide.position,
+          packageWineId: currentSlide.packageWineId!
+        });
+        updates.push({
+          slideId: targetSlide.id,
+          position: currentSlide.position,
+          packageWineId: targetSlide.packageWineId!
         });
       }
-    });
+    }
     
     // Update local state with new positions
     const newLocalSlides = localSlides.map(s => {
