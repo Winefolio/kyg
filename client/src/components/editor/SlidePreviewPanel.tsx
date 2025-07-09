@@ -81,7 +81,7 @@ function renderSlideContent(slide: Slide) {
     case 'question':
       // Check for new generic_questions format first
       if (slide.genericQuestions) {
-        const gq = slide.genericQuestions;
+        const gq = slide.genericQuestions as any; // Type assertion for unknown type
         
         switch (gq.format) {
           case 'multiple_choice':
@@ -89,12 +89,12 @@ function renderSlideContent(slide: Slide) {
               <PreviewWrapper>
                 <MultipleChoiceQuestion
                   question={{
-                    title: gq.config.title,
-                    description: gq.config.description || '',
+                    title: gq.config?.title || 'Untitled Question',
+                    description: gq.config?.description || '',
                     category: gq.metadata?.category || 'Question',
-                    options: gq.config.options || [],
-                    allow_multiple: gq.config.allowMultiple || false,
-                    allow_notes: gq.config.allowNotes || false
+                    options: gq.config?.options || [],
+                    allow_multiple: gq.config?.allowMultiple || false,
+                    allow_notes: gq.config?.allowNotes || false
                   }}
                   value={{ selected: [], notes: '' }}
                   onChange={dummyHandlers.onChange}
@@ -107,14 +107,14 @@ function renderSlideContent(slide: Slide) {
               <PreviewWrapper>
                 <ScaleQuestion
                   question={{
-                    title: gq.config.title,
-                    description: gq.config.description || '',
+                    title: gq.config?.title || 'Scale Question',
+                    description: gq.config?.description || '',
                     category: gq.metadata?.category || 'Scale',
-                    scale_min: gq.config.scaleMin || 1,
-                    scale_max: gq.config.scaleMax || 10,
-                    scale_labels: gq.config.scaleLabels || ['Low', 'High']
+                    scale_min: gq.config?.scaleMin || 1,
+                    scale_max: gq.config?.scaleMax || 10,
+                    scale_labels: gq.config?.scaleLabels || ['Low', 'High']
                   }}
-                  value={Math.floor(((gq.config.scaleMin || 1) + (gq.config.scaleMax || 10)) / 2)}
+                  value={Math.floor(((gq.config?.scaleMin || 1) + (gq.config?.scaleMax || 10)) / 2)}
                   onChange={dummyHandlers.onChange}
                 />
               </PreviewWrapper>
@@ -125,13 +125,13 @@ function renderSlideContent(slide: Slide) {
               <PreviewWrapper>
                 <TextQuestion
                   question={{
-                    title: gq.config.title,
-                    description: gq.config.description,
-                    placeholder: (gq.config as any).placeholder,
-                    maxLength: (gq.config as any).maxLength,
-                    minLength: (gq.config as any).minLength,
-                    rows: (gq.config as any).rows,
-                    category: gq.config.category
+                    title: gq.config?.title || 'Text Question',
+                    description: gq.config?.description || '',
+                    placeholder: gq.config?.placeholder || 'Enter your response...',
+                    maxLength: gq.config?.maxLength || 500,
+                    minLength: gq.config?.minLength,
+                    rows: gq.config?.rows || 4,
+                    category: gq.config?.category || 'Response'
                   }}
                   value=""
                   onChange={dummyHandlers.onChange}
@@ -144,13 +144,13 @@ function renderSlideContent(slide: Slide) {
               <PreviewWrapper>
                 <BooleanQuestion
                   question={{
-                    title: gq.config.title,
-                    description: gq.config.description,
-                    category: gq.config.category,
-                    trueLabel: (gq.config as any).trueLabel,
-                    falseLabel: (gq.config as any).falseLabel,
-                    trueIcon: (gq.config as any).trueIcon,
-                    falseIcon: (gq.config as any).falseIcon
+                    title: gq.config?.title || 'Boolean Question',
+                    description: gq.config?.description || '',
+                    category: gq.config?.category || 'Yes/No',
+                    trueLabel: gq.config?.trueLabel || 'Yes',
+                    falseLabel: gq.config?.falseLabel || 'No',
+                    trueIcon: gq.config?.trueIcon !== false,
+                    falseIcon: gq.config?.falseIcon !== false
                   }}
                   value={null}
                   onChange={dummyHandlers.onChange}
@@ -161,19 +161,19 @@ function renderSlideContent(slide: Slide) {
       }
 
       // Fallback to legacy payloadJson format
-      const questionData = slide.payloadJson;
+      const questionData = slide.payloadJson as any; // Type assertion for unknown type
       
-      if (questionData.questionType === 'multiple_choice' || questionData.question_type === 'multiple_choice') {
+      if (questionData?.questionType === 'multiple_choice' || questionData?.question_type === 'multiple_choice') {
         return (
           <PreviewWrapper>
             <MultipleChoiceQuestion
               question={{
-                title: questionData.title || questionData.question,
-                description: questionData.description || '',
-                category: questionData.category || 'Question',
-                options: questionData.options || [],
-                allow_multiple: questionData.allow_multiple || questionData.allowMultiple || false,
-                allow_notes: questionData.allow_notes || questionData.allowNotes || false
+                title: questionData?.title || questionData?.question || 'Untitled Question',
+                description: questionData?.description || '',
+                category: questionData?.category || 'Question',
+                options: questionData?.options || [],
+                allow_multiple: questionData?.allow_multiple || questionData?.allowMultiple || false,
+                allow_notes: questionData?.allow_notes || questionData?.allowNotes || false
               }}
               value={{ selected: [], notes: '' }}
               onChange={dummyHandlers.onChange}
@@ -182,37 +182,37 @@ function renderSlideContent(slide: Slide) {
         );
       }
 
-      if (questionData.questionType === 'scale' || questionData.question_type === 'scale') {
+      if (questionData?.questionType === 'scale' || questionData?.question_type === 'scale') {
         return (
           <PreviewWrapper>
             <ScaleQuestion
               question={{
-                title: questionData.title || questionData.question,
-                description: questionData.description || '',
-                category: questionData.category || 'Scale',
-                scale_min: questionData.scale_min || questionData.scaleMin || 1,
-                scale_max: questionData.scale_max || questionData.scaleMax || 10,
-                scale_labels: questionData.scale_labels || questionData.scaleLabels || ['Low', 'High']
+                title: questionData?.title || questionData?.question || 'Scale Question',
+                description: questionData?.description || '',
+                category: questionData?.category || 'Scale',
+                scale_min: questionData?.scale_min || questionData?.scaleMin || 1,
+                scale_max: questionData?.scale_max || questionData?.scaleMax || 10,
+                scale_labels: questionData?.scale_labels || questionData?.scaleLabels || ['Low', 'High']
               }}
-              value={Math.floor(((questionData.scale_min || questionData.scaleMin || 1) + (questionData.scale_max || questionData.scaleMax || 10)) / 2)}
+              value={Math.floor(((questionData?.scale_min || questionData?.scaleMin || 1) + (questionData?.scale_max || questionData?.scaleMax || 10)) / 2)}
               onChange={dummyHandlers.onChange}
             />
           </PreviewWrapper>
         );
       }
 
-      if (questionData.questionType === 'text' || questionData.question_type === 'text') {
+      if (questionData?.questionType === 'text' || questionData?.question_type === 'text') {
         return (
           <PreviewWrapper>
             <TextQuestion
               question={{
-                title: questionData.title || questionData.question,
-                description: questionData.description || '',
-                placeholder: questionData.placeholder || '',
-                maxLength: questionData.maxLength || questionData.max_length || 500,
-                minLength: questionData.minLength || questionData.min_length,
-                rows: questionData.rows || 4,
-                category: questionData.category || 'Text Response'
+                title: questionData?.title || questionData?.question || 'Text Question',
+                description: questionData?.description || '',
+                placeholder: questionData?.placeholder || 'Enter your response...',
+                maxLength: questionData?.maxLength || questionData?.max_length || 500,
+                minLength: questionData?.minLength || questionData?.min_length,
+                rows: questionData?.rows || 4,
+                category: questionData?.category || 'Text Response'
               }}
               value=""
               onChange={dummyHandlers.onChange}
@@ -221,18 +221,18 @@ function renderSlideContent(slide: Slide) {
         );
       }
 
-      if (questionData.questionType === 'boolean' || questionData.question_type === 'boolean') {
+      if (questionData?.questionType === 'boolean' || questionData?.question_type === 'boolean') {
         return (
           <PreviewWrapper>
             <BooleanQuestion
               question={{
-                title: questionData.title || questionData.question,
-                description: questionData.description || '',
-                category: questionData.category || 'Yes/No',
-                trueLabel: questionData.trueLabel || questionData.true_label,
-                falseLabel: questionData.falseLabel || questionData.false_label,
-                trueIcon: questionData.trueIcon !== false,
-                falseIcon: questionData.falseIcon !== false
+                title: questionData?.title || questionData?.question || 'Boolean Question',
+                description: questionData?.description || '',
+                category: questionData?.category || 'Yes/No',
+                trueLabel: questionData?.trueLabel || questionData?.true_label || 'Yes',
+                falseLabel: questionData?.falseLabel || questionData?.false_label || 'No',
+                trueIcon: questionData?.trueIcon !== false,
+                falseIcon: questionData?.falseIcon !== false
               }}
               value={null}
               onChange={dummyHandlers.onChange}

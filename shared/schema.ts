@@ -285,10 +285,12 @@ export const insertPackageSchema = createInsertSchema(packages, {
 
 export const insertPackageWineSchema = createInsertSchema(packageWines, {
   wineDescription: z.string().nullable().optional(),
-  wineImageUrl: z.string().nullable().optional()
+  wineImageUrl: z.string().nullable().optional(),
+  position: z.number().optional() // Optional since it's calculated server-side
 }).omit({
   id: true,
-  createdAt: true
+  createdAt: true,
+  updatedAt: true
 });
 
 export const insertSlideSchema = createInsertSchema(slides, {

@@ -5,13 +5,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ModernButton } from "@/components/ui/modern-button";
 import { ModernCard } from "@/components/ui/modern-card";
-import { DynamicTextRenderer, extractRelevantTerms } from "@/components/ui/DynamicTextRenderer";
+import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
+import { extractRelevantTerms } from "@/lib/glossary-utils";
 import { TooltipInfoPanel } from "@/components/ui/TooltipInfoPanel";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronUp, MessageSquare, Info, BookOpen } from "lucide-react";
 import { modernCardVariants, staggeredReveal, springTransition } from "@/lib/modern-animations";
 import { useHaptics } from "@/hooks/useHaptics";
-import { useGlossary } from "@/contexts/GlossaryContext";
+import { useGlossarySafe } from "@/contexts/GlossaryContext";
 
 interface Option {
   id: string;
@@ -37,7 +38,8 @@ interface MultipleChoiceQuestionProps {
 
 export function MultipleChoiceQuestion({ question, value, onChange }: MultipleChoiceQuestionProps) {
   const { triggerHaptic } = useHaptics();
-  const { terms } = useGlossary();
+  const glossaryContext = useGlossarySafe();
+  const terms = glossaryContext?.terms || [];
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
 

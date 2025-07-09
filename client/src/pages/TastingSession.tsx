@@ -15,7 +15,7 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import { useHaptics } from "@/hooks/useHaptics";
 import { apiRequest } from "@/lib/queryClient";
-import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause, Award, Wine, ChevronDown } from "lucide-react";
+import { Menu, Users, BadgeCheck, CloudOff, ArrowLeft, ArrowRight, X, CheckCircle, Clock, Pause, Award, Wine, ChevronDown, RefreshCw } from "lucide-react";
 import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
 import { WineTransition } from "@/components/WineTransition";
 import { WineIntroduction } from "@/components/WineIntroduction";
@@ -101,6 +101,16 @@ export default function TastingSession() {
     refetchInterval: 3000, // Refetch every 3 seconds to check status
   });
 
+  // Invalidate slides query when session status changes
+  useEffect(() => {
+    if (currentSession?.status) {
+      // Invalidate the slides query to force a refetch
+      queryClient.invalidateQueries({
+        queryKey: [`/api/packages/${currentSession?.packageCode}/slides`]
+      });
+    }
+  }, [currentSession?.status, currentSession?.packageCode, queryClient]);
+
   // Get participant data
   const { data: participant } = useQuery<Participant>({
     queryKey: [`/api/participants/${participantId}`],
@@ -108,13 +118,19 @@ export default function TastingSession() {
   });
 
   // Get session slides and wine data - use dynamic package code from session
-  const { data: slidesData, isLoading } = useQuery<{ package: Package; slides: Slide[]; totalCount: number; wines: any[] }>({
-    queryKey: [`/api/packages/${currentSession?.packageCode}/slides`, participantId],
+  const { data: slidesData, isLoading, refetch: refetchSlides, dataUpdatedAt } = useQuery<{ package: Package; slides: Slide[]; totalCount: number; wines: any[] }>({
+    queryKey: [`/api/packages/${currentSession?.packageCode}/slides`, participantId, currentSession?.status],
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/packages/${currentSession?.packageCode}/slides?participantId=${participantId}`, null);
       return response.json();
     },
-    enabled: !!currentSession?.packageCode && !!participantId
+    enabled: !!currentSession?.packageCode && !!participantId,
+    // Prevent any caching - always fetch fresh data
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true
   });
 
   // Extract wines data from slides response
@@ -189,9 +205,9 @@ export default function TastingSession() {
     );
   }
 
-  const allSlides = slidesData.slides || [];
+  const allSlides = slidesData?.slides || [];
   // All wines should now start from position 1 (no more position 0 wines after migration)
-  const wines = slidesData.wines || [];
+  const wines = slidesData?.wines || [];
   
   // Include transition slides in the navigation flow
   const rawSlides = allSlides;
@@ -239,7 +255,7 @@ export default function TastingSession() {
 
   // Sort each wine's slides using database section_type (now properly organized)
   const sortedSlidesByWine = Object.keys(wineSpecificSlidesByWine).reduce((acc, wineId) => {
-    const wineSlides = wineSpecificSlidesByWine[wineId];
+    const wineSlides = wineSpecificSlidesByWine[wineId] || [];
     const wine = wines.find(w => w.id === wineId);
     
     if (wineSlides.length === 0) {
@@ -304,19 +320,16 @@ export default function TastingSession() {
     }, {} as Record<string, number>)
   });
     
-  const currentSlide = slides[currentSlideIndex];
-  const currentWine = currentSlide ? wines.find(w => w.id === currentSlide.packageWineId) : null;
-  const isPackageLevelSlide = currentSlide && currentSlide.packageId && !currentSlide.packageWineId;
-
-  // Helper function to get section for a slide (defined early to avoid hoisting issues)
-  const getSlideSection = (slide: any) => {
+  // Define helper functions as function declarations for proper hoisting
+  function getSlideSection(slide: any): string {
     // Use database section_type (now properly organized)
     return slide.section_type || slide.payloadJson?.section_type || 'intro';
-  };
+  }
 
   // Helper function to check if current slide is the last slide of its section
-  const isLastSlideOfSection = (slideIndex: number, wineSlides: any[], currentSection: string) => {
-    const currentSlideInWine = slideIndex - (currentWine ? slides.findIndex(s => s.packageWineId === currentWine.id) : 0);
+  function isLastSlideOfSection(slideIndex: number, wineSlides: any[], currentSection: string, currentWineId?: string): boolean {
+    const wineStartIndex = currentWineId ? slides.findIndex(s => s.packageWineId === currentWineId) : 0;
+    const currentSlideInWine = slideIndex - wineStartIndex;
     
     // Find all slides in current section
     const sectionSlides = wineSlides.filter(slide => getSlideSection(slide) === currentSection);
@@ -336,7 +349,11 @@ export default function TastingSession() {
     });
     
     return isLast;
-  };
+  }
+
+  const currentSlide = slides && slides[currentSlideIndex] ? slides[currentSlideIndex] : null;
+  const currentWine = currentSlide && wines ? wines.find(w => w.id === currentSlide.packageWineId) : null;
+  const isPackageLevelSlide = currentSlide && currentSlide.packageId && !currentSlide.packageWineId;
 
   // Calculate section progress based on current wine's slides only (or package context for package-level slides)
   const currentWineSlides = currentWine ? sortedSlidesByWine[currentWine.id] || [] : (isPackageLevelSlide ? packageIntroSlides : []);
@@ -407,6 +424,8 @@ export default function TastingSession() {
 
   // Navigation functions
   const goToNextSlide = async () => {
+    if (!slides || slides.length === 0) return;
+    
     console.log(`📍 Navigation: Current slide ${currentSlideIndex + 1}/${slides.length}`, {
       currentSlide: currentSlide?.payloadJson?.title || 'Unknown',
       currentSection: currentSlide?.section_type,
@@ -415,7 +434,7 @@ export default function TastingSession() {
     
     if (currentSlideIndex < slides.length - 1) {
       const nextSlide = slides[currentSlideIndex + 1];
-      const nextWine = wines.find(w => w.id === nextSlide.packageWineId);
+      const nextWine = nextSlide && wines ? wines.find(w => w.id === nextSlide.packageWineId) : null;
       
       const currentSection = getSlideSection(currentSlide);
       const nextSection = getSlideSection(nextSlide);
@@ -458,7 +477,7 @@ export default function TastingSession() {
       // ONLY trigger section transition when completing the LAST slide of current section
       else if (currentWine && nextWine && currentWine.id === nextWine.id && 
                currentSection !== nextSection && 
-               isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection) &&
+               isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection, currentWine.id) &&
                !nextSlideIsTransition) {
         
         // Debug logging for section transitions
@@ -467,7 +486,7 @@ export default function TastingSession() {
         console.log(`   Wine: ${currentWine.wineName}`);
         console.log(`   Current slide index: ${currentSlideIndex}`);
         console.log(`   Current slide in wine: ${currentSlideIndex - currentWineStartIndex}`);
-        console.log(`   Is last slide of section: ${isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection)}`);
+        console.log(`   Is last slide of section: ${isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection, currentWine.id)}`);
         
         setSectionTransitionData({
           fromSection: currentSection,
@@ -1034,7 +1053,7 @@ export default function TastingSession() {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-primary flex relative">
+      <div className="h-[100dvh] bg-gradient-primary flex relative overflow-hidden">
         {/* Sidebar */}
         <AnimatePresence>
           {sidebarOpen && (
@@ -1103,6 +1122,25 @@ export default function TastingSession() {
                           </>
                         )}
                       </div>
+                    </div>
+                    
+                    {/* Data refresh section */}
+                    <div className="flex items-center justify-between mt-2 text-xs">
+                      <div className="text-white/40">
+                        {dataUpdatedAt && (
+                          <span>Updated {new Date(dataUpdatedAt).toLocaleTimeString()}</span>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => refetchSlides()}
+                        disabled={isLoading}
+                        className="text-white/60 hover:text-white hover:bg-white/10 h-6 px-2"
+                      >
+                        <RefreshCw className={`w-3 h-3 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </Button>
                     </div>
                   </div>
 
@@ -1217,7 +1255,7 @@ export default function TastingSession() {
         </AnimatePresence>
 
         {/* Main content area */}
-        <div className="flex-1 flex flex-col min-h-screen">
+        <div className="flex-1 flex flex-col h-full overflow-hidden">
           {/* Header */}
           <div className="flex-shrink-0 p-4 border-b border-white/10">
             <div className="flex items-center justify-between">
@@ -1275,7 +1313,7 @@ export default function TastingSession() {
           </div>
 
           {/* Main slide content */}
-          <div className="flex-1 flex flex-col p-3 pb-20">
+          <div className="flex-grow overflow-y-auto p-3">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentSlide?.id || currentSlideIndex}
@@ -1283,7 +1321,7 @@ export default function TastingSession() {
                 animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
                 exit={{ opacity: 0, x: isNavigating ? (currentSlideIndex < slides.length - 1 ? -30 : 30) : 0, y: -20, scale: 0.95 }}
                 transition={TRANSITION_DURATIONS.slideAnimation}
-                className="flex-grow flex flex-col justify-center max-w-2xl mx-auto w-full"
+                className="min-h-full flex flex-col justify-center max-w-2xl mx-auto w-full"
               >
                 {renderSlideContent()}
               </motion.div>

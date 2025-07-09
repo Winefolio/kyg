@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { DynamicTextRenderer, extractRelevantTerms } from '@/components/ui/DynamicTextRenderer';
+import { DynamicTextRenderer } from '@/components/ui/DynamicTextRenderer';
+import { extractRelevantTerms } from '@/lib/glossary-utils';
 import { TooltipInfoPanel } from '@/components/ui/TooltipInfoPanel';
 import { Progress } from '@/components/ui/progress';
-import { useGlossary } from '@/contexts/GlossaryContext';
+import { useGlossarySafe } from '@/contexts/GlossaryContext';
 import { useHaptics } from '@/hooks/useHaptics';
 import { Info, BookOpen } from 'lucide-react';
 import { ModernButton } from '@/components/ui/modern-button';
@@ -29,7 +30,8 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
   const [localValue, setLocalValue] = useState(value);
   const [isFocused, setIsFocused] = useState(false);
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
-  const { terms } = useGlossary();
+  const glossaryContext = useGlossarySafe();
+  const terms = glossaryContext?.terms || [];
   const { triggerHaptic } = useHaptics();
   
   // Extract all relevant glossary terms from the current slide content

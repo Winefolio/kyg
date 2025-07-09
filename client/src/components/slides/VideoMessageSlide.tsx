@@ -34,7 +34,7 @@ export function VideoMessageSlide({ payload, className = "" }: VideoMessageSlide
       {/* Video Player */}
       <div className="max-w-4xl mx-auto">
         <VideoPlayer
-          src={payload.video_publicId ? `/api/media/${payload.video_publicId}/file` : payload.video_url}
+          src={payload.video_publicId ? `/api/media/${payload.video_publicId}/file` : payload.video_url || ''}
           title={payload.title}
           description={payload.description}
           autoplay={payload.autoplay}

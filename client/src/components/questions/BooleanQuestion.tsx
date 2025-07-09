@@ -2,10 +2,11 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { DynamicTextRenderer, extractRelevantTerms } from '@/components/ui/DynamicTextRenderer';
+import { DynamicTextRenderer } from '@/components/ui/DynamicTextRenderer';
+import { extractRelevantTerms } from '@/lib/glossary-utils';
 import { TooltipInfoPanel } from '@/components/ui/TooltipInfoPanel';
 import { CheckCircle2, XCircle, Info, BookOpen } from 'lucide-react';
-import { useGlossary } from '@/contexts/GlossaryContext';
+import { useGlossarySafe } from '@/contexts/GlossaryContext';
 import { useHaptics } from '@/hooks/useHaptics';
 import { ModernButton } from '@/components/ui/modern-button';
 
@@ -27,7 +28,8 @@ export function BooleanQuestion({ question, value, onChange }: BooleanQuestionPr
   const trueLabel = question.trueLabel || 'Yes';
   const falseLabel = question.falseLabel || 'No';
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
-  const { terms } = useGlossary();
+  const glossaryContext = useGlossarySafe();
+  const terms = glossaryContext?.terms || [];
   const { triggerHaptic } = useHaptics();
   
   // Extract all relevant glossary terms from the current slide content

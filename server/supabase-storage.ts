@@ -129,12 +129,13 @@ export async function uploadMediaFile(
     });
 
   if (error) {
+    const storageError = error as any; // Type assertion for StorageError properties
     console.error('Supabase Storage upload error:', {
       error: error,
-      errorCode: error.code,
+      errorCode: storageError.code,
       errorMessage: error.message,
-      errorDetails: error.details,
-      errorHint: error.hint,
+      errorDetails: storageError.details,
+      errorHint: storageError.hint,
       filePath: filePath,
       fileName: fileName,
       mimeType: mimeType,
@@ -242,9 +243,10 @@ export async function deleteMediaFile(fileUrl: string): Promise<void> {
       .remove([filePath]);
 
     if (error) {
+      const storageError = error as any; // Type assertion for StorageError properties
       console.error('Supabase Storage delete error:', {
         error: error,
-        errorCode: error.code,
+        errorCode: storageError.code,
         errorMessage: error.message,
         filePath: filePath,
         fileUrl: fileUrl,

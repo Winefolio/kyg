@@ -15,7 +15,7 @@ interface WineIntroductionProps {
 
 export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroductionProps) {
   return (
-    <div className="min-h-[100dvh] relative overflow-auto">
+    <div className="h-[100dvh] relative overflow-hidden flex flex-col">
       {/* Animated Background */}
       <div className="fixed inset-0 bg-gradient-to-br from-amber-900 via-orange-900 to-red-900">
         {/* Orange overlay removed for better mobile visibility */}
@@ -33,7 +33,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
       </div>
 
       {/* Floating wine elements */}
-      <div className="fixed inset-0 overflow-hidden">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
         {[...Array(12)].map((_, i) => (
           <motion.div
             key={i}
@@ -59,16 +59,17 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
         ))}
       </div>
 
-      <div className="relative z-10 min-h-[100dvh] flex items-center justify-center p-4 sm:p-6">
+      {/* Main Content - Flex Layout */}
+      <div className="relative z-10 flex-1 flex flex-col p-4 sm:p-6">
         <motion.div
-          className="max-w-4xl w-full text-center py-4 sm:py-6"
+          className="flex-1 flex flex-col max-w-4xl w-full mx-auto"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1, ease: "easeOut" }}
         >
-          {/* Introduction Badge */}
+          {/* Fixed Header - Introduction Badge */}
           <motion.div
-            className="mb-4 sm:mb-6"
+            className="flex-shrink-0 mb-4 text-center"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.8 }}
@@ -86,8 +87,10 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
             </div>
           </motion.div>
 
-          {/* Wine Showcase */}
-          <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 items-center mb-4 sm:mb-6">
+          {/* Scrollable Content Area */}
+          <div className="flex-grow overflow-y-auto">
+            {/* Wine Showcase */}
+            <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 items-center mb-4 sm:mb-6">
             {/* Wine Image */}
             <motion.div
               className="order-2 lg:order-1 flex justify-center"
@@ -194,10 +197,12 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
                 </div>
               </motion.div>
             </motion.div>
+            </div>
           </div>
 
-          {/* Continue Button */}
+          {/* Fixed Footer - Continue Button */}
           <motion.div
+            className="flex-shrink-0 mt-4 text-center"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 2, duration: 0.8 }}

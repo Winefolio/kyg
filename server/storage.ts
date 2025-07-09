@@ -29,7 +29,7 @@ import {
   wineCharacteristics,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, inArray, desc, gte, lt, asc } from "drizzle-orm";
+import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull } from "drizzle-orm";
 import crypto from "crypto";
 
 // Utility function to generate unique short codes
@@ -605,7 +605,7 @@ export class DatabaseStorage implements IStorage {
       .insert(packageWines)
       .values({
         packageId: wine.packageId,
-        position: wine.position,
+        position: wine.position || 0, // Provide default value for undefined position
         wineName: wine.wineName,
         wineDescription: wine.wineDescription,
         wineImageUrl: wine.wineImageUrl,
@@ -857,7 +857,7 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             eq(media.entityType, entityType),
-            eq(db.sql`metadata->>'originalEntityId'`, originalEntityId)
+            eq(sql`metadata->>'originalEntityId'`, originalEntityId)
           )
         );
       
@@ -894,12 +894,12 @@ export class DatabaseStorage implements IStorage {
         .update(media)
         .set({ 
           entityId: newEntityId,
-          metadata: db.sql`jsonb_set(metadata, '{linkedAt}', to_jsonb(now()::text))`
+          metadata: sql`jsonb_set(metadata, '{linkedAt}', to_jsonb(now()::text))`
         })
         .where(
           and(
             eq(media.publicId, publicId),
-            eq(media.entityId, null) // Only update if not already linked
+            isNull(media.entityId) // Only update if not already linked
           )
         );
       
@@ -2390,10 +2390,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePackageWine(id: string): Promise<void> {
+    // Get the wine to be deleted to know its package and position
+    const wineToDelete = await db.select().from(packageWines)
+      .where(eq(packageWines.id, id)).limit(1);
+    
+    if (wineToDelete.length === 0) return;
+    
+    const { packageId, position } = wineToDelete[0];
+    
     // First delete associated slides
     await db.delete(slides).where(eq(slides.packageWineId, id));
+    
     // Then delete the wine
     await db.delete(packageWines).where(eq(packageWines.id, id));
+    
+    // Update positions of wines that came after the deleted one
+    await db.update(packageWines)
+      .set({ position: sql`position - 1` })
+      .where(and(
+        eq(packageWines.packageId, packageId),
+        gt(packageWines.position, position)
+      ));
   }
 
   async updateSlide(id: string, data: Partial<InsertSlide>): Promise<Slide> {
@@ -2653,26 +2670,39 @@ export class DatabaseStorage implements IStorage {
         .where(eq(slides.packageWineId, sourceWineId))
         .orderBy(slides.position);
 
-      // Filter out intro slides and welcome slides - only copy deep dive, ending, conclusion slides
+      // Filter out only wine-specific intro slides, but keep intro questions and assessments
       const slidesToCopy = sourceSlides.filter(slide => {
-        const sectionType = slide.section_type;
         const payloadJson = slide.payloadJson as any;
         
-        // Skip intro section slides
-        if (sectionType === 'intro') return false;
-        
-        // Skip welcome slides (usually marked with is_welcome or title contains "welcome")
-        if (payloadJson?.is_welcome || 
-            payloadJson?.title?.toLowerCase().includes('welcome') ||
-            payloadJson?.title?.toLowerCase().includes('introduction')) {
+        // EXCLUDE wine-specific intro slides (those that introduce a specific wine)
+        if (payloadJson?.is_wine_intro === true) {
+          console.log(`Excluding wine-specific intro: ${payloadJson.title}`);
           return false;
         }
         
-        // Only include deep dive, ending, conclusion, tasting slides
-        return sectionType === 'deep_dive' || 
-               sectionType === 'tasting' || 
-               sectionType === 'ending' || 
-               sectionType === 'conclusion';
+        // EXCLUDE package-level intro slides (general package welcome)
+        if (payloadJson?.is_package_intro === true) {
+          console.log(`Excluding package intro: ${payloadJson.title}`);
+          return false;
+        }
+        
+        // EXCLUDE slides with wine-specific titles as a fallback check
+        if (payloadJson?.title && sourceWine[0]) {
+          const title = payloadJson.title.toLowerCase();
+          const wineName = sourceWine[0].wineName.toLowerCase();
+          
+          // Check for common wine-specific intro patterns
+          if (title.includes(`meet ${wineName}`) || 
+              title.includes(`introduction to ${wineName}`) ||
+              title.includes(`welcome to ${wineName}`) ||
+              title === wineName) {
+            console.log(`Excluding wine-specific title: ${payloadJson.title}`);
+            return false;
+          }
+        }
+        
+        // INCLUDE everything else - intro questions, deep dive, ending, etc.
+        return true;
       });
 
       if (slidesToCopy.length === 0) {
@@ -2681,7 +2711,16 @@ export class DatabaseStorage implements IStorage {
 
       // 3. Handle target wine slides if replacing
       if (replaceExisting) {
-        await db.delete(slides).where(eq(slides.packageWineId, targetWineId));
+        // Delete all slides from target wine EXCEPT its own intro slide
+        // This preserves the "Meet [Wine Name]" slide that belongs to the target wine
+        // We use COALESCE to handle NULL/undefined values in JSON
+        await db.delete(slides).where(
+          and(
+            eq(slides.packageWineId, targetWineId),
+            sql`COALESCE(${slides.payloadJson}->>'is_wine_intro', 'false') != 'true'`
+          )
+        );
+        console.log(`Deleted non-intro slides from target wine, preserving wine intro slide`);
       }
 
       // 4. Use database transaction to ensure data consistency
@@ -2695,8 +2734,22 @@ export class DatabaseStorage implements IStorage {
           .orderBy(slides.position);
 
         let startingPosition = 1;
-        if (!replaceExisting && existingSlides.length > 0) {
-          // Find the highest position and start from there
+        
+        // In replace mode, we may have preserved the wine intro slide
+        // We need to account for it when assigning positions
+        if (replaceExisting && existingSlides.length > 0) {
+          // Check if any of the existing slides is a wine intro (should be at position 1)
+          const hasPreservedIntro = existingSlides.some(slide => {
+            const payload = slide.payloadJson as any;
+            return payload?.is_wine_intro === true;
+          });
+          
+          if (hasPreservedIntro) {
+            // Start copying at position 2 to avoid conflict with preserved intro
+            startingPosition = 2;
+          }
+        } else if (!replaceExisting && existingSlides.length > 0) {
+          // For append mode, find the highest position and start from there
           const maxPosition = Math.max(...existingSlides.map(s => s.position));
           startingPosition = maxPosition + 10; // Leave gap to avoid conflicts
         }
@@ -2707,22 +2760,34 @@ export class DatabaseStorage implements IStorage {
           let newPosition: number;
 
           if (replaceExisting) {
-            // For replace mode, try to use original position, but ensure no conflicts
-            newPosition = sourceSlide.position;
-            const conflict = existingSlides.find(s => s.position === newPosition);
-            if (conflict) {
-              // If position conflicts, use sequential numbering
-              newPosition = startingPosition + i;
-            }
+            // For replace mode, assign sequential positions starting from startingPosition
+            // This handles the case where we preserved the intro at position 1
+            newPosition = startingPosition + i;
           } else {
             // For append mode, use sequential positions starting from safe position
             newPosition = startingPosition + (i * 10); // Use gaps of 10 for future insertions
           }
 
+          // Update wine context in payloadJson if present
+          let updatedPayloadJson = { ...(sourceSlide.payloadJson || {}) } as any;
+          
+          // If the slide contains wine-specific context, update it to target wine
+          if (updatedPayloadJson.wine_name || updatedPayloadJson.wine_context || 
+              updatedPayloadJson.wine_type || updatedPayloadJson.wine_region) {
+            updatedPayloadJson = {
+              ...updatedPayloadJson,
+              wine_name: targetWine[0].wineName,
+              wine_type: targetWine[0].wineType || updatedPayloadJson.wine_type,
+              wine_region: targetWine[0].region || updatedPayloadJson.wine_region,
+              wine_vintage: targetWine[0].vintage || updatedPayloadJson.wine_vintage,
+              wine_image: targetWine[0].wineImageUrl || updatedPayloadJson.wine_image
+            };
+          }
+          
           const newSlideData = {
             packageWineId: targetWineId,
             type: sourceSlide.type,
-            payloadJson: sourceSlide.payloadJson || {},
+            payloadJson: updatedPayloadJson,
             position: newPosition,
             section_type: sourceSlide.section_type
           };
@@ -2765,7 +2830,15 @@ export class DatabaseStorage implements IStorage {
         }
       });
 
-      console.log(`✅ Duplicated ${duplicatedSlides.length} slides from wine ${sourceWineId} to wine ${targetWineId}`);
+      // Log detailed information about the duplication
+      console.log(`\n📋 Slide Duplication Summary:`);
+      console.log(`  Source Wine: ${sourceWine[0].wineName} (${sourceWineId})`);
+      console.log(`  Target Wine: ${targetWine[0].wineName} (${targetWineId})`);
+      console.log(`  Total source slides: ${sourceSlides.length}`);
+      console.log(`  Slides after filtering: ${slidesToCopy.length}`);
+      console.log(`  Excluded slides: ${sourceSlides.length - slidesToCopy.length}`);
+      console.log(`  Mode: ${replaceExisting ? 'Replace' : 'Append'}`);
+      console.log(`✅ Successfully duplicated ${duplicatedSlides.length} slides\n`);
       
       // Normalize positions after duplication to ensure clean sequential numbering
       await this.normalizeSlidePositions(targetWineId);

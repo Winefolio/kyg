@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ModernSlider } from "@/components/ui/modern-slider";
 import { Label } from "@/components/ui/label";
 import { ModernButton } from "@/components/ui/modern-button";
-import { DynamicTextRenderer, extractRelevantTerms } from "@/components/ui/DynamicTextRenderer";
+import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
+import { extractRelevantTerms } from "@/lib/glossary-utils";
 import { TooltipInfoPanel } from "@/components/ui/TooltipInfoPanel";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronUp, Info, BookOpen, TrendingUp } from "lucide-react";
 import { modernCardVariants, springTransition } from "@/lib/modern-animations";
 import { useHaptics } from "@/hooks/useHaptics";
-import { useGlossary } from "@/contexts/GlossaryContext";
+import { useGlossarySafe } from "@/contexts/GlossaryContext";
 
 interface ScaleQuestionProps {
   question: {
@@ -26,7 +27,8 @@ interface ScaleQuestionProps {
 
 export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps) {
   const { triggerHaptic } = useHaptics();
-  const { terms } = useGlossary();
+  const glossaryContext = useGlossarySafe();
+  const terms = glossaryContext?.terms || [];
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
 
   // Extract all relevant glossary terms from the current slide content

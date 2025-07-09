@@ -40,7 +40,9 @@
       "mcp__supabase__list_tables",
       "Bash(PORT=5173 npm run dev)",
       "Bash(npx tsc:*)",
-      "Bash(timeout 10s npm start)"
+      "Bash(timeout 10s npm start)",
+      "Bash(madge:*)",
+      "Bash(sed:*)"
     ],
     "deny": []
   },

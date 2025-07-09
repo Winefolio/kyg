@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
@@ -69,6 +69,7 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   console.log("🚀 Starting route registration...");
+  
   
   // Verify Supabase Storage configuration if configured
   if (isSupabaseConfigured()) {
@@ -1272,7 +1273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         requestBody: req.body,
         userAgent: req.get('User-Agent'),
         slideCount: req.body?.updates?.length || 0,
-        wineIds: [...new Set(req.body?.updates?.map((u: any) => u.packageWineId) || [])]
+        wineIds: Array.from(new Set(req.body?.updates?.map((u: any) => u.packageWineId) || []))
       });
       
       // Handle specific database constraint errors with detailed guidance

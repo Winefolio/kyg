@@ -28,7 +28,7 @@ function SortableSlideItem({ slide, isActive, onClick }: {
     const payload = slide.payloadJson as any;
     if (payload?.title) return payload.title;
     if (payload?.question) return payload.question;
-    return slide.title || slide.type;
+    return slide.type; // Remove slide.title reference since it doesn't exist in schema
   };
 
   return (

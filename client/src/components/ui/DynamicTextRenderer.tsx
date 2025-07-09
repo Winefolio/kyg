@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useGlossary } from '@/contexts/GlossaryContext';
+import { useGlossary, useGlossarySafe } from '@/contexts/GlossaryContext';
 import type { GlossaryTerm } from '@shared/schema';
 
 interface DynamicTextRendererProps {
@@ -8,28 +8,66 @@ interface DynamicTextRendererProps {
   enableHighlighting?: boolean;
 }
 
-export function DynamicTextRenderer({ text, className, enableHighlighting = true }: DynamicTextRendererProps) {
-  const { terms, isLoading } = useGlossary();
+// Safe hook wrapper with fallback for context initialization issues
+function useSafeGlossary() {
+  try {
+    const context = useGlossary();
+    // Additional check for context readiness
+    if (!context.isReady) {
+      return { terms: [], isLoading: true, error: null, isReady: false };
+    }
+    return context;
+  } catch (error) {
+    // Fallback when context is not available or not ready
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('GlossaryContext not available, rendering plain text:', error);
+    }
+    
+    // Try the safe hook as a fallback
+    const safeContext = useGlossarySafe();
+    if (safeContext) {
+      return safeContext;
+    }
+    
+    // Ultimate fallback
+    return { terms: [], isLoading: false, error: null, isReady: true };
+  }
+}
+
+function DynamicTextRenderer({ text, className, enableHighlighting = true }: DynamicTextRendererProps) {
+  const { terms, isLoading } = useSafeGlossary();
 
   const renderedContent = useMemo(() => {
-    if (isLoading || !text || terms.length === 0 || !enableHighlighting) {
+    // Early return for safety - always provide fallback text
+    if (!text) {
+      return <span className={className}></span>;
+    }
+
+    // Safe fallback if glossary is loading, unavailable, or highlighting disabled
+    if (isLoading || !terms || terms.length === 0 || !enableHighlighting) {
       return <span className={className}>{text}</span>;
     }
 
-    // Build a comprehensive list of all terms and their variations
-    const allTerms: Array<{ term: string; data: GlossaryTerm }> = [];
-    
-    terms.forEach(termData => {
-      // Add the main term
-      allTerms.push({ term: termData.term, data: termData });
+    try {
+      // Build a comprehensive list of all terms and their variations
+      const allTerms: Array<{ term: string; data: GlossaryTerm }> = [];
       
-      // Add variations if they exist
-      if (termData.variations) {
-        termData.variations.forEach(variation => {
-          allTerms.push({ term: variation, data: termData });
-        });
-      }
-    });
+      terms.forEach(termData => {
+        // Safety check for term data structure
+        if (!termData || !termData.term) return;
+        
+        // Add the main term
+        allTerms.push({ term: termData.term, data: termData });
+        
+        // Add variations if they exist
+        if (termData.variations && Array.isArray(termData.variations)) {
+          termData.variations.forEach(variation => {
+            if (variation && typeof variation === 'string') {
+              allTerms.push({ term: variation, data: termData });
+            }
+          });
+        }
+      });
 
     // Sort by length (longest first) to avoid partial matches
     allTerms.sort((a, b) => b.term.length - a.term.length);
@@ -97,38 +135,25 @@ export function DynamicTextRenderer({ text, className, enableHighlighting = true
       }
     });
 
-    return <span className={className}>{result}</span>;
+      return <span className={className}>{result}</span>;
+    } catch (error) {
+      // Graceful degradation - if anything goes wrong, just render plain text
+      console.warn('Error in DynamicTextRenderer, falling back to plain text:', error);
+      return <span className={className}>{text}</span>;
+    }
   }, [text, terms, isLoading, className, enableHighlighting]);
 
-  return renderedContent;
+  // Final safety wrapper
+  try {
+    return renderedContent;
+  } catch (error) {
+    console.warn('Critical error in DynamicTextRenderer, using emergency fallback:', error);
+    return <span className={className}>{text || ''}</span>;
+  }
 }
 
-// Helper function to extract relevant glossary terms from text
-export function extractRelevantTerms(text: string, allTerms: GlossaryTerm[]): GlossaryTerm[] {
-  if (!text || allTerms.length === 0) return [];
+// Export as default for better minification stability
+export default DynamicTextRenderer;
 
-  const relevantTerms: GlossaryTerm[] = [];
-  const processedTerms = new Set<string>();
-
-  allTerms.forEach(termData => {
-    const mainTerm = termData.term.toLowerCase();
-    const variations = termData.variations?.map(v => v.toLowerCase()) || [];
-    const allVariations = [mainTerm, ...variations];
-
-    // Check if any variation appears in the text
-    const termKey = mainTerm.replace(/\s+/g, '_');
-    if (!processedTerms.has(termKey)) {
-      const isRelevant = allVariations.some(term => {
-        const regex = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
-        return regex.test(text);
-      });
-
-      if (isRelevant) {
-        relevantTerms.push(termData);
-        processedTerms.add(termKey);
-      }
-    }
-  });
-
-  return relevantTerms.sort((a, b) => a.term.localeCompare(b.term));
-}
+// Also provide named export for backward compatibility
+export { DynamicTextRenderer };

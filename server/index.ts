@@ -57,6 +57,15 @@ app.use(cors({
   maxAge: 86400 // Cache preflight response for 24 hours
 }));
 
+// Add cache prevention middleware for API routes
+app.use('/api/*', (req, res, next) => {
+  // Prevent any caching of API responses
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
