@@ -963,8 +963,69 @@ export default function PackageEditor() {
   const handleQuestionSave = (question: GenericQuestion) => {
     if (!currentWineContext) return;
 
-    // Use getNextPositionForWine for proper wine-based positioning
-    const nextPosition = getNextPositionForWine(currentWineContext.wineId);
+    // Define position ranges for each section to prevent conflicts
+    const SECTION_RANGES = {
+      'intro': { min: 0, max: 10000 },
+      'deep_dive': { min: 10000, max: 20000 },
+      'ending': { min: 30000, max: 40000 }
+    };
+
+    const sectionRange = SECTION_RANGES[currentWineContext.sectionType] || SECTION_RANGES.intro;
+    
+    // Get all slides for this wine
+    const wineSlides = localSlides.filter(s => 
+      s.packageWineId === currentWineContext.wineId
+    );
+    
+    // Get all used positions for this wine
+    const usedPositions = new Set(wineSlides.map(s => s.position));
+    
+    // Get slides in the current section
+    const sectionSlides = wineSlides.filter(s => s.section_type === currentWineContext.sectionType);
+    
+    let nextPosition;
+    
+    if (sectionSlides.length === 0) {
+      // No slides in this section - start at the beginning of the range
+      nextPosition = sectionRange.min + 10; // Start at min + 10 to leave room
+    } else {
+      // Find the highest position in this section
+      const sectionPositions = sectionSlides
+        .map(s => s.position)
+        .filter(p => p >= sectionRange.min && p < sectionRange.max);
+      
+      if (sectionPositions.length === 0) {
+        // All section slides are outside the range (legacy positions) - start fresh
+        nextPosition = sectionRange.min + 10;
+      } else {
+        const maxSectionPosition = Math.max(...sectionPositions);
+        nextPosition = maxSectionPosition + 10;
+      }
+    }
+    
+    // Ensure we don't exceed the section's max range
+    if (nextPosition >= sectionRange.max) {
+      // Find a gap within the range
+      nextPosition = sectionRange.min + 10;
+      while (usedPositions.has(nextPosition) && nextPosition < sectionRange.max) {
+        nextPosition += 10;
+      }
+      
+      if (nextPosition >= sectionRange.max) {
+        console.error(`Section ${currentWineContext.sectionType} is full! Cannot add more slides.`);
+        toast({
+          title: "Section Full",
+          description: `The ${currentWineContext.sectionType} section has reached its maximum capacity.`,
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
+    // Final check to ensure position is available
+    while (usedPositions.has(nextPosition) && nextPosition < sectionRange.max) {
+      nextPosition += 10;
+    }
 
     // Determine the correct slide type based on question format
     let slideType: 'question' | 'video_message' | 'audio_message' = 'question';

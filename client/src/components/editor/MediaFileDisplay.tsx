@@ -104,7 +104,7 @@ export function MediaFileDisplay({
 
   // Show preview with fallback if media access fails but we have publicId or legacyUrl
   if (showPreview && (publicId || legacyUrl) && !isLoadingUrl) {
-    const mediaUrl = mediaAccess?.url || (publicId ? `/api/media/${publicId}/file` : legacyUrl);
+    const mediaUrl = mediaAccess?.url || (publicId ? `/api/media/${publicId}/stream` : legacyUrl);
     
     if (compact) {
       // Compact preview for editor sidebar

@@ -265,7 +265,7 @@ export function SlideConfigPanel({
                                 <Label className="text-white/80 text-sm mb-2 block">Preview</Label>
                                 <div className="bg-black/20 rounded-lg overflow-hidden">
                                     <VideoPlayer
-                                        src={localPayload.video_publicId ? `/api/media/${localPayload.video_publicId}/file` : localPayload.video_url}
+                                        src={localPayload.video_publicId ? `/api/media/${localPayload.video_publicId}/stream` : localPayload.video_url}
                                         title={localPayload.video_fileName}
                                         className="w-full h-32"
                                         controls={true}
@@ -366,7 +366,7 @@ export function SlideConfigPanel({
                                 <div className="bg-black/20 rounded-lg p-3 flex justify-center">
                                     <div className="w-full max-w-md">
                                         <AudioPlayer
-                                            src={localPayload.audio_publicId ? `/api/media/${localPayload.audio_publicId}/file` : localPayload.audio_url}
+                                            src={localPayload.audio_publicId ? `/api/media/${localPayload.audio_publicId}/stream` : localPayload.audio_url}
                                             title={localPayload.audio_fileName}
                                             className="w-full scale-75 origin-center"
                                             autoplay={false}

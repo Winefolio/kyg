@@ -12,6 +12,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getOptimalVideoPreload, isMobileDevice } from '@/lib/device-utils';
 
 interface VideoPlayerProps {
   src: string;
@@ -48,6 +49,8 @@ export function VideoPlayer({
   const [showControls, setShowControls] = useState(true);
   const [controlsTimeout, setControlsTimeout] = useState<NodeJS.Timeout | null>(null);
   const [bufferedPercentage, setBufferedPercentage] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
 
   const video = videoRef.current;
 
@@ -98,9 +101,51 @@ export function VideoPlayer({
     }
   };
 
-  const handleError = () => {
+  const handleError = (e: Event) => {
+    const video = e.target as HTMLVideoElement;
+    let errorMessage = 'Failed to load video.';
+    let shouldRetry = false;
+    
+    // Provide more specific error messages based on error type
+    if (video.error) {
+      switch (video.error.code) {
+        case video.error.MEDIA_ERR_NETWORK:
+          errorMessage = 'Network error while loading video. Please check your connection and try again.';
+          shouldRetry = true; // Network errors can be retried
+          break;
+        case video.error.MEDIA_ERR_DECODE:
+          errorMessage = 'Video format not supported on this device.';
+          break;
+        case video.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+          errorMessage = 'Video format not supported. Please try a different video.';
+          break;
+        case video.error.MEDIA_ERR_ABORTED:
+          errorMessage = 'Video loading was cancelled.';
+          shouldRetry = true; // Aborted loads can be retried
+          break;
+        default:
+          errorMessage = 'An error occurred while loading the video.';
+      }
+    }
+    
+    // Auto-retry for network errors on mobile
+    if (shouldRetry && retryCount < maxRetries && isMobileDevice()) {
+      console.log(`Retrying video load (attempt ${retryCount + 1}/${maxRetries})`);
+      setRetryCount(retryCount + 1);
+      setError(null);
+      setIsLoading(true);
+      
+      // Wait a bit before retrying
+      setTimeout(() => {
+        if (video) {
+          video.load();
+        }
+      }, 1000 * (retryCount + 1)); // Exponential backoff
+      
+      return;
+    }
+    
     setIsLoading(false);
-    const errorMessage = 'Failed to load video. Please check the file format and try again.';
     setError(errorMessage);
     onError?.(errorMessage);
   };
@@ -214,8 +259,8 @@ export function VideoPlayer({
       <video
         ref={videoRef}
         src={src}
-        autoPlay={autoplay}
-        preload="metadata"
+        autoPlay={autoplay && !isMobileDevice()} // Disable autoplay on mobile to save bandwidth
+        preload={getOptimalVideoPreload()}
         onLoadStart={handleLoadStart}
         onCanPlay={handleCanPlay}
         onLoadedMetadata={handleLoadedMetadata}
@@ -226,8 +271,12 @@ export function VideoPlayer({
         onPause={handlePause}
         onWaiting={() => setIsLoading(true)}
         onPlaying={() => setIsLoading(false)}
+        onStalled={() => setIsLoading(true)}
+        onSuspend={() => setIsLoading(false)}
         className="w-full h-full object-contain"
         playsInline
+        crossOrigin="anonymous"
+        muted={autoplay && isMobileDevice()} // Mute on mobile autoplay for better compatibility
       />
 
       {/* Loading State */}
@@ -265,6 +314,7 @@ export function VideoPlayer({
                 onClick={() => {
                   setError(null);
                   setIsLoading(true);
+                  setRetryCount(0); // Reset retry count on manual retry
                   video?.load();
                 }}
                 variant="outline"
