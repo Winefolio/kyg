@@ -661,6 +661,15 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async getSlidesByPackageWineIds(packageWineIds: string[]): Promise<Slide[]> {
+    if (packageWineIds.length === 0) return [];
+    return await db
+      .select()
+      .from(slides)
+      .where(inArray(slides.packageWineId, packageWineIds))
+      .orderBy(slides.globalPosition);
+  }
+
   async getSlidesByPackageId(packageId: string): Promise<Slide[]> {
     const result = await db
       .select()
@@ -1137,6 +1146,18 @@ export class DatabaseStorage implements IStorage {
       .where(eq(participants.sessionId, sessionId));
   }
 
+  async getParticipantByEmailInSession(sessionId: string, email: string): Promise<Participant | undefined> {
+    const result = await db
+      .select()
+      .from(participants)
+      .where(and(
+        eq(participants.sessionId, sessionId),
+        eq(participants.email, email)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
   async updateParticipantProgress(
     participantId: string,
     progress: number,
@@ -1145,6 +1166,19 @@ export class DatabaseStorage implements IStorage {
       .update(participants)
       .set({
         progressPtr: progress,
+        lastActive: new Date(),
+      })
+      .where(eq(participants.id, participantId));
+  }
+
+  async updateParticipantDisplayName(
+    participantId: string,
+    displayName: string,
+  ): Promise<void> {
+    await db
+      .update(participants)
+      .set({
+        displayName,
         lastActive: new Date(),
       })
       .where(eq(participants.id, participantId));
@@ -1442,12 +1476,15 @@ export class DatabaseStorage implements IStorage {
 
     // 4. Get package and wine data
     const packageWines = await this.getPackageWines(session.packageId!);
-    let allSlides: Slide[] = [];
-    
-    for (const wine of packageWines) {
-      const wineSlides = await this.getSlidesByPackageWineId(wine.id);
-      allSlides = allSlides.concat(wineSlides);
-    }
+    // Fetch all slides for all wines in a single query (optimized)
+    const wineIds = packageWines.map(w => w.id);
+    const allSlides: Slide[] = wineIds.length > 0
+      ? await db
+          .select()
+          .from(slides)
+          .where(inArray(slides.packageWineId, wineIds))
+          .orderBy(slides.globalPosition)
+      : [];
 
     const questionSlides = allSlides.filter(slide => slide.type === "question");
 

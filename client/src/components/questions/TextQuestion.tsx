@@ -31,51 +31,24 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
   const [localValue, setLocalValue] = useState(value);
   const [isFocused, setIsFocused] = useState(false);
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const glossaryContext = useGlossarySafe();
   const terms = glossaryContext?.terms || [];
   const { triggerHaptic } = useHaptics();
   
-  // Debounce the value to reduce the number of onChange calls
-  const debouncedValue = useDebounce(localValue, 300);
+  // Use shorter debounce when user adds space or punctuation (natural pause points)
+  const [debounceDelay, setDebounceDelay] = useState(1500);
+  const debouncedValue = useDebounce(localValue, debounceDelay);
   
-  // MASSIVE DEBUG LOGGING - Component Lifecycle
+  // Save on unmount if there are unsaved changes
   useEffect(() => {
-    console.log('🟢 [TextQuestion MOUNT] Component mounted:', {
-      questionTitle: question.title,
-      initialValue: value,
-      timestamp: new Date().toISOString(),
-      componentId: Math.random().toString(36).substring(7)
-    });
-    
     return () => {
-      console.log('🔴 [TextQuestion UNMOUNT] Component unmounting:', {
-        questionTitle: question.title,
-        finalValue: localValue,
-        isFocused,
-        activeElement: document.activeElement?.tagName,
-        timestamp: new Date().toISOString()
-      });
+      // Force save on unmount if value has changed
+      if (localValue !== value && localValue.trim() !== '') {
+        onChange(localValue);
+      }
     };
-  }, []);
-  
-  // Debug every render
-  console.log('🔄 [TextQuestion RENDER]:', {
-    questionTitle: question.title,
-    currentValue: value,
-    localValue,
-    isFocused,
-    timestamp: new Date().toISOString()
-  });
-  
-  // Log every render
-  console.log('🔄 [TextQuestion RENDER]:', {
-    questionTitle: question.title,
-    localValue,
-    isFocused,
-    isInfoPanelOpen,
-    debouncedValue,
-    timestamp: new Date().toISOString()
-  });
+  }, [localValue, value, onChange]);
   
   // Extract all relevant glossary terms from the current slide content
   const relevantTerms = useMemo(() => {
@@ -85,45 +58,45 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
   
   // Sync with external value
   useEffect(() => {
-    console.log('📥 [TextQuestion SYNC] External value changed:', {
-      oldValue: localValue,
-      newValue: value,
-      timestamp: new Date().toISOString()
-    });
     setLocalValue(value);
   }, [value]);
   
-  // Call onChange when debounced value changes - with additional safety checks
+  // Call onChange when debounced value changes
   useEffect(() => {
     if (debouncedValue !== value) {
-      console.log('⏱️ [TextQuestion DEBOUNCE] Debounced onChange triggered:', {
-        debouncedValue,
-        previousValue: value,
-        timestamp: new Date().toISOString()
-      });
-      // Use requestAnimationFrame to ensure DOM is updated before onChange
-      requestAnimationFrame(() => {
-        onChange(debouncedValue);
-      });
+      onChange(debouncedValue);
+      setHasUnsavedChanges(false);
+      setDebounceDelay(1500); // Reset to default delay after save
     }
   }, [debouncedValue, onChange, value]);
 
   const handleChange = (newValue: string) => {
-    console.log('✏️ [TextQuestion INPUT] handleChange called:', {
-      currentValue: localValue,
-      newValue,
-      valueLength: newValue.length,
-      isFocused,
-      timestamp: new Date().toISOString()
-    });
-    
     // Respect maxLength if provided
     if (question.maxLength && newValue.length > question.maxLength) {
-      console.log('🚫 [TextQuestion LIMIT] Max length reached:', question.maxLength);
       return;
     }
+    
+    const lastChar = newValue[newValue.length - 1];
+    const naturalPauseChars = [' ', '.', '!', '?', ',', ';', ':', '\n'];
+    
+    // Detect natural pause points and use shorter debounce
+    if (naturalPauseChars.includes(lastChar)) {
+      setDebounceDelay(500); // Save quickly after natural pause
+    } else {
+      setDebounceDelay(1500); // Longer delay for continuous typing
+    }
+    
     setLocalValue(newValue);
-    // onChange is now triggered by the debounced value effect
+    setHasUnsavedChanges(newValue !== value);
+    triggerHaptic('selection');
+  };
+
+  // Save immediately on blur (when user clicks away)
+  const handleBlur = () => {
+    setIsFocused(false);
+    if (localValue !== value && localValue.trim() !== '') {
+      onChange(localValue);
+    }
   };
 
   const characterCount = localValue.length;
@@ -186,21 +159,8 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
               <Textarea
                 value={localValue}
                 onChange={(e) => handleChange(e.target.value)}
-                onFocus={() => {
-                  console.log('🎯 [TextQuestion FOCUS] Textarea focused:', {
-                    timestamp: new Date().toISOString(),
-                    previousActiveElement: document.activeElement?.tagName
-                  });
-                  setIsFocused(true);
-                }}
-                onBlur={() => {
-                  console.log('👋 [TextQuestion BLUR] Textarea blurred:', {
-                    timestamp: new Date().toISOString(),
-                    newActiveElement: document.activeElement?.tagName,
-                    finalValue: localValue
-                  });
-                  setIsFocused(false);
-                }}
+                onFocus={() => setIsFocused(true)}
+                onBlur={handleBlur}
                 placeholder={question.placeholder || "Type your answer here..."}
                 rows={question.rows || 4}
                 className={`
@@ -229,10 +189,15 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
             {/* Character Count & Progress */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-sm">
-                <span className="text-white/50">
+                <span className="text-white/50 flex items-center gap-2">
                   {question.minLength && characterCount < question.minLength && (
                     <span className="text-yellow-400">
                       Minimum {question.minLength} characters required
+                    </span>
+                  )}
+                  {hasUnsavedChanges && (
+                    <span className="text-blue-400 text-xs animate-pulse">
+                      Saving...
                     </span>
                   )}
                 </span>

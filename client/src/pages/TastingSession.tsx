@@ -50,7 +50,13 @@ const TRANSITION_DURATIONS = {
 export default function TastingSession() {
   const { sessionId, participantId } = useParams();
   const [, setLocation] = useLocation();
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  
+  // Check for resume parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const resumePosition = urlParams.get('resume');
+  const initialSlideIndex = resumePosition ? Math.max(0, parseInt(resumePosition) - 1) : 0;
+  
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(initialSlideIndex);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [completedSlides, setCompletedSlides] = useState<number[]>([]);
@@ -166,10 +172,36 @@ export default function TastingSession() {
   const packageData = slidesData ? { wines: slidesData.wines } : null;
 
   // Get participant responses
-  const { data: responses } = useQuery({
+  const { data: responses } = useQuery<Response[]>({
     queryKey: [`/api/participants/${participantId}/responses`],
     enabled: !!participantId
   });
+  
+  // Load previous responses into answers state
+  useEffect(() => {
+    if (responses && responses.length > 0) {
+      console.log('📥 [TASTING_SESSION] Loading previous responses:', {
+        count: responses.length,
+        participantId,
+        resumePosition
+      });
+      
+      const previousAnswers: Record<string, any> = {};
+      responses.forEach((response: any) => {
+        previousAnswers[response.slideId] = response.answerJson;
+      });
+      
+      setAnswers(previousAnswers);
+      
+      // Update completed slides based on previous responses
+      if (slidesData?.slides) {
+        const completedIndices = slidesData.slides
+          .map((slide, index) => previousAnswers[slide.id] ? index : null)
+          .filter(index => index !== null) as number[];
+        setCompletedSlides(completedIndices);
+      }
+    }
+  }, [responses, participantId, resumePosition, slidesData]);
 
   if (sessionDetailsLoading || isLoading) {
     return (
@@ -397,7 +429,7 @@ export default function TastingSession() {
   // Prevent rendering if slides aren't loaded yet or if we're in an invalid state
   if (!slides || slides.length === 0) {
     console.log('⚠️ [RENDER GUARD] Preventing render due to missing slides');
-    return <LoadingOverlay />;
+    return <LoadingOverlay isVisible={true} message="Loading slides..." />;
   }
   
   // Handle case where currentSlideIndex is out of bounds
@@ -409,7 +441,7 @@ export default function TastingSession() {
     });
     // Reset to valid index instead of showing loading
     setCurrentSlideIndex(Math.min(currentSlideIndex, slides.length - 1));
-    return <LoadingOverlay />;
+    return <LoadingOverlay isVisible={true} message="Loading..." />;
   }
   
   const currentWine = currentSlide && wines ? wines.find(w => w.id === currentSlide.packageWineId) : null;
@@ -585,10 +617,8 @@ export default function TastingSession() {
         setIsNavigating(true);
         triggerHaptic('success');
         
-        // Use a shorter delay for text questions to prevent race conditions
-        const navigationDelay = (currentSlide?.type === 'question' && 
-          (currentSlide?.payloadJson?.questionType === 'text' || 
-           currentSlide?.payloadJson?.question_type === 'text')) ? 50 : TRANSITION_DURATIONS.slideNavigation;
+        // Use consistent delay for all question types to ensure saves complete
+        const navigationDelay = TRANSITION_DURATIONS.slideNavigation;
         
         setTimeout(() => {
           setCurrentSlideIndex(currentSlideIndex + 1);
@@ -665,34 +695,22 @@ export default function TastingSession() {
 
   // Handle answer changes
   const handleAnswerChange = async (slideId: string, answer: any) => {
-    console.log('💾 [ANSWER CHANGE] handleAnswerChange triggered:', { 
-      slideId, 
-      answer, 
-      participantId,
-      currentSlideId: currentSlide?.id,
-      answersBeforeUpdate: { ...answers },
-      timestamp: new Date().toISOString()
-    });
-    
     // Update answers state immediately for UI responsiveness
-    setAnswers(prev => {
-      const newAnswers = { ...prev, [slideId]: answer };
-      console.log('📝 [STATE UPDATE] Answers state updated:', {
-        oldAnswers: prev,
-        newAnswers,
-        changedSlideId: slideId
-      });
-      return newAnswers;
-    });
+    setAnswers(prev => ({ ...prev, [slideId]: answer }));
     
     // Save response in background without blocking UI
     if (participantId) {
       setIsSaving(true);
       try {
         await saveResponse(participantId, slideId, answer);
-        console.log('✅ [SAVE COMPLETE] Response saved successfully');
+        
+        // Update participant progress on the server
+        // Progress is 1-indexed (slide 0 = progress 1)
+        const progress = currentSlideIndex + 1;
+        await apiRequest('PATCH', `/api/participants/${participantId}/progress`, { progress });
+        
       } catch (error) {
-        console.error('❌ [SAVE ERROR] Error saving response:', error);
+        console.error('Error saving response:', error);
       } finally {
         // Use setTimeout to ensure isSaving is updated after any pending state changes
         setTimeout(() => setIsSaving(false), 0);
@@ -715,19 +733,7 @@ export default function TastingSession() {
 
   // Render current slide content
   const renderSlideContent = () => {
-    console.log('🎨 [RENDER SLIDE] renderSlideContent called:', {
-      currentSlideExists: !!currentSlide,
-      currentSlideId: currentSlide?.id,
-      currentSlideType: currentSlide?.type,
-      currentSlideIndex,
-      totalSlides: slides?.length,
-      isNavigating,
-      isSaving,
-      timestamp: new Date().toISOString()
-    });
-    
     if (!currentSlide) {
-      console.log('⚠️ [RENDER SLIDE] No current slide, returning fallback content');
       return (
         <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl text-center">
           <p className="text-white">No slide data available</p>
@@ -735,8 +741,6 @@ export default function TastingSession() {
         </div>
       );
     }
-
-    console.log('🔀 [RENDER SLIDE] Entering switch for type:', currentSlide.type, 'with payload:', currentSlide.payloadJson);
     
     switch (currentSlide.type) {
       case 'interlude':

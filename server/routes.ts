@@ -156,10 +156,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
       allSlides = allSlides.concat(packageSlidesWithContext);
 
-      // Get slides for each wine and combine them
+      // Get all wine slides in a single query (optimized)
+      const wineIds = wines.map(w => w.id);
+      const allWineSlides = wineIds.length > 0 
+        ? await storage.getSlidesByPackageWineIds(wineIds)
+        : [];
+      
+      // Group slides by wine ID for context addition
+      const slidesByWineId = allWineSlides.reduce((acc, slide) => {
+        if (!acc[slide.packageWineId!]) acc[slide.packageWineId!] = [];
+        acc[slide.packageWineId!].push(slide);
+        return acc;
+      }, {} as Record<string, typeof allWineSlides>);
+      
+      // Add wine context to each slide
       for (const wine of wines) {
-        const wineSlides = await storage.getSlidesByPackageWineId(wine.id);
-        // Add wine context to each slide
+        const wineSlides = slidesByWineId[wine.id] || [];
         const slidesWithWineContext = wineSlides.map(slide => ({
           ...slide,
           wineInfo: {
@@ -367,7 +379,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Session does not have an active host. Please contact the session organizer." });
       }
 
-      // 5. Create the participant using the actual session UUID
+      // 5. Check if participant with same email already exists in this session
+      let existingParticipant = null;
+      if (participantInputData.email) {
+        existingParticipant = await storage.getParticipantByEmailInSession(session.id, participantInputData.email);
+        
+        if (existingParticipant) {
+          console.log(`[JOIN_RESUME] Found existing participant with email ${participantInputData.email} in session ${session.id}`);
+          
+          // Update their display name if it changed
+          if (existingParticipant.displayName !== participantInputData.displayName) {
+            await storage.updateParticipantDisplayName(existingParticipant.id, participantInputData.displayName);
+            existingParticipant.displayName = participantInputData.displayName;
+          }
+          
+          // Update their last active time
+          await storage.updateParticipantProgress(existingParticipant.id, existingParticipant.progressPtr || 0);
+          
+          console.log(`[JOIN_RESUME] Participant ${existingParticipant.displayName} (ID: ${existingParticipant.id}) resuming session ${session.id}`);
+          return res.json({
+            ...existingParticipant,
+            isReturning: true
+          });
+        }
+      }
+      
+      // 6. Create new participant if none exists
       const participantPayload = {
         ...participantInputData,
         sessionId: session.id  // CRITICAL FIX: Use actual session UUID, not short code
@@ -402,7 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Failed to create participant. Please try again." });
       }
 
-      // 6. Update participant count using the actual session UUID
+      // 7. Update participant count using the actual session UUID
       const updatedParticipantsList = await storage.getParticipantsBySessionId(session.id);
       await storage.updateSessionParticipantCount(session.id, updatedParticipantsList.length);
 
@@ -688,6 +725,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(responses);
     } catch (error) {
       console.error("Error fetching participant responses:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Update participant progress
+  app.patch("/api/participants/:participantId/progress", async (req, res) => {
+    try {
+      const { participantId } = req.params;
+      const { progress } = req.body;
+      
+      if (typeof progress !== 'number' || progress < 0) {
+        return res.status(400).json({ message: "Invalid progress value" });
+      }
+      
+      const participant = await storage.getParticipantById(participantId);
+      if (!participant) {
+        return res.status(404).json({ message: "Participant not found" });
+      }
+      
+      await storage.updateParticipantProgress(participantId, progress);
+      res.json({ success: true, progress });
+    } catch (error) {
+      console.error("Error updating participant progress:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

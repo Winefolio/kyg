@@ -132,8 +132,23 @@ export default function SessionJoin() {
 
         triggerHaptic('success');
         
-        // Navigate to tasting session
-        setLocation(`/tasting/${sessionIdFromUrl}/${participant.id}`);
+        // Handle returning participants
+        if (participant.isReturning) {
+          console.log('[SESSION_JOIN] Returning participant detected:', {
+            participantId: participant.id,
+            progressPtr: participant.progressPtr,
+            email: participant.email
+          });
+          
+          // Show welcome back message
+          alert(`Welcome back, ${participant.displayName}! We'll resume where you left off.`);
+        }
+        
+        // Navigate to tasting session with resume parameter
+        const resumeParam = participant.isReturning && participant.progressPtr > 0 
+          ? `?resume=${participant.progressPtr}` 
+          : '';
+        setLocation(`/tasting/${sessionIdFromUrl}/${participant.id}${resumeParam}`);
         
       } else {
         // Creating a new session (original flow for hosts or package code entry)
