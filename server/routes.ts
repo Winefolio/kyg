@@ -1421,6 +1421,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Batch update slide positions
+  app.post("/api/slides/batch-update-positions", async (req, res) => {
+    try {
+      const { updates } = req.body;
+      
+      if (!Array.isArray(updates) || updates.length === 0) {
+        return res.status(400).json({ 
+          message: "Updates array is required" 
+        });
+      }
+      
+      // Validate all updates
+      for (const update of updates) {
+        if (!update.slideId || typeof update.position !== 'number') {
+          return res.status(400).json({ 
+            message: "Each update must have slideId and position" 
+          });
+        }
+      }
+      
+      await storage.batchUpdateSlidePositions(updates);
+      res.json({ 
+        success: true, 
+        message: `${updates.length} slide positions updated successfully` 
+      });
+    } catch (error: any) {
+      console.error("Error in batch position update:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Batch position update failed", 
+        error: error.message || 'Unknown error'
+      });
+    }
+  });
+
   // UPDATED: Use new function to include wines  
   app.get("/api/packages-with-wines", async (req, res) => {
     try {
@@ -1679,11 +1714,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         publicId: mediaRecord.publicId,
+        accessUrl: `/api/media/${mediaRecord.publicId}/file`,
         mediaType,
         fileName: originalname,
-        fileSize: buffer.length,
-        // Provide secure access URL instead of raw storage URL
-        accessUrl: `/api/media/${mediaRecord.publicId}/file`
+        fileSize: buffer.length
       });
     } catch (error) {
       // Detailed error logging

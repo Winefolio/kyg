@@ -74,51 +74,20 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
       <CardContent className="space-y-6">
         <div>
           <Label className="text-white/80">Question Type</Label>
-          <Select value={payload.question_type || payload.type || 'multiple_choice'} onValueChange={(value) => {
-            handleFieldChange('question_type', value);
-            handleFieldChange('type', value); // Also update type field for backward compatibility
-            
-            // Immediately initialize default options when switching to multiple choice
-            if (value === 'multiple_choice' && (!payload.options || payload.options.length === 0)) {
-              onPayloadChange({
-                ...payload,
-                question_type: value,
-                type: value,
-                options: [
-                  { value: 'option1', text: 'Option 1', description: '' },
-                  { value: 'option2', text: 'Option 2', description: '' }
-                ]
-              });
-            } else if (value === 'boolean' && (!payload.trueLabel && !payload.falseLabel)) {
-              // Initialize boolean question defaults
-              onPayloadChange({
-                ...payload,
-                question_type: value,
-                type: value,
-                trueLabel: 'Yes',
-                falseLabel: 'No'
-              });
-            } else if ((value === 'scale' || value === 'slider') && (!payload.scale_min && !payload.scale_max)) {
-              // Initialize scale question defaults
-              onPayloadChange({
-                ...payload,
-                question_type: value,
-                type: value,
-                scale_min: 1,
-                scale_max: 10,
-                scale_labels: ['Low', 'High']
-              });
-            }
-          }}>
-            <SelectTrigger className="bg-white/10 border-white/20 text-white"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
-              <SelectItem value="scale">Scale Rating</SelectItem>
-              <SelectItem value="slider">Scale Rating</SelectItem>
-              <SelectItem value="text">Text Input</SelectItem>
-              <SelectItem value="boolean">Yes/No</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center space-x-2">
+            <div className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-1">
+              <span className="text-white">
+                {(payload.question_type || payload.type) === 'multiple_choice' && '✓ Multiple Choice'}
+                {((payload.question_type || payload.type) === 'scale' || (payload.question_type || payload.type) === 'slider') && '📊 Scale Rating'}
+                {(payload.question_type || payload.type) === 'text' && '✏️ Text Input'}
+                {(payload.question_type || payload.type) === 'boolean' && '✅ Yes/No'}
+                {!(payload.question_type || payload.type) && '✓ Multiple Choice'}
+              </span>
+            </div>
+            <span className="text-white/40 text-sm">
+              (Cannot be changed)
+            </span>
+          </div>
         </div>
 
         {(payload.question_type === 'multiple_choice' || payload.type === 'multiple_choice') && (

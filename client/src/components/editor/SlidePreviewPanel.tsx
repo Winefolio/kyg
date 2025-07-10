@@ -79,6 +79,30 @@ function renderSlideContent(slide: Slide) {
         </PreviewWrapper>
       );
 
+    case 'media':
+      const mediaPayload = slide.payloadJson as any;
+      return (
+        <div className="bg-gradient-card backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl h-full flex flex-col">
+          {mediaPayload.title && (
+            <h3 className="text-2xl font-bold text-white mb-4 text-center">{mediaPayload.title}</h3>
+          )}
+          {mediaPayload.image_url && (
+            <div className="flex-1 flex items-center justify-center">
+              <img 
+                src={mediaPayload.image_url} 
+                alt={mediaPayload.alt_text || mediaPayload.title || 'Image'} 
+                className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+              />
+            </div>
+          )}
+          {!mediaPayload.image_url && (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-white/50">No image URL provided</p>
+            </div>
+          )}
+        </div>
+      );
+
     case 'question':
       // Check for new generic_questions format first
       if (slide.genericQuestions) {

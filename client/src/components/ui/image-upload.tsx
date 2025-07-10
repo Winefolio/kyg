@@ -89,6 +89,8 @@ export function ImageUpload({
         const formData = new FormData();
         formData.append('file', file);
         formData.append('type', 'image');
+        formData.append('entityType', 'slide');
+        formData.append('entityId', 'temp-' + Date.now());
         
         const response = await fetch('/api/upload', {
           method: 'POST',
@@ -97,7 +99,7 @@ export function ImageUpload({
         
         if (response.ok) {
           const result = await response.json();
-          onChange(result.url);
+          onChange(result.accessUrl);
         } else {
           throw new Error('Upload failed');
         }

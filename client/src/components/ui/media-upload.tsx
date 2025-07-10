@@ -8,7 +8,7 @@ import { apiRequest } from '@/lib/queryClient';
 
 interface MediaUploadProps {
   value?: string;
-  onChange: (result: UploadResult) => void;
+  onChange: (result: UploadResult | null) => void;
   accept: 'image' | 'video' | 'audio' | 'all';
   label?: string;
   placeholder?: string;
@@ -20,7 +20,7 @@ interface MediaUploadProps {
 
 interface UploadResult {
   publicId: string;
-  accessUrl: string;
+  url: string;
   mediaType: 'image' | 'video' | 'audio';
   fileName: string;
   fileSize: number;
@@ -203,7 +203,16 @@ export function MediaUpload({
       }, 200);
 
       const response = await uploadWithRetry(formData);
-      const result = await response.json() as UploadResult;
+      const serverResponse = await response.json();
+
+      // Map server response to expected interface
+      const result: UploadResult = {
+        publicId: serverResponse.publicId,
+        url: serverResponse.accessUrl,  // Map accessUrl to url
+        mediaType: serverResponse.mediaType,
+        fileName: serverResponse.fileName,
+        fileSize: serverResponse.fileSize
+      };
 
       clearInterval(progressInterval);
       setUploadProgress(100);
@@ -277,7 +286,7 @@ export function MediaUpload({
       }
     }
     
-    onChange('');
+    onChange(null);
     setUploadedFile(null);
     setError(null);
     if (fileInputRef.current) {

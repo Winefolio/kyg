@@ -3035,9 +3035,16 @@ export class DatabaseStorage implements IStorage {
       const pos1 = slide1[0].position;
       const pos2 = slide2[0].position;
       
-      // Simply swap the positions - no temporary positions needed
-      await tx.update(slides).set({ position: pos2 }).where(eq(slides.id, slideId1));
+      // Use temporary position to avoid unique constraint violation
+      const tempPosition = Math.max(pos1, pos2) + 1000000; // Temporary position way above normal range
+      
+      // Three-step swap to avoid constraint violation:
+      // 1. Move slide1 to temp position
+      await tx.update(slides).set({ position: tempPosition }).where(eq(slides.id, slideId1));
+      // 2. Move slide2 to slide1's original position
       await tx.update(slides).set({ position: pos1 }).where(eq(slides.id, slideId2));
+      // 3. Move slide1 to slide2's original position
+      await tx.update(slides).set({ position: pos2 }).where(eq(slides.id, slideId1));
       
       console.log(`✅ Swapped positions: ${slideId1}(${pos1}) ↔ ${slideId2}(${pos2})`);
     });
@@ -3092,6 +3099,36 @@ export class DatabaseStorage implements IStorage {
         .where(eq(slides.id, slideId));
       
       console.log(`✅ Assigned slide ${slideId} to position ${targetPosition}`);
+    });
+  }
+  
+  /**
+   * Batch update slide positions - updates all positions in a single transaction
+   */
+  async batchUpdateSlidePositions(updates: Array<{ slideId: string; position: number }>): Promise<void> {
+    console.log(`📦 Batch updating ${updates.length} slide positions`);
+    
+    await db.transaction(async (tx) => {
+      // First, move all slides to temporary positions to avoid conflicts
+      const tempPositionBase = 900000000;
+      
+      for (let i = 0; i < updates.length; i++) {
+        const update = updates[i];
+        await tx
+          .update(slides)
+          .set({ position: tempPositionBase + i })
+          .where(eq(slides.id, update.slideId));
+      }
+      
+      // Then assign final positions
+      for (const update of updates) {
+        await tx
+          .update(slides)
+          .set({ position: update.position })
+          .where(eq(slides.id, update.slideId));
+      }
+      
+      console.log(`✅ Batch updated ${updates.length} slide positions successfully`);
     });
   }
   

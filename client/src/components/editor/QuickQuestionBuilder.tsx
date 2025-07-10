@@ -500,10 +500,17 @@ export function QuickQuestionBuilder({
             <MediaUpload
               value={(questionData.config as VideoMessageConfig).video_url || ''}
               onChange={(result) => {
-                updateConfig('video_publicId', result.publicId);
-                updateConfig('video_url', result.accessUrl);
-                updateConfig('video_fileName', result.fileName);
-                updateConfig('video_fileSize', result.fileSize);
+                if (result) {
+                  updateConfig('video_publicId', result.publicId);
+                  updateConfig('video_url', result.url);
+                  updateConfig('video_fileName', result.fileName);
+                  updateConfig('video_fileSize', result.fileSize);
+                } else {
+                  updateConfig('video_publicId', '');
+                  updateConfig('video_url', '');
+                  updateConfig('video_fileName', '');
+                  updateConfig('video_fileSize', 0);
+                }
               }}
               accept="video"
               label="Video File"
@@ -559,10 +566,17 @@ export function QuickQuestionBuilder({
             <MediaUpload
               value={(questionData.config as AudioMessageConfig).audio_url || ''}
               onChange={(result) => {
-                updateConfig('audio_publicId', result.publicId);
-                updateConfig('audio_url', result.accessUrl);
-                updateConfig('audio_fileName', result.fileName);
-                updateConfig('audio_fileSize', result.fileSize);
+                if (result) {
+                  updateConfig('audio_publicId', result.publicId);
+                  updateConfig('audio_url', result.url);
+                  updateConfig('audio_fileName', result.fileName);
+                  updateConfig('audio_fileSize', result.fileSize);
+                } else {
+                  updateConfig('audio_publicId', '');
+                  updateConfig('audio_url', '');
+                  updateConfig('audio_fileName', '');
+                  updateConfig('audio_fileSize', 0);
+                }
               }}
               accept="audio"
               label="Audio File"

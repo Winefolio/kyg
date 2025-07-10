@@ -287,11 +287,11 @@ export default function PackageEditor() {
 
   const updateSlideMutation = useMutation({
     mutationFn: ({ slideId, data }: { slideId: string; data: any }) => apiRequest('PATCH', `/api/slides/${slideId}`, data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       // Remove from pending content changes on successful save
       setPendingContentChanges(prev => {
         const newSet = new Set(prev);
-        newSet.delete(activeSlideId || '');
+        newSet.delete(variables.slideId);
         return newSet;
       });
       queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
@@ -368,6 +368,62 @@ export default function PackageEditor() {
       setActivelyMovingSlide(null);
       setHasUnsavedChanges(false);
     },
+  });
+
+  // Smart swap mutation for adjacent slide swapping
+  const smartSwapMutation = useMutation({
+    mutationFn: ({ slideId1, slideId2 }: { slideId1: string; slideId2: string }) => 
+      apiRequest('POST', '/api/slides/smart-swap', { slideId1, slideId2 }),
+    onSuccess: () => {
+      console.log('✅ Smart swap completed successfully');
+      setHasUnsavedChanges(false);
+      setActivelyMovingSlide(null);
+      toast({
+        title: "Slide moved",
+        description: "Position updated successfully",
+        duration: 2000,
+      });
+      // Refresh data to ensure consistency
+      queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+    },
+    onError: (error) => {
+      console.error('❌ Failed to swap slide positions:', error);
+      // Revert the optimistic update
+      setLocalSlides(originalSlidesRef.current);
+      setActivelyMovingSlide(null);
+      toast({
+        title: "Failed to move slide",
+        description: "Please try again",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Batch update mutation for drag-and-drop
+  const batchUpdateMutation = useMutation({
+    mutationFn: (updates: Array<{ slideId: string; position: number }>) =>
+      apiRequest('POST', '/api/slides/batch-update-positions', { updates }),
+    onSuccess: () => {
+      console.log('✅ Batch position update completed successfully');
+      setHasUnsavedChanges(false);
+      toast({
+        title: "Slides reordered",
+        description: "Order updated successfully",
+        duration: 2000,
+      });
+      // Refresh data to ensure consistency
+      queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+    },
+    onError: (error) => {
+      console.error('❌ Failed to batch update positions:', error);
+      // Revert the optimistic update
+      setLocalSlides(originalSlidesRef.current);
+      toast({
+        title: "Failed to reorder slides",
+        description: "Please try again",
+        variant: "destructive"
+      });
+    }
   });
 
   // Enhanced validation function for slide updates
@@ -559,16 +615,14 @@ export default function PackageEditor() {
       { slideId, data },
       {
         onSuccess: () => {
-          // Remove from pending changes on success
+          // The mutation's onSuccess will handle clearing pending changes
+          // Just update the unsaved changes flag here
           setPendingContentChanges(prev => {
-            const next = new Set(prev);
-            next.delete(slideId);
-            return next;
+            if (pendingReorders.size === 0 && prev.size <= 1) {
+              setHasUnsavedChanges(false);
+            }
+            return prev;
           });
-          // Check if we still have unsaved changes
-          if (pendingReorders.size === 0 && pendingContentChanges.size === 1) {
-            setHasUnsavedChanges(false);
-          }
         },
         onError: () => {
           // Keep in pending changes on error
@@ -758,67 +812,22 @@ export default function PackageEditor() {
       return;
     }
     
-    // Use fractional indexing to avoid position conflicts
-    const allWineSlides = localSlides
-      .filter(s => s.packageWineId === slide.packageWineId)
-      .sort((a, b) => a.position - b.position);
+    // SIMPLIFIED: Use simple position swapping instead of fractional indexing
+    // Find the target slide to swap with (adjacent slide in the same section)
+    const currentSlidePosition = slide.position;
+    const targetSlidePosition = targetSlide.position;
     
-    // Find current position in sorted array
-    const currentIndex = allWineSlides.findIndex(s => s.id === slide.id);
-    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    
-    // Validate target index
-    if (targetIndex < 0 || targetIndex >= allWineSlides.length) {
-      console.log('⚠️ Target position out of bounds');
-      setActivelyMovingSlide(null);
-      return;
-    }
-    
-    // Calculate new fractional position to achieve the swap
-    let newPosition: number;
-    
-    if (direction === 'up' && targetIndex >= 0) {
-      // Moving up: we want to go ABOVE the target slide
-      // So we need a position between the target's previous neighbor and the target
-      const targetSlide = allWineSlides[targetIndex];
-      const prevOfTarget = targetIndex > 0 ? allWineSlides[targetIndex - 1] : null;
-      
-      if (prevOfTarget) {
-        // Place between previous slide and target
-        newPosition = (prevOfTarget.position + targetSlide.position) / 2;
-      } else {
-        // Target is first slide, go before it
-        newPosition = targetSlide.position / 2;
-      }
-    } else if (direction === 'down' && targetIndex < allWineSlides.length) {
-      // Moving down: we want to go BELOW the target slide
-      // So we need a position between the target and the target's next neighbor
-      const targetSlide = allWineSlides[targetIndex];
-      const nextOfTarget = targetIndex < allWineSlides.length - 1 ? allWineSlides[targetIndex + 1] : null;
-      
-      if (nextOfTarget) {
-        // Place between target and next slide
-        newPosition = (targetSlide.position + nextOfTarget.position) / 2;
-      } else {
-        // Target is last slide, go after it
-        newPosition = targetSlide.position + 10000;
-      }
-    } else {
-      console.log('⚠️ Invalid move operation');
-      setActivelyMovingSlide(null);
-      return;
-    }
-    
-    console.log(`🎯 Moving slide ${slideId} to new position ${newPosition} (between ${
-      direction === 'up' ? 
-      `${targetIndex > 0 ? allWineSlides[targetIndex - 1].position : 0} and ${allWineSlides[targetIndex].position}` :
-      `${allWineSlides[targetIndex].position} and ${targetIndex < allWineSlides.length - 1 ? allWineSlides[targetIndex + 1].position : allWineSlides[targetIndex].position + 10000}`
-    })`);
+    console.log(`🔄 Simple swap: ${slideId} (pos ${currentSlidePosition}) ↔ ${targetSlide.id} (pos ${targetSlidePosition})`);
     
     // Update local state immediately for instant UI feedback
-    const updatedSlides = localSlides.map(s => 
-      s.id === slideId ? { ...s, position: newPosition } : s
-    );
+    const updatedSlides = localSlides.map(s => {
+      if (s.id === slideId) {
+        return { ...s, position: targetSlidePosition };
+      } else if (s.id === targetSlide.id) {
+        return { ...s, position: currentSlidePosition };
+      }
+      return s;
+    });
     setLocalSlides(updatedSlides);
     setHasUnsavedChanges(true);
     
@@ -827,31 +836,8 @@ export default function PackageEditor() {
       setActivelyMovingSlide(null);
     }, 300);
     
-    // Make the API call to update the position
-    updateSlidePositionMutation.mutate(
-      { slideId, newPosition },
-      {
-        onSuccess: () => {
-          console.log('✅ Slide position updated successfully');
-          setHasUnsavedChanges(false);
-          toast({
-            title: "Slide moved",
-            description: "Position updated successfully",
-            duration: 2000,
-          });
-        },
-        onError: (error) => {
-          console.error('❌ Failed to update slide position:', error);
-          // Revert the optimistic update
-          setLocalSlides(originalSlidesRef.current);
-          toast({
-            title: "Failed to move slide",
-            description: "Please try again",
-            variant: "destructive"
-          });
-        }
-      }
-    );
+    // Execute the smart swap to properly exchange positions
+    smartSwapMutation.mutate({ slideId1: slideId, slideId2: targetSlide.id });
   };
 
   // Handle drag-and-drop reordering with fractional indexing
@@ -877,52 +863,36 @@ export default function PackageEditor() {
     // Calculate new fractional position for the moved slide
     let newPosition: number;
     
-    if (movedSlideIndex === 0) {
-      // Moved to the beginning
-      const nextSlide = reorderedSlides[1];
-      newPosition = nextSlide ? nextSlide.position / 2 : 5000;
-    } else if (movedSlideIndex === reorderedSlides.length - 1) {
-      // Moved to the end
-      const prevSlide = reorderedSlides[movedSlideIndex - 1];
-      newPosition = prevSlide.position + 10000;
-    } else {
-      // Moved to the middle
-      const prevSlide = reorderedSlides[movedSlideIndex - 1];
-      const nextSlide = reorderedSlides[movedSlideIndex + 1];
-      newPosition = (prevSlide.position + nextSlide.position) / 2;
+    // For drag-and-drop, we need to update multiple slides with new positions
+    // Instead of fractional indexing, we'll reassign positions with proper gaps
+    
+    // Update all slides in this wine with new positions based on their order
+    const updates: Array<{ slideId: string; position: number }> = [];
+    
+    reorderedSlides.forEach((slide, index) => {
+      const newPosition = (index + 1) * 10000; // Gap-based positioning
+      if (slide.position !== newPosition) {
+        updates.push({ slideId: slide.id, position: newPosition });
+      }
+    });
+    
+    if (updates.length === 0) {
+      console.log('No position changes needed');
+      return;
     }
     
-    console.log(`🎯 Drag-drop: Moving slide ${movedSlide.id} to position ${newPosition}`);
+    console.log(`🔄 Batch updating ${updates.length} slide positions`);
     
-    // Update local state immediately
-    const updatedSlides = localSlides.map(s => 
-      s.id === movedSlide.id ? { ...s, position: newPosition } : s
-    );
+    // Update local state immediately for all affected slides
+    const updatedSlides = localSlides.map(s => {
+      const update = updates.find(u => u.slideId === s.id);
+      return update ? { ...s, position: update.position } : s;
+    });
     setLocalSlides(updatedSlides);
+    setHasUnsavedChanges(true);
     
-    // Make the API call
-    updateSlidePositionMutation.mutate(
-      { slideId: movedSlide.id, newPosition },
-      {
-        onSuccess: () => {
-          console.log('✅ Drag-drop position update successful');
-          toast({
-            title: "Slide reordered",
-            description: "Position updated successfully",
-            duration: 2000,
-          });
-        },
-        onError: (error) => {
-          console.error('❌ Drag-drop position update failed:', error);
-          setLocalSlides(originalSlidesRef.current);
-          toast({
-            title: "Failed to reorder slide",
-            description: "Please try again",
-            variant: "destructive"
-          });
-        }
-      }
-    );
+    // Execute batch update
+    batchUpdateMutation.mutate(updates);
   };
 
   // Since we're now doing real-time saves, this function is simplified

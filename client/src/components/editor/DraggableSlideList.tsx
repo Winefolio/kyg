@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useState, useCallback, useRef } from 'react';
 import type { Slide } from '@shared/schema';
 
@@ -56,6 +57,7 @@ function DraggableSlideItem({
 }: DraggableSlideItemProps) {
   const controls = useDragControls();
   const clickTimestamps = useRef<Map<string, number>>(new Map());
+  const [isDragging, setIsDragging] = useState(false);
   
   // Get appropriate icon based on slide type and question type
   const getSlideIcon = () => {
@@ -152,16 +154,20 @@ function DraggableSlideItem({
         boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)",
         backgroundColor: "rgba(139, 92, 246, 0.1)"
       }}
-      dragListener={false}
       dragControls={controls}
+      onDragStart={() => setIsDragging(true)}
+      onDragEnd={() => {
+        // Small delay to prevent click event from firing immediately after drag
+        setTimeout(() => setIsDragging(false), 100);
+      }}
     >
       <div 
-        className="p-2.5 cursor-pointer flex items-center"
-        onClick={() => onSlideClick(slide.id)}
+        className="p-2.5 cursor-pointer flex items-center touch-none"
+        onClick={() => !isDragging && onSlideClick(slide.id)}
+        onPointerDown={(e) => !isDisabled && controls.start(e)}
       >
         <div
-          className={`touch-none ${isDisabled ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'}`}
-          onPointerDown={(e) => !isDisabled && controls.start(e)}
+          className={`${isDisabled ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'}`}
         >
           <GripVertical className={`w-3.5 h-3.5 mr-2 flex-shrink-0 ${hasPendingPositionChange ? 'text-amber-400' : 'text-white/30'}`} />
         </div>
@@ -178,7 +184,7 @@ function DraggableSlideItem({
           {getSlideIcon()}
         </div>
         
-        <div className="flex items-center flex-1 min-w-0">
+        <div className="flex items-center flex-1 min-w-0 pr-2 group-hover:pr-20">
           {isWelcomeSlide && (
             <>
               <Sparkles className="w-3 h-3 mr-1.5 text-amber-400 flex-shrink-0" />
@@ -187,13 +193,20 @@ function DraggableSlideItem({
               </Badge>
             </>
           )}
-          <p className="text-sm font-medium text-white truncate">
-            {(slide.payloadJson as any)?.title || 'Untitled Slide'}
-          </p>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <p className="text-sm font-medium text-white truncate" title={(slide.payloadJson as any)?.title || 'Untitled Slide'}>
+                {(slide.payloadJson as any)?.title || 'Untitled Slide'}
+              </p>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs bg-gray-900 text-white border-gray-700">
+              <p className="text-sm">{(slide.payloadJson as any)?.title || 'Untitled Slide'}</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
         
-        {/* Action buttons */}
-        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Action buttons - absolutely positioned */}
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1 bg-gray-900/90 backdrop-blur-sm rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 shadow-lg">
           <Button
             size="sm"
             variant="ghost"

@@ -145,28 +145,20 @@ export function SlideConfigPanel({
                             />
                         </div>
                         <div>
-                            <Label htmlFor="section-type" className="text-white/80">Section</Label>
-                            <Select
-                                value={slide.section_type || 'deep_dive'}
-                                onValueChange={(value: string) => {
-                                    setIsSaving(true);
-                                    // Trigger immediate preview update for section type change
-                                    if (onPreviewUpdate) {
-                                        onPreviewUpdate(slide.id, { ...localPayload, section_type: value });
-                                    }
-                                    onUpdate(slide.id, { section_type: value });
-                                    setTimeout(() => setIsSaving(false), 500);
-                                }}
-                            >
-                                <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="intro">🎬 Intro</SelectItem>
-                                    <SelectItem value="deep_dive">🤔 Deep Dive</SelectItem>
-                                    <SelectItem value="ending">🏁 Ending</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            <Label className="text-white/80">Section</Label>
+                            <div className="flex items-center space-x-2">
+                                <div className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-1">
+                                    <span className="text-white">
+                                        {slide.section_type === 'intro' && '🎬 Intro'}
+                                        {slide.section_type === 'deep_dive' && '🤔 Deep Dive'}
+                                        {slide.section_type === 'ending' && '🏁 Ending'}
+                                        {!slide.section_type && '🤔 Deep Dive'}
+                                    </span>
+                                </div>
+                                <span className="text-white/40 text-sm">
+                                    (Cannot be changed)
+                                </span>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -230,12 +222,25 @@ export function SlideConfigPanel({
                             ) : (
                                 <MediaUpload
                                     accept="video"
-                                    value=""
+                                    value={localPayload.video_url || ''}
                                     onChange={(result) => {
-                                        handleFieldChange('video_publicId', result.publicId);
-                                        handleFieldChange('video_url', result.accessUrl);
-                                        handleFieldChange('video_fileName', result.fileName);
-                                        handleFieldChange('video_fileSize', result.fileSize);
+                                        if (result) {
+                                            const updates = {
+                                                video_publicId: result.publicId,
+                                                video_url: result.url,
+                                                video_fileName: result.fileName,
+                                                video_fileSize: result.fileSize
+                                            };
+                                            handlePayloadChange({ ...localPayload, ...updates });
+                                        } else {
+                                            const updates = {
+                                                video_publicId: '',
+                                                video_url: '',
+                                                video_fileName: '',
+                                                video_fileSize: 0
+                                            };
+                                            handlePayloadChange({ ...localPayload, ...updates });
+                                        }
                                     }}
                                     label="Upload Video"
                                     entityId={slide.id}
@@ -317,12 +322,25 @@ export function SlideConfigPanel({
                             ) : (
                                 <MediaUpload
                                     accept="audio"
-                                    value=""
+                                    value={localPayload.audio_url || ''}
                                     onChange={(result) => {
-                                        handleFieldChange('audio_publicId', result.publicId);
-                                        handleFieldChange('audio_url', result.accessUrl);
-                                        handleFieldChange('audio_fileName', result.fileName);
-                                        handleFieldChange('audio_fileSize', result.fileSize);
+                                        if (result) {
+                                            const updates = {
+                                                audio_publicId: result.publicId,
+                                                audio_url: result.url,
+                                                audio_fileName: result.fileName,
+                                                audio_fileSize: result.fileSize
+                                            };
+                                            handlePayloadChange({ ...localPayload, ...updates });
+                                        } else {
+                                            const updates = {
+                                                audio_publicId: '',
+                                                audio_url: '',
+                                                audio_fileName: '',
+                                                audio_fileSize: 0
+                                            };
+                                            handlePayloadChange({ ...localPayload, ...updates });
+                                        }
                                     }}
                                     label="Upload Audio"
                                     entityId={slide.id}
@@ -437,7 +455,71 @@ export function SlideConfigPanel({
                 </Card>
             )}
 
-            {slide.type !== "question" && slide.type !== "video_message" && slide.type !== "audio_message" && slide.type !== "transition" && slide.type !== "interlude" && (
+            {slide.type === "media" && (
+                <Card className="bg-white/5 border-white/10">
+                    <CardHeader>
+                        <CardTitle className="text-lg text-white">
+                            Media Slide Settings
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <Label htmlFor="title" className="text-white/80">
+                                Title (Optional)
+                            </Label>
+                            <Input
+                                id="title"
+                                value={localPayload.title || ""}
+                                onChange={(e) => handleFieldChange("title", e.target.value)}
+                                placeholder="Enter image title..."
+                                className="bg-white/5 border-white/10 text-white placeholder:text-white/50"
+                            />
+                        </div>
+                        
+                        <div>
+                            <Label htmlFor="alt_text" className="text-white/80">
+                                Alt Text
+                            </Label>
+                            <Input
+                                id="alt_text"
+                                value={localPayload.alt_text || ""}
+                                onChange={(e) => handleFieldChange("alt_text", e.target.value)}
+                                placeholder="Describe the image for accessibility..."
+                                className="bg-white/5 border-white/10 text-white placeholder:text-white/50"
+                            />
+                        </div>
+                        
+                        <div>
+                            <Label htmlFor="image_url" className="text-white/80">
+                                Image URL
+                            </Label>
+                            <Input
+                                id="image_url"
+                                value={localPayload.image_url || ""}
+                                onChange={(e) => handleFieldChange("image_url", e.target.value)}
+                                placeholder="Enter image URL or upload below..."
+                                className="bg-white/5 border-white/10 text-white placeholder:text-white/50"
+                            />
+                        </div>
+                        
+                        {/* Image preview */}
+                        {localPayload.image_url && (
+                            <div>
+                                <Label className="text-white/80 text-sm mb-2 block">Preview</Label>
+                                <div className="bg-black/20 rounded-lg overflow-hidden">
+                                    <img 
+                                        src={localPayload.image_url} 
+                                        alt={localPayload.alt_text || localPayload.title || "Preview"} 
+                                        className="w-full h-48 object-contain"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {slide.type !== "question" && slide.type !== "video_message" && slide.type !== "audio_message" && slide.type !== "transition" && slide.type !== "interlude" && slide.type !== "media" && (
                 <Card className="bg-white/5 border-white/10">
                     <CardHeader>
                         <CardTitle className="text-lg text-white">
