@@ -1278,141 +1278,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Reorder slides - Fixed version with proper constraint handling
-  app.put("/api/slides/reorder", async (req, res) => {
-    console.log(`🔥 SLIDE REORDER ENDPOINT HIT!`, {
-      method: req.method,
-      url: req.url,
-      headers: req.headers,
-      bodyType: typeof req.body,
-      bodyKeys: req.body ? Object.keys(req.body) : 'no body',
+  // Update single slide position - using fractional indexing
+  app.put("/api/slides/:slideId/position", async (req, res) => {
+    console.log(`🔄 SLIDE POSITION UPDATE:`, {
+      slideId: req.params.slideId,
+      newPosition: req.body.newPosition,
       timestamp: new Date().toISOString()
     });
     
     try {
-      const { updates } = req.body;
-      if (!Array.isArray(updates)) {
-        console.error(`❌ Updates is not an array:`, { updates, type: typeof updates });
-        return res.status(400).json({ message: "Updates must be an array" });
+      const { slideId } = req.params;
+      const { newPosition } = req.body;
+      
+      // Validate inputs
+      if (!slideId) {
+        return res.status(400).json({ message: "Invalid slideId" });
       }
       
-      console.log(`📋 Processing ${updates.length} slide position updates:`, {
-        updates: updates.map(u => ({ slideId: u.slideId, position: u.position, packageWineId: u.packageWineId })),
+      if (typeof newPosition !== 'number' || newPosition < 0) {
+        console.error(`❌ Invalid position value:`, { newPosition, type: typeof newPosition });
+        return res.status(400).json({ message: "Position must be a positive number" });
+      }
+      
+      console.log(`🎯 Updating slide ${slideId} to position ${newPosition}`);
+      
+      // Use the new simple storage method
+      await storage.updateSlidePosition(slideId, newPosition);
+      
+      console.log(`✅ Successfully updated slide position`);
+      res.json({ message: "Slide position updated successfully", slideId, newPosition });
+    } catch (error: any) {
+      console.error("❌ Failed to update slide position:", {
+        error: error.message,
+        slideId: req.params.slideId,
+        newPosition: req.body.newPosition,
         timestamp: new Date().toISOString()
       });
       
-      // Validate updates
-      if (updates.some(u => !u.slideId || typeof u.position !== 'number' || !u.packageWineId)) {
-        console.error(`❌ Invalid update format detected:`, {
-          invalidUpdates: updates.filter(u => !u.slideId || typeof u.position !== 'number' || !u.packageWineId),
-          allUpdates: updates
-        });
-        return res.status(400).json({ message: "Invalid update format. Each update must have slideId, position, and packageWineId." });
-      }
-      
-      // Use the proven storage layer method for reliable slide reordering
-      console.log(`🔄 Using storage.batchUpdateSlidePositions for reliable constraint handling`);
-      
-      try {
-        await storage.batchUpdateSlidePositions(updates);
-        console.log(`✅ Successfully updated ${updates.length} slide positions using storage layer`);
-      } catch (storageError: any) {
-        console.error(`❌ Storage layer error:`, {
-          error: storageError.message,
-          errorCode: storageError.code,
-          errorDetail: storageError.detail,
-          constraint: storageError.constraint,
-          updates: updates.map(u => ({ slideId: u.slideId, position: u.position, packageWineId: u.packageWineId }))
-        });
-        
-        // Check if it's a duplicate key error
-        if (storageError.code === '23505' || storageError.message?.includes('duplicate key')) {
-          throw new Error(`Position conflict detected. ${storageError.detail || storageError.message}`);
-        }
-        
-        throw storageError;
-      }
-      
-      res.json({ message: "Slides reordered successfully" });
-    } catch (error: any) {
-      console.error("❌ CRITICAL ERROR in slide reordering:", {
-        error: error.message,
-        errorCode: error.code,
-        errorDetail: error.detail,
-        constraint: error.constraint,
-        stack: error.stack,
-        timestamp: new Date().toISOString(),
-        requestBody: req.body,
-        userAgent: req.get('User-Agent'),
-        slideCount: req.body?.updates?.length || 0,
-        wineIds: Array.from(new Set(req.body?.updates?.map((u: any) => u.packageWineId) || []))
-      });
-      
-      // Handle specific database constraint errors with detailed guidance
-      if (error.code === '23505' || error.constraint?.includes('position') || error.message?.includes('duplicate key')) {
-        console.error("🚨 DATABASE CONSTRAINT VIOLATION (409):", {
-          constraintCode: error.code,
-          constraintName: error.constraint,
-          errorDetail: error.detail,
-          affectedUpdates: req.body?.updates || [],
-          guidance: "This indicates multiple slides are trying to use the same position within a wine"
-        });
-        
-        return res.status(409).json({ 
-          message: "Position conflict detected. Multiple slides cannot have the same position within the same wine.", 
-          error: "DUPLICATE_POSITION",
-          details: error.detail || 'Unique constraint violation on slide positions',
-          guidance: "Please refresh the page and try reordering again. If the issue persists, contact support."
-        });
-      }
-      
-      // Handle validation errors
-      if (error.message?.includes('Invalid update format') || error.message?.includes('packageWineId')) {
-        console.error("🚨 DATA VALIDATION ERROR (400):", {
-          validationError: error.message,
-          updates: req.body?.updates || [],
-          missingFields: req.body?.updates?.filter((u: any) => !u.slideId || !u.position || !u.packageWineId) || []
-        });
-        
-        return res.status(400).json({
-          message: "Invalid slide data format",
-          error: "VALIDATION_ERROR", 
-          details: error.message,
-          guidance: "Each slide update must include slideId, position, and packageWineId"
-        });
-      }
-      
-      // Handle network/database connection errors
-      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.message?.includes('connection')) {
-        console.error("🚨 DATABASE CONNECTION ERROR (503):", {
-          connectionError: error.message,
-          errorCode: error.code,
-          guidance: "Database connection failed"
-        });
-        
-        return res.status(503).json({
-          message: "Database temporarily unavailable",
-          error: "DATABASE_CONNECTION_ERROR",
-          details: "Please try again in a moment",
-          guidance: "This is usually a temporary issue. Please refresh and try again."
-        });
-      }
-      
-      // Log all other 500 errors with comprehensive context
-      console.error("💥 RETURNING 500 ERROR - UNKNOWN ISSUE:", {
-        errorMessage: error.message || "Internal server error",
-        errorCode: error.code || 'UNKNOWN_ERROR',
-        errorDetails: error.detail || error.constraint || 'Unknown error',
-        requestData: req.body,
-        timestamp: new Date().toISOString(),
-        guidance: "This is an unexpected error that needs investigation"
-      });
-      
       res.status(500).json({ 
-        message: "An unexpected error occurred while reordering slides", 
-        error: error.code || 'UNKNOWN_ERROR',
-        details: error.message || 'Internal server error',
-        guidance: "Please refresh the page and try again. If the issue persists, contact support with the timestamp: " + new Date().toISOString()
+        message: "Failed to update slide position",
+        error: error.message || 'Internal server error'
       });
     }
   });
@@ -1432,41 +1337,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // NEW: Endpoint to update slide order (uses transaction-based batch update)
-  app.put("/api/slides/order", async (req, res) => {
-    try {
-      const { slideUpdates } = req.body;
-      if (!Array.isArray(slideUpdates)) {
-        return res.status(400).json({ message: "Invalid payload: slideUpdates must be an array." });
-      }
-      
-      // Map to the format expected by batchUpdateSlidePositions
-      const updates = slideUpdates.map((update: any) => ({
-        slideId: update.slideId,
-        position: update.position,
-        packageWineId: update.packageWineId
-      }));
-      
-      await storage.batchUpdateSlidePositions(updates);
-      res.status(200).json({ message: "Slide order updated successfully." });
-    } catch (error: any) {
-      console.error("Failed to update slide order:", error);
-      
-      // Check for specific database constraint errors
-      if (error.code === '23505' || error.constraint === 'slides_package_wine_id_position_key') {
-        return res.status(409).json({ 
-          message: "Position conflict detected. Slides cannot have duplicate positions within the same wine.", 
-          error: "DUPLICATE_POSITION",
-          details: error.detail || 'Duplicate key violation'
-        });
-      }
-      
-      res.status(500).json({ 
-        message: error.message || "Failed to update slide order.",
-        error: error.code || 'UNKNOWN_ERROR' 
-      });
-    }
-  });
 
   // Position Recovery and Smart Reordering Endpoints
   

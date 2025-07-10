@@ -89,7 +89,6 @@ export default function PackageEditor() {
     wineType: string;
     sectionType: 'intro' | 'deep_dive' | 'ending';
   } | null>(null);
-  const [pendingReorders, setPendingReorders] = useState<Map<string, { slideId: string; position: number; packageWineId: string }>>(new Map());
   const [pendingContentChanges, setPendingContentChanges] = useState<Set<string>>(new Set());
   const [activelyMovingSlide, setActivelyMovingSlide] = useState<string | null>(null);
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
@@ -158,8 +157,8 @@ export default function PackageEditor() {
       setWines(sortedWines);
       setSlides(sortedSlides);
       
-      // Only update localSlides if we don't have pending changes
-      if (pendingReorders.size === 0 && pendingContentChanges.size === 0) {
+      // Only update localSlides if we don't have pending content changes
+      if (pendingContentChanges.size === 0) {
         setLocalSlides(sortedSlides);
         originalSlidesRef.current = sortedSlides;
       }
@@ -311,9 +310,10 @@ export default function PackageEditor() {
     onError: (error: any) => toast({ title: "Error deleting slide", description: error.message, variant: "destructive" }),
   });
 
-  const reorderSlidesMutation = useMutation({
-    mutationFn: (updates: { slideId: string; position: number; packageWineId?: string }[]) => 
-      apiRequest('PUT', '/api/slides/reorder', { updates }),
+  // New mutation for single slide position update using fractional indexing
+  const updateSlidePositionMutation = useMutation({
+    mutationFn: ({ slideId, newPosition }: { slideId: string; newPosition: number }) => 
+      apiRequest('PUT', `/api/slides/${slideId}/position`, { newPosition }),
     onSuccess: () => {
       // Show subtle success confirmation
       toast({ 
@@ -321,15 +321,14 @@ export default function PackageEditor() {
         description: "Slide order updated successfully",
         duration: 2000,
       });
-      // Clear all pending state after successful save
-      setPendingReorders(new Map());
+      // Clear pending state after successful save
       setPendingContentChanges(new Set());
       setActivelyMovingSlide(null);
       setHasUnsavedChanges(false);
       setIsSavingOrder(false);
       
       // No need for synchronous refetch - optimistic updates already applied
-      console.log('✅ Slide reorder completed - using optimistic updates');
+      console.log('✅ Slide position update completed');
     },
     onError: (error: any) => {
       console.error('❌ Slide reorder mutation failed:', error);
@@ -366,7 +365,6 @@ export default function PackageEditor() {
       setLocalSlides(originalSlidesRef.current);
       
       // Reset state without refetch
-      setPendingReorders(new Map());
       setActivelyMovingSlide(null);
       setHasUnsavedChanges(false);
     },
@@ -430,7 +428,6 @@ export default function PackageEditor() {
   // Force refresh function for when state gets out of sync
   const forceDataRefresh = useCallback(async () => {
     console.log('🔄 Force refreshing package data...');
-    setPendingReorders(new Map());
     setPendingContentChanges(new Set());
     setActivelyMovingSlide(null);
     setHasUnsavedChanges(false);
@@ -455,117 +452,6 @@ export default function PackageEditor() {
     });
   }, [code, queryClient, toast]);
 
-  // Optimistic slide reorder function with immediate UI updates
-  const performSlideReorder = useCallback(async (updates: Array<{ slideId: string; position: number; packageWineId: string }>) => {
-    if (updates.length === 0) return;
-    
-    // Prevent concurrent operations on the same slides
-    const slidesBeingMoved = new Set(updates.map(u => u.slideId));
-    if (isProcessingQueue) {
-      console.log('⏳ Operation already in progress, skipping duplicate request');
-      toast({
-        title: "Operation in Progress",
-        description: "Please wait for the current reorder to complete",
-        variant: "default"
-      });
-      return;
-    }
-    
-    console.log('🔄 Starting optimistic slide reorder:', updates);
-    setIsProcessingQueue(true);
-    setIsSavingOrder(true);
-    
-    try {
-      // Validate updates before sending
-      const validationErrors = validateSlideUpdates(updates);
-      if (validationErrors.length > 0) {
-        console.error('❌ Validation failed:', validationErrors);
-        toast({
-          title: "Validation Error",
-          description: `Invalid slide data: ${validationErrors[0]}. Try refreshing the page.`,
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Apply optimistic updates immediately for instant UI feedback
-      console.log('⚡ Applying optimistic updates to local state');
-      const optimisticSlides = [...localSlides];
-      updates.forEach(update => {
-        const slideIndex = optimisticSlides.findIndex(s => s.id === update.slideId);
-        if (slideIndex !== -1) {
-          optimisticSlides[slideIndex] = {
-            ...optimisticSlides[slideIndex],
-            position: update.position,
-            packageWineId: update.packageWineId
-          };
-        }
-      });
-      
-      // Sort and apply immediately
-      const sortedOptimisticSlides = optimisticSlides.sort((a, b) => a.position - b.position);
-      setLocalSlides(sortedOptimisticSlides);
-      console.log('✅ Optimistic updates applied - UI should update immediately');
-      
-      // Show brief success indicator
-      toast({
-        title: "Slide moved",
-        description: "Saving changes...",
-        duration: 2000,
-      });
-      
-      // Clear the actively moving slide indicator after a short delay
-      setTimeout(() => {
-        setActivelyMovingSlide(null);
-      }, 300);
-      
-      // Execute the reorder mutation in the background
-      console.log('🌐 Making API request to /api/slides/reorder (background)');
-      console.log('📦 Request payload:', { updates });
-      
-      // Unblock UI immediately after optimistic updates
-      setIsProcessingQueue(false);
-      setIsSavingOrder(false);
-      
-      // Make the API call asynchronously
-      reorderSlidesMutation.mutate(updates, {
-        onSuccess: () => {
-          console.log('✅ Slide reorder completed successfully (background)');
-          // Clear pending state
-          setPendingReorders(new Map());
-          setHasUnsavedChanges(false);
-          
-          // Update originalSlidesRef to reflect the new state
-          originalSlidesRef.current = sortedOptimisticSlides;
-        },
-        onError: (error) => {
-          console.error('❌ Slide reorder failed (background):', error);
-          // Error handling is done in the mutation's onError callback
-          // which includes rollback logic
-        }
-      });
-      
-    } catch (error) {
-      console.error('❌ Slide reorder validation failed:', error);
-      
-      // Only handle validation errors here (API errors are handled in mutation callbacks)
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      toast({
-        title: "Validation Error",
-        description: `Failed to validate slide data: ${errorMessage}`,
-        variant: "destructive"
-      });
-      
-      // Revert optimistic updates on validation error
-      setLocalSlides(originalSlidesRef.current);
-      setPendingReorders(new Map());
-      setActivelyMovingSlide(null);
-      setHasUnsavedChanges(false);
-      setIsProcessingQueue(false);
-      setIsSavingOrder(false);
-    }
-  }, [isProcessingQueue, toast, reorderSlidesMutation, localSlides, originalSlidesRef, forceDataRefresh, validateSlideUpdates]);
 
   // --- HELPER FUNCTIONS ---
   const getNextPositionForWine = (wineId: string): number => {
@@ -590,19 +476,6 @@ export default function PackageEditor() {
     return Math.max(nextPosition, BASE_POSITION);
   };
 
-  // Generate conflict-free positions for a sequence of slides
-  const generateConflictFreePositions = (slides: Slide[], startPosition: number): number[] => {
-    const GAP_SIZE = 1000;
-    const positions: number[] = [];
-    
-    // Use gap-based positioning for consistent spacing
-    for (let i = 0; i < slides.length; i++) {
-      const position = startPosition + (i * GAP_SIZE);
-      positions.push(position);
-    }
-    
-    return positions;
-  };
 
   // --- HANDLER FUNCTIONS ---
   const handleWineSave = (wineData: Partial<any>) => {
@@ -885,223 +758,182 @@ export default function PackageEditor() {
       return;
     }
     
-    // Instead of swapping positions directly, recalculate positions for the entire wine
-    // This prevents duplicate position conflicts that cause database constraint violations
+    // Use fractional indexing to avoid position conflicts
     const allWineSlides = localSlides
       .filter(s => s.packageWineId === slide.packageWineId)
       .sort((a, b) => a.position - b.position);
     
-    // Find current positions in sorted array
-    const wineSlideIndex = allWineSlides.findIndex(s => s.id === slide.id);
-    const wineTargetIndex = direction === 'up' ? wineSlideIndex - 1 : wineSlideIndex + 1;
+    // Find current position in sorted array
+    const currentIndex = allWineSlides.findIndex(s => s.id === slide.id);
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
     
-    // Create new order by moving the slide
-    const reorderedSlides = [...allWineSlides];
-    reorderedSlides.splice(wineSlideIndex, 1);
-    reorderedSlides.splice(wineTargetIndex, 0, slide);
-    
-    // Check if slides have legacy positions that need migration
-    const hasLegacyPositions = allWineSlides.some(s => s.position < 100000);
-    
-    let updates: Array<{ slideId: string; position: number; packageWineId: string }> = [];
-    
-    if (hasLegacyPositions) {
-      // If legacy positions exist, assign new gap-based positions to all slides
-      console.log('🔄 Detected legacy positions, converting to gap-based system');
-      
-      // Reorder slides as requested
-      const reorderedSlides = [...allWineSlides];
-      reorderedSlides.splice(wineSlideIndex, 1);
-      reorderedSlides.splice(wineTargetIndex, 0, slide);
-      
-      // Assign new gap-based positions
-      reorderedSlides.forEach((reorderedSlide, index) => {
-        const newPosition = 100000 + (index * 1000);
-        updates.push({
-          slideId: reorderedSlide.id,
-          position: newPosition,
-          packageWineId: reorderedSlide.packageWineId!
-        });
-      });
-    } else {
-      // Smart position assignment - only update positions that need to change
-      // Only update positions for the slides that actually moved
-      if (direction === 'up' && wineTargetIndex >= 0) {
-        // Moving up: only swap positions with the slide above
-        const targetSlide = allWineSlides[wineTargetIndex];
-        const currentSlide = allWineSlides[wineSlideIndex];
-        
-        console.log(`🔄 Swapping positions: ${currentSlide.type} (pos ${currentSlide.position}) ↔️ ${targetSlide.type} (pos ${targetSlide.position})`);
-        
-        updates.push({
-          slideId: currentSlide.id,
-          position: targetSlide.position,
-          packageWineId: currentSlide.packageWineId!
-        });
-        updates.push({
-          slideId: targetSlide.id,
-          position: currentSlide.position,
-          packageWineId: targetSlide.packageWineId!
-        });
-      } else if (direction === 'down' && wineTargetIndex < allWineSlides.length) {
-        // Moving down: only swap positions with the slide below
-        const targetSlide = allWineSlides[wineTargetIndex];
-        const currentSlide = allWineSlides[wineSlideIndex];
-        
-        console.log(`🔄 Swapping positions: ${currentSlide.type} (pos ${currentSlide.position}) ↔️ ${targetSlide.type} (pos ${targetSlide.position})`);
-        
-        updates.push({
-          slideId: currentSlide.id,
-          position: targetSlide.position,
-          packageWineId: currentSlide.packageWineId!
-        });
-        updates.push({
-          slideId: targetSlide.id,
-          position: currentSlide.position,
-          packageWineId: targetSlide.packageWineId!
-        });
-      }
+    // Validate target index
+    if (targetIndex < 0 || targetIndex >= allWineSlides.length) {
+      console.log('⚠️ Target position out of bounds');
+      setActivelyMovingSlide(null);
+      return;
     }
     
-    // Update local state with new positions
-    const newLocalSlides = localSlides.map(s => {
-      const update = updates.find(u => u.slideId === s.id);
-      if (update) {
-        return { ...s, position: update.position };
-      }
-      return s;
-    });
+    // Calculate new fractional position to achieve the swap
+    let newPosition: number;
     
-    // Set local state and mark as having changes
-    setLocalSlides(newLocalSlides);
+    if (direction === 'up' && targetIndex >= 0) {
+      // Moving up: we want to go ABOVE the target slide
+      // So we need a position between the target's previous neighbor and the target
+      const targetSlide = allWineSlides[targetIndex];
+      const prevOfTarget = targetIndex > 0 ? allWineSlides[targetIndex - 1] : null;
+      
+      if (prevOfTarget) {
+        // Place between previous slide and target
+        newPosition = (prevOfTarget.position + targetSlide.position) / 2;
+      } else {
+        // Target is first slide, go before it
+        newPosition = targetSlide.position / 2;
+      }
+    } else if (direction === 'down' && targetIndex < allWineSlides.length) {
+      // Moving down: we want to go BELOW the target slide
+      // So we need a position between the target and the target's next neighbor
+      const targetSlide = allWineSlides[targetIndex];
+      const nextOfTarget = targetIndex < allWineSlides.length - 1 ? allWineSlides[targetIndex + 1] : null;
+      
+      if (nextOfTarget) {
+        // Place between target and next slide
+        newPosition = (targetSlide.position + nextOfTarget.position) / 2;
+      } else {
+        // Target is last slide, go after it
+        newPosition = targetSlide.position + 10000;
+      }
+    } else {
+      console.log('⚠️ Invalid move operation');
+      setActivelyMovingSlide(null);
+      return;
+    }
+    
+    console.log(`🎯 Moving slide ${slideId} to new position ${newPosition} (between ${
+      direction === 'up' ? 
+      `${targetIndex > 0 ? allWineSlides[targetIndex - 1].position : 0} and ${allWineSlides[targetIndex].position}` :
+      `${allWineSlides[targetIndex].position} and ${targetIndex < allWineSlides.length - 1 ? allWineSlides[targetIndex + 1].position : allWineSlides[targetIndex].position + 10000}`
+    })`);
+    
+    // Update local state immediately for instant UI feedback
+    const updatedSlides = localSlides.map(s => 
+      s.id === slideId ? { ...s, position: newPosition } : s
+    );
+    setLocalSlides(updatedSlides);
     setHasUnsavedChanges(true);
     
-    // Update pending reorders map
-    const newPendingReorders = new Map(pendingReorders);
-    updates.forEach(update => {
-      newPendingReorders.set(update.slideId, update);
-    });
-    setPendingReorders(newPendingReorders);
+    // Clear the actively moving slide after animation
+    setTimeout(() => {
+      setActivelyMovingSlide(null);
+    }, 300);
     
-    // Use direct reorder for successful movements
-    if (updates.length > 0) {
-      console.log(`✅ Performing slide reorder changes for ${updates.length} slides:`, updates.map(u => `${u.slideId} -> pos ${u.position}`));
-      
-      // Convert map values to array for the direct function
-      const allUpdates = Array.from(newPendingReorders.values());
-      performSlideReorder(allUpdates);
-    } else {
-      console.log(`⚠️ No position updates needed for slide ${slideId} movement ${direction}`);
-    }
+    // Make the API call to update the position
+    updateSlidePositionMutation.mutate(
+      { slideId, newPosition },
+      {
+        onSuccess: () => {
+          console.log('✅ Slide position updated successfully');
+          setHasUnsavedChanges(false);
+          toast({
+            title: "Slide moved",
+            description: "Position updated successfully",
+            duration: 2000,
+          });
+        },
+        onError: (error) => {
+          console.error('❌ Failed to update slide position:', error);
+          // Revert the optimistic update
+          setLocalSlides(originalSlidesRef.current);
+          toast({
+            title: "Failed to move slide",
+            description: "Please try again",
+            variant: "destructive"
+          });
+        }
+      }
+    );
   };
 
-  // Handle drag-and-drop reordering
+  // Handle drag-and-drop reordering with fractional indexing
   const handleDragReorder = (reorderedSlides: Slide[], wineId: string) => {
-    // Prevent operations while queue is processing
-    if (isProcessingQueue) {
-      toast({
-        title: "Operation in Progress", 
-        description: "Please wait for the current operation to complete",
-        variant: "default"
-      });
+    // reorderedSlides is the new order of slides from framer-motion
+    const wineSlides = localSlides.filter(s => s.packageWineId === wineId).sort((a, b) => a.position - b.position);
+    
+    if (reorderedSlides.length === 0) return;
+    
+    // Find which slide was moved
+    const movedSlideIndex = reorderedSlides.findIndex((slide, index) => {
+      const originalIndex = wineSlides.findIndex(s => s.id === slide.id);
+      return originalIndex !== index;
+    });
+    
+    if (movedSlideIndex === -1) {
+      console.log('No slide was actually moved');
       return;
     }
     
-    // Get all slides for this wine in their new order
-    const otherSlides = localSlides.filter(s => s.packageWineId !== wineId);
+    const movedSlide = reorderedSlides[movedSlideIndex];
     
-    // Assign conflict-free positions to reordered slides
-    const updates: Array<{ slideId: string; position: number; packageWineId: string }> = [];
+    // Calculate new fractional position for the moved slide
+    let newPosition: number;
     
-    // Generate conflict-free positions starting from 100000+ to avoid all conflicts
-    const startPosition = 100000;
-    const newPositions = generateConflictFreePositions(reorderedSlides, startPosition);
-    
-    reorderedSlides.forEach((slide, index) => {
-      const newPosition = newPositions[index];
-      if (slide.position !== newPosition && slide.packageWineId) {
-        updates.push({ 
-          slideId: slide.id, 
-          position: newPosition, 
-          packageWineId: slide.packageWineId 
-        });
-      }
-    });
-    
-    // Update local state with new conflict-free positions
-    const updatedWineSlides = reorderedSlides.map((slide, index) => ({
-      ...slide,
-      position: newPositions[index]
-    }));
-    
-    // Combine with other wines' slides
-    const newLocalSlides = [...otherSlides, ...updatedWineSlides].sort((a, b) => a.position - b.position);
-    
-    // Set local state and mark as having changes
-    setLocalSlides(newLocalSlides);
-    setHasUnsavedChanges(true);
-    
-    // Update pending reorders map
-    const newPendingReorders = new Map(pendingReorders);
-    updates.forEach(update => {
-      newPendingReorders.set(update.slideId, update);
-    });
-    setPendingReorders(newPendingReorders);
-    
-    // Use direct reorder save
-    if (updates.length > 0) {
-      console.log('🔄 Performing drag-and-drop reorder changes:', updates);
-      const allUpdates = Array.from(newPendingReorders.values());
-      performSlideReorder(allUpdates);
+    if (movedSlideIndex === 0) {
+      // Moved to the beginning
+      const nextSlide = reorderedSlides[1];
+      newPosition = nextSlide ? nextSlide.position / 2 : 5000;
+    } else if (movedSlideIndex === reorderedSlides.length - 1) {
+      // Moved to the end
+      const prevSlide = reorderedSlides[movedSlideIndex - 1];
+      newPosition = prevSlide.position + 10000;
+    } else {
+      // Moved to the middle
+      const prevSlide = reorderedSlides[movedSlideIndex - 1];
+      const nextSlide = reorderedSlides[movedSlideIndex + 1];
+      newPosition = (prevSlide.position + nextSlide.position) / 2;
     }
+    
+    console.log(`🎯 Drag-drop: Moving slide ${movedSlide.id} to position ${newPosition}`);
+    
+    // Update local state immediately
+    const updatedSlides = localSlides.map(s => 
+      s.id === movedSlide.id ? { ...s, position: newPosition } : s
+    );
+    setLocalSlides(updatedSlides);
+    
+    // Make the API call
+    updateSlidePositionMutation.mutate(
+      { slideId: movedSlide.id, newPosition },
+      {
+        onSuccess: () => {
+          console.log('✅ Drag-drop position update successful');
+          toast({
+            title: "Slide reordered",
+            description: "Position updated successfully",
+            duration: 2000,
+          });
+        },
+        onError: (error) => {
+          console.error('❌ Drag-drop position update failed:', error);
+          setLocalSlides(originalSlidesRef.current);
+          toast({
+            title: "Failed to reorder slide",
+            description: "Please try again",
+            variant: "destructive"
+          });
+        }
+      }
+    );
   };
 
-  // Save all slide order changes
+  // Since we're now doing real-time saves, this function is simplified
   const handleSaveSlideOrder = useCallback(async () => {
-    if (!hasUnsavedChanges || pendingReorders.size === 0) return;
-    
-    setIsSavingOrder(true);
-    
-    // Get all pending updates
-    const updates = Array.from(pendingReorders.values());
-    
-    // Add validation - check for duplicate positions within same wine
-    const positionsByWine = new Map<string, Set<number>>();
-    const duplicates: string[] = [];
-    
-    localSlides.forEach(slide => {
-      const wineId = slide.packageWineId;
-      if (!wineId) return; // Skip package-level slides
-      if (!positionsByWine.has(wineId)) {
-        positionsByWine.set(wineId, new Set());
-      }
-      const positions = positionsByWine.get(wineId)!;
-      if (positions.has(slide.position)) {
-        duplicates.push(`Wine has duplicate position ${slide.position}`);
-      }
-      positions.add(slide.position);
+    // No longer needed for slide reordering as updates are saved immediately
+    toast({ 
+      title: "Already saved", 
+      description: "Changes are saved automatically",
+      duration: 2000 
     });
-    
-    if (duplicates.length > 0) {
-      setIsSavingOrder(false);
-      toast({ 
-        title: "❌ Position conflict detected", 
-        description: duplicates[0],
-        variant: "destructive" 
-      });
-      return;
-    }
-    
-    console.log(`📋 Sending ${updates.length} position updates to server:`, updates);
-    
-    if (updates.length > 0) {
-      reorderSlidesMutation.mutate(updates);
-    } else {
-      setHasUnsavedChanges(false);
-      setIsSavingOrder(false);
-      toast({ title: "No changes to save" });
-    }
-  }, [hasUnsavedChanges, pendingReorders, localSlides, reorderSlidesMutation, toast]);
+  }, [toast]);
 
   // Development invariant checks
   useEffect(() => {
@@ -1130,22 +962,20 @@ export default function PackageEditor() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [hasUnsavedChanges, handleSaveSlideOrder]);
 
-  // Warn before leaving with unsaved changes
+  // Warn before leaving with unsaved content changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      const hasAnyUnsavedChanges = hasUnsavedChanges || pendingReorders.size > 0 || pendingContentChanges.size > 0;
-      
-      if (hasAnyUnsavedChanges) {
+      if (pendingContentChanges.size > 0) {
         // Standard way to trigger the browser's confirmation dialog
         e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        e.returnValue = 'You have unsaved content changes. Are you sure you want to leave?';
         return e.returnValue;
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges, pendingReorders, pendingContentChanges]);
+  }, [pendingContentChanges]);
 
   const handleQuickAddQuestion = (wineId: string, sectionType: 'intro' | 'deep_dive' | 'ending') => {
     const wine = wines.find(w => w.id === wineId);
@@ -1230,43 +1060,6 @@ export default function PackageEditor() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            {(hasUnsavedChanges || pendingContentChanges.size > 0) && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="relative"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg blur-lg opacity-50 animate-pulse" />
-                <Button 
-                  size="sm" 
-                  onClick={handleSaveSlideOrder}
-                  disabled={isSavingOrder}
-                  title="Save all position changes (⌘+S)"
-                  className="relative bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
-                >
-                  {isSavingOrder ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                      Saving {pendingReorders.size} changes...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      Save Slide Order
-                    </>
-                  )}
-                </Button>
-                <Badge className="absolute -top-2 -right-2 bg-red-500 text-white animate-bounce">
-                  {(() => {
-                    const totalChanges = pendingReorders.size + pendingContentChanges.size;
-                    if (totalChanges > 0) {
-                      return `${totalChanges} change${totalChanges > 1 ? 's' : ''}`;
-                    }
-                    return 'Unsaved';
-                  })()}
-                </Badge>
-              </motion.div>
-            )}
           </div>
         </div>
       </div>
@@ -1296,24 +1089,6 @@ export default function PackageEditor() {
               className="fixed lg:relative inset-y-0 left-0 z-50 w-80 lg:w-96 bg-gradient-to-br from-purple-900/90 to-black/90 backdrop-blur-xl border-r border-white/10 overflow-y-auto"
             >
               <div className="p-4">
-                {hasUnsavedChanges && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-4 p-3 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 rounded-lg"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className="h-2 w-2 bg-amber-500 rounded-full animate-pulse" />
-                        <p className="text-sm font-medium text-amber-300">Unsaved slide order changes</p>
-                      </div>
-                      <Badge variant="secondary" className="bg-amber-500/20 text-amber-300 border-amber-500/40">
-                        {localSlides.filter(s => s.position !== slides.find(os => os.id === s.id)?.position).length} changed
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-amber-300/70 mt-1">Click "Save Slide Order" to persist changes</p>
-                  </motion.div>
-                )}
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-lg font-semibold text-white">Content Structure</h2>
                   <Button 
@@ -1524,7 +1299,7 @@ export default function PackageEditor() {
                                         <DraggableSlideList
                                           slides={sectionSlides}
                                           activeSlideId={activeSlideId}
-                                          pendingReorders={pendingReorders}
+                                          pendingReorders={new Map()}
                                           pendingContentChanges={pendingContentChanges}
                                           activelyMovingSlide={activelyMovingSlide}
                                           isProcessingQueue={isProcessingQueue}

@@ -43,7 +43,10 @@
       "Bash(timeout 10s npm start)",
       "Bash(madge:*)",
       "Bash(sed:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git push:*)"
     ],
     "deny": []
   },
