@@ -172,7 +172,7 @@ export function useSessionPersistence() {
 
   // Save response with offline support - ONLY if session is active
   const saveResponse = async (participantId: string, slideId: string, answerJson: any): Promise<void> => {
-    console.log('[PERSISTENCE] saveResponse called:', { participantId, slideId, answerJson });
+    // console.log('[PERSISTENCE] saveResponse called:', { participantId, slideId, answerJson });
     
     // Only save if we have an active session
     if (!activeSession || activeSession.participantId !== participantId) {
@@ -206,6 +206,7 @@ export function useSessionPersistence() {
     
     if (navigator.onLine) {
       try {
+        console.log('[PERSISTENCE] Attempting to save response:', { participantId, slideId });
         await apiRequest('POST', '/api/responses', {
           participantId,
           slideId,
@@ -218,7 +219,7 @@ export function useSessionPersistence() {
         }
         setOfflineQueue(prev => prev.filter(item => item.id !== response.id));
         setSyncStatus('synced');
-        console.log('[PERSISTENCE] Response saved successfully:', slideId);
+        // console.log('[PERSISTENCE] Response saved successfully:', slideId);
       } catch (error) {
         setSyncStatus('pending');
         // Don't throw - we've saved offline, so this is recoverable
@@ -226,10 +227,10 @@ export function useSessionPersistence() {
       }
     } else {
       setSyncStatus('offline');
-      console.log('[PERSISTENCE] Offline - response saved locally:', slideId);
+      // console.log('[PERSISTENCE] Offline - response saved locally:', slideId);
     }
     
-    console.log('[PERSISTENCE] saveResponse completed for:', slideId);
+    // console.log('[PERSISTENCE] saveResponse completed for:', slideId);
     // Ensure we always return a resolved promise
     return Promise.resolve();
   };

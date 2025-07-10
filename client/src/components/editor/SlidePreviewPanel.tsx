@@ -9,6 +9,7 @@ import { VideoMessageSlide } from '@/components/slides/VideoMessageSlide';
 import { AudioMessageSlide } from '@/components/slides/AudioMessageSlide';
 import { TransitionSlide } from '@/components/slides/TransitionSlide';
 import type { Slide, VideoMessagePayload, AudioMessagePayload, TransitionPayload } from '@shared/schema';
+import { memo, useMemo } from 'react';
 
 // Preview wrapper component that scales down and disables interactions
 function PreviewWrapper({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -201,7 +202,8 @@ function renderSlideContent(slide: Slide) {
         );
       }
 
-      if (questionData?.questionType === 'text' || questionData?.question_type === 'text') {
+      if (questionData?.questionType === 'text' || questionData?.question_type === 'text' ||
+          questionData?.questionType === 'free_response' || questionData?.question_type === 'free_response') {
         return (
           <PreviewWrapper>
             <TextQuestion
@@ -269,7 +271,20 @@ function renderSlideContent(slide: Slide) {
   }
 }
 
-export function SlidePreviewPanel({ activeSlide }: { activeSlide: Slide | undefined }) {
+export const SlidePreviewPanel = memo(function SlidePreviewPanel({ activeSlide }: { activeSlide: Slide | undefined }) {
+  // Memoize the slide content to prevent re-renders
+  const slideContent = useMemo(() => {
+    if (!activeSlide) {
+      return (
+        <div className="text-center text-white/50 p-6">
+          <Eye className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <p className="text-sm">Select a slide to preview</p>
+        </div>
+      );
+    }
+    return renderSlideContent(activeSlide);
+  }, [activeSlide?.id, activeSlide?.payloadJson, activeSlide?.genericQuestions]);
+
   return (
     <div className="h-full flex items-center justify-center p-2">
       <div className="aspect-[9/16] w-full max-w-sm bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 rounded-2xl shadow-2xl overflow-hidden relative">
@@ -284,14 +299,7 @@ export function SlidePreviewPanel({ activeSlide }: { activeSlide: Slide | undefi
               transition={{ duration: 0.3, ease: 'easeInOut' }}
               className="h-full flex items-center justify-center"
             >
-              {!activeSlide ? (
-                <div className="text-center text-white/50 p-6">
-                  <Eye className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-sm">Select a slide to preview</p>
-                </div>
-              ) : (
-                renderSlideContent(activeSlide)
-              )}
+              {slideContent}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -318,4 +326,4 @@ export function SlidePreviewPanel({ activeSlide }: { activeSlide: Slide | undefi
       </div>
     </div>
   );
-}
+});

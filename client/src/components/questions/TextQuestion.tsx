@@ -31,24 +31,12 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
   const [localValue, setLocalValue] = useState(value);
   const [isFocused, setIsFocused] = useState(false);
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const glossaryContext = useGlossarySafe();
   const terms = glossaryContext?.terms || [];
   const { triggerHaptic } = useHaptics();
   
-  // Use shorter debounce when user adds space or punctuation (natural pause points)
-  const [debounceDelay, setDebounceDelay] = useState(1500);
-  const debouncedValue = useDebounce(localValue, debounceDelay);
-  
-  // Save on unmount if there are unsaved changes
-  useEffect(() => {
-    return () => {
-      // Force save on unmount if value has changed
-      if (localValue !== value && localValue.trim() !== '') {
-        onChange(localValue);
-      }
-    };
-  }, [localValue, value, onChange]);
+  // Debounce the value to reduce the number of onChange calls
+  const debouncedValue = useDebounce(localValue, 300);
   
   // Extract all relevant glossary terms from the current slide content
   const relevantTerms = useMemo(() => {
@@ -61,12 +49,13 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
     setLocalValue(value);
   }, [value]);
   
-  // Call onChange when debounced value changes
+  // Call onChange when debounced value changes - with additional safety checks
   useEffect(() => {
     if (debouncedValue !== value) {
-      onChange(debouncedValue);
-      setHasUnsavedChanges(false);
-      setDebounceDelay(1500); // Reset to default delay after save
+      // Use requestAnimationFrame to ensure DOM is updated before onChange
+      requestAnimationFrame(() => {
+        onChange(debouncedValue);
+      });
     }
   }, [debouncedValue, onChange, value]);
 
@@ -75,28 +64,8 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
     if (question.maxLength && newValue.length > question.maxLength) {
       return;
     }
-    
-    const lastChar = newValue[newValue.length - 1];
-    const naturalPauseChars = [' ', '.', '!', '?', ',', ';', ':', '\n'];
-    
-    // Detect natural pause points and use shorter debounce
-    if (naturalPauseChars.includes(lastChar)) {
-      setDebounceDelay(500); // Save quickly after natural pause
-    } else {
-      setDebounceDelay(1500); // Longer delay for continuous typing
-    }
-    
     setLocalValue(newValue);
-    setHasUnsavedChanges(newValue !== value);
     triggerHaptic('selection');
-  };
-
-  // Save immediately on blur (when user clicks away)
-  const handleBlur = () => {
-    setIsFocused(false);
-    if (localValue !== value && localValue.trim() !== '') {
-      onChange(localValue);
-    }
   };
 
   const characterCount = localValue.length;
@@ -160,7 +129,7 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
                 value={localValue}
                 onChange={(e) => handleChange(e.target.value)}
                 onFocus={() => setIsFocused(true)}
-                onBlur={handleBlur}
+                onBlur={() => setIsFocused(false)}
                 placeholder={question.placeholder || "Type your answer here..."}
                 rows={question.rows || 4}
                 className={`
@@ -189,15 +158,10 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
             {/* Character Count & Progress */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-sm">
-                <span className="text-white/50 flex items-center gap-2">
+                <span className="text-white/50">
                   {question.minLength && characterCount < question.minLength && (
                     <span className="text-yellow-400">
                       Minimum {question.minLength} characters required
-                    </span>
-                  )}
-                  {hasUnsavedChanges && (
-                    <span className="text-blue-400 text-xs animate-pulse">
-                      Saving...
                     </span>
                   )}
                 </span>

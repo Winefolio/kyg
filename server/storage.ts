@@ -29,7 +29,7 @@ import {
   wineCharacteristics,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull } from "drizzle-orm";
+import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull, isNotNull } from "drizzle-orm";
 import crypto from "crypto";
 
 // Utility function to generate unique short codes
@@ -3030,6 +3030,293 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMedia(id: string): Promise<void> {
     await db.delete(media).where(eq(media.id, id));
+  }
+
+  // Position Recovery and Smart Reordering Functions
+  
+  /**
+   * Detects and fixes slides stuck at temporary positions (900000000+)
+   * This happens when the two-phase reorder process fails, leaving slides at temp positions
+   */
+  async detectAndFixTemporaryPositions(): Promise<{ fixedCount: number; wines: string[] }> {
+    console.log('🔍 Checking for slides stuck at temporary positions...');
+    
+    const TEMP_BASE_POSITION = 900000000;
+    
+    // Find all slides stuck at temporary positions
+    const stuckSlides = await db
+      .select({
+        id: slides.id,
+        packageWineId: slides.packageWineId,
+        position: slides.position,
+        type: slides.type,
+        payloadJson: slides.payloadJson
+      })
+      .from(slides)
+      .where(gte(slides.position, TEMP_BASE_POSITION));
+    
+    if (stuckSlides.length === 0) {
+      console.log('✅ No slides found at temporary positions');
+      return { fixedCount: 0, wines: [] };
+    }
+    
+    console.log(`🚨 Found ${stuckSlides.length} slides stuck at temporary positions`);
+    
+    // Group slides by wine
+    const slidesByWine = new Map<string, typeof stuckSlides>();
+    stuckSlides.forEach(slide => {
+      const wineId = slide.packageWineId!;
+      if (!slidesByWine.has(wineId)) {
+        slidesByWine.set(wineId, []);
+      }
+      slidesByWine.get(wineId)!.push(slide);
+    });
+    
+    const fixedWines: string[] = [];
+    let totalFixed = 0;
+    
+    // Fix each wine's positions
+    for (const [wineId, wineStuckSlides] of slidesByWine) {
+      console.log(`🔧 Fixing ${wineStuckSlides.length} stuck slides for wine ${wineId}`);
+      
+      // Get all slides for this wine (including non-stuck ones)
+      const allWineSlides = await db
+        .select()
+        .from(slides)
+        .where(eq(slides.packageWineId, wineId))
+        .orderBy(slides.position);
+      
+      // Normalize all positions for this wine
+      const fixedCount = await this.normalizeWinePositions(wineId, allWineSlides);
+      
+      if (fixedCount > 0) {
+        fixedWines.push(wineId);
+        totalFixed += fixedCount;
+      }
+    }
+    
+    console.log(`✅ Fixed ${totalFixed} slides across ${fixedWines.length} wines`);
+    return { fixedCount: totalFixed, wines: fixedWines };
+  }
+  
+  /**
+   * Normalizes all slide positions for a wine to use sequential gap-based positions
+   */
+  async normalizeWinePositions(wineId: string, wineSlides?: any[]): Promise<number> {
+    if (!wineSlides) {
+      wineSlides = await db
+        .select()
+        .from(slides)
+        .where(eq(slides.packageWineId, wineId))
+        .orderBy(slides.position);
+    }
+    
+    if (wineSlides.length === 0) {
+      return 0;
+    }
+    
+    console.log(`🔄 Normalizing positions for ${wineSlides.length} slides in wine ${wineId}`);
+    
+    const GAP_SIZE = 1000;
+    const BASE_POSITION = 100000;
+    let fixedCount = 0;
+    
+    // Sort slides by current position to maintain relative order
+    const sortedSlides = [...wineSlides].sort((a, b) => {
+      // Handle temporary positions - sort them last but maintain their relative order
+      if (a.position >= 900000000 && b.position >= 900000000) {
+        return a.position - b.position;
+      }
+      if (a.position >= 900000000) return 1;
+      if (b.position >= 900000000) return -1;
+      return a.position - b.position;
+    });
+    
+    // Assign new sequential positions
+    for (let i = 0; i < sortedSlides.length; i++) {
+      const slide = sortedSlides[i];
+      const newPosition = BASE_POSITION + (i * GAP_SIZE);
+      
+      if (slide.position !== newPosition) {
+        await db
+          .update(slides)
+          .set({ position: newPosition })
+          .where(eq(slides.id, slide.id));
+        
+        console.log(`📍 Fixed slide ${slide.id}: ${slide.position} → ${newPosition}`);
+        fixedCount++;
+      }
+    }
+    
+    return fixedCount;
+  }
+  
+  /**
+   * Smart swap function that only swaps two adjacent slides without using temporary positions
+   */
+  async smartSwapSlides(slideId1: string, slideId2: string): Promise<void> {
+    console.log(`🔄 Smart swapping slides ${slideId1} ↔ ${slideId2}`);
+    
+    await db.transaction(async (tx) => {
+      // Get both slides
+      const slide1 = await tx.select().from(slides).where(eq(slides.id, slideId1)).limit(1);
+      const slide2 = await tx.select().from(slides).where(eq(slides.id, slideId2)).limit(1);
+      
+      if (slide1.length === 0 || slide2.length === 0) {
+        throw new Error('One or both slides not found');
+      }
+      
+      const pos1 = slide1[0].position;
+      const pos2 = slide2[0].position;
+      
+      // Simply swap the positions - no temporary positions needed
+      await tx.update(slides).set({ position: pos2 }).where(eq(slides.id, slideId1));
+      await tx.update(slides).set({ position: pos1 }).where(eq(slides.id, slideId2));
+      
+      console.log(`✅ Swapped positions: ${slideId1}(${pos1}) ↔ ${slideId2}(${pos2})`);
+    });
+  }
+  
+  /**
+   * Direct position assignment with conflict resolution
+   */
+  async assignSlidePosition(slideId: string, targetPosition: number, packageWineId?: string): Promise<void> {
+    console.log(`🎯 Assigning slide ${slideId} to position ${targetPosition}`);
+    
+    await db.transaction(async (tx) => {
+      // Get the slide to move
+      const slideToMove = await tx.select().from(slides).where(eq(slides.id, slideId)).limit(1);
+      if (slideToMove.length === 0) {
+        throw new Error('Slide not found');
+      }
+      
+      const currentWineId = packageWineId || slideToMove[0].packageWineId!;
+      
+      // Check if target position is occupied
+      const conflictingSlide = await tx
+        .select()
+        .from(slides)
+        .where(and(
+          eq(slides.packageWineId, currentWineId),
+          eq(slides.position, targetPosition),
+          ne(slides.id, slideId)
+        ))
+        .limit(1);
+      
+      if (conflictingSlide.length > 0) {
+        // Find next available position
+        const nextAvailablePosition = await this.findNextAvailablePosition(currentWineId, targetPosition, tx);
+        
+        // Move the conflicting slide to the available position
+        await tx
+          .update(slides)
+          .set({ position: nextAvailablePosition })
+          .where(eq(slides.id, conflictingSlide[0].id));
+        
+        console.log(`📍 Moved conflicting slide ${conflictingSlide[0].id} to position ${nextAvailablePosition}`);
+      }
+      
+      // Now assign the target position
+      await tx
+        .update(slides)
+        .set({ 
+          position: targetPosition,
+          ...(packageWineId && { packageWineId })
+        })
+        .where(eq(slides.id, slideId));
+      
+      console.log(`✅ Assigned slide ${slideId} to position ${targetPosition}`);
+    });
+  }
+  
+  /**
+   * Find the next available position for a wine, starting from a given position
+   */
+  private async findNextAvailablePosition(wineId: string, startPosition: number, tx?: any): Promise<number> {
+    const dbToUse = tx || db;
+    const GAP_SIZE = 1000;
+    let position = startPosition + GAP_SIZE;
+    
+    while (true) {
+      const existing = await dbToUse
+        .select()
+        .from(slides)
+        .where(and(
+          eq(slides.packageWineId, wineId),
+          eq(slides.position, position)
+        ))
+        .limit(1);
+      
+      if (existing.length === 0) {
+        return position;
+      }
+      
+      position += GAP_SIZE;
+    }
+  }
+  
+  /**
+   * Recovery function to check and fix any position conflicts in the database
+   */
+  async performPositionRecovery(): Promise<{ recovered: boolean; details: string }> {
+    console.log('🔍 Starting comprehensive position recovery...');
+    
+    try {
+      // Step 1: Fix temporary positions
+      const tempFix = await this.detectAndFixTemporaryPositions();
+      
+      // Step 2: Check for duplicate positions within wines
+      const duplicates = await db
+        .select({
+          packageWineId: slides.packageWineId,
+          position: slides.position,
+          count: sql<number>`count(*)`.as('count')
+        })
+        .from(slides)
+        .where(isNotNull(slides.packageWineId))
+        .groupBy(slides.packageWineId, slides.position)
+        .having(sql`count(*) > 1`);
+      
+      if (duplicates.length > 0) {
+        console.log(`🚨 Found ${duplicates.length} position conflicts to resolve`);
+        
+        for (const duplicate of duplicates) {
+          const conflictingSlides = await db
+            .select()
+            .from(slides)
+            .where(and(
+              eq(slides.packageWineId, duplicate.packageWineId!),
+              eq(slides.position, duplicate.position)
+            ));
+          
+          // Keep the first slide at the original position, move others
+          for (let i = 1; i < conflictingSlides.length; i++) {
+            const newPosition = await this.findNextAvailablePosition(duplicate.packageWineId!, duplicate.position);
+            await db
+              .update(slides)
+              .set({ position: newPosition })
+              .where(eq(slides.id, conflictingSlides[i].id));
+            
+            console.log(`📍 Resolved conflict: moved slide ${conflictingSlides[i].id} to position ${newPosition}`);
+          }
+        }
+      }
+      
+      const details = `Fixed ${tempFix.fixedCount} temporary positions, resolved ${duplicates.length} conflicts`;
+      console.log(`✅ Position recovery completed: ${details}`);
+      
+      return { 
+        recovered: tempFix.fixedCount > 0 || duplicates.length > 0, 
+        details 
+      };
+      
+    } catch (error) {
+      console.error('❌ Position recovery failed:', error);
+      return { 
+        recovered: false, 
+        details: `Recovery failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      };
+    }
   }
 }
 

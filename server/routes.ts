@@ -615,10 +615,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertResponseSchema.parse(req.body);
       
+      console.log('[API] POST /api/responses - participantId:', validatedData.participantId);
+      
       // First check if participant exists
       const participant = await storage.getParticipantById(validatedData.participantId!);
       if (!participant) {
-        console.log(`Participant ${validatedData.participantId} not found - likely from stale offline sync`);
+        console.log(`[API] Participant ${validatedData.participantId} not found - likely from stale offline sync`);
         return res.status(404).json({ message: "Participant not found" });
       }
       
@@ -682,8 +684,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(response);
     } catch (error: any) {
-      console.log("POST /api/responses - Request body:", req.body);
-      console.log("POST /api/responses - Error:", error);
+      // console.log("POST /api/responses - Request body:", req.body);
+      // console.log("POST /api/responses - Error:", error);
       
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
@@ -1462,6 +1464,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         message: error.message || "Failed to update slide order.",
         error: error.code || 'UNKNOWN_ERROR' 
+      });
+    }
+  });
+
+  // Position Recovery and Smart Reordering Endpoints
+  
+  // Detect and fix slides stuck at temporary positions
+  app.post("/api/slides/recover-positions", async (req, res) => {
+    try {
+      console.log('🔧 Position recovery endpoint called');
+      const result = await storage.performPositionRecovery();
+      
+      if (result.recovered) {
+        res.json({ 
+          success: true, 
+          message: "Position recovery completed successfully",
+          details: result.details
+        });
+      } else {
+        res.json({ 
+          success: true, 
+          message: "No position issues found",
+          details: result.details
+        });
+      }
+    } catch (error: any) {
+      console.error("Error in position recovery:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Position recovery failed", 
+        error: error.message || 'Unknown error'
+      });
+    }
+  });
+
+  // Smart swap two slides (for adjacent moves)
+  app.post("/api/slides/smart-swap", async (req, res) => {
+    try {
+      const { slideId1, slideId2 } = req.body;
+      
+      if (!slideId1 || !slideId2) {
+        return res.status(400).json({ 
+          message: "Both slideId1 and slideId2 are required" 
+        });
+      }
+      
+      await storage.smartSwapSlides(slideId1, slideId2);
+      res.json({ 
+        success: true, 
+        message: "Slides swapped successfully" 
+      });
+    } catch (error: any) {
+      console.error("Error in smart swap:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Smart swap failed", 
+        error: error.message || 'Unknown error'
+      });
+    }
+  });
+
+  // Direct position assignment (for quick repositioning)
+  app.post("/api/slides/assign-position", async (req, res) => {
+    try {
+      const { slideId, targetPosition, packageWineId } = req.body;
+      
+      if (!slideId || typeof targetPosition !== 'number') {
+        return res.status(400).json({ 
+          message: "slideId and targetPosition are required" 
+        });
+      }
+      
+      await storage.assignSlidePosition(slideId, targetPosition, packageWineId);
+      res.json({ 
+        success: true, 
+        message: "Slide position assigned successfully" 
+      });
+    } catch (error: any) {
+      console.error("Error in position assignment:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Position assignment failed", 
+        error: error.message || 'Unknown error'
       });
     }
   });

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -28,8 +28,8 @@ import type { Slide, Participant, Session, Package, VideoMessagePayload, AudioMe
 
 // Configurable transition durations (in milliseconds)
 const TRANSITION_DURATIONS = {
-  slideNavigation: 600,        // Delay before changing slides
-  slideJump: 400,             // Delay when jumping to a specific slide
+  slideNavigation: 300,        // Delay before changing slides - reduced from 600ms
+  slideJump: 200,             // Delay when jumping to a specific slide - reduced from 400ms
   slideAnimation: {           // Framer Motion animation config
     type: "spring",
     stiffness: 200,
@@ -88,21 +88,21 @@ export default function TastingSession() {
   }, [sessionId, participantId, initializeForSession]);
   
   // Log state changes
-  useEffect(() => {
-    console.log('🔄 [STATE CHANGE] currentSlideIndex changed:', {
-      newIndex: currentSlideIndex,
-      timestamp: new Date().toISOString()
-    });
-  }, [currentSlideIndex]);
+  // useEffect(() => {
+  //   console.log('🔄 [STATE CHANGE] currentSlideIndex changed:', {
+  //     newIndex: currentSlideIndex,
+  //     timestamp: new Date().toISOString()
+  //   });
+  // }, [currentSlideIndex]);
   
   // Monitor focus changes globally
   useEffect(() => {
     const handleFocusChange = () => {
-      console.log('🔍 [GLOBAL FOCUS] Focus changed:', {
-        activeElement: document.activeElement?.tagName,
-        isTextarea: document.activeElement?.tagName === 'TEXTAREA',
-        timestamp: new Date().toISOString()
-      });
+      // console.log('🔍 [GLOBAL FOCUS] Focus changed:', {
+      //   activeElement: document.activeElement?.tagName,
+      //   isTextarea: document.activeElement?.tagName === 'TEXTAREA',
+      //   timestamp: new Date().toISOString()
+      // });
     };
     
     document.addEventListener('focusin', handleFocusChange);
@@ -125,7 +125,7 @@ export default function TastingSession() {
       } catch (error: any) {
         // If 404, try looking up by package code
         if (error.message.includes('404')) {
-          console.log(`Session ${sessionId} not found, trying as package code...`);
+          // Session not found as ID, trying as package code
           const response = await apiRequest('GET', `/api/sessions/by-package/${sessionId}`, null);
           return response.json();
         }
@@ -133,7 +133,15 @@ export default function TastingSession() {
       }
     },
     enabled: !!sessionId,
-    refetchInterval: 3000, // Refetch every 3 seconds to check status
+    refetchInterval: (data: any) => {
+      // Only refetch frequently for waiting/paused sessions
+      if (data?.status === 'waiting' || data?.status === 'paused') {
+        return 3000; // 3 seconds for status changes
+      }
+      return 30000; // 30 seconds for active sessions
+    },
+    // Add some caching to reduce object recreation
+    staleTime: 2000, // 2 seconds - allow brief caching
   });
 
   // Invalidate slides query when session status changes
@@ -147,29 +155,58 @@ export default function TastingSession() {
   }, [currentSession?.status, currentSession?.packageCode, queryClient]);
 
   // Get participant data
-  const { data: participant } = useQuery<Participant>({
+  const { data: participant, error: participantError } = useQuery<Participant>({
     queryKey: [`/api/participants/${participantId}`],
     enabled: !!participantId
   });
+  
+  // Log participant fetch status
+  useEffect(() => {
+    if (participant) {
+      console.log('[TASTING_SESSION] Participant loaded:', participant.id);
+    }
+    if (participantError) {
+      console.error('[TASTING_SESSION] Error loading participant:', participantError);
+    }
+  }, [participant, participantError]);
+
+  // Memoize query key dependencies to prevent unnecessary refetches
+  const slidesQueryKey = useMemo(() => {
+    return [
+      `/api/packages/${currentSession?.packageCode}/slides`,
+      participantId,
+      currentSession?.status
+    ];
+  }, [currentSession?.packageCode, participantId, currentSession?.status]);
 
   // Get session slides and wine data - use dynamic package code from session
   const { data: slidesData, isLoading, refetch: refetchSlides, dataUpdatedAt } = useQuery<{ package: Package; slides: Slide[]; totalCount: number; wines: any[] }>({
-    queryKey: [`/api/packages/${currentSession?.packageCode}/slides`, participantId, currentSession?.status],
+    queryKey: slidesQueryKey,
     queryFn: async () => {
       const response = await apiRequest('GET', `/api/packages/${currentSession?.packageCode}/slides?participantId=${participantId}`, null);
       return response.json();
     },
     enabled: !!currentSession?.packageCode && !!participantId,
-    // Prevent any caching - always fetch fresh data
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
+    // Allow reasonable caching to prevent excessive refetches
+    staleTime: 30000, // 30 seconds - slides don't change that often
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: true,
+    refetchOnWindowFocus: false, // Don't refetch on every focus change
     refetchOnReconnect: true
   });
 
   // Extract wines data from slides response
   const packageData = slidesData ? { wines: slidesData.wines } : null;
+  
+  // Track when slidesData changes
+  // useEffect(() => {
+  //   console.log('📊 [SLIDES DATA] slidesData changed:', {
+  //     exists: !!slidesData,
+  //     slidesCount: slidesData?.slides?.length || 0,
+  //     winesCount: slidesData?.wines?.length || 0,
+  //     timestamp: new Date().toISOString()
+  //   });
+  // }, [slidesData]);
 
   // Get participant responses
   const { data: responses } = useQuery<Response[]>({
@@ -180,11 +217,7 @@ export default function TastingSession() {
   // Load previous responses into answers state
   useEffect(() => {
     if (responses && responses.length > 0) {
-      console.log('📥 [TASTING_SESSION] Loading previous responses:', {
-        count: responses.length,
-        participantId,
-        resumePosition
-      });
+      // Loading previous responses
       
       const previousAnswers: Record<string, any> = {};
       responses.forEach((response: any) => {
@@ -192,16 +225,210 @@ export default function TastingSession() {
       });
       
       setAnswers(previousAnswers);
-      
-      // Update completed slides based on previous responses
-      if (slidesData?.slides) {
-        const completedIndices = slidesData.slides
-          .map((slide, index) => previousAnswers[slide.id] ? index : null)
-          .filter(index => index !== null) as number[];
-        setCompletedSlides(completedIndices);
-      }
     }
-  }, [responses, participantId, resumePosition, slidesData]);
+  }, [responses, participantId, resumePosition]);
+
+
+  // Memoize expensive slides processing to prevent recalculation on every render
+  // Must be called before any early returns to follow Rules of Hooks
+  const processedSlidesData = useMemo(() => {
+    // console.log('🔄 [EXPENSIVE PROCESSING] processedSlidesData useMemo running:', {
+    //   slidesDataExists: !!slidesData,
+    //   slidesCount: slidesData?.slides?.length || 0,
+    //   timestamp: new Date().toISOString()
+    // });
+    
+    if (!slidesData || !slidesData.slides || slidesData.slides.length === 0) {
+      return {
+        slides: [],
+        wines: [],
+        sortedSlidesByWine: {},
+        packageIntroSlides: [],
+        getSlideSection: (slide: any) => 'intro',
+        isLastSlideOfSection: () => false
+      };
+    }
+
+    const allSlides = slidesData.slides || [];
+    const wines = slidesData.wines || [];
+    
+    // Include transition slides in the navigation flow
+    const rawSlides = allSlides;
+  
+    // Separate package-level slides from wine-level slides
+    const packageLevelSlides = rawSlides.filter(slide => slide.packageId && !slide.packageWineId);
+    const wineLevelSlides = rawSlides.filter(slide => slide.packageWineId);
+    
+    // Group wine-level slides by wine
+    const slidesByWine = wineLevelSlides.reduce((acc: Record<string, any[]>, slide) => {
+      const wineId = slide.packageWineId;
+      if (!wineId) return acc; // Skip slides without packageWineId
+      if (!acc[wineId]) {
+        acc[wineId] = [];
+      }
+      acc[wineId].push(slide);
+      return acc;
+    }, {});
+
+    // Handle package intro slides
+    let packageIntroSlides: any[] = packageLevelSlides.sort((a, b) => (a.globalPosition || 0) - (b.globalPosition || 0));
+    const wineSpecificSlidesByWine: Record<string, any[]> = {};
+    
+    Object.keys(slidesByWine).forEach(wineId => {
+      const wineSlides = slidesByWine[wineId];
+      const wine = wines.find(w => w.id === wineId);
+
+      
+      // Sort slides by position
+      const sortedWineSlides = wineSlides.sort((a, b) => a.position - b.position);
+      
+      // DON'T extract package intro - treat all slides as wine-specific for consistent section math
+      wineSpecificSlidesByWine[wineId] = sortedWineSlides;
+      
+      // Mark package welcome slide if it exists, but keep it in wine flow
+      if (wine?.position === 1 && sortedWineSlides[0]) {
+        const firstSlide = sortedWineSlides[0];
+        if (firstSlide.payloadJson?.title?.includes('Welcome') || 
+            firstSlide.payloadJson?.title?.includes('Your Wine Tasting')) {
+          firstSlide._isPackageIntro = true;
+
+        }
+      }
+    });
+
+    // Sort each wine's slides using database section_type (now properly organized)
+    const sortedSlidesByWine = Object.keys(wineSpecificSlidesByWine).reduce((acc, wineId) => {
+      const wineSlides = wineSpecificSlidesByWine[wineId] || [];
+      const wine = wines.find(w => w.id === wineId);
+      
+      if (wineSlides.length === 0) {
+        acc[wineId] = [];
+        return acc;
+      }
+      
+      // Separate slides by database section_type
+      const introSlides = wineSlides.filter(slide => {
+        const sectionType = slide.section_type || slide.payloadJson?.section_type;
+        return sectionType === 'intro';
+      }).sort((a, b) => a.position - b.position);
+      
+      const deepDiveSlides = wineSlides.filter(slide => {
+        const sectionType = slide.section_type || slide.payloadJson?.section_type;
+        return sectionType === 'deep_dive' || sectionType === 'tasting';
+      }).sort((a, b) => a.position - b.position);
+      
+      const endingSlides = wineSlides.filter(slide => {
+        const sectionType = slide.section_type || slide.payloadJson?.section_type;
+        return sectionType === 'ending' || sectionType === 'conclusion';
+      }).sort((a, b) => a.position - b.position);
+      
+      // Debug logging for ending slides
+      if (wine && endingSlides.length === 0) {
+        console.warn(`⚠️ No ending slides found for wine: ${wine.wineName}`, {
+          wineId: wine.id,
+          totalSlides: wineSlides.length,
+          sections: wineSlides.map(s => s.section_type || s.payloadJson?.section_type || 'unknown')
+        });
+      } else if (wine && endingSlides.length > 0) {
+        // Found ending slides for wine
+      }
+      
+      // Combine in proper order: Intro → Deep Dive → Ending
+      acc[wineId] = [...introSlides, ...deepDiveSlides, ...endingSlides];
+      return acc;
+    }, {} as Record<string, any[]>);
+
+    // Create final ordered slides array: Package slides first, then wine slides in order
+    const wineSlides = wines
+      .sort((a, b) => a.position - b.position)
+      .flatMap(wine => sortedSlidesByWine[wine.id] || []);
+    
+    const slides = [...packageIntroSlides, ...wineSlides];
+    
+    // Debug: Log total slides and section breakdown
+    // console.log(`📊 Total slides loaded: ${slides.length}`, {
+    //   packageIntroSlides: packageIntroSlides.length,
+    //   wineSlides: wineSlides.length,
+    //   slidesBySection: slides.reduce((acc, slide) => {
+    //     const section = slide.section_type || slide.payloadJson?.section_type || 'unknown';
+    //     acc[section] = (acc[section] || 0) + 1;
+    //     return acc;
+    //   }, {} as Record<string, number>)
+    // });
+      
+    // Define helper functions as function declarations for proper hoisting
+    function getSlideSection(slide: any): string {
+      // Use database section_type (now properly organized)
+      return slide.section_type || slide.payloadJson?.section_type || 'intro';
+    }
+
+    // Helper function to check if current slide is the last slide of its section
+    function isLastSlideOfSection(slideIndex: number, wineSlides: any[], currentSection: string, currentWineId?: string): boolean {
+      const wineStartIndex = currentWineId ? slides.findIndex(s => s.packageWineId === currentWineId) : 0;
+      const currentSlideInWine = slideIndex - wineStartIndex;
+      
+      // Find all slides in current section
+      const sectionSlides = wineSlides.filter(slide => getSlideSection(slide) === currentSection);
+      const lastSlideInSection = sectionSlides[sectionSlides.length - 1];
+      const lastSlideIndexInWine = wineSlides.findIndex(s => s.id === lastSlideInSection?.id);
+      
+      const isLast = currentSlideInWine === lastSlideIndexInWine;
+      
+      // Section boundary check
+      
+      return isLast;
+    }
+
+      // Return all processed data
+      return {
+        slides,
+        wines,
+        sortedSlidesByWine,
+        packageIntroSlides,
+        getSlideSection,
+        isLastSlideOfSection
+      };
+    }, [slidesData]); // Only recalculate when slidesData changes
+
+    // Extract processed data
+    const { slides, wines, sortedSlidesByWine, packageIntroSlides, getSlideSection, isLastSlideOfSection } = processedSlidesData;
+
+  // Update completed slides when we have both responses and processed slides
+  useEffect(() => {
+    if (responses && responses.length > 0 && slides.length > 0) {
+      const previousAnswers: Record<string, any> = {};
+      responses.forEach((response: any) => {
+        previousAnswers[response.slideId] = response.answerJson;
+      });
+      
+      const completedIndices = slides
+        .map((slide, index) => previousAnswers[slide.id] ? index : null)
+        .filter(index => index !== null) as number[];
+      setCompletedSlides(completedIndices);
+    }
+  }, [responses, slides]);
+
+  // Handle answer changes
+  const handleAnswerChange = async (slideId: string, answer: any) => {
+    // Update answers state immediately for UI responsiveness
+    setAnswers(prev => ({ ...prev, [slideId]: answer }));
+    
+    // Save response in background without blocking UI
+    if (participantId && participant) {
+      console.log('[TASTING_SESSION] Saving response with participantId:', participantId);
+      setIsSaving(true);
+      try {
+        await saveResponse(participantId, slideId, answer);
+        // Set saving to false immediately after save completes
+        setIsSaving(false);
+      } catch (error) {
+        console.error('Error saving response:', error);
+        setIsSaving(false);
+      }
+    } else {
+      console.warn('[TASTING_SESSION] Cannot save response - missing participant data:', { participantId, participant });
+    }
+  };
 
   if (sessionDetailsLoading || isLoading) {
     return (
@@ -228,6 +455,23 @@ export default function TastingSession() {
       <div className="min-h-screen bg-gradient-primary flex flex-col items-center justify-center text-white p-8">
         <h2 className="text-2xl font-semibold mb-2">Session Not Found</h2>
         <p className="text-purple-200 text-center">The session you're looking for doesn't exist or has expired.</p>
+      </div>
+    );
+  }
+  
+  // Check if participant exists after loading
+  if (participantId && !sessionDetailsLoading && !participant && participantError) {
+    console.error('[TASTING_SESSION] Participant not found, redirecting to join page');
+    // Redirect to session join page
+    setTimeout(() => {
+      setLocation(`/session/${currentSession.packageCode || sessionId}`);
+    }, 2000);
+    
+    return (
+      <div className="min-h-screen bg-gradient-primary flex flex-col items-center justify-center text-white p-8">
+        <h2 className="text-2xl font-semibold mb-2">Participant Not Found</h2>
+        <p className="text-purple-200 text-center mb-4">Your participant record wasn't found. Redirecting to join page...</p>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div>
       </div>
     );
   }
@@ -266,179 +510,33 @@ export default function TastingSession() {
     );
   }
 
-  const allSlides = slidesData?.slides || [];
-  // All wines should now start from position 1 (no more position 0 wines after migration)
-  const wines = slidesData?.wines || [];
-  
-  // Include transition slides in the navigation flow
-  const rawSlides = allSlides;
-  
-  // Separate package-level slides from wine-level slides
-  const packageLevelSlides = rawSlides.filter(slide => slide.packageId && !slide.packageWineId);
-  const wineLevelSlides = rawSlides.filter(slide => slide.packageWineId);
-  
-  // Group wine-level slides by wine
-  const slidesByWine = wineLevelSlides.reduce((acc: Record<string, any[]>, slide) => {
-    const wineId = slide.packageWineId;
-    if (!wineId) return acc; // Skip slides without packageWineId
-    if (!acc[wineId]) {
-      acc[wineId] = [];
-    }
-    acc[wineId].push(slide);
-    return acc;
-  }, {});
-
-  // Handle package intro slides
-  let packageIntroSlides: any[] = packageLevelSlides.sort((a, b) => (a.globalPosition || 0) - (b.globalPosition || 0));
-  const wineSpecificSlidesByWine: Record<string, any[]> = {};
-  
-  Object.keys(slidesByWine).forEach(wineId => {
-    const wineSlides = slidesByWine[wineId];
-    const wine = wines.find(w => w.id === wineId);
-
-    
-    // Sort slides by position
-    const sortedWineSlides = wineSlides.sort((a, b) => a.position - b.position);
-    
-    // DON'T extract package intro - treat all slides as wine-specific for consistent section math
-    wineSpecificSlidesByWine[wineId] = sortedWineSlides;
-    
-    // Mark package welcome slide if it exists, but keep it in wine flow
-    if (wine?.position === 1 && sortedWineSlides[0]) {
-      const firstSlide = sortedWineSlides[0];
-      if (firstSlide.payloadJson?.title?.includes('Welcome') || 
-          firstSlide.payloadJson?.title?.includes('Your Wine Tasting')) {
-        firstSlide._isPackageIntro = true;
-
-      }
-    }
-  });
-
-  // Sort each wine's slides using database section_type (now properly organized)
-  const sortedSlidesByWine = Object.keys(wineSpecificSlidesByWine).reduce((acc, wineId) => {
-    const wineSlides = wineSpecificSlidesByWine[wineId] || [];
-    const wine = wines.find(w => w.id === wineId);
-    
-    if (wineSlides.length === 0) {
-      acc[wineId] = [];
-      return acc;
-    }
-    
-    // Separate slides by database section_type
-    const introSlides = wineSlides.filter(slide => {
-      const sectionType = slide.section_type || slide.payloadJson?.section_type;
-      return sectionType === 'intro';
-    }).sort((a, b) => a.position - b.position);
-    
-    const deepDiveSlides = wineSlides.filter(slide => {
-      const sectionType = slide.section_type || slide.payloadJson?.section_type;
-      return sectionType === 'deep_dive' || sectionType === 'tasting';
-    }).sort((a, b) => a.position - b.position);
-    
-    const endingSlides = wineSlides.filter(slide => {
-      const sectionType = slide.section_type || slide.payloadJson?.section_type;
-      return sectionType === 'ending' || sectionType === 'conclusion';
-    }).sort((a, b) => a.position - b.position);
-    
-    // Debug logging for ending slides
-    if (wine && endingSlides.length === 0) {
-      console.warn(`⚠️ No ending slides found for wine: ${wine.wineName}`, {
-        wineId: wine.id,
-        totalSlides: wineSlides.length,
-        sections: wineSlides.map(s => s.section_type || s.payloadJson?.section_type || 'unknown')
-      });
-    } else if (wine && endingSlides.length > 0) {
-      console.log(`✅ Found ${endingSlides.length} ending slides for wine: ${wine.wineName}`, {
-        wineId: wine.id,
-        endingSlides: endingSlides.map(s => ({
-          title: (s.payloadJson as any)?.title || 'Untitled',
-          position: s.position,
-          section: s.section_type
-        }))
-      });
-    }
-    
-    // Combine in proper order: Intro → Deep Dive → Ending
-    acc[wineId] = [...introSlides, ...deepDiveSlides, ...endingSlides];
-    return acc;
-  }, {} as Record<string, any[]>);
-
-  // Create final ordered slides array: Package slides first, then wine slides in order
-  const wineSlides = wines
-    .sort((a, b) => a.position - b.position)
-    .flatMap(wine => sortedSlidesByWine[wine.id] || []);
-  
-  const slides = [...packageIntroSlides, ...wineSlides];
-  
-  // Debug: Log total slides and section breakdown
-  console.log(`📊 Total slides loaded: ${slides.length}`, {
-    packageIntroSlides: packageIntroSlides.length,
-    wineSlides: wineSlides.length,
-    slidesBySection: slides.reduce((acc, slide) => {
-      const section = slide.section_type || slide.payloadJson?.section_type || 'unknown';
-      acc[section] = (acc[section] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>)
-  });
-    
-  // Define helper functions as function declarations for proper hoisting
-  function getSlideSection(slide: any): string {
-    // Use database section_type (now properly organized)
-    return slide.section_type || slide.payloadJson?.section_type || 'intro';
-  }
-
-  // Helper function to check if current slide is the last slide of its section
-  function isLastSlideOfSection(slideIndex: number, wineSlides: any[], currentSection: string, currentWineId?: string): boolean {
-    const wineStartIndex = currentWineId ? slides.findIndex(s => s.packageWineId === currentWineId) : 0;
-    const currentSlideInWine = slideIndex - wineStartIndex;
-    
-    // Find all slides in current section
-    const sectionSlides = wineSlides.filter(slide => getSlideSection(slide) === currentSection);
-    const lastSlideInSection = sectionSlides[sectionSlides.length - 1];
-    const lastSlideIndexInWine = wineSlides.findIndex(s => s.id === lastSlideInSection?.id);
-    
-    const isLast = currentSlideInWine === lastSlideIndexInWine;
-    
-    // Debug logging for section detection
-    console.log(`🔍 Section boundary check for "${currentSection}":`, {
-      slideIndex,
-      currentSlideInWine,
-      sectionSlides: sectionSlides.length,
-      lastSlideIndexInWine,
-      isLastSlide: isLast,
-      sectionSlideIds: sectionSlides.map(s => ({ id: s.id, section: getSlideSection(s) }))
-    });
-    
-    return isLast;
-  }
-
-  // CRITICAL STATE CALCULATION - Log everything
+  // CRITICAL STATE CALCULATION
   const currentSlide = slides && slides[currentSlideIndex] ? slides[currentSlideIndex] : null;
-  console.log('🔍 [CURRENT SLIDE CALC]:', {
-    currentSlideIndex,
-    slidesLength: slides?.length,
-    currentSlideExists: !!currentSlide,
-    currentSlideId: currentSlide?.id,
-    currentSlideType: currentSlide?.type,
-    currentSlideTitle: currentSlide?.payloadJson?.title,
-    isNavigating,
-    isSaving,
-    timestamp: new Date().toISOString()
-  });
+  // console.log('🔍 [CURRENT SLIDE CALC]:', {
+  //   currentSlideIndex,
+  //   slidesLength: slides?.length,
+  //   currentSlideExists: !!currentSlide,
+  //   currentSlideId: currentSlide?.id,
+  //   currentSlideType: currentSlide?.type,
+  //   currentSlideTitle: currentSlide?.payloadJson?.title,
+  //   isNavigating,
+  //   isSaving,
+  //   timestamp: new Date().toISOString()
+  // });
   
   // Prevent rendering if slides aren't loaded yet or if we're in an invalid state
   if (!slides || slides.length === 0) {
-    console.log('⚠️ [RENDER GUARD] Preventing render due to missing slides');
+    // console.log('⚠️ [RENDER GUARD] Preventing render due to missing slides');
     return <LoadingOverlay isVisible={true} message="Loading slides..." />;
   }
   
   // Handle case where currentSlideIndex is out of bounds
   if (currentSlideIndex >= slides.length || currentSlideIndex < 0) {
-    console.log('⚠️ [RENDER GUARD] currentSlideIndex out of bounds:', {
-      currentSlideIndex,
-      slidesLength: slides.length,
-      timestamp: new Date().toISOString()
-    });
+    // console.log('⚠️ [RENDER GUARD] currentSlideIndex out of bounds:', {
+    //   currentSlideIndex,
+    //   slidesLength: slides.length,
+    //   timestamp: new Date().toISOString()
+    // });
     // Reset to valid index instead of showing loading
     setCurrentSlideIndex(Math.min(currentSlideIndex, slides.length - 1));
     return <LoadingOverlay isVisible={true} message="Loading..." />;
@@ -516,29 +614,29 @@ export default function TastingSession() {
 
   // Navigation functions
   const goToNextSlide = async () => {
-    console.log('🚀 [NAVIGATION START] goToNextSlide called:', {
-      currentSlideIndex,
-      totalSlides: slides?.length,
-      isSaving,
-      isNavigating,
-      activeElement: document.activeElement?.tagName,
-      activeElementClass: document.activeElement?.className,
-      timestamp: new Date().toISOString()
-    });
+    // console.log('🚀 [NAVIGATION START] goToNextSlide called:', {
+    //   currentSlideIndex,
+    //   totalSlides: slides?.length,
+    //   isSaving,
+    //   isNavigating,
+    //   activeElement: document.activeElement?.tagName,
+    //   activeElementClass: document.activeElement?.className,
+    //   timestamp: new Date().toISOString()
+    // });
     
     if (!slides || slides.length === 0) return;
     
     // Don't block navigation for saves - let them happen in background
-    if (isSaving) {
-      console.log('⚠️ [NAVIGATION WITH SAVE] Navigation proceeding while save in progress');
-    }
+    // if (isSaving) {
+    //   console.log('⚠️ [NAVIGATION WITH SAVE] Navigation proceeding while save in progress');
+    // }
     
     // Check if we're dealing with a text question
-    if (currentSlide?.type === 'question' && 
-        (currentSlide?.payloadJson?.questionType === 'text' || 
-         currentSlide?.payloadJson?.question_type === 'text')) {
-      console.log('🔍 [TEXT SLIDE] Navigating from text response slide');
-    }
+    // if (currentSlide?.type === 'question' && 
+    //     (currentSlide?.payloadJson?.questionType === 'text' || 
+    //      currentSlide?.payloadJson?.question_type === 'text')) {
+    //   console.log('🔍 [TEXT SLIDE] Navigating from text response slide');
+    // }
     
     if (currentSlideIndex < slides.length - 1) {
       const nextSlide = slides[currentSlideIndex + 1];
@@ -589,12 +687,12 @@ export default function TastingSession() {
                !nextSlideIsTransition) {
         
         // Debug logging for section transitions
-        console.log('🎯 SECTION TRANSITION DETECTED:');
-        console.log(`   From: ${currentSection} → To: ${nextSection}`);
-        console.log(`   Wine: ${currentWine.wineName}`);
-        console.log(`   Current slide index: ${currentSlideIndex}`);
-        console.log(`   Current slide in wine: ${currentSlideIndex - currentWineStartIndex}`);
-        console.log(`   Is last slide of section: ${isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection, currentWine.id)}`);
+        // console.log('🎯 SECTION TRANSITION DETECTED:');
+        // console.log(`   From: ${currentSection} → To: ${nextSection}`);
+        // console.log(`   Wine: ${currentWine.wineName}`);
+        // console.log(`   Current slide index: ${currentSlideIndex}`);
+        // console.log(`   Current slide in wine: ${currentSlideIndex - currentWineStartIndex}`);
+        // console.log(`   Is last slide of section: ${isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection, currentWine.id)}`);
         
         setSectionTransitionData({
           fromSection: currentSection,
@@ -604,7 +702,7 @@ export default function TastingSession() {
         setShowSectionTransition(true);
         triggerHaptic('success');
       } else {
-        console.log('🎬 [NAVIGATION SIMPLE] No transition needed, moving to next slide');
+        // console.log('🎬 [NAVIGATION SIMPLE] No transition needed, moving to next slide');
         
         // Force blur before navigation
         const activeElement = document.activeElement;
@@ -657,12 +755,6 @@ export default function TastingSession() {
 
   const goToPreviousSlide = () => {
     if (currentSlideIndex > 0) {
-      // Prevent navigation if save is in progress
-      if (isSaving) {
-        console.log('[TextResponse Debug] Navigation blocked - save in progress');
-        return;
-      }
-      
       setIsNavigating(true);
       triggerHaptic('selection');
       
@@ -670,18 +762,12 @@ export default function TastingSession() {
         setCurrentSlideIndex(currentSlideIndex - 1);
         setCompletedSlides(prev => prev.filter(i => i !== currentSlideIndex));
         setIsNavigating(false);
-      }, 600);
+      }, TRANSITION_DURATIONS.slideNavigation);
     }
   };
 
   const jumpToSlide = (slideIndex: number) => {
     if (slideIndex !== currentSlideIndex) {
-      // Prevent navigation if save is in progress
-      if (isSaving) {
-        console.log('[TextResponse Debug] Navigation blocked - save in progress');
-        return;
-      }
-      
       setIsNavigating(true);
       triggerHaptic('selection');
       
@@ -693,30 +779,6 @@ export default function TastingSession() {
     setSidebarOpen(false);
   };
 
-  // Handle answer changes
-  const handleAnswerChange = async (slideId: string, answer: any) => {
-    // Update answers state immediately for UI responsiveness
-    setAnswers(prev => ({ ...prev, [slideId]: answer }));
-    
-    // Save response in background without blocking UI
-    if (participantId) {
-      setIsSaving(true);
-      try {
-        await saveResponse(participantId, slideId, answer);
-        
-        // Update participant progress on the server
-        // Progress is 1-indexed (slide 0 = progress 1)
-        const progress = currentSlideIndex + 1;
-        await apiRequest('PATCH', `/api/participants/${participantId}/progress`, { progress });
-        
-      } catch (error) {
-        console.error('Error saving response:', error);
-      } finally {
-        // Use setTimeout to ensure isSaving is updated after any pending state changes
-        setTimeout(() => setIsSaving(false), 0);
-      }
-    }
-  };
 
   // Handle completion
   const handleComplete = async () => {
@@ -1008,14 +1070,8 @@ export default function TastingSession() {
           );
         }
 
-        if (questionData.questionType === 'text' || questionData.question_type === 'text') {
-          console.log('📝 [RENDER TEXT] Rendering TextQuestion component:', {
-            slideId: currentSlide.id,
-            title: questionData.title || questionData.question,
-            currentValue: answers[currentSlide.id],
-            timestamp: new Date().toISOString()
-          });
-          
+        if (questionData.questionType === 'text' || questionData.question_type === 'text' ||
+            questionData.questionType === 'free_response' || questionData.question_type === 'free_response') {
           return (
             <TextQuestion
               question={{
@@ -1067,7 +1123,7 @@ export default function TastingSession() {
         }
 
         // Enhanced fallback detection for questions that don't match standard patterns
-        console.log('Question fallback triggered for slide:', currentSlide.id, 'questionData:', questionData);
+        // console.log('Question fallback triggered for slide:', currentSlide.id, 'questionData:', questionData);
         
         // Try to detect boolean questions by content analysis
         const title = questionData.title || questionData.question || '';
@@ -1311,7 +1367,7 @@ export default function TastingSession() {
                   {/* Wine sections */}
                   <div className="flex-1 overflow-y-auto p-6 space-y-4">
                     {wines.map((wine, wineIndex) => {
-                      const wineSlides = slidesByWine[wine.id] || [];
+                      const wineSlides = sortedSlidesByWine[wine.id] || [];
                       const wineStartIndex = slides.findIndex(s => s.packageWineId === wine.id);
                       const isExpanded = expandedWines[wine.id];
                       const section = sections[wineIndex];
@@ -1370,7 +1426,7 @@ export default function TastingSession() {
                                 exit={{ opacity: 0, height: 0 }}
                                 className="space-y-2 overflow-hidden"
                               >
-                                {wineSlides.map((slide, slideIndex) => {
+                                {wineSlides.map((slide: any, slideIndex: number) => {
                                   const globalSlideIndex = wineStartIndex + slideIndex;
                                   const isCompleted = completedSlides.includes(globalSlideIndex);
                                   const isCurrent = globalSlideIndex === currentSlideIndex;
@@ -1491,7 +1547,7 @@ export default function TastingSession() {
               <Button
                 variant="ghost"
                 onClick={goToPreviousSlide}
-                disabled={currentSlideIndex === 0 || isNavigating || isSaving}
+                disabled={currentSlideIndex === 0 || isNavigating}
                 className="text-white hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
@@ -1522,7 +1578,7 @@ export default function TastingSession() {
               <Button
                 variant={currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro ? "default" : "ghost"}
                 onClick={currentSlideIndex >= slides.length - 1 ? handleComplete : goToNextSlide}
-                disabled={isNavigating || isSaving}
+                disabled={isNavigating}
                 className={
                   currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro
                     ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold px-3 sm:px-4 md:px-6 py-1.5 sm:py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 transform hover:scale-105 active:scale-100 text-[14px] sm:text-sm md:text-base min-h-[44px] flex items-center justify-center"
@@ -1530,20 +1586,14 @@ export default function TastingSession() {
                 }
               >
                 <span className="hidden sm:inline">
-                  {isSaving ? 'Saving...' :
-                   currentSlideIndex >= slides.length - 1 ? 'Complete' : 
+                  {currentSlideIndex >= slides.length - 1 ? 'Complete' : 
                    (currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro) ? 'Continue Your Wine Journey' : 'Next'}
                 </span>
                 <span className="sm:hidden">
-                  {isSaving ? 'Saving...' :
-                   currentSlideIndex >= slides.length - 1 ? 'Complete' : 
+                  {currentSlideIndex >= slides.length - 1 ? 'Complete' : 
                    (currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro) ? 'Continue' : 'Next'}
                 </span>
-                {isSaving ? (
-                  <div className="w-4 h-4 ml-2 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                ) : (
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                )}
+                <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
           </div>

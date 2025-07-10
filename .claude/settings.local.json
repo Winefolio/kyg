@@ -42,7 +42,8 @@
       "Bash(npx tsc:*)",
       "Bash(timeout 10s npm start)",
       "Bash(madge:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   },
