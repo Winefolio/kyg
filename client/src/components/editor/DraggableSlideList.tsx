@@ -1,5 +1,9 @@
 import { Reorder, useDragControls } from 'framer-motion';
-import { GripVertical, Sparkles, ArrowUp, ArrowDown, Trash2, X, Loader2 } from 'lucide-react';
+import { 
+  GripVertical, Sparkles, ArrowUp, ArrowDown, Trash2, X, Loader2,
+  FileText, BarChart3, PenTool, CheckCircle2, Video, Mic, 
+  MessageSquare, Clapperboard, Image as ImageIcon 
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useState, useCallback, useRef } from 'react';
@@ -52,6 +56,42 @@ function DraggableSlideItem({
 }: DraggableSlideItemProps) {
   const controls = useDragControls();
   const clickTimestamps = useRef<Map<string, number>>(new Map());
+  
+  // Get appropriate icon based on slide type and question type
+  const getSlideIcon = () => {
+    if (slide.type === 'question') {
+      // For question slides, check the question_type in payloadJson
+      const questionType = (slide.payloadJson as any)?.question_type;
+      switch (questionType) {
+        case 'multiple_choice':
+          return <FileText className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />;
+        case 'scale':
+          return <BarChart3 className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />;
+        case 'text':
+          return <PenTool className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />;
+        case 'boolean':
+          return <CheckCircle2 className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />;
+        default:
+          return <FileText className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />;
+      }
+    }
+    
+    // For non-question slide types
+    switch (slide.type) {
+      case 'video_message':
+        return <Video className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />;
+      case 'audio_message':
+        return <Mic className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />;
+      case 'interlude':
+        return <Clapperboard className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />;
+      case 'media':
+        return <ImageIcon className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />;
+      case 'transition':
+        return <MessageSquare className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />;
+      default:
+        return <FileText className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />;
+    }
+  };
   
   const isWelcomeSlide = slide.type === 'interlude' && 
     ((slide.payloadJson as any)?.is_welcome || 
@@ -133,6 +173,10 @@ function DraggableSlideItem({
             ? 'bg-amber-400' 
             : 'bg-white/40 group-hover:bg-white/60'
         }`} />
+        
+        <div className="mr-2.5">
+          {getSlideIcon()}
+        </div>
         
         <div className="flex items-center flex-1 min-w-0">
           {isWelcomeSlide && (

@@ -1403,9 +1403,6 @@ export default function PackageEditor() {
                         <Badge className="bg-purple-600/20 text-purple-300">
                           {activeSlide.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                         </Badge>
-                        <span className="text-white/50 text-sm">
-                          Position: {activeSlide.position}
-                        </span>
                       </div>
                     </div>
                   </div>
