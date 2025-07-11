@@ -723,15 +723,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSlide(slide: InsertSlide): Promise<Slide> {
-    // Validate payload before creating slide
-    if (!slide.payloadJson || typeof slide.payloadJson !== 'object' || Object.keys(slide.payloadJson).length === 0) {
-      console.error('[SLIDE_CREATE] Invalid or empty payload detected:', {
-        slideType: slide.type,
-        sectionType: slide.section_type,
-        position: slide.position,
-        payload: slide.payloadJson
-      });
-      throw new Error('Cannot create slide with invalid or empty payload');
+    // Validate payload type and provide defaults
+    if (!slide.payloadJson || typeof slide.payloadJson !== 'object') {
+      console.log('[SLIDE_CREATE] No payload provided, using minimal default for slide type:', slide.type);
+      // Provide minimal default payload based on slide type
+      slide.payloadJson = this.getDefaultPayloadForSlideType(slide.type);
+    } else if (Object.keys(slide.payloadJson).length === 0) {
+      console.log('[SLIDE_CREATE] Empty payload provided, using minimal default for slide type:', slide.type);
+      // Provide minimal default payload for empty objects
+      slide.payloadJson = this.getDefaultPayloadForSlideType(slide.type);
     }
     
     // Log slide creation for debugging
@@ -2403,7 +2403,7 @@ export class DatabaseStorage implements IStorage {
     const wineData = {
       ...wine,
       position: nextPosition,
-      wineType: wine.wineType || 'Red',
+      wineType: wine.wineType || 'red',
       vintage: wine.vintage || new Date().getFullYear() - 2,
       region: wine.region || 'Napa Valley',
       producer: wine.producer || 'Premium Winery',
@@ -3281,6 +3281,67 @@ export class DatabaseStorage implements IStorage {
         recovered: false, 
         details: `Recovery failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
       };
+    }
+  }
+
+  /**
+   * Provides minimal default payload for each slide type to allow creation of basic slides
+   */
+  private getDefaultPayloadForSlideType(slideType: string): any {
+    switch (slideType) {
+      case 'question':
+        return {
+          question_type: 'text',
+          title: 'New Question',
+          question: 'New Question',
+          description: '',
+          placeholder: 'Enter your answer here...',
+          timeLimit: 60,
+          points: 10
+        };
+      
+      case 'video_message':
+        return {
+          title: 'New Video Message',
+          description: '',
+          video_url: '',
+          autoplay: false,
+          show_controls: true
+        };
+      
+      case 'audio_message':
+        return {
+          title: 'New Audio Message',
+          description: '',
+          audio_url: '',
+          autoplay: false,
+          show_controls: true
+        };
+      
+      case 'interlude':
+        return {
+          title: 'New Interlude',
+          description: '',
+          duration: 5000,
+          backgroundImage: '',
+          animation: 'fade'
+        };
+      
+      case 'transition':
+        return {
+          title: 'New Transition',
+          description: '',
+          duration: 2500,
+          showContinueButton: false,
+          animation_type: 'fade',
+          backgroundImage: ''
+        };
+      
+      default:
+        return {
+          title: 'New Slide',
+          description: ''
+        };
     }
   }
 }

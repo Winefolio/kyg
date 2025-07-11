@@ -103,16 +103,32 @@ export function registerMediaProxyRoutes(app: Express) {
   // This is the most performant option for mobile devices
   app.get("/api/media/:publicId/stream", async (req, res) => {
     try {
+      console.log(`[MEDIA_PROXY] Stream request for publicId: ${req.params.publicId}`);
+      
       if (!isSupabaseConfigured()) {
+        console.log(`[MEDIA_PROXY] Supabase not configured`);
         return res.status(503).json({ 
           message: "Media service is not available" 
         });
       }
 
       const { publicId } = mediaAccessSchema.parse(req.params);
+      console.log(`[MEDIA_PROXY] Parsed publicId: ${publicId}`);
       
       const mediaRecord = await storage.getMediaByPublicId(publicId);
+      console.log(`[MEDIA_PROXY] Media record found:`, mediaRecord ? 'YES' : 'NO');
+      if (mediaRecord) {
+        console.log(`[MEDIA_PROXY] Media record details:`, {
+          id: mediaRecord.id,
+          fileName: mediaRecord.fileName,
+          mediaType: mediaRecord.mediaType,
+          isPublic: mediaRecord.isPublic,
+          storageUrl: mediaRecord.storageUrl
+        });
+      }
+      
       if (!mediaRecord) {
+        console.log(`[MEDIA_PROXY] No media record found for publicId: ${publicId}`);
         return res.status(404).json({ message: "Media not found" });
       }
 
@@ -156,5 +172,12 @@ export function registerMediaProxyRoutes(app: Express) {
     }
   });
 
-  console.log("✅ Media proxy routes registered with streaming support");
+  // Legacy /file endpoint - redirect to /stream for backward compatibility
+  app.get("/api/media/:publicId/file", async (req, res) => {
+    console.log(`[MEDIA_PROXY] Legacy /file request for publicId: ${req.params.publicId}, redirecting to /stream`);
+    const { publicId } = req.params;
+    res.redirect(301, `/api/media/${publicId}/stream`);
+  });
+
+  console.log("✅ Media proxy routes registered with streaming support and legacy compatibility");
 }

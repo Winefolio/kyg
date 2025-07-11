@@ -490,7 +490,7 @@ export function getTemplatesByDifficulty(difficulty: string): QuestionTemplate[]
 }
 
 export function getTemplatesForContext(
-  wineType: 'red' | 'white' | 'rosé' | 'sparkling' | 'dessert' | string,
+  wineType: 'red' | 'white' | 'rosé' | 'sparkling' | 'dessert' | 'fortified' | 'orange' | string,
   sectionType: 'intro' | 'deep_dive' | 'ending',
   difficulty: 'beginner' | 'intermediate' | 'advanced' = 'beginner'
 ): QuestionTemplate[] {
@@ -512,8 +512,8 @@ export function getTemplatesForContext(
         t.category === 'structure'
       );
       
-      // Filter out tannin questions for white wines
-      if (wineType === 'white' || wineType === 'rosé') {
+      // Filter out tannin questions for white wines and orange wines
+      if (wineType === 'white' || wineType === 'rosé' || wineType === 'orange') {
         suggestions = suggestions.filter(t => t.id !== 'tannin-assessment');
       }
       break;

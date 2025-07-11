@@ -46,7 +46,8 @@ const wineTypes = [
   { value: 'rose', label: 'Rosé' },
   { value: 'sparkling', label: 'Sparkling' },
   { value: 'dessert', label: 'Dessert Wine' },
-  { value: 'fortified', label: 'Fortified Wine' }
+  { value: 'fortified', label: 'Fortified Wine' },
+  { value: 'orange', label: 'Orange Wine' }
 ];
 
 const commonGrapes = [

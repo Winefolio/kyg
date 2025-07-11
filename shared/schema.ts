@@ -73,7 +73,7 @@ export const packageWines = pgTable("package_wines", {
   wineDescription: text("wine_description"),
   wineImageUrl: text("wine_image_url"),
   // Wine Analytics Attributes
-  wineType: varchar("wine_type", { length: 50 }), // 'red', 'white', 'rosé', 'sparkling', 'dessert'
+  wineType: varchar("wine_type", { length: 50 }), // 'red', 'white', 'rosé', 'sparkling', 'dessert', 'fortified', 'orange'
   vintage: integer("vintage"),
   region: text("region"),
   producer: text("producer"),

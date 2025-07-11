@@ -27,7 +27,7 @@ async function testWineCreation() {
       packageId: packageData.id,
       wineName: 'Test Wine with Deep Dive',
       wineDescription: 'A test wine to verify deep dive slide creation',
-      wineType: 'Red',
+      wineType: 'red',
       vintage: 2021,
       region: 'Test Valley',
       producer: 'Test Winery'

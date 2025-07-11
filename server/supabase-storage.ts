@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Supabase client for storage operations only (database uses direct PostgreSQL)
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE;
+const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Lazy initialization of Supabase client
 let supabaseStorage: ReturnType<typeof createClient> | null = null;
@@ -15,7 +15,7 @@ export function getSupabaseStorage() {
         hasServiceRole: !!supabaseServiceRole,
         urlPrefix: supabaseUrl?.substring(0, 30) + '...'
       });
-      throw new Error('Missing Supabase environment variables: SUPABASE_URL and SUPABASE_SERVICE_ROLE required for media uploads');
+      throw new Error('Missing Supabase environment variables: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required for media uploads');
     }
     
     console.log('Initializing Supabase Storage client:', {
@@ -62,7 +62,15 @@ export const ALLOWED_FILE_TYPES = {
     'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac',
     'audio/ogg', 'audio/webm'
   ],
-  video: ['video/mp4', 'video/webm', 'video/quicktime'],
+  video: [
+    'video/mp4', 'video/webm', 'video/quicktime', 
+    'video/avi', 'video/x-msvideo',
+    'video/x-matroska', 'video/mkv',
+    'video/x-flv', 'video/flv',
+    'video/x-ms-wmv', 'video/wmv',
+    'video/3gpp', 'video/3gpp2',
+    'video/mov', 'video/ogg', 'video/ogv'
+  ],
 };
 
 // Helper function to get media type from MIME type

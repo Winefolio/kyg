@@ -50,11 +50,11 @@ export function MediaUpload({
       case 'image':
         return 'image/jpeg,image/jpg,image/png,image/webp,image/gif,image/bmp,image/tiff,image/svg+xml,image/avif,image/heic,image/heif';
       case 'video':
-        return 'video/mp4,video/webm,video/quicktime';
+        return 'video/mp4,video/webm,video/quicktime,video/avi,video/x-msvideo,video/x-matroska,video/mkv,video/x-flv,video/flv,video/x-ms-wmv,video/wmv,video/3gpp,video/3gpp2,video/mov,video/ogg,video/ogv';
       case 'audio':
         return 'audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/mp4,audio/m4a,audio/x-m4a,audio/aac,audio/x-aac,audio/ogg,audio/webm,audio/flac,audio/x-flac,audio/3gpp,audio/3gpp2,audio/amr,audio/opus,audio/vnd.wav,audio/L16,audio/pcm,audio/basic,audio/aiff,audio/x-aiff,audio/midi,audio/x-midi,audio/wma,audio/x-ms-wma,audio/ra,audio/x-realaudio,audio/vorbis,audio/x-vorbis+ogg';
       case 'all':
-        return 'image/jpeg,image/jpg,image/png,image/webp,image/gif,image/bmp,image/tiff,image/svg+xml,image/avif,image/heic,image/heif,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/mp4,audio/m4a,audio/x-m4a,audio/aac,audio/x-aac,audio/ogg,audio/webm,audio/flac,audio/x-flac,audio/3gpp,audio/3gpp2,audio/amr,audio/opus,audio/vnd.wav,audio/L16,audio/pcm,audio/basic,audio/aiff,audio/x-aiff,audio/midi,audio/x-midi,audio/wma,audio/x-ms-wma,audio/ra,audio/x-realaudio,audio/vorbis,audio/x-vorbis+ogg';
+        return 'image/jpeg,image/jpg,image/png,image/webp,image/gif,image/bmp,image/tiff,image/svg+xml,image/avif,image/heic,image/heif,video/mp4,video/webm,video/quicktime,video/avi,video/x-msvideo,video/x-matroska,video/mkv,video/x-flv,video/flv,video/x-ms-wmv,video/wmv,video/3gpp,video/3gpp2,video/mov,video/ogg,video/ogv,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/mp4,audio/m4a,audio/x-m4a,audio/aac,audio/x-aac,audio/ogg,audio/webm,audio/flac,audio/x-flac,audio/3gpp,audio/3gpp2,audio/amr,audio/opus,audio/vnd.wav,audio/L16,audio/pcm,audio/basic,audio/aiff,audio/x-aiff,audio/midi,audio/x-midi,audio/wma,audio/x-ms-wma,audio/ra,audio/x-realaudio,audio/vorbis,audio/x-vorbis+ogg';
       default:
         return '';
     }
@@ -63,8 +63,8 @@ export function MediaUpload({
   // Get file size limit based on type
   const getFileSizeLimit = (fileType: string) => {
     if (fileType.startsWith('image/')) return 10 * 1024 * 1024; // 10MB
-    if (fileType.startsWith('audio/')) return 100 * 1024 * 1024; // 100MB
-    if (fileType.startsWith('video/')) return 200 * 1024 * 1024; // 200MB
+    if (fileType.startsWith('audio/')) return 50 * 1024 * 1024; // 50MB (align with server)
+    if (fileType.startsWith('video/')) return Infinity; // No limit for videos
     return 10 * 1024 * 1024; // default 10MB
   };
 

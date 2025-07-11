@@ -146,6 +146,7 @@ export function getMediaUrlFromSlide(slide: any): { url: string; type: 'video' |
 
 /**
  * Get optimal media URL for preview (handles both public IDs and direct URLs)
+ * @deprecated Use getMediaUrl from media-utils.ts instead
  */
 export function getPreviewMediaUrl(publicId?: string, fallbackUrl?: string): string {
   if (publicId) {

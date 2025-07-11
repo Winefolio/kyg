@@ -348,6 +348,21 @@ export const WINE_TEMPLATES = [
     },
     description: 'Bold Napa Cabernet with rich fruit and robust tannins',
     imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400'
+  },
+  {
+    name: 'Natural Orange Wine',
+    type: 'orange',
+    grapeVarietals: ['Pinot Grigio'],
+    region: 'Friuli, Italy',
+    characteristics: {
+      'Body': 'Medium',
+      'Tannins': 6,
+      'Acidity': 7,
+      'Fruit Intensity': 6,
+      'Oak Influence': 2
+    },
+    description: 'Skin-contact white wine with amber hue and complex texture',
+    imageUrl: 'https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400'
   }
 ];
 
@@ -358,7 +373,8 @@ export function getWineImage(wineType: string): string {
     rose: 'https://images.unsplash.com/photo-1586370434639-0fe43b2d32d6?w=400',
     sparkling: 'https://images.unsplash.com/photo-1549418885-0da47c3b70fd?w=400',
     dessert: 'https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=400',
-    fortified: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400'
+    fortified: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400',
+    orange: 'https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400'
   };
   return images[wineType as keyof typeof images] || images.red;
 }
@@ -391,7 +407,8 @@ export function getWineTypes() {
     { value: 'rose', label: 'Rosé' },
     { value: 'sparkling', label: 'Sparkling' },
     { value: 'dessert', label: 'Dessert Wine' },
-    { value: 'fortified', label: 'Fortified Wine' }
+    { value: 'fortified', label: 'Fortified Wine' },
+    { value: 'orange', label: 'Orange Wine' }
   ];
 }
 

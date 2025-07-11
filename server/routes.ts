@@ -20,7 +20,7 @@ import { registerMediaProxyRoutes } from './routes/media-proxy';
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 200 * 1024 * 1024, // 200MB max file size
+    fileSize: Infinity, // No file size limit for videos
   },
   fileFilter: (req, file, cb) => {
     // Support all major media formats
@@ -38,7 +38,15 @@ const upload = multer({
       'audio/wma', 'audio/x-ms-wma', 'audio/ra', 'audio/x-realaudio',
       'audio/vorbis', 'audio/x-vorbis+ogg'
     ];
-    const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+    const allowedVideoTypes = [
+      'video/mp4', 'video/webm', 'video/quicktime', 
+      'video/avi', 'video/x-msvideo',
+      'video/x-matroska', 'video/mkv',
+      'video/x-flv', 'video/flv',
+      'video/x-ms-wmv', 'video/wmv',
+      'video/3gpp', 'video/3gpp2',
+      'video/mov', 'video/ogg', 'video/ogv'
+    ];
     
     // Check file type
     if (file.mimetype.startsWith('image/')) {
@@ -67,7 +75,17 @@ const upload = multer({
       if (allowedVideoTypes.includes(file.mimetype)) {
         cb(null, true);
       } else {
-        cb(new Error(`Unsupported video format: ${file.mimetype}`));
+        // Check file extension as fallback for common video files
+        const fileName = file.originalname.toLowerCase();
+        const videoExtensions = ['.mp4', '.webm', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.3gp', '.ogg', '.ogv'];
+        const hasVideoExtension = videoExtensions.some(ext => fileName.endsWith(ext));
+        
+        if (hasVideoExtension) {
+          console.log(`Video file accepted by extension despite MIME type: ${file.mimetype} (${file.originalname})`);
+          cb(null, true);
+        } else {
+          cb(new Error(`Unsupported video format: ${file.mimetype} (file: ${file.originalname})`));
+        }
       }
     } else {
       cb(new Error(`Unsupported file type: ${file.mimetype}`));
@@ -1258,9 +1276,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📝 Creating slide with type: ${validatedData.type}`);
       const slide = await storage.createSlide(validatedData);
       res.json({ slide });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating slide:", error);
-      res.status(500).json({ error: "Failed to create slide" });
+      
+      // Provide specific error messages based on error type
+      if (error.message?.includes('Cannot create slide with invalid or empty payload')) {
+        return res.status(400).json({ 
+          error: "Invalid slide configuration",
+          message: "Slide must have valid content. Please check your slide settings and try again.",
+          details: error.message
+        });
+      }
+      
+      if (error.message?.includes('createSlide requires packageWineId')) {
+        return res.status(400).json({ 
+          error: "Missing wine context",
+          message: "This slide must be associated with a specific wine. Please select a wine first.",
+          details: error.message
+        });
+      }
+      
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ 
+          error: "Invalid slide data",
+          message: "The slide data format is incorrect. Please check all required fields.",
+          details: error.errors || error.message
+        });
+      }
+      
+      // Generic fallback
+      res.status(500).json({ 
+        error: "Failed to create slide",
+        message: "An unexpected error occurred while creating the slide. Please try again.",
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 

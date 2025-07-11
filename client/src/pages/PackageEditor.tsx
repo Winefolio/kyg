@@ -283,7 +283,18 @@ export default function PackageEditor() {
       queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
       toast({ title: "Slide created successfully" });
     },
-    onError: (error: any) => toast({ title: "Error creating slide", description: error.message, variant: "destructive" }),
+    onError: (error: any) => {
+      // Extract better error messages from the API response
+      const errorData = error?.response?.data;
+      const title = errorData?.error || "Error creating slide";
+      const description = errorData?.message || error.message || "Please try again";
+      
+      toast({ 
+        title, 
+        description, 
+        variant: "destructive" 
+      });
+    },
   });
 
   const updateSlideMutation = useMutation({
