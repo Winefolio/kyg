@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getOptimalVideoPreload, isMobileDevice } from '@/lib/device-utils';
+import { useNetworkMonitor } from '@/hooks/useNetworkMonitor';
 
 interface VideoPlayerProps {
   src: string;
@@ -53,6 +54,7 @@ export function VideoPlayer({
   const maxRetries = 3;
 
   const video = videoRef.current;
+  const networkStatus = useNetworkMonitor();
 
   // Auto-hide controls in fullscreen
   useEffect(() => {
@@ -73,6 +75,32 @@ export function VideoPlayer({
       }
     };
   }, [showControls, isFullscreen]);
+
+  // React to network changes
+  useEffect(() => {
+    if (!video) return;
+
+    // If we go offline, pause the video
+    if (!networkStatus.isOnline && isPlaying) {
+      video.pause();
+      setError('You are offline. Please check your internet connection.');
+    }
+    
+    // If we come back online and there was an error, try to reload
+    if (networkStatus.isOnline && error && error.includes('offline')) {
+      setError(null);
+      setIsLoading(true);
+      video.load();
+    }
+
+    // If network speed improves and we're using 'none' preload, upgrade to metadata
+    if (networkStatus.speed === 'fast' && video.preload === 'none') {
+      video.preload = 'metadata';
+      if (!isPlaying && !isLoading) {
+        video.load();
+      }
+    }
+  }, [networkStatus, video, isPlaying, error]);
 
   // Video event handlers
   const handleLoadStart = () => {
@@ -101,8 +129,8 @@ export function VideoPlayer({
     }
   };
 
-  const handleError = (e: Event) => {
-    const video = e.target as HTMLVideoElement;
+  const handleError = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
     let errorMessage = 'Failed to load video.';
     let shouldRetry = false;
     
@@ -126,6 +154,12 @@ export function VideoPlayer({
         default:
           errorMessage = 'An error occurred while loading the video.';
       }
+    }
+    
+    // Check if it's a 404 error (media not found)
+    if (src.includes('/api/media/') && video.error && video.error.code === video.error.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+      errorMessage = 'Video not found. The media file may have been deleted or moved.';
+      shouldRetry = false; // Don't retry 404 errors
     }
     
     // Auto-retry for network errors on mobile
@@ -273,7 +307,7 @@ export function VideoPlayer({
         onPlaying={() => setIsLoading(false)}
         onStalled={() => setIsLoading(true)}
         onSuspend={() => setIsLoading(false)}
-        className="w-full h-full object-contain"
+        className="w-full h-full object-cover"
         playsInline
         crossOrigin="anonymous"
         muted={autoplay && isMobileDevice()} // Mute on mobile autoplay for better compatibility
@@ -286,12 +320,15 @@ export function VideoPlayer({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
           >
             <div className="text-center text-white">
-              <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4" />
-              <p className="text-lg font-medium">Loading video...</p>
-              {title && <p className="text-white/70 text-sm mt-1">{title}</p>}
+              <Loader2 className="w-8 h-8 sm:w-12 sm:h-12 animate-spin mx-auto mb-4" />
+              <p className="text-base sm:text-lg font-medium">Loading video...</p>
+              {title && <p className="text-white/70 text-xs sm:text-sm mt-1">{title}</p>}
+              {networkStatus.speed === 'slow' && (
+                <p className="text-yellow-400 text-xs sm:text-sm mt-2">Slow connection detected</p>
+              )}
             </div>
           </motion.div>
         )}
@@ -304,12 +341,12 @@ export function VideoPlayer({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+            className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
           >
-            <div className="text-center text-white p-6">
-              <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Video Error</h3>
-              <p className="text-white/80 mb-4">{error}</p>
+            <div className="text-center text-white p-4 sm:p-6">
+              <AlertCircle className="w-12 h-12 sm:w-16 sm:h-16 text-red-400 mx-auto mb-4" />
+              <h3 className="text-lg sm:text-xl font-semibold mb-2">Video Error</h3>
+              <p className="text-white/80 mb-4 text-sm sm:text-base">{error}</p>
               <Button
                 onClick={() => {
                   setError(null);
@@ -335,13 +372,13 @@ export function VideoPlayer({
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/60 to-transparent"
+            className="absolute top-0 left-0 right-0 p-3 sm:p-4 md:p-6 bg-gradient-to-b from-black/60 to-transparent"
           >
             {title && (
-              <h3 className="text-white text-xl font-bold mb-2">{title}</h3>
+              <h3 className="text-white text-base sm:text-lg md:text-xl font-bold mb-2">{title}</h3>
             )}
             {description && (
-              <p className="text-white/80 text-sm">{description}</p>
+              <p className="text-white/80 text-xs sm:text-sm">{description}</p>
             )}
           </motion.div>
         )}
@@ -355,12 +392,12 @@ export function VideoPlayer({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent"
+              className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 bg-gradient-to-t from-black/80 to-transparent"
             >
               {/* Progress Bar */}
-              <div className="mb-4 relative">
+              <div className="mb-3 sm:mb-4 relative">
                 <div
-                  className="relative h-1 bg-white/20 rounded-full cursor-pointer overflow-hidden"
+                  className="relative h-1 sm:h-1.5 bg-white/20 rounded-full cursor-pointer overflow-hidden"
                   onClick={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const percentage = ((e.clientX - rect.left) / rect.width) * 100;
@@ -389,17 +426,17 @@ export function VideoPlayer({
 
               {/* Control Buttons */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1 sm:space-x-2">
                   <Button
                     size="icon"
                     variant="ghost"
                     onClick={togglePlay}
-                    className="text-white hover:bg-white/20"
+                    className="text-white hover:bg-white/20 h-8 w-8 sm:h-10 sm:w-10"
                   >
                     {isPlaying ? (
-                      <Pause className="w-5 h-5" />
+                      <Pause className="w-4 h-4 sm:w-5 sm:h-5" />
                     ) : (
-                      <Play className="w-5 h-5" />
+                      <Play className="w-4 h-4 sm:w-5 sm:h-5" />
                     )}
                   </Button>
 
@@ -407,22 +444,22 @@ export function VideoPlayer({
                     size="icon"
                     variant="ghost"
                     onClick={restart}
-                    className="text-white hover:bg-white/20"
+                    className="text-white hover:bg-white/20 h-8 w-8 sm:h-10 sm:w-10"
                   >
-                    <RotateCcw className="w-4 h-4" />
+                    <RotateCcw className="w-3 h-3 sm:w-4 sm:h-4" />
                   </Button>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="hidden sm:flex items-center space-x-2">
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={toggleMute}
-                      className="text-white hover:bg-white/20"
+                      className="text-white hover:bg-white/20 h-8 w-8 sm:h-10 sm:w-10"
                     >
                       {isMuted ? (
-                        <VolumeX className="w-4 h-4" />
+                        <VolumeX className="w-3 h-3 sm:w-4 sm:h-4" />
                       ) : (
-                        <Volume2 className="w-4 h-4" />
+                        <Volume2 className="w-3 h-3 sm:w-4 sm:h-4" />
                       )}
                     </Button>
                     
@@ -433,13 +470,13 @@ export function VideoPlayer({
                       step="0.1"
                       value={isMuted ? 0 : volume}
                       onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                      className="w-20 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                      className="w-16 sm:w-20 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <span className="text-white/80 text-sm">
+                <div className="flex items-center space-x-1 sm:space-x-2">
+                  <span className="text-white/80 text-xs sm:text-sm">
                     {formatTime(currentTime)} / {formatTime(duration)}
                   </span>
                   
@@ -447,9 +484,9 @@ export function VideoPlayer({
                     size="icon"
                     variant="ghost"
                     onClick={toggleFullscreen}
-                    className="text-white hover:bg-white/20"
+                    className="text-white hover:bg-white/20 h-8 w-8 sm:h-10 sm:w-10"
                   >
-                    <Maximize className="w-4 h-4" />
+                    <Maximize className="w-3 h-3 sm:w-4 sm:h-4" />
                   </Button>
                 </div>
               </div>

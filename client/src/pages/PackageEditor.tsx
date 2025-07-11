@@ -90,6 +90,7 @@ export default function PackageEditor() {
     sectionType: 'intro' | 'deep_dive' | 'ending';
   } | null>(null);
   const [pendingContentChanges, setPendingContentChanges] = useState<Set<string>>(new Set());
+  const [pendingReorders, setPendingReorders] = useState<Map<string, any>>(new Map());
   const [activelyMovingSlide, setActivelyMovingSlide] = useState<string | null>(null);
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   const [livePreviewData, setLivePreviewData] = useState<Map<string, any>>(new Map());
@@ -294,10 +295,14 @@ export default function PackageEditor() {
         newSet.delete(variables.slideId);
         return newSet;
       });
-      queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
-      toast({ title: "Slide updated successfully" });
+      // Don't refetch all data - use optimistic updates instead
+      // Only show success toast after actual save, not on every keystroke
+      console.log('✅ Slide content saved:', variables.slideId);
     },
-    onError: (error: any) => toast({ title: "Error updating slide", description: error.message, variant: "destructive" }),
+    onError: (error: any) => {
+      console.error('❌ Slide update failed:', error);
+      toast({ title: "Error updating slide", description: error.message, variant: "destructive" });
+    },
   });
 
   const deleteSlideMutation = useMutation({
@@ -602,6 +607,11 @@ export default function PackageEditor() {
   };
 
   const handleSlideUpdate = (slideId: string, data: any) => {
+    // Apply optimistic update to local state immediately
+    setLocalSlides(prev => prev.map(slide => 
+      slide.id === slideId ? { ...slide, ...data } : slide
+    ));
+    
     // Track content changes
     setPendingContentChanges(prev => {
       const newSet = new Set(prev);
@@ -625,6 +635,11 @@ export default function PackageEditor() {
           });
         },
         onError: () => {
+          // Revert optimistic update on error
+          setLocalSlides(prev => prev.map(slide => 
+            slide.id === slideId ? slides.find(s => s.id === slideId) || slide : slide
+          ));
+          
           // Keep in pending changes on error
           toast({
             title: "Failed to save slide changes",
@@ -840,39 +855,50 @@ export default function PackageEditor() {
     smartSwapMutation.mutate({ slideId1: slideId, slideId2: targetSlide.id });
   };
 
-  // Handle drag-and-drop reordering with fractional indexing
-  const handleDragReorder = (reorderedSlides: Slide[], wineId: string) => {
-    // reorderedSlides is the new order of slides from framer-motion
-    const wineSlides = localSlides.filter(s => s.packageWineId === wineId).sort((a, b) => a.position - b.position);
-    
+  // Handle drag-and-drop reordering with comprehensive section and position management
+  const handleDragReorder = (reorderedSlides: Slide[], wineId: string, sectionType?: string) => {
     if (reorderedSlides.length === 0) return;
     
-    // Find which slide was moved
-    const movedSlideIndex = reorderedSlides.findIndex((slide, index) => {
-      const originalIndex = wineSlides.findIndex(s => s.id === slide.id);
+    // Get all slides for this wine, regardless of section
+    const wineSlides = localSlides.filter(s => s.packageWineId === wineId).sort((a, b) => a.position - b.position);
+    
+    // Check if the order actually changed
+    const orderChanged = reorderedSlides.some((slide, index) => {
+      const originalSlides = sectionType 
+        ? wineSlides.filter(s => s.section_type === sectionType)
+        : wineSlides;
+      const originalIndex = originalSlides.findIndex(s => s.id === slide.id);
       return originalIndex !== index;
     });
     
-    if (movedSlideIndex === -1) {
-      console.log('No slide was actually moved');
+    if (!orderChanged) {
+      console.log('No slide order changed');
       return;
     }
     
-    const movedSlide = reorderedSlides[movedSlideIndex];
-    
-    // Calculate new fractional position for the moved slide
-    let newPosition: number;
-    
-    // For drag-and-drop, we need to update multiple slides with new positions
-    // Instead of fractional indexing, we'll reassign positions with proper gaps
-    
-    // Update all slides in this wine with new positions based on their order
-    const updates: Array<{ slideId: string; position: number }> = [];
+    // Create updates with proper position calculations
+    const updates: Array<{ slideId: string; position: number; section_type?: string }> = [];
+    const baseTime = Date.now();
     
     reorderedSlides.forEach((slide, index) => {
-      const newPosition = (index + 1) * 10000; // Gap-based positioning
-      if (slide.position !== newPosition) {
-        updates.push({ slideId: slide.id, position: newPosition });
+      // Calculate section-specific position ranges
+      let positionBase = 0;
+      if (sectionType === 'intro') positionBase = 100000;
+      else if (sectionType === 'deep_dive') positionBase = 200000;
+      else if (sectionType === 'ending') positionBase = 300000;
+      
+      // Create unique positions within the section
+      const newPosition = positionBase + (index + 1) * 1000 + (baseTime % 1000);
+      
+      const updateData: any = { slideId: slide.id, position: newPosition };
+      
+      // If we're moving to a different section, update the section_type
+      if (sectionType && slide.section_type !== sectionType) {
+        updateData.section_type = sectionType;
+      }
+      
+      if (slide.position !== newPosition || (sectionType && slide.section_type !== sectionType)) {
+        updates.push(updateData);
       }
     });
     
@@ -881,12 +907,20 @@ export default function PackageEditor() {
       return;
     }
     
-    console.log(`🔄 Batch updating ${updates.length} slide positions`);
+    console.log(`🔄 Batch updating ${updates.length} slide positions in wine ${wineId}${sectionType ? ` (section: ${sectionType})` : ''}`);
+    console.log('Updates:', updates.map(u => `${u.slideId.slice(-6)}: ${u.position}${u.section_type ? ` -> ${u.section_type}` : ''}`));
     
     // Update local state immediately for all affected slides
     const updatedSlides = localSlides.map(s => {
       const update = updates.find(u => u.slideId === s.id);
-      return update ? { ...s, position: update.position } : s;
+      if (update) {
+        return { 
+          ...s, 
+          position: update.position,
+          ...(update.section_type && { section_type: update.section_type })
+        };
+      }
+      return s;
     });
     setLocalSlides(updatedSlides);
     setHasUnsavedChanges(true);
@@ -1330,13 +1364,13 @@ export default function PackageEditor() {
                                         <DraggableSlideList
                                           slides={sectionSlides}
                                           activeSlideId={activeSlideId}
-                                          pendingReorders={new Map()}
+                                          pendingReorders={pendingReorders}
                                           pendingContentChanges={pendingContentChanges}
                                           activelyMovingSlide={activelyMovingSlide}
                                           isProcessingQueue={isProcessingQueue}
                                           buttonStates={buttonStates}
                                           onSlideClick={setActiveSlideId}
-                                          onSlideReorder={(newOrder) => handleDragReorder(newOrder, wine.id)}
+                                          onSlideReorder={(newOrder) => handleDragReorder(newOrder, wine.id, key as any)}
                                           onSlideDelete={handleSlideDelete}
                                           onSlideMove={handleSlideReorder}
                                         />
@@ -1397,7 +1431,7 @@ export default function PackageEditor() {
         )}>
           {/* Editor Panel */}
           <div className={cn(
-            "p-6 overflow-y-auto",
+            "p-4 sm:p-6 overflow-y-auto",
             isMobileView ? "flex-1" : `${isPreviewCollapsed ? 'flex-1' : 'flex-1'}`
           )}>
             {activeSlide ? (() => {
@@ -1459,9 +1493,9 @@ export default function PackageEditor() {
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: "100%", opacity: 0 }}
                 transition={{ duration: 0.4, ease: "easeInOut" }}
-                className="fixed inset-x-0 bottom-0 top-0 z-50 bg-gradient-to-br from-black/95 to-purple-900/95 backdrop-blur-xl border-t border-white/20 shadow-2xl flex flex-col"
+                className="fixed inset-x-0 bottom-0 top-0 z-50 bg-gradient-to-br from-black/95 to-purple-900/95 backdrop-blur-xl border-t border-white/20 shadow-2xl flex flex-col overflow-hidden"
               >
-              <div className="p-4 border-b border-white/10 flex-shrink-0">
+              <div className="p-3 border-b border-white/10 flex-shrink-0 bg-black/20">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <motion.div
@@ -1506,30 +1540,30 @@ export default function PackageEditor() {
                     const canGoNext = currentIndex < wineSlides.length - 1;
                     
                     return (
-                      <div className="p-3 border-b border-white/10 bg-black/10 flex-shrink-0">
+                      <div className="p-2 border-b border-white/10 bg-black/10 flex-shrink-0">
                         <div className="flex items-center justify-between">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => navigateToSlide('prev')}
                             disabled={!canGoPrev}
-                            className="h-8 px-3 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+                            className="h-8 px-2 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 text-xs"
                           >
-                            <ChevronLeft className="w-4 h-4 mr-1" />
-                            Previous
+                            <ChevronLeft className="w-3 h-3 mr-1" />
+                            Prev
                           </Button>
                           <div className="text-xs text-white/60 font-medium">
-                            Slide {currentIndex + 1} of {wineSlides.length}
+                            {currentIndex + 1} of {wineSlides.length}
                           </div>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => navigateToSlide('next')}
                             disabled={!canGoNext}
-                            className="h-8 px-3 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+                            className="h-8 px-2 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 text-xs"
                           >
                             Next
-                            <ChevronRight className="w-4 h-4 ml-1" />
+                            <ChevronRight className="w-3 h-3 ml-1" />
                           </Button>
                         </div>
                       </div>
@@ -1537,9 +1571,10 @@ export default function PackageEditor() {
                   })()}
                   
                 <div className="flex-1 overflow-y-auto">
-                  <div className="pt-4 pb-6 px-2 h-full">
+                  <div className="pt-2 pb-4 px-2 h-full">
                     <SlidePreviewPanel 
-                      activeSlide={activeSlide ? getSlideWithLivePreview(activeSlide) : undefined} 
+                      activeSlide={activeSlide}
+                      livePreviewData={livePreviewData}
                     />
                   </div>
                 </div>
@@ -1610,7 +1645,8 @@ export default function PackageEditor() {
               
               <div className="h-full pb-16">
                 <SlidePreviewPanel 
-                  activeSlide={activeSlide ? getSlideWithLivePreview(activeSlide) : undefined} 
+                  activeSlide={activeSlide}
+                  livePreviewData={livePreviewData}
                 />
               </div>
             </div>
@@ -1639,12 +1675,12 @@ export default function PackageEditor() {
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.3, duration: 0.3 }}
-              className="fixed bottom-6 right-6 z-50"
+              className="fixed bottom-4 right-4 z-40"
             >
               <Button
                 onClick={() => setIsPreviewCollapsed(!isPreviewCollapsed)}
                 className={cn(
-                  "w-16 h-16 rounded-full shadow-2xl transition-all duration-300 flex items-center justify-center",
+                  "w-14 h-14 rounded-full shadow-2xl transition-all duration-300 flex items-center justify-center",
                   isPreviewCollapsed 
                     ? "bg-purple-600 hover:bg-purple-700 text-white shadow-purple-600/25 shadow-2xl" 
                     : "bg-purple-600 hover:bg-purple-700 text-white shadow-purple-600/25"
@@ -1660,9 +1696,9 @@ export default function PackageEditor() {
                   }}
                 >
                   {isPreviewCollapsed ? (
-                    <Eye className="w-7 h-7" />
+                    <Eye className="w-6 h-6" />
                   ) : (
-                    <X className="w-7 h-7" />
+                    <X className="w-6 h-6" />
                   )}
                 </motion.div>
               </Button>

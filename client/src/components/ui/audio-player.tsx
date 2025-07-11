@@ -12,6 +12,8 @@ import {
   Music
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getOptimalAudioPreload, isMobileDevice } from '@/lib/device-utils';
+import { useNetworkMonitor } from '@/hooks/useNetworkMonitor';
 
 interface AudioPlayerProps {
   src: string;
@@ -43,8 +45,45 @@ export function AudioPlayer({
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [bufferedPercentage, setBufferedPercentage] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
 
   const audio = audioRef.current;
+  const networkStatus = useNetworkMonitor();
+
+  // React to network changes
+  useEffect(() => {
+    if (!audio) return;
+
+    // If we go offline, pause the audio
+    if (!networkStatus.isOnline && isPlaying) {
+      audio.pause();
+      setError('You are offline. Please check your internet connection.');
+    }
+    
+    // If we come back online and there was an error, try to reload
+    if (networkStatus.isOnline && error && error.includes('offline')) {
+      setError(null);
+      setIsLoading(true);
+      audio.load();
+    }
+
+    // More aggressive preloading for mobile audio
+    if (networkStatus.speed === 'fast' && audio.preload === 'metadata') {
+      audio.preload = 'auto';
+      if (!isPlaying && !isLoading) {
+        audio.load();
+      }
+    }
+    
+    // Even upgrade to metadata on medium speed for mobile audio
+    if (networkStatus.speed === 'medium' && audio.preload === 'none') {
+      audio.preload = 'metadata';
+      if (!isPlaying && !isLoading) {
+        audio.load();
+      }
+    }
+  }, [networkStatus, audio, isPlaying, error]);
 
   // Audio event handlers
   const handleLoadStart = () => {
@@ -73,9 +112,53 @@ export function AudioPlayer({
     }
   };
 
-  const handleError = () => {
+  const handleError = (e: React.SyntheticEvent<HTMLAudioElement>) => {
+    const audio = e.currentTarget;
+    let errorMessage = 'Failed to load audio.';
+    let shouldRetry = false;
+    
+    // Provide more specific error messages based on error type
+    if (audio.error) {
+      switch (audio.error.code) {
+        case audio.error.MEDIA_ERR_NETWORK:
+          errorMessage = 'Network error while loading audio. Please check your connection and try again.';
+          shouldRetry = true; // Network errors can be retried
+          break;
+        case audio.error.MEDIA_ERR_DECODE:
+          errorMessage = 'Audio format not supported on this device.';
+          break;
+        case audio.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+          errorMessage = 'Audio format not supported. Please try a different file.';
+          break;
+        case audio.error.MEDIA_ERR_ABORTED:
+          errorMessage = 'Audio loading was cancelled.';
+          shouldRetry = true; // Aborted loads can be retried
+          break;
+        default:
+          errorMessage = 'An error occurred while loading the audio.';
+      }
+    }
+    
+    // Auto-retry for network errors on both mobile and desktop
+    if (shouldRetry && retryCount < maxRetries) {
+      console.log(`Retrying audio load (attempt ${retryCount + 1}/${maxRetries})`);
+      setRetryCount(retryCount + 1);
+      setError(null);
+      setIsLoading(true);
+      
+      // Shorter retry delay for mobile audio
+      const retryDelay = isMobileDevice() ? 500 * (retryCount + 1) : 1000 * (retryCount + 1);
+      
+      setTimeout(() => {
+        if (audio) {
+          audio.load();
+        }
+      }, retryDelay);
+      
+      return;
+    }
+    
     setIsLoading(false);
-    const errorMessage = 'Failed to load audio. Please check the file format and try again.';
     setError(errorMessage);
     onError?.(errorMessage);
   };
@@ -207,8 +290,8 @@ export function AudioPlayer({
       <audio
         ref={audioRef}
         src={src}
-        autoPlay={autoplay}
-        preload="metadata"
+        autoPlay={autoplay && !isMobileDevice()} // Disable autoplay on mobile to save bandwidth
+        preload={getOptimalAudioPreload()}
         onLoadStart={handleLoadStart}
         onCanPlay={handleCanPlay}
         onLoadedMetadata={handleLoadedMetadata}
@@ -220,6 +303,12 @@ export function AudioPlayer({
         onWaiting={() => setIsLoading(true)}
         onPlaying={() => setIsLoading(false)}
         onEnded={handleEnded}
+        crossOrigin="anonymous"
+        // Add mobile-specific optimizations
+        controls={false}
+        muted={false}
+        playsInline={true}
+        {...(isMobileDevice() ? { 'webkit-playsinline': 'true' } : {})}
       />
 
       {/* Loading State */}
@@ -234,6 +323,9 @@ export function AudioPlayer({
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
             <p className="text-lg font-medium">Loading audio...</p>
             {title && <p className="text-white/70 text-sm mt-1">{title}</p>}
+            {networkStatus.speed === 'slow' && (
+              <p className="text-yellow-400 text-sm mt-2">Slow connection detected</p>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -254,6 +346,7 @@ export function AudioPlayer({
               onClick={() => {
                 setError(null);
                 setIsLoading(true);
+                setRetryCount(0); // Reset retry count on manual retry
                 audio?.load();
               }}
               variant="outline"

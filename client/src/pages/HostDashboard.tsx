@@ -244,7 +244,7 @@ export default function HostDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-primary">
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
+      <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6 lg:px-6 lg:py-8 max-w-7xl">
         {/* Improved Header with Better Spacing */}
         <div className="text-center mb-10 space-y-6">
           <div className="space-y-3">
@@ -290,12 +290,12 @@ export default function HostDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-6xl mx-auto">
-          <TabsList className="grid w-full grid-cols-5 bg-white/10 backdrop-blur-xl rounded-2xl p-1 mb-8">
-            <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all">Overview</TabsTrigger>
-            <TabsTrigger value="wines" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all">Selection</TabsTrigger>
-            <TabsTrigger value="participants" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all">Participants</TabsTrigger>
-            <TabsTrigger value="analytics" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all">Analytics</TabsTrigger>
-            <TabsTrigger value="controls" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all">Controls</TabsTrigger>
+          <TabsList className="flex w-full overflow-x-auto md:grid md:grid-cols-5 bg-white/10 backdrop-blur-xl rounded-2xl p-1 mb-8 scrollbar-hide">
+            <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Overview</TabsTrigger>
+            <TabsTrigger value="wines" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Selection</TabsTrigger>
+            <TabsTrigger value="participants" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Participants</TabsTrigger>
+            <TabsTrigger value="analytics" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Analytics</TabsTrigger>
+            <TabsTrigger value="controls" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Controls</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">

@@ -1,6 +1,6 @@
 // client/src/components/editor/SlideConfigPanel.tsx
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,22 +26,28 @@ interface SlideConfigPanelProps {
     onPreviewUpdate?: (slideId: string, livePayload: any) => void;
 }
 
-// Debounce helper
+// Improved debounce helper with stable callback reference
 function useDebounce<T extends (...args: any[]) => any>(
     callback: T,
     delay: number
 ): T {
     const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+    const callbackRef = useRef(callback);
+    
+    // Keep callback reference current
+    useEffect(() => {
+        callbackRef.current = callback;
+    }, [callback]);
 
     const debouncedCallback = useCallback((...args: Parameters<T>) => {
         if (debounceTimer) {
             clearTimeout(debounceTimer);
         }
         const newTimer = setTimeout(() => {
-            callback(...args);
+            callbackRef.current(...args);
         }, delay);
         setDebounceTimer(newTimer);
-    }, [callback, delay, debounceTimer]) as T;
+    }, [delay, debounceTimer]) as T; // Removed callback from dependencies
 
     // Cleanup on unmount
     useEffect(() => {
@@ -70,21 +76,24 @@ export function SlideConfigPanel({
         setLocalPayload(slide.payloadJson);
     }, [slide.id, slide.payloadJson]);
 
-    // Debounced update function
+    // Debounced update function with proper saving state management
     const debouncedUpdate = useDebounce((updates: any) => {
         onUpdate(slide.id, updates);
-        // Simulate saving indicator
-        setTimeout(() => setIsSaving(false), 500);
     }, 500);
 
     const handlePayloadChange = useCallback((newPayload: any) => {
         setLocalPayload(newPayload);
-        setIsSaving(true);
-        // Trigger immediate preview update
+        
+        // Trigger immediate preview update first (most important for UX)
         if (onPreviewUpdate) {
             onPreviewUpdate(slide.id, newPayload);
         }
-        // Trigger debounced save
+        
+        // Set saving state and auto-clear it after a reasonable delay
+        setIsSaving(true);
+        setTimeout(() => setIsSaving(false), 1000);
+        
+        // Trigger debounced save to server
         debouncedUpdate({ payloadJson: newPayload });
     }, [debouncedUpdate, onPreviewUpdate, slide.id]);
 
@@ -95,11 +104,11 @@ export function SlideConfigPanel({
 
     return (
         <div className="space-y-6">
-            {/* Saving indicator */}
+            {/* Saving indicator - positioned to not interfere with typing */}
             {isSaving && (
-                <div className="fixed top-20 right-6 bg-purple-600/90 text-white px-4 py-2 rounded-lg flex items-center space-x-2 shadow-lg z-50">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">Saving...</span>
+                <div className="fixed top-20 right-6 bg-purple-600/90 text-white px-3 py-1.5 rounded-lg flex items-center space-x-2 shadow-lg z-50 pointer-events-none">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span className="text-xs">Saving...</span>
                 </div>
             )}
 
@@ -146,19 +155,27 @@ export function SlideConfigPanel({
                         </div>
                         <div>
                             <Label className="text-white/80">Section</Label>
-                            <div className="flex items-center space-x-2">
-                                <div className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-1">
-                                    <span className="text-white">
-                                        {slide.section_type === 'intro' && '🎬 Intro'}
-                                        {slide.section_type === 'deep_dive' && '🤔 Deep Dive'}
-                                        {slide.section_type === 'ending' && '🏁 Ending'}
-                                        {!slide.section_type && '🤔 Deep Dive'}
-                                    </span>
-                                </div>
-                                <span className="text-white/40 text-sm">
-                                    (Cannot be changed)
-                                </span>
-                            </div>
+                            <Select
+                                value={slide.section_type || 'deep_dive'}
+                                onValueChange={(value) => {
+                                    onUpdate(slide.id, { section_type: value });
+                                }}
+                            >
+                                <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-gray-800 border-white/20">
+                                    <SelectItem value="intro" className="text-white hover:bg-white/10">
+                                        🎬 Intro
+                                    </SelectItem>
+                                    <SelectItem value="deep_dive" className="text-white hover:bg-white/10">
+                                        🤔 Deep Dive
+                                    </SelectItem>
+                                    <SelectItem value="ending" className="text-white hover:bg-white/10">
+                                        🏁 Ending
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </CardContent>
                 </Card>
@@ -528,7 +545,7 @@ export function SlideConfigPanel({
                     </CardHeader>
                     <CardContent>
                         <p className="text-white/50 text-center py-8">
-                            Editor for '{slide.type.replace("_", " ")}' slides
+                            Editor for '{String(slide.type).replace(/_/g, " ")}' slides
                             is not yet implemented.
                         </p>
                     </CardContent>

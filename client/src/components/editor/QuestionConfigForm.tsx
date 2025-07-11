@@ -1,5 +1,5 @@
 // client/src/components/editor/QuestionConfigForm.tsx
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,26 +14,76 @@ interface QuestionConfigFormProps {
   onPayloadChange: (newPayload: any) => void;
 }
 
+// Debounce helper (same as SlideConfigPanel)
+function useDebounce<T extends (...args: any[]) => any>(
+  callback: T,
+  delay: number
+): T {
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const callbackRef = useRef(callback);
+  
+  // Keep callback reference current
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+
+  const debouncedCallback = useCallback((...args: Parameters<T>) => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    const newTimer = setTimeout(() => {
+      callbackRef.current(...args);
+    }, delay);
+    setDebounceTimer(newTimer);
+  }, [delay, debounceTimer]) as T;
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+    };
+  }, [debounceTimer]);
+
+  return debouncedCallback;
+}
+
 export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigFormProps) {
   const questionType = payload.question_type || payload.type || 'multiple_choice';
+  
+  // Local state for responsive editing
+  const [localPayload, setLocalPayload] = useState(payload);
+  
+  // Update local state when payload changes from outside
+  useEffect(() => {
+    setLocalPayload(payload);
+  }, [payload]);
+
+  // Debounced update to parent
+  const debouncedUpdate = useDebounce((newPayload: any) => {
+    onPayloadChange(newPayload);
+  }, 300); // Shorter delay for question settings
 
   // Initialize options when changing to multiple choice
   useEffect(() => {
-    if (questionType === 'multiple_choice' && (!payload.options || payload.options.length === 0)) {
-      onPayloadChange({
-        ...payload,
+    if (questionType === 'multiple_choice' && (!localPayload.options || localPayload.options.length === 0)) {
+      const newPayload = {
+        ...localPayload,
         options: [
           { value: 'option1', text: 'Option 1', description: '' },
           { value: 'option2', text: 'Option 2', description: '' }
         ]
-      });
+      };
+      setLocalPayload(newPayload);
+      debouncedUpdate(newPayload);
     }
   }, [questionType]);
 
   // Safeguard: Ensure multiple choice questions always have options displayed
   const displayOptions = useMemo(() => {
     if (questionType === 'multiple_choice') {
-      const currentOptions = payload.options || [];
+      const currentOptions = localPayload.options || [];
       if (currentOptions.length === 0) {
         return [
           { value: 'option1', text: 'Option 1', description: '' },
@@ -42,27 +92,29 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
       }
       return currentOptions;
     }
-    return payload.options || [];
-  }, [questionType, payload.options]);
+    return localPayload.options || [];
+  }, [questionType, localPayload.options]);
 
   const handleFieldChange = (field: string, value: any) => {
-    onPayloadChange({ ...payload, [field]: value });
+    const newPayload = { ...localPayload, [field]: value };
+    setLocalPayload(newPayload);
+    debouncedUpdate(newPayload);
   };
 
   const handleOptionChange = (index: number, field: string, value: string) => {
-    const newOptions = [...(payload.options || [])];
+    const newOptions = [...(localPayload.options || [])];
     newOptions[index] = { ...newOptions[index], [field]: value };
     handleFieldChange('options', newOptions);
   };
 
   const addOption = () => {
     // Correctly add a unique value to each new option
-    const newOptions = [...(payload.options || []), { text: '', description: '', value: `option_${Date.now()}` }];
+    const newOptions = [...(localPayload.options || []), { text: '', description: '', value: `option_${Date.now()}` }];
     handleFieldChange('options', newOptions);
   };
 
   const removeOption = (index: number) => {
-    const newOptions = (payload.options || []).filter((_: any, i: number) => i !== index);
+    const newOptions = (localPayload.options || []).filter((_: any, i: number) => i !== index);
     handleFieldChange('options', newOptions);
   };
 
@@ -77,11 +129,11 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
           <div className="flex items-center space-x-2">
             <div className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 flex-1">
               <span className="text-white">
-                {(payload.question_type || payload.type) === 'multiple_choice' && '✓ Multiple Choice'}
-                {((payload.question_type || payload.type) === 'scale' || (payload.question_type || payload.type) === 'slider') && '📊 Scale Rating'}
-                {(payload.question_type || payload.type) === 'text' && '✏️ Text Input'}
-                {(payload.question_type || payload.type) === 'boolean' && '✅ Yes/No'}
-                {!(payload.question_type || payload.type) && '✓ Multiple Choice'}
+                {(localPayload.question_type || localPayload.type) === 'multiple_choice' && '✓ Multiple Choice'}
+                {((localPayload.question_type || localPayload.type) === 'scale' || (localPayload.question_type || localPayload.type) === 'slider') && '📊 Scale Rating'}
+                {(localPayload.question_type || localPayload.type) === 'text' && '✏️ Text Input'}
+                {(localPayload.question_type || localPayload.type) === 'boolean' && '✅ Yes/No'}
+                {!(localPayload.question_type || localPayload.type) && '✓ Multiple Choice'}
               </span>
             </div>
             <span className="text-white/40 text-sm">
@@ -90,7 +142,7 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
           </div>
         </div>
 
-        {(payload.question_type === 'multiple_choice' || payload.type === 'multiple_choice') && (
+        {(localPayload.question_type === 'multiple_choice' || localPayload.type === 'multiple_choice') && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
@@ -101,7 +153,7 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
                 </div>
                 <div className="flex items-center space-x-2">
                     <Label htmlFor="allow_multiple" className="text-xs text-white/70">Allow Multiple</Label>
-                    <Switch id="allow_multiple" checked={payload.allow_multiple || false} onCheckedChange={(checked) => handleFieldChange('allow_multiple', checked)} />
+                    <Switch id="allow_multiple" checked={localPayload.allow_multiple || false} onCheckedChange={(checked) => handleFieldChange('allow_multiple', checked)} />
                 </div>
             </div>
             {displayOptions.map((option: any, index: number) => (
@@ -114,14 +166,14 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
           </div>
         )}
 
-        {(payload.question_type === 'scale' || payload.question_type === 'slider' || payload.type === 'scale' || payload.type === 'slider') && (
+        {(localPayload.question_type === 'scale' || localPayload.question_type === 'slider' || localPayload.type === 'scale' || localPayload.type === 'slider') && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="text-white/80">Min Value</Label>
                 <Input 
                   type="number" 
-                  value={payload.scale_min || payload.min || 1} 
+                  value={localPayload.scale_min || localPayload.min || 1} 
                   onChange={(e) => {
                     const value = parseInt(e.target.value);
                     handleFieldChange('scale_min', value);
@@ -134,7 +186,7 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
                 <Label className="text-white/80">Max Value</Label>
                 <Input 
                   type="number" 
-                  value={payload.scale_max || payload.max || 10} 
+                  value={localPayload.scale_max || localPayload.max || 10} 
                   onChange={(e) => {
                     const value = parseInt(e.target.value);
                     handleFieldChange('scale_max', value);
@@ -148,7 +200,7 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
               <Label className="text-white/80">Step Size</Label>
               <Input 
                 type="number" 
-                value={payload.step || 1} 
+                value={localPayload.step || 1} 
                 onChange={(e) => handleFieldChange('step', parseInt(e.target.value))} 
                 className="bg-white/10 border-white/20 text-white" 
                 placeholder="1"
@@ -157,7 +209,7 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
             <div>
               <Label className="text-white/80">Min Label</Label>
               <Input 
-                value={payload.scale_min_label || ''} 
+                value={localPayload.scale_min_label || ''} 
                 onChange={(e) => handleFieldChange('scale_min_label', e.target.value)} 
                 className="bg-white/10 border-white/20 text-white" 
                 placeholder="e.g., 'Low'" 
@@ -166,7 +218,7 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
             <div>
               <Label className="text-white/80">Max Label</Label>
               <Input 
-                value={payload.scale_max_label || ''} 
+                value={localPayload.scale_max_label || ''} 
                 onChange={(e) => handleFieldChange('scale_max_label', e.target.value)} 
                 className="bg-white/10 border-white/20 text-white" 
                 placeholder="e.g., 'High'" 
@@ -175,15 +227,46 @@ export function QuestionConfigForm({ payload, onPayloadChange }: QuestionConfigF
           </div>
         )}
 
-        {(payload.question_type === 'text' || payload.type === 'text') && (
+        {(localPayload.question_type === 'text' || localPayload.type === 'text') && (
           <div>
             <Label className="text-white/80">Placeholder Text</Label>
             <Input 
-              value={payload.placeholder || ''} 
+              value={localPayload.placeholder || ''} 
               onChange={(e) => handleFieldChange('placeholder', e.target.value)} 
               className="bg-white/10 border-white/20 text-white" 
               placeholder="e.g., Describe the aromas..." 
             />
+          </div>
+        )}
+
+        {(localPayload.question_type === 'boolean' || localPayload.type === 'boolean') && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-white/80">True Label</Label>
+                <Input 
+                  value={localPayload.trueLabel || localPayload.true_label || 'Yes'} 
+                  onChange={(e) => {
+                    handleFieldChange('trueLabel', e.target.value);
+                    handleFieldChange('true_label', e.target.value);
+                  }} 
+                  className="bg-white/10 border-white/20 text-white" 
+                  placeholder="Yes"
+                />
+              </div>
+              <div>
+                <Label className="text-white/80">False Label</Label>
+                <Input 
+                  value={localPayload.falseLabel || localPayload.false_label || 'No'} 
+                  onChange={(e) => {
+                    handleFieldChange('falseLabel', e.target.value);
+                    handleFieldChange('false_label', e.target.value);
+                  }} 
+                  className="bg-white/10 border-white/20 text-white" 
+                  placeholder="No"
+                />
+              </div>
+            </div>
           </div>
         )}
 

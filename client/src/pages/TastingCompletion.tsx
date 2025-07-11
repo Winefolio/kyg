@@ -188,7 +188,7 @@ export default function TastingCompletion() {
 
   return (
     <div className="min-h-screen bg-gradient-primary">
-      <div className="container mx-auto px-6 py-8">
+      <div className="container mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -212,7 +212,7 @@ export default function TastingCompletion() {
           className="max-w-6xl mx-auto"
         >
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-5 bg-white/10 backdrop-blur-xl border border-white/20">
+            <TabsList className="flex w-full overflow-x-auto md:grid md:grid-cols-5 bg-white/10 backdrop-blur-xl border border-white/20 scrollbar-hide">
               <TabsTrigger value="summary" className="flex items-center gap-2 data-[state=active]:bg-purple-500/30">
                 <Trophy size={16} />
                 <span className="hidden sm:inline">Your Summary</span>
@@ -772,7 +772,7 @@ export default function TastingCompletion() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
-          className="flex justify-center gap-4 max-w-6xl mx-auto mt-8"
+          className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 max-w-6xl mx-auto mt-8"
         >
           <Button
             onClick={() => setLocation('/')}

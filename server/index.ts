@@ -25,10 +25,10 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
     
     // Handle different response structures from different database clients
     let mediaTableExists = false;
-    if (mediaTableCheck.rows && mediaTableCheck.rows[0]) {
-      mediaTableExists = mediaTableCheck.rows[0].exists;
-    } else if (Array.isArray(mediaTableCheck) && mediaTableCheck[0]) {
-      mediaTableExists = mediaTableCheck[0].exists;
+    if (Array.isArray(mediaTableCheck) && mediaTableCheck[0]) {
+      mediaTableExists = (mediaTableCheck[0] as any).exists;
+    } else if ((mediaTableCheck as any).rows && (mediaTableCheck as any).rows[0]) {
+      mediaTableExists = (mediaTableCheck as any).rows[0].exists;
     } else {
       console.warn('[DB_CHECK] Unexpected database response structure:', mediaTableCheck);
     }
@@ -48,7 +48,18 @@ app.use(express.urlencoded({ extended: false, limit: '10mb' }));
       ORDER BY tablename;
     `);
     
-    console.log('[DB_CHECK] Current tables:', tables.rows.map(r => r.tablename).join(', '));
+    // Handle different response structures for table listing
+    let tableNames: string[] = [];
+    if (Array.isArray(tables)) {
+      tableNames = tables.map((r: any) => r.tablename);
+    } else if ((tables as any).rows && Array.isArray((tables as any).rows)) {
+      tableNames = (tables as any).rows.map((r: any) => r.tablename);
+    } else {
+      console.warn('[DB_CHECK] Unexpected table query response structure:', tables);
+      tableNames = ['Unable to fetch table list'];
+    }
+    
+    console.log('[DB_CHECK] Current tables:', tableNames.join(', '));
   } catch (error) {
     console.error('[DB_CHECK] Error checking database status:', error);
   }

@@ -574,6 +574,7 @@ export class DatabaseStorage implements IStorage {
         code: pkg.code.toUpperCase(),
         name: pkg.name,
         description: pkg.description,
+        imageUrl: pkg.imageUrl,
         sommelierId: pkg.sommelierId,
       })
       .returning();
@@ -772,7 +773,7 @@ export class DatabaseStorage implements IStorage {
       
       if (sectionType === 'intro') {
         sectionOffset = slide.payloadJson?.is_wine_intro ? 10 : 50; // Wine intro at 10, other intros after
-      } else if (sectionType === 'deep_dive' || sectionType === 'tasting') {
+      } else if (sectionType === 'deep_dive') {
         sectionOffset = 100;
       } else if (sectionType === 'ending' || sectionType === 'conclusion') {
         sectionOffset = 200;
@@ -880,7 +881,7 @@ export class DatabaseStorage implements IStorage {
             .set({ 
               entityId: newEntityId,
               metadata: {
-                ...record.metadata,
+                ...(record.metadata || {}),
                 originalEntityId,
                 updatedAt: new Date().toISOString(),
                 linkedAt: new Date().toISOString()
@@ -1377,17 +1378,34 @@ export class DatabaseStorage implements IStorage {
           notesSubmittedCount,
         };
       } else if (slidePayload.question_type === "scale") {
-        // Process scale questions
+        // Process scale questions with validation
+        const scaleMin = slidePayload.scale_min || slidePayload.min_value || 1;
+        const scaleMax = slidePayload.scale_max || slidePayload.max_value || 10;
+        
         const scores = slideResponses
           .map((response) => {
             const answerData = response.answerJson as any;
-            // ROBUSTNESS FIX: Handle both numeric and object-based scale answers
+            let rawValue: number | null = null;
+            
+            // Extract numeric value from different answer formats
             if (typeof answerData === "number") {
-              return answerData;
+              rawValue = answerData;
+            } else if (typeof answerData === "object" && answerData !== null && typeof answerData.value === "number") {
+              rawValue = answerData.value;
             }
-            if (typeof answerData === "object" && answerData !== null && typeof answerData.value === "number") {
-              return answerData.value;
+            
+            // Validate and clamp the value to scale bounds
+            if (rawValue !== null) {
+              const clampedValue = Math.max(scaleMin, Math.min(scaleMax, rawValue));
+              
+              // Log if we had to clamp the value (indicates data corruption)
+              if (clampedValue !== rawValue) {
+                console.warn(`🔧 Analytics: Scale value clamped from ${rawValue} to ${clampedValue} (scale: ${scaleMin}-${scaleMax})`);
+              }
+              
+              return clampedValue;
             }
+            
             return null;
           })
           .filter((score): score is number => score !== null);
@@ -1607,7 +1625,7 @@ export class DatabaseStorage implements IStorage {
                 const matchedOption = sortedOptions.find((opt: any) => opt.optionId === userChoice);
                 if (matchedOption) {
                   totalPopularityMatched += matchedOption.percentage;
-                  if (topTwoOptions.find(opt => opt.optionId === userChoice)) {
+                  if (topTwoOptions.find((opt: any) => opt.optionId === userChoice)) {
                     matchedPopularChoices++;
                   }
                 }
@@ -1728,8 +1746,17 @@ export class DatabaseStorage implements IStorage {
     }
 
     const averageRating = scaleResponses.reduce((sum, r) => {
-      const value = typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5;
-      return sum + value;
+      let rawValue = typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5;
+      
+      // Validate and clamp scale values to expected range (1-10)
+      const clampedValue = Math.max(1, Math.min(10, rawValue));
+      
+      // Log if we had to clamp the value (indicates data corruption)
+      if (clampedValue !== rawValue) {
+        console.warn(`🔧 Personality: Scale value clamped from ${rawValue} to ${clampedValue}`);
+      }
+      
+      return sum + clampedValue;
     }, 0) / scaleResponses.length;
 
     const hasNotes = responses.some(r => (r.answerJson as any)?.notes?.trim().length > 0);
@@ -1799,7 +1826,16 @@ export class DatabaseStorage implements IStorage {
     scaleResponses.forEach(response => {
       const slideAnalytics = sessionAnalytics.slidesAnalytics.find((s: any) => s.slideId === response.slideId);
       if (slideAnalytics) {
-        const userAnswer = typeof response.answerJson === "number" ? response.answerJson : (response.answerJson as any)?.value || 0;
+        let rawUserAnswer = typeof response.answerJson === "number" ? response.answerJson : (response.answerJson as any)?.value || 0;
+        
+        // Validate and clamp user answer to expected scale range (1-10)
+        const userAnswer = Math.max(1, Math.min(10, rawUserAnswer));
+        
+        // Log if we had to clamp the value (indicates data corruption)
+        if (userAnswer !== rawUserAnswer) {
+          console.warn(`🔧 Achievements: Scale value clamped from ${rawUserAnswer} to ${userAnswer}`);
+        }
+        
         const groupAverage = slideAnalytics.aggregatedData.averageScore || 0;
         if (Math.abs(userAnswer - groupAverage) <= 1) {
           alignmentCount++;
@@ -1832,8 +1868,17 @@ export class DatabaseStorage implements IStorage {
 
     if (tanninResponses.length > 0) {
       const avgTanninRating = tanninResponses.reduce((sum, r) => {
-        const value = typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5;
-        return sum + value;
+        let rawValue = typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5;
+        
+        // Validate and clamp tannin values to expected scale (1-10)
+        const clampedValue = Math.max(1, Math.min(10, rawValue));
+        
+        // Log if we had to clamp the value (indicates data corruption)
+        if (clampedValue !== rawValue) {
+          console.warn(`🔧 Tannin insight: Scale value clamped from ${rawValue} to ${clampedValue}`);
+        }
+        
+        return sum + clampedValue;
       }, 0) / tanninResponses.length;
 
       if (avgTanninRating >= 7) {
@@ -1856,7 +1901,19 @@ export class DatabaseStorage implements IStorage {
     });
 
     if (scaleResponses.length >= 3) {
-      const values = scaleResponses.map(r => typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5);
+      const values = scaleResponses.map(r => {
+        let rawValue = typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5;
+        
+        // Validate and clamp scale values to expected range (1-10)
+        const clampedValue = Math.max(1, Math.min(10, rawValue));
+        
+        // Log if we had to clamp the value (indicates data corruption)
+        if (clampedValue !== rawValue) {
+          console.warn(`🔧 Insights: Scale value clamped from ${rawValue} to ${clampedValue}`);
+        }
+        
+        return clampedValue;
+      });
       const avg = values.reduce((a, b) => a + b, 0) / values.length;
       const variance = values.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / values.length;
       
@@ -2942,7 +2999,7 @@ export class DatabaseStorage implements IStorage {
     let totalFixed = 0;
     
     // Fix each wine's positions
-    for (const [wineId, wineStuckSlides] of slidesByWine) {
+    for (const [wineId, wineStuckSlides] of Array.from(slidesByWine.entries())) {
       console.log(`🔧 Fixing ${wineStuckSlides.length} stuck slides for wine ${wineId}`);
       
       // Get all slides for this wine (including non-stuck ones)
@@ -3105,7 +3162,7 @@ export class DatabaseStorage implements IStorage {
   /**
    * Batch update slide positions - updates all positions in a single transaction
    */
-  async batchUpdateSlidePositions(updates: Array<{ slideId: string; position: number }>): Promise<void> {
+  async batchUpdateSlidePositions(updates: Array<{ slideId: string; position: number; section_type?: string }>): Promise<void> {
     console.log(`📦 Batch updating ${updates.length} slide positions`);
     
     await db.transaction(async (tx) => {
@@ -3120,11 +3177,16 @@ export class DatabaseStorage implements IStorage {
           .where(eq(slides.id, update.slideId));
       }
       
-      // Then assign final positions
+      // Then assign final positions and section types
       for (const update of updates) {
+        const updateData: any = { position: update.position };
+        if (update.section_type) {
+          updateData.section_type = update.section_type;
+        }
+        
         await tx
           .update(slides)
-          .set({ position: update.position })
+          .set(updateData)
           .where(eq(slides.id, update.slideId));
       }
       

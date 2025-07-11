@@ -29,9 +29,14 @@ const upload = multer({
       'image/bmp', 'image/tiff', 'image/svg+xml', 'image/avif', 'image/heic', 'image/heif'
     ];
     const allowedAudioTypes = [
-      'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 
-      'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac', 
-      'audio/ogg', 'audio/webm'
+      'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave',
+      'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac', 'audio/x-aac',
+      'audio/ogg', 'audio/webm', 'audio/flac', 'audio/x-flac',
+      'audio/3gpp', 'audio/3gpp2', 'audio/amr', 'audio/opus',
+      'audio/vnd.wav', 'audio/L16', 'audio/pcm', 'audio/basic',
+      'audio/aiff', 'audio/x-aiff', 'audio/midi', 'audio/x-midi',
+      'audio/wma', 'audio/x-ms-wma', 'audio/ra', 'audio/x-realaudio',
+      'audio/vorbis', 'audio/x-vorbis+ogg'
     ];
     const allowedVideoTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
     
@@ -46,10 +51,13 @@ const upload = multer({
       if (allowedAudioTypes.includes(file.mimetype)) {
         cb(null, true);
       } else {
-        // Check file extension as fallback for M4A files
+        // Check file extension as fallback for common audio files
         const fileName = file.originalname.toLowerCase();
-        if (fileName.endsWith('.m4a')) {
-          console.log(`M4A file accepted by extension despite MIME type: ${file.mimetype}`);
+        const audioExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.wma', '.opus', '.aiff', '.amr', '.3gp'];
+        const hasAudioExtension = audioExtensions.some(ext => fileName.endsWith(ext));
+        
+        if (hasAudioExtension) {
+          console.log(`Audio file accepted by extension despite MIME type: ${file.mimetype} (${file.originalname})`);
           cb(null, true);
         } else {
           cb(new Error(`Unsupported audio format: ${file.mimetype} (file: ${file.originalname})`));
@@ -848,7 +856,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (slide.questionType === 'multiple_choice' && slide.aggregatedData.optionsSummary) {
           // Format multiple choice options
           const optionsText = slide.aggregatedData.optionsSummary
-            .map(opt => `${opt.optionText}: ${opt.count} (${opt.percentage}%)`)
+            .map((opt: any) => `${opt.optionText}: ${opt.count} (${opt.percentage}%)`)
             .join(' | ');
           csv += `"${optionsText.replace(/"/g, '""')}"\n`;
           
@@ -1439,6 +1447,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             message: "Each update must have slideId and position" 
           });
         }
+        // section_type is optional for section changes
       }
       
       await storage.batchUpdateSlidePositions(updates);

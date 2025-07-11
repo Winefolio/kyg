@@ -41,8 +41,8 @@ export function getNetworkSpeed(): 'slow' | 'medium' | 'fast' | 'unknown' {
   
   // Check downlink speed in Mbps
   if (connection.downlink) {
-    if (connection.downlink >= 5) return 'fast';
-    if (connection.downlink >= 1) return 'medium';
+    if (connection.downlink >= 3) return 'fast'; // Lowered from 5 to 3 Mbps
+    if (connection.downlink >= 0.5) return 'medium'; // Lowered from 1 to 0.5 Mbps
     return 'slow';
   }
   
@@ -60,13 +60,51 @@ export function shouldPreloadVideo(): boolean {
 }
 
 export function getOptimalVideoPreload(): 'none' | 'metadata' | 'auto' {
-  if (!shouldPreloadVideo()) {
-    return 'none';
-  }
-  
+  // On mobile devices, be more conservative with preloading
   if (isMobileDevice()) {
-    return 'metadata'; // Only load metadata on mobile
+    const speed = getNetworkSpeed();
+    
+    // No preloading on slow or unknown connections
+    if (speed === 'slow' || speed === 'unknown') {
+      return 'none';
+    }
+    
+    // Only metadata on medium speed connections
+    if (speed === 'medium') {
+      return 'metadata';
+    }
+    
+    // Metadata even on fast mobile connections to save bandwidth
+    return 'metadata';
   }
   
-  return 'metadata'; // Default to metadata for all devices
+  // Desktop devices can be more aggressive
+  const speed = getNetworkSpeed();
+  
+  // Still use metadata on slow connections
+  if (speed === 'slow') {
+    return 'metadata';
+  }
+  
+  // Auto-preload on fast connections or unknown (assume good connection on desktop)
+  return 'auto';
+}
+
+export function getOptimalAudioPreload(): 'none' | 'metadata' | 'auto' {
+  // Audio files are typically smaller than video, so we can be more aggressive
+  if (isMobileDevice()) {
+    const speed = getNetworkSpeed();
+    
+    // Only avoid preloading on explicitly slow connections
+    if (speed === 'slow') {
+      return 'metadata'; // Changed from 'none' to 'metadata' for better mobile performance
+    }
+    
+    // Auto-preload on all other connections (unknown, medium, fast)
+    // Audio files are small enough that this is acceptable even on medium connections
+    return 'auto';
+  }
+  
+  // Desktop always auto-preloads audio
+  return 'auto';
 }

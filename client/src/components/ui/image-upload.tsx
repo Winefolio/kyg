@@ -4,7 +4,8 @@ import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
-import { Upload, X, Image } from 'lucide-react';
+import { Upload, X, Image, Search } from 'lucide-react';
+import { UnsplashSelector } from './unsplash-selector';
 
 interface ImageUploadProps {
   value?: string;
@@ -25,6 +26,7 @@ export function ImageUpload({
 }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [showUnsplash, setShowUnsplash] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const compressImage = (file: File, maxWidth: number = 1200, quality: number = 0.8): Promise<string> => {
@@ -206,16 +208,28 @@ export function ImageUpload({
             <p className="text-xs text-white/40 mb-4">
               Supports: JPEG, PNG, WebP, GIF, AVIF, HEIC, SVG, BMP, TIFF (up to 10MB)
             </p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || isUploading}
-              className="border-white/20 text-white hover:bg-white/10"
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              {isUploading ? 'Uploading...' : 'Select Image'}
-            </Button>
+            <div className="flex space-x-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={disabled || isUploading}
+                className="border-white/20 text-white hover:bg-white/10"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {isUploading ? 'Uploading...' : 'Upload File'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowUnsplash(true)}
+                disabled={disabled || isUploading}
+                className="border-white/20 text-white hover:bg-white/10"
+              >
+                <Search className="h-4 w-4 mr-2" />
+                Browse Photos
+              </Button>
+            </div>
           </div>
         )}
         
@@ -228,6 +242,12 @@ export function ImageUpload({
           disabled={disabled}
         />
       </Card>
+      
+      <UnsplashSelector
+        isOpen={showUnsplash}
+        onSelect={onChange}
+        onClose={() => setShowUnsplash(false)}
+      />
     </div>
   );
 }

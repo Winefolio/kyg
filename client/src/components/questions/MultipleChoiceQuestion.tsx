@@ -147,8 +147,8 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
               <Label
                 htmlFor={option.id}
                 className={`
-                  flex items-center p-2 rounded-lg cursor-pointer transition-all duration-300 group
-                  transform-gpu
+                  flex items-center p-3 sm:p-2 rounded-lg cursor-pointer transition-all duration-300 group
+                  transform-gpu min-h-[44px] min-w-[44px]
                   ${isSelected 
                     ? 'bg-purple-500/20 border border-purple-400/50 shadow-md shadow-purple-500/20' 
                     : 'bg-white/5 hover:bg-white/10 border border-transparent hover:border-white/20'

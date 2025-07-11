@@ -24,6 +24,7 @@ import { VideoMessageSlide } from "@/components/slides/VideoMessageSlide";
 import { AudioMessageSlide } from "@/components/slides/AudioMessageSlide";
 import { TransitionSlide } from "@/components/slides/TransitionSlide";
 import { DebugErrorBoundary } from "@/components/DebugErrorBoundary";
+import { prefetchUpcomingSlides, clearPrefetchCache } from "@/lib/media-prefetch";
 import type { Slide, Participant, Session, Package, VideoMessagePayload, AudioMessagePayload, TransitionPayload } from "@shared/schema";
 
 // Configurable transition durations (in milliseconds)
@@ -86,6 +87,13 @@ export default function TastingSession() {
       initializeForSession(sessionId, participantId);
     }
   }, [sessionId, participantId, initializeForSession]);
+
+  // Clear prefetch cache on unmount
+  useEffect(() => {
+    return () => {
+      clearPrefetchCache();
+    };
+  }, []);
   
   // Log state changes
   // useEffect(() => {
@@ -227,6 +235,7 @@ export default function TastingSession() {
       setAnswers(previousAnswers);
     }
   }, [responses, participantId, resumePosition]);
+
 
 
   // Memoize expensive slides processing to prevent recalculation on every render
@@ -393,6 +402,27 @@ export default function TastingSession() {
     // Extract processed data
     const { slides, wines, sortedSlidesByWine, packageIntroSlides, getSlideSection, isLastSlideOfSection } = processedSlidesData;
 
+  // Prefetch upcoming media when slide changes or slides are loaded
+  useEffect(() => {
+    if (slides && slides.length > 0 && currentSlideIndex >= 0) {
+      // More aggressive prefetching for mobile audio - look ahead 3 slides
+      const lookAhead = 3;
+      prefetchUpcomingSlides(slides, currentSlideIndex, lookAhead).catch(err => {
+        console.warn('Media prefetch failed:', err);
+      });
+    }
+  }, [slides, currentSlideIndex]);
+  
+  // Also prefetch when slides are first loaded
+  useEffect(() => {
+    if (slides && slides.length > 0) {
+      // Prefetch the first few slides immediately
+      prefetchUpcomingSlides(slides, -1, 3).catch(err => {
+        console.warn('Initial media prefetch failed:', err);
+      });
+    }
+  }, [slides]);
+
   // Update completed slides when we have both responses and processed slides
   useEffect(() => {
     if (responses && responses.length > 0 && slides.length > 0) {
@@ -429,6 +459,54 @@ export default function TastingSession() {
       console.warn('[TASTING_SESSION] Cannot save response - missing participant data:', { participantId, participant });
     }
   };
+
+  // Clean up corrupted scale data when both responses and slides are available
+  useEffect(() => {
+    if (responses && responses.length > 0 && slides.length > 0) {
+      console.log('[TASTING_SESSION] Validating scale data...');
+      
+      let corruptedCount = 0;
+      
+      responses.forEach((response: any) => {
+        const slide = slides.find(s => s.id === response.slideId);
+        
+        // If this is a scale question, validate the data
+        if (slide && (slide.type === 'question' || slide.genericQuestions?.format === 'scale')) {
+          const isGenericScale = slide.genericQuestions?.format === 'scale';
+          const isLegacyScale = slide.payloadJson?.questionType === 'scale' || slide.payloadJson?.question_type === 'scale';
+          
+          if (isGenericScale || isLegacyScale) {
+            let scaleMin, scaleMax;
+            
+            if (isGenericScale) {
+              scaleMin = slide.genericQuestions.config?.scaleMin || 1;
+              scaleMax = slide.genericQuestions.config?.scaleMax || 10;
+            } else {
+              scaleMin = slide.payloadJson?.scale_min || slide.payloadJson?.scaleMin || 1;
+              scaleMax = slide.payloadJson?.scale_max || slide.payloadJson?.scaleMax || 10;
+            }
+            
+            // Check if we need to correct the value
+            const originalValue = response.answerJson;
+            if (typeof originalValue === 'number' && (originalValue < scaleMin || originalValue > scaleMax)) {
+              const cleanedValue = Math.max(scaleMin, Math.min(scaleMax, originalValue));
+              corruptedCount++;
+              console.warn(`🔧 Cleaned corrupted scale data for slide ${response.slideId}: ${originalValue} → ${cleanedValue}`);
+              
+              // Save the corrected value
+              setTimeout(() => {
+                handleAnswerChange(response.slideId, cleanedValue);
+              }, 100);
+            }
+          }
+        }
+      });
+      
+      if (corruptedCount > 0) {
+        console.warn(`🚨 Found and cleaned ${corruptedCount} corrupted scale responses`);
+      }
+    }
+  }, [responses, slides]);
 
   if (sessionDetailsLoading || isLoading) {
     return (
@@ -779,6 +857,66 @@ export default function TastingSession() {
     setSidebarOpen(false);
   };
 
+  // Helper function to extract numeric value from potentially complex answer objects
+  const extractScaleValue = (answer: any, scaleMin: number, scaleMax: number): number => {
+    if (answer === null || answer === undefined) {
+      return Math.floor((scaleMin + scaleMax) / 2); // Default to middle value
+    }
+    
+    let numericValue: number;
+    const originalAnswer = answer; // Store for debugging
+    
+    // Handle different answer formats
+    if (typeof answer === 'number') {
+      numericValue = answer;
+    } else if (typeof answer === 'object' && answer !== null) {
+      // Check for common object structures
+      if (typeof answer.value === 'number') {
+        numericValue = answer.value;
+      } else if (typeof answer.selected === 'number') {
+        numericValue = answer.selected;
+      } else if (typeof answer.rating === 'number') {
+        numericValue = answer.rating;
+      } else if (typeof answer.score === 'number') {
+        numericValue = answer.score;
+      } else {
+        // Try to extract first numeric value from object
+        const values = Object.values(answer).filter(v => typeof v === 'number');
+        numericValue = values.length > 0 ? values[0] as number : Math.floor((scaleMin + scaleMax) / 2);
+      }
+    } else if (typeof answer === 'string') {
+      // Try to parse string as number
+      const parsed = parseFloat(answer);
+      numericValue = isNaN(parsed) ? Math.floor((scaleMin + scaleMax) / 2) : parsed;
+    } else {
+      // Fallback to default
+      numericValue = Math.floor((scaleMin + scaleMax) / 2);
+    }
+    
+    // CRITICAL: Always clamp to valid range to prevent UI overflow
+    const originalValue = numericValue;
+    numericValue = Math.max(scaleMin, Math.min(scaleMax, numericValue));
+    
+    // Log corrupted data for debugging and potential data cleanup
+    if (originalValue !== numericValue) {
+      console.error(`🚨 CORRUPTED SCALE DATA DETECTED:`, {
+        slideId: 'unknown',
+        slideTitle: 'unknown',
+        originalAnswer,
+        originalValue,
+        clampedValue: numericValue,
+        scaleRange: `${scaleMin}-${scaleMax}`,
+        participantId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Note: Corrupted data will be detected and corrected by validation useEffect
+    }
+    
+    // Round to nearest integer for cleaner display
+    return Math.round(numericValue);
+  };
+
 
   // Handle completion
   const handleComplete = async () => {
@@ -824,7 +962,7 @@ export default function TastingSession() {
                   <img 
                     src={currentSlide.payloadJson.package_image || currentSlide.payloadJson.background_image} 
                     alt={currentSlide.payloadJson.package_name || "Package"} 
-                    className="w-24 h-24 sm:w-32 sm:h-32 lg:w-40 lg:h-40 mx-auto rounded-xl object-cover shadow-2xl border-2 sm:border-4 border-white/20"
+                    className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 lg:w-40 lg:h-40 mx-auto rounded-xl object-cover shadow-2xl border-2 sm:border-4 border-white/20"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
@@ -833,8 +971,8 @@ export default function TastingSession() {
                     }}
                   />
                 ) : null}
-                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full items-center justify-center" style={{display: 'none'}}>
-                  <Wine className="w-8 h-8 text-white" />
+                <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full items-center justify-center" style={{display: 'none'}}>
+                  <Wine className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                 </div>
               </div>
             )}
@@ -927,18 +1065,24 @@ export default function TastingSession() {
               );
             
             case 'scale':
+              const scaleMin = gq.config.scaleMin || 1;
+              const scaleMax = gq.config.scaleMax || 10;
               return (
                 <ScaleQuestion
                   question={{
                     title: gq.config.title,
                     description: gq.config.description || '',
                     category: gq.metadata?.category || 'Scale',
-                    scale_min: gq.config.scaleMin || 1,
-                    scale_max: gq.config.scaleMax || 10,
+                    scale_min: scaleMin,
+                    scale_max: scaleMax,
                     scale_labels: gq.config.scaleLabels || ['Low', 'High']
                   }}
-                  value={answers[currentSlide.id] ?? Math.floor(((gq.config.scaleMin || 1) + (gq.config.scaleMax || 10)) / 2)}
-                  onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+                  value={extractScaleValue(answers[currentSlide.id], scaleMin, scaleMax)}
+                  onChange={(value) => {
+                    // Ensure value is always within valid range before saving
+                    const clampedValue = Math.max(scaleMin, Math.min(scaleMax, value));
+                    handleAnswerChange(currentSlide.id, clampedValue);
+                  }}
                 />
               );
             
@@ -1039,18 +1183,24 @@ export default function TastingSession() {
         }
 
         if (questionData.questionType === 'scale' || questionData.question_type === 'scale') {
+          const scaleMin = questionData.scale_min || questionData.scaleMin || 1;
+          const scaleMax = questionData.scale_max || questionData.scaleMax || 10;
           return (
             <ScaleQuestion
               question={{
                 title: questionData.title || questionData.question,
                 description: questionData.description || '',
                 category: questionData.category || 'Scale',
-                scale_min: questionData.scale_min || questionData.scaleMin || 1,
-                scale_max: questionData.scale_max || questionData.scaleMax || 10,
+                scale_min: scaleMin,
+                scale_max: scaleMax,
                 scale_labels: questionData.scale_labels || questionData.scaleLabels || ['Low', 'High']
               }}
-              value={answers[currentSlide.id] ?? Math.floor(((questionData.scale_min || questionData.scaleMin || 1) + (questionData.scale_max || questionData.scaleMax || 10)) / 2)}
-              onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+              value={extractScaleValue(answers[currentSlide.id], scaleMin, scaleMax)}
+              onChange={(value) => {
+                // Ensure value is always within valid range before saving
+                const clampedValue = Math.max(scaleMin, Math.min(scaleMax, value));
+                handleAnswerChange(currentSlide.id, clampedValue);
+              }}
             />
           );
         }
@@ -1182,8 +1332,13 @@ export default function TastingSession() {
                 scale_max: questionData.scale_max || questionData.scaleMax || 10,
                 scale_labels: questionData.scale_labels || questionData.scaleLabels || ['Low', 'High']
               }}
-              value={answers[currentSlide.id] ?? Math.floor(((questionData.scale_min || questionData.scaleMin || 1) + (questionData.scale_max || questionData.scaleMax || 10)) / 2)}
-              onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+              value={extractScaleValue(answers[currentSlide.id], questionData.scale_min || questionData.scaleMin || 1, questionData.scale_max || questionData.scaleMax || 10)}
+              onChange={(value) => {
+                const scaleMin = questionData.scale_min || questionData.scaleMin || 1;
+                const scaleMax = questionData.scale_max || questionData.scaleMax || 10;
+                const clampedValue = Math.max(scaleMin, Math.min(scaleMax, value));
+                handleAnswerChange(currentSlide.id, clampedValue);
+              }}
             />
           );
         }
@@ -1292,19 +1447,19 @@ export default function TastingSession() {
                 initial={{ x: -300, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: -300, opacity: 0 }}
-                transition={{ type: "spring", damping: 20, stiffness: 100 }}
-                className="fixed left-0 top-0 h-full w-80 bg-gradient-to-b from-purple-950/95 to-purple-900/95 backdrop-blur-xl border-r border-white/10 z-50 lg:relative lg:w-96"
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="fixed left-0 top-0 h-full w-72 sm:w-80 bg-gradient-to-b from-purple-950/95 to-purple-900/95 backdrop-blur-xl border-r border-white/10 z-50 lg:relative lg:w-96"
               >
                 <div className="flex flex-col h-full">
                   {/* Sidebar header */}
-                  <div className="p-6 border-b border-white/10">
+                  <div className="p-4 sm:p-6 border-b border-white/10">
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-xl font-bold text-white">Wine Tasting</h2>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setSidebarOpen(false)}
-                        className="text-white hover:bg-white/10 lg:hidden"
+                        className="text-white hover:bg-white/10"
                       >
                         <X className="w-5 h-5" />
                       </Button>
@@ -1354,7 +1509,11 @@ export default function TastingSession() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => refetchSlides()}
+                        onClick={async () => {
+                          // Invalidate and refetch the slides data
+                          queryClient.invalidateQueries({ queryKey: slidesQueryKey });
+                          refetchSlides();
+                        }}
                         disabled={isLoading}
                         className="text-white/60 hover:text-white hover:bg-white/10 h-6 px-2"
                       >
@@ -1371,6 +1530,7 @@ export default function TastingSession() {
                       const wineStartIndex = slides.findIndex(s => s.packageWineId === wine.id);
                       const isExpanded = expandedWines[wine.id];
                       const section = sections[wineIndex];
+                      const isCurrentWine = wine.id === currentWine?.id;
 
                       return (
                         <motion.div
@@ -1387,8 +1547,8 @@ export default function TastingSession() {
                           >
                             <div className="flex items-center space-x-3">
                               <div className={`w-3 h-3 rounded-full ${
-                                section.isCompleted ? 'bg-green-400' : 
-                                section.isActive ? 'bg-purple-400' : 'bg-white/30'
+                                section?.isCompleted ? 'bg-green-400' : 
+                                section?.isActive ? 'bg-purple-400' : 'bg-white/30'
                               }`} />
                               <div className="text-left">
                                 <h3 className="font-medium text-white">
@@ -1411,10 +1571,10 @@ export default function TastingSession() {
                                 {wineSlides.length} slides
                               </span>
                               <span className="text-white/80">
-                                {Math.round(section.progress)}%
+                                {Math.round(section?.progress || 0)}%
                               </span>
                             </div>
-                            <Progress value={section.progress} className="h-1" />
+                            <Progress value={section?.progress || 0} className="h-1" />
                           </div>
 
                           {/* Slides list */}
@@ -1477,7 +1637,7 @@ export default function TastingSession() {
         {/* Main content area */}
         <div className="flex-1 flex flex-col h-full overflow-hidden">
           {/* Header */}
-          <div className="flex-shrink-0 p-4 border-b border-white/10">
+          <div className="flex-shrink-0 p-3 sm:p-4 lg:p-6 border-b border-white/10">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <Button

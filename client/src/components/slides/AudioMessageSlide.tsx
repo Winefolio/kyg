@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { AudioPlayer } from '@/components/ui/audio-player';
+import { prefetchMedia } from '@/lib/media-prefetch';
 import type { AudioMessagePayload } from '@shared/schema';
 
 interface AudioMessageSlideProps {
@@ -9,6 +10,19 @@ interface AudioMessageSlideProps {
 }
 
 export function AudioMessageSlide({ payload, className = "" }: AudioMessageSlideProps) {
+  const audioUrl = payload.audio_publicId 
+    ? `/api/media/${payload.audio_publicId}/stream` 
+    : payload.audio_url || '';
+  
+  // Prefetch audio as soon as component mounts
+  useEffect(() => {
+    if (audioUrl) {
+      prefetchMedia(audioUrl, 'audio').catch(err => {
+        console.warn('Audio prefetch failed:', err);
+      });
+    }
+  }, [audioUrl]);
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -34,7 +48,7 @@ export function AudioMessageSlide({ payload, className = "" }: AudioMessageSlide
       {/* Audio Player */}
       <div className="max-w-2xl mx-auto">
         <AudioPlayer
-          src={payload.audio_publicId ? `/api/media/${payload.audio_publicId}/stream` : payload.audio_url || ''}
+          src={audioUrl}
           title={payload.title}
           description={payload.description}
           autoplay={payload.autoplay}

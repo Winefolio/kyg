@@ -11,13 +11,27 @@ import { TransitionSlide } from '@/components/slides/TransitionSlide';
 import type { Slide, VideoMessagePayload, AudioMessagePayload, TransitionPayload } from '@shared/schema';
 import { memo, useMemo } from 'react';
 
-// Preview wrapper component that scales down and disables interactions
+// Preview wrapper component that adapts size and disables interactions
 function PreviewWrapper({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`transform scale-75 origin-center pointer-events-none ${className}`}>
-      {children}
+    <div className={`pointer-events-none ${className}`}>
+      <div className="transform scale-75 sm:scale-90 md:scale-100 origin-center transition-transform duration-200">
+        {children}
+      </div>
     </div>
   );
+}
+
+// Lazy wrapper for media components to improve performance
+function LazyMediaWrapper({ children, isVisible }: { children: React.ReactNode; isVisible: boolean }) {
+  if (!isVisible) {
+    return (
+      <div className="w-full h-32 sm:h-40 md:h-48 bg-black/20 rounded-lg flex items-center justify-center">
+        <p className="text-white/50 text-xs sm:text-sm">Media preview disabled for performance</p>
+      </div>
+    );
+  }
+  return <>{children}</>;
 }
 
 // Render actual slide content using the same logic as TastingSession.tsx
@@ -51,20 +65,26 @@ function renderSlideContent(slide: Slide) {
       );
 
     case 'video_message':
+      const videoPayload = slide.payloadJson as VideoMessagePayload;
       return (
         <PreviewWrapper>
-          <VideoMessageSlide
-            payload={slide.payloadJson as VideoMessagePayload}
-          />
+          <LazyMediaWrapper isVisible={Boolean(videoPayload.video_publicId || videoPayload.video_url)}>
+            <VideoMessageSlide
+              payload={videoPayload}
+            />
+          </LazyMediaWrapper>
         </PreviewWrapper>
       );
 
     case 'audio_message':
+      const audioPayload = slide.payloadJson as AudioMessagePayload;
       return (
         <PreviewWrapper>
-          <AudioMessageSlide
-            payload={slide.payloadJson as AudioMessagePayload}
-          />
+          <LazyMediaWrapper isVisible={Boolean(audioPayload.audio_publicId || audioPayload.audio_url)}>
+            <AudioMessageSlide
+              payload={audioPayload}
+            />
+          </LazyMediaWrapper>
         </PreviewWrapper>
       );
 
@@ -295,25 +315,49 @@ function renderSlideContent(slide: Slide) {
   }
 }
 
-export const SlidePreviewPanel = memo(function SlidePreviewPanel({ activeSlide }: { activeSlide: Slide | undefined }) {
+export const SlidePreviewPanel = memo(function SlidePreviewPanel({ 
+  activeSlide, 
+  livePreviewData 
+}: { 
+  activeSlide: Slide | undefined;
+  livePreviewData?: Map<string, any>;
+}) {
   // Memoize the slide content to prevent re-renders
   const slideContent = useMemo(() => {
     if (!activeSlide) {
       return (
-        <div className="text-center text-white/50 p-6">
-          <Eye className="w-12 h-12 mx-auto mb-4 opacity-50" />
-          <p className="text-sm">Select a slide to preview</p>
+        <div className="text-center text-white/50 p-4 sm:p-6">
+          <Eye className="w-8 h-8 sm:w-12 sm:h-12 mx-auto mb-4 opacity-50" />
+          <p className="text-xs sm:text-sm">Select a slide to preview</p>
         </div>
       );
     }
-    return renderSlideContent(activeSlide);
-  }, [activeSlide?.id, activeSlide?.payloadJson, activeSlide?.genericQuestions]);
+    
+    // Use live preview data if available, otherwise use the slide's current payload
+    const currentPayload = livePreviewData?.get(activeSlide.id) || activeSlide.payloadJson;
+    const slideWithLiveData = { ...activeSlide, payloadJson: currentPayload };
+    
+    return renderSlideContent(slideWithLiveData);
+  }, [
+    activeSlide?.id, 
+    activeSlide?.payloadJson, 
+    activeSlide?.genericQuestions,
+    // Include live preview data in dependencies
+    livePreviewData?.get(activeSlide?.id || ''),
+    // Force update when key fields change
+    activeSlide?.payloadJson && typeof activeSlide.payloadJson === 'object' ? (activeSlide.payloadJson as any).title : undefined,
+    activeSlide?.payloadJson && typeof activeSlide.payloadJson === 'object' ? (activeSlide.payloadJson as any).question : undefined,
+    activeSlide?.payloadJson && typeof activeSlide.payloadJson === 'object' ? (activeSlide.payloadJson as any).description : undefined,
+    activeSlide?.payloadJson && typeof activeSlide.payloadJson === 'object' ? (activeSlide.payloadJson as any).options : undefined,
+    // Use a hash of the payloadJson to detect any changes
+    activeSlide?.payloadJson ? JSON.stringify(activeSlide.payloadJson) : undefined
+  ]);
 
   return (
-    <div className="h-full flex items-center justify-center p-2">
-      <div className="aspect-[9/16] w-full max-w-sm bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 rounded-2xl shadow-2xl overflow-hidden relative">
-        {/* Content area - with top padding for nav clearance */}
-        <div className="h-full flex flex-col pt-16 pb-12">
+    <div className="h-full flex items-center justify-center p-2 sm:p-4">
+      <div className="aspect-[9/16] w-full max-w-[280px] sm:max-w-sm bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 rounded-2xl shadow-2xl overflow-hidden relative">
+        {/* Content area - with responsive padding for nav clearance */}
+        <div className="h-full flex flex-col pt-12 sm:pt-16 pb-8 sm:pb-12">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeSlide?.id || 'empty'}
@@ -321,16 +365,18 @@ export const SlidePreviewPanel = memo(function SlidePreviewPanel({ activeSlide }
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.3, ease: 'easeInOut' }}
-              className="h-full flex items-center justify-center"
+              className="h-full flex items-center justify-center overflow-hidden"
             >
-              {slideContent}
+              <div className="w-full h-full flex items-center justify-center">
+                {slideContent}
+              </div>
             </motion.div>
           </AnimatePresence>
         </div>
 
         {/* Bottom indicator */}
         {activeSlide && (
-          <div className="absolute bottom-4 left-4 right-4">
+          <div className="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 right-2 sm:right-4">
             <div className="flex items-center justify-between">
               <Badge 
                 variant="secondary" 

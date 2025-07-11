@@ -31,7 +31,9 @@ export function ModernSlider({
   const [hoverPosition, setHoverPosition] = React.useState<number | null>(null);
   const trackRef = React.useRef<HTMLDivElement>(null);
 
-  const percentage = ((value - min) / (max - min)) * 100;
+  // Clamp value to valid range and calculate safe percentage
+  const clampedValue = Math.max(min, Math.min(max, value));
+  const percentage = Math.max(0, Math.min(100, ((clampedValue - min) / (max - min)) * 100));
 
   const handleClick = (e: React.MouseEvent) => {
     if (!trackRef.current) return;
@@ -59,12 +61,13 @@ export function ModernSlider({
   const dashPositions = Array.from({ length: dashCount }, (_, i) => (i / (dashCount - 1)) * 100);
 
   return (
-    <div className={cn("relative", className)}>
+    <div className={cn("relative overflow-hidden", className)}>
       {/* Slider Track */}
       <div className="relative">
         <motion.div
           ref={trackRef}
           className="relative h-3 bg-white/20 rounded-full cursor-pointer overflow-hidden backdrop-blur-sm"
+          style={{ maxWidth: '100%' }} // Safety net to prevent overflow
           onClick={handleClick}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setHoverPosition(null)}
@@ -87,8 +90,8 @@ export function ModernSlider({
 
           {/* Progress fill with dynamic glow */}
           <motion.div
-            className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
-            animate={{ width: `${percentage}%` }}
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full overflow-hidden"
+            animate={{ width: `${Math.min(100, percentage)}%` }}
             transition={{ type: "spring", stiffness: 200, damping: 25 }}
           >
             {/* Dynamic intensity glow effect */}
@@ -116,7 +119,7 @@ export function ModernSlider({
             className="absolute w-8 h-8 rounded-full pointer-events-none"
             style={{ 
               background: 'radial-gradient(circle, rgba(233, 168, 255, 0.5) 0%, rgba(192, 132, 252, 0) 65%)',
-              left: `${percentage}%`, // Use same percentage as fill bar and thumb
+              left: `${Math.min(100, Math.max(0, percentage))}%`, // Constrain to valid range
               top: `calc(50% - 16px)`, // 16px is half the glow height to center on track
               transform: 'translateX(-50%)' // Center the glow on the percentage point
             }}
@@ -151,7 +154,7 @@ export function ModernSlider({
         <motion.div
           className="absolute w-6 h-6 bg-white rounded-full shadow-lg cursor-grab"
           style={{ 
-            left: `${percentage}%`, // Use same percentage as fill bar
+            left: `${Math.min(100, Math.max(0, percentage))}%`, // Constrain to valid range
             top: `calc(50% - 12px)`, // 12px is half the thumb height to center on track
             transform: 'translateX(-50%)' // Center the thumb on the percentage point
           }}
@@ -176,8 +179,10 @@ export function ModernSlider({
             const newPercentage = (newOffset / rect.width) * 100;
             const newValue = Math.round((newPercentage / 100) * (max - min) + min);
             
-            if (newValue !== value && newValue >= min && newValue <= max) {
-              onChange(newValue);
+            // Always clamp to valid range
+            const finalValue = Math.max(min, Math.min(max, newValue));
+            if (finalValue !== value) {
+              onChange(finalValue);
             }
           }}
           whileHover={{ 
@@ -211,13 +216,13 @@ export function ModernSlider({
           {isDragging && (
             <motion.div
               className="absolute -top-12 left-1/2 -translate-x-1/2 bg-black/80 text-white px-3 py-1 rounded-lg text-sm font-medium backdrop-blur-sm"
-              style={{ left: `${percentage}%` }}
+              style={{ left: `${Math.min(100, Math.max(0, percentage))}%` }}
               initial={{ opacity: 0, y: 10, scale: 0.8 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.8 }}
               transition={{ duration: 0.2 }}
             >
-              {value}
+              {clampedValue}
               <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black/80" />
             </motion.div>
           )}
