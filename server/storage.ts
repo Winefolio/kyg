@@ -794,7 +794,9 @@ export class DatabaseStorage implements IStorage {
         .limit(1);
       
       const lastPositionInSection = existingSlides[0]?.globalPosition || (wineBasePosition + sectionOffset);
-      targetGlobalPosition = lastPositionInSection + 10; // Use 10 as gap
+      targetGlobalPosition = lastPositionInSection === (wineBasePosition + sectionOffset) 
+        ? wineBasePosition + sectionOffset 
+        : lastPositionInSection + 10; // Use 10 as gap
     }
 
     // Auto-assign local position if not provided
@@ -808,19 +810,86 @@ export class DatabaseStorage implements IStorage {
       
       targetPosition = (existingSlides[0]?.position || 0) + 1;
     }
+    
+    // Check for existing slide with same globalPosition to prevent conflicts
+    const conflictCheck = await db
+      .select({ id: slides.id })
+      .from(slides)
+      .where(eq(slides.globalPosition, targetGlobalPosition))
+      .limit(1);
+    
+    if (conflictCheck.length > 0) {
+      console.log(`[SLIDE_CREATE] Position conflict detected at globalPosition ${targetGlobalPosition}, finding next available`);
+      // Find next available globalPosition
+      const nextAvailable = await db
+        .select({ globalPosition: slides.globalPosition })
+        .from(slides)
+        .where(
+          and(
+            eq(slides.packageWineId, slide.packageWineId),
+            gte(slides.globalPosition, targetGlobalPosition)
+          )
+        )
+        .orderBy(asc(slides.globalPosition));
+      
+      // Find gap in positions
+      let newGlobalPosition = targetGlobalPosition;
+      for (const existing of nextAvailable) {
+        if (existing.globalPosition !== newGlobalPosition) {
+          break; // Found a gap
+        }
+        newGlobalPosition = existing.globalPosition + 1;
+      }
+      targetGlobalPosition = newGlobalPosition;
+    }
 
-    const result = await db
-      .insert(slides)
-      .values({
-        packageWineId: slide.packageWineId,
-        position: targetPosition,
-        globalPosition: targetGlobalPosition,
-        type: slide.type,
-        section_type: slide.section_type,
-        payloadJson: slide.payloadJson,
-        genericQuestions: slide.genericQuestions,
-      })
-      .returning();
+    // Log detailed position info for debugging Wine 1 issues
+    console.log(`[SLIDE_CREATE] Inserting slide with positions:`, {
+      packageWineId: slide.packageWineId,
+      winePosition: wine[0].position,
+      section_type: slide.section_type,
+      localPosition: targetPosition,
+      globalPosition: targetGlobalPosition,
+      slideType: slide.type
+    });
+
+    let result;
+    try {
+      result = await db
+        .insert(slides)
+        .values({
+          packageWineId: slide.packageWineId,
+          position: targetPosition,
+          globalPosition: targetGlobalPosition,
+          type: slide.type,
+          section_type: slide.section_type,
+          payloadJson: slide.payloadJson,
+          genericQuestions: slide.genericQuestions,
+        })
+        .returning();
+    } catch (dbError: any) {
+      console.error(`[SLIDE_CREATE] Database error:`, {
+        error: dbError,
+        errorMessage: dbError?.message,
+        errorCode: dbError?.code,
+        errorDetail: dbError?.detail,
+        attemptedValues: {
+          packageWineId: slide.packageWineId,
+          position: targetPosition,
+          globalPosition: targetGlobalPosition,
+          type: slide.type,
+          section_type: slide.section_type
+        }
+      });
+      
+      // Check for specific constraint violations
+      if (dbError.code === '23505') { // Unique constraint violation
+        throw new Error(`Position conflict: A slide already exists at position ${targetPosition} for this wine. Please try again.`);
+      }
+      
+      // Re-throw with more context
+      throw new Error(`Failed to create slide: ${dbError.message || 'Database error'}`);
+    }
     
     const newSlide = result[0];
     
