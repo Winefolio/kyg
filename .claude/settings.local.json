@@ -48,7 +48,8 @@
       "Bash(git config:*)",
       "Bash(git push:*)",
       "mcp__supabase__search_docs",
-      "Bash(timeout 10 bash -c 'echo \"no\" | npm run db:push' 2>&1)"
+      "Bash(timeout 10 bash -c 'echo \"no\" | npm run db:push' 2>&1)",
+      "Bash(ss:*)"
     ],
     "deny": []
   },

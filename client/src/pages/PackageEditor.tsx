@@ -1009,8 +1009,9 @@ export default function PackageEditor() {
     if (!currentWineContext) return;
 
     // Define position ranges for each section to prevent conflicts
+    // Updated intro range to start at 100 to avoid conflicts with reserved positions
     const SECTION_RANGES = {
-      'intro': { min: 0, max: 10000 },
+      'intro': { min: 100, max: 10000 },      // Changed from 0 to 100
       'deep_dive': { min: 10000, max: 20000 },
       'ending': { min: 30000, max: 40000 }
     };
@@ -1028,11 +1029,22 @@ export default function PackageEditor() {
     // Get slides in the current section
     const sectionSlides = wineSlides.filter(s => s.section_type === currentWineContext.sectionType);
     
+    // Get wine position for special handling
+    const wine = wines.find(w => w.id === currentWineContext.wineId);
+    const winePosition = wine?.position || 1;
+    
     let nextPosition;
     
     if (sectionSlides.length === 0) {
       // No slides in this section - start at the beginning of the range
-      nextPosition = sectionRange.min + 10; // Start at min + 10 to leave room
+      // Special handling for Wine 1 intro to align with backend expectations
+      if (winePosition === 1 && currentWineContext.sectionType === 'intro') {
+        // For Wine 1 intro, use a position that aligns with backend calculation
+        // Backend calculates: wineBasePosition (1000) + sectionOffset (50) = 1050
+        nextPosition = 1050;
+      } else {
+        nextPosition = sectionRange.min + 10; // Start at min + 10 to leave room
+      }
     } else {
       // Find the highest position in this section
       const sectionPositions = sectionSlides
@@ -1041,7 +1053,12 @@ export default function PackageEditor() {
       
       if (sectionPositions.length === 0) {
         // All section slides are outside the range (legacy positions) - start fresh
-        nextPosition = sectionRange.min + 10;
+        // Special handling for Wine 1 intro
+        if (winePosition === 1 && currentWineContext.sectionType === 'intro') {
+          nextPosition = 1050;
+        } else {
+          nextPosition = sectionRange.min + 10;
+        }
       } else {
         const maxSectionPosition = Math.max(...sectionPositions);
         nextPosition = maxSectionPosition + 10;
@@ -1117,6 +1134,17 @@ export default function PackageEditor() {
       payloadJson,
       genericQuestions: question
     };
+
+    // Log slide creation attempt for debugging
+    console.log(`📝 Creating slide for Wine ${winePosition} (${currentWineContext.wineName}) in ${currentWineContext.sectionType} section:`, {
+      wineId: currentWineContext.wineId,
+      winePosition,
+      section: currentWineContext.sectionType,
+      calculatedPosition: nextPosition,
+      slideType,
+      existingSlideCount: sectionSlides.length,
+      usedPositions: Array.from(usedPositions).sort((a, b) => a - b)
+    });
 
     createSlideMutation.mutate(slideData);
     setQuickBuilderOpen(false);

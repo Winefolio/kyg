@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Upload, X, Image, Search } from 'lucide-react';
 import { UnsplashSelector } from './unsplash-selector';
+import { getImageUrl } from '@/lib/media-utils';
 
 interface ImageUploadProps {
   value?: string;
@@ -176,9 +177,17 @@ export function ImageUpload({
         {value ? (
           <div className="relative">
             <img 
-              src={value} 
+              src={getImageUrl({ imageUrl: value })} 
               alt="Preview" 
               className="w-full h-48 object-cover rounded-lg"
+              onError={(e) => {
+                // Fallback to original value if media utils don't work
+                const img = e.target as HTMLImageElement;
+                if (img.src !== value) {
+                  console.warn('Image failed to load, trying original URL:', value);
+                  img.src = value;
+                }
+              }}
             />
             <Button
               type="button"

@@ -1740,7 +1740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             originalEntityId: originalEntityId, // Store temp ID here for later reference
             isTemporary: isTemporaryId || !entityId
           },
-          isPublic: false
+          isPublic: true // Files are uploaded to public bucket, so mark as public
         });
       } catch (dbError: any) {
         // Check if error is due to missing media table
@@ -1762,7 +1762,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         publicId: mediaRecord.publicId,
-        accessUrl: `/api/media/${mediaRecord.publicId}/file`,
+        accessUrl: `/api/media/${mediaRecord.publicId}/stream`,
         mediaType,
         fileName: originalname,
         fileSize: buffer.length

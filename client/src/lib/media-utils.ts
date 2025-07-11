@@ -21,6 +21,10 @@ export function getMediaUrl(media: MediaDescriptor): string {
   
   // Support old, direct URLs for backward compatibility
   if (media.legacyUrl) {
+    // Convert legacy /file URLs to /stream URLs since /file doesn't work in dev
+    if (media.legacyUrl.includes('/api/media/') && media.legacyUrl.includes('/file')) {
+      return media.legacyUrl.replace('/file', '/stream');
+    }
     return media.legacyUrl;
   }
   

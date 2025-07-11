@@ -135,15 +135,25 @@ export function registerMediaProxyRoutes(app: Express) {
       // Update last accessed time
       await storage.updateMediaLastAccessed(mediaRecord.id);
 
-      // For public media, redirect to the CDN URL which supports range requests natively
-      if (mediaRecord.isPublic) {
+      // Check if this is actually a public file regardless of database flag
+      const isActuallyPublic = mediaRecord.storageUrl.includes('/storage/v1/object/public/');
+      
+      // For public media OR mismatched public files, redirect to the CDN URL which supports range requests natively
+      if (mediaRecord.isPublic || isActuallyPublic) {
         // Set cache headers before redirecting
         res.setHeader('Cache-Control', 'public, max-age=86400'); // 24 hours
+        
+        // Log configuration mismatch for debugging
+        if (!mediaRecord.isPublic && isActuallyPublic) {
+          console.log(`[MEDIA_PROXY] Configuration mismatch detected for ${publicId}: database says private but URL is public. Treating as public.`);
+        }
+        
         return res.redirect(302, mediaRecord.storageUrl);
       }
 
-      // For private media, generate a signed URL with longer expiration
-      const urlPath = mediaRecord.storageUrl.split('/storage/v1/object/public/')[1];
+      // For truly private media, generate a signed URL with longer expiration
+      const urlPath = mediaRecord.storageUrl.split('/storage/v1/object/sign/')[1] || 
+                     mediaRecord.storageUrl.split('/storage/v1/object/')[1];
       if (!urlPath) {
         console.error("Invalid storage URL format:", mediaRecord.storageUrl);
         return res.status(500).json({ message: "Invalid media storage configuration" });
