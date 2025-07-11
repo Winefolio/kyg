@@ -1087,6 +1087,9 @@ export default function PackageEditor() {
         title: question.config.title,
         description: question.config.description,
         video_url: (question.config as any).video_url,
+        video_publicId: (question.config as any).video_publicId,
+        video_fileName: (question.config as any).video_fileName,
+        video_fileSize: (question.config as any).video_fileSize,
         autoplay: (question.config as any).autoplay || false,
         show_controls: (question.config as any).controls !== false
       };
@@ -1098,6 +1101,9 @@ export default function PackageEditor() {
         title: question.config.title,
         description: question.config.description,
         audio_url: (question.config as any).audio_url,
+        audio_publicId: (question.config as any).audio_publicId,
+        audio_fileName: (question.config as any).audio_fileName,
+        audio_fileSize: (question.config as any).audio_fileSize,
         autoplay: (question.config as any).autoplay || false,
         show_controls: true
       };
@@ -1736,6 +1742,7 @@ export default function PackageEditor() {
         }}
         onSave={handleQuestionSave}
         wineContext={currentWineContext ? {
+          wineId: currentWineContext.wineId,
           wineName: currentWineContext.wineName,
           wineType: currentWineContext.wineType
         } : undefined}

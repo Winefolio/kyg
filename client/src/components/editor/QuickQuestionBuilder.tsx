@@ -39,6 +39,7 @@ interface QuickQuestionBuilderProps {
   onClose: () => void;
   onSave: (question: GenericQuestion) => void;
   wineContext?: {
+    wineId: string;
     wineName: string;
     wineType: string;
   };
