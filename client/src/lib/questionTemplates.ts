@@ -247,19 +247,15 @@ export const QUESTION_TEMPLATES: QuestionTemplate[] = [
     category: 'structure',
     difficulty: 'intermediate',
     question: {
-      format: 'multiple_choice',
+      format: 'scale',
       config: {
-        title: 'How would you describe the tannins?',
-        description: 'Focus on the drying sensation in your mouth',
-        options: [
-          { id: '1', text: 'Low - Barely perceptible', value: 'low' },
-          { id: '2', text: 'Medium(-) - Soft and smooth', value: 'medium-minus' },
-          { id: '3', text: 'Medium - Well-integrated', value: 'medium' },
-          { id: '4', text: 'Medium(+) - Firm and structured', value: 'medium-plus' },
-          { id: '5', text: 'High - Gripping and astringent', value: 'high' }
-        ],
-        allowMultiple: false,
-        allowOther: false
+        title: 'How would you rate the tannin level in this wine?',
+        description: 'Tannins create a drying, grippy sensation on your gums and tongue. Think of the difference between black tea (high tannins) and herbal tea (low tannins).',
+        scaleMin: 1,
+        scaleMax: 10,
+        scaleLabels: ['Soft', 'Grippy'],
+        showNumbers: true,
+        visualStyle: 'slider'
       },
       metadata: {
         category: 'structure',

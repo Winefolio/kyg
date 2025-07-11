@@ -857,8 +857,27 @@ export default function TastingSession() {
     setSidebarOpen(false);
   };
 
+  // Helper function to safely extract scale min/max values with validation
+  const extractScaleRange = (payloadJson: any): { scaleMin: number; scaleMax: number } => {
+    let scaleMin = Number(payloadJson?.scale_min || payloadJson?.scaleMin || 1);
+    let scaleMax = Number(payloadJson?.scale_max || payloadJson?.scaleMax || 10);
+    
+    // Validate and fix invalid ranges
+    if (isNaN(scaleMin) || scaleMin < 1) scaleMin = 1;
+    if (isNaN(scaleMax) || scaleMax < scaleMin + 1) scaleMax = scaleMin + 9;
+    if (scaleMin > scaleMax) [scaleMin, scaleMax] = [scaleMax, scaleMin];
+    
+    return { scaleMin, scaleMax };
+  };
+
   // Helper function to extract numeric value from potentially complex answer objects
   const extractScaleValue = (answer: any, scaleMin: number, scaleMax: number): number => {
+    // Fix invalid scale ranges (defense against corrupted data)
+    if (scaleMin > scaleMax) {
+      console.warn('Invalid scale range detected, fixing:', { scaleMin, scaleMax });
+      [scaleMin, scaleMax] = [scaleMax, scaleMin]; // Swap values
+    }
+    
     if (answer === null || answer === undefined) {
       return Math.floor((scaleMin + scaleMax) / 2); // Default to middle value
     }
@@ -1183,8 +1202,7 @@ export default function TastingSession() {
         }
 
         if (questionData.questionType === 'scale' || questionData.question_type === 'scale') {
-          const scaleMin = questionData.scale_min || questionData.scaleMin || 1;
-          const scaleMax = questionData.scale_max || questionData.scaleMax || 10;
+          const { scaleMin, scaleMax } = extractScaleRange(questionData);
           return (
             <ScaleQuestion
               question={{
@@ -1322,20 +1340,19 @@ export default function TastingSession() {
         // Try to detect scale questions
         if (questionData.scale_min !== undefined || questionData.scaleMin !== undefined ||
             questionData.scale_max !== undefined || questionData.scaleMax !== undefined) {
+          const { scaleMin, scaleMax } = extractScaleRange(questionData);
           return (
             <ScaleQuestion
               question={{
                 title: title,
                 description: questionData.description || '',
                 category: questionData.category || 'Scale',
-                scale_min: questionData.scale_min || questionData.scaleMin || 1,
-                scale_max: questionData.scale_max || questionData.scaleMax || 10,
+                scale_min: scaleMin,
+                scale_max: scaleMax,
                 scale_labels: questionData.scale_labels || questionData.scaleLabels || ['Low', 'High']
               }}
-              value={extractScaleValue(answers[currentSlide.id], questionData.scale_min || questionData.scaleMin || 1, questionData.scale_max || questionData.scaleMax || 10)}
+              value={extractScaleValue(answers[currentSlide.id], scaleMin, scaleMax)}
               onChange={(value) => {
-                const scaleMin = questionData.scale_min || questionData.scaleMin || 1;
-                const scaleMax = questionData.scale_max || questionData.scaleMax || 10;
                 const clampedValue = Math.max(scaleMin, Math.min(scaleMax, value));
                 handleAnswerChange(currentSlide.id, clampedValue);
               }}
