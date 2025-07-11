@@ -1668,17 +1668,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { mimetype, buffer, originalname, size } = req.file;
       
-      // Enhanced validation for image uploads (10MB limit)
-      if (mimetype.startsWith('image/')) {
-        const maxImageSize = 10 * 1024 * 1024; // 10MB for images
-        if (size > maxImageSize) {
-          return res.status(400).json({ 
-            message: "Image file too large. Maximum size is 10MB.",
-            maxSize: maxImageSize,
-            fileSize: size
-          });
-        }
-      }
+      // No file size restrictions - allow unlimited size for all media types
 
       // Check if Supabase is configured for production uploads
       if (!isSupabaseConfigured()) {

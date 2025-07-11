@@ -62,10 +62,10 @@ export function MediaUpload({
 
   // Get file size limit based on type
   const getFileSizeLimit = (fileType: string) => {
-    if (fileType.startsWith('image/')) return 10 * 1024 * 1024; // 10MB
-    if (fileType.startsWith('audio/')) return 50 * 1024 * 1024; // 50MB (align with server)
+    if (fileType.startsWith('image/')) return Infinity; // No limit for images
+    if (fileType.startsWith('audio/')) return Infinity; // No limit for audio
     if (fileType.startsWith('video/')) return Infinity; // No limit for videos
-    return 10 * 1024 * 1024; // default 10MB
+    return Infinity; // No limit by default
   };
 
   // Format file size for display
@@ -105,7 +105,8 @@ export function MediaUpload({
   const validateFile = (file: File): string | null => {
     const sizeLimit = getFileSizeLimit(file.type);
     
-    if (file.size > sizeLimit) {
+    // Skip size validation if limit is Infinity
+    if (sizeLimit !== Infinity && file.size > sizeLimit) {
       return `File too large. Maximum size: ${formatFileSize(sizeLimit)}`;
     }
 
@@ -203,7 +204,20 @@ export function MediaUpload({
       }, 200);
 
       const response = await uploadWithRetry(formData);
+      
+      // Enhanced error handling and debugging
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Upload failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      }
+      
       const serverResponse = await response.json();
+      console.log('Upload successful:', serverResponse);
 
       // Map server response to expected interface
       const result: UploadResult = {

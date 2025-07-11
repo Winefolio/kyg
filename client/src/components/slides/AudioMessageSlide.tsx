@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { AudioPlayer } from '@/components/ui/audio-player';
 import { prefetchMedia } from '@/lib/media-prefetch';
+import { getAudioUrl } from '@/lib/media-utils';
 import type { AudioMessagePayload } from '@shared/schema';
 
 interface AudioMessageSlideProps {
@@ -10,9 +11,10 @@ interface AudioMessageSlideProps {
 }
 
 export function AudioMessageSlide({ payload, className = "" }: AudioMessageSlideProps) {
-  const audioUrl = payload.audio_publicId 
-    ? `/api/media/${payload.audio_publicId}/stream` 
-    : payload.audio_url || '';
+  const audioUrl = getAudioUrl({
+    audio_publicId: payload.audio_publicId,
+    audio_url: payload.audio_url
+  });
   
   // Prefetch audio as soon as component mounts
   useEffect(() => {

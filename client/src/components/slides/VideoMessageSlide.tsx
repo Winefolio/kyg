@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { VideoPlayer } from '@/components/ui/video-player';
 import { getPreviewMediaUrl, validateMediaUrl } from '@/lib/media-prefetch';
+import { getVideoUrl } from '@/lib/media-utils';
 import type { VideoMessagePayload } from '@shared/schema';
 
 interface VideoMessageSlideProps {
@@ -16,7 +17,10 @@ export function VideoMessageSlide({ payload, className = "" }: VideoMessageSlide
 
   // Determine the optimal video URL
   useEffect(() => {
-    const url = getPreviewMediaUrl(payload.video_publicId, payload.video_url);
+    const url = getVideoUrl({
+      video_publicId: payload.video_publicId,
+      video_url: payload.video_url
+    });
     setVideoUrl(url);
     
     // Validate the URL if it's available
