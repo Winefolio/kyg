@@ -15,7 +15,7 @@ interface WineIntroductionProps {
 
 export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroductionProps) {
   return (
-    <div className="h-[100dvh] relative overflow-hidden flex flex-col">
+    <div className="h-dynamic-screen relative overflow-hidden flex flex-col">
       {/* Animated Background */}
       <div className="fixed inset-0 bg-gradient-to-br from-amber-900 via-orange-900 to-red-900">
         {/* Orange overlay removed for better mobile visibility */}
@@ -202,7 +202,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
 
           {/* Fixed Footer - Continue Button */}
           <motion.div
-            className="flex-shrink-0 mt-4 text-center"
+            className="flex-shrink-0 mt-4 text-center safe-area-bottom"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 2, duration: 0.8 }}

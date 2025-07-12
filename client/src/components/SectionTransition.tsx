@@ -76,7 +76,7 @@ export function SectionTransition({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-gradient-primary flex items-center justify-center overflow-y-auto"
+          className="fixed inset-0 z-50 bg-gradient-primary flex flex-col"
           onAnimationComplete={() => {
             setTimeout(onComplete, duration);
           }}
@@ -86,7 +86,8 @@ export function SectionTransition({
             <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 to-blue-900/20 animate-pulse"></div>
           </div>
 
-          <div className="relative z-10 text-center text-white max-w-2xl mx-auto px-8">
+          <div className="flex-1 overflow-y-auto flex items-center justify-center p-4 safe-area-bottom">
+            <div className="relative z-10 text-center text-white max-w-2xl w-full px-4 sm:px-8 py-8">
             {/* Wine Name */}
             <motion.h1
               initial={{ y: -30, opacity: 0 }}
@@ -223,6 +224,7 @@ export function SectionTransition({
             >
               Preparing next section...
             </motion.div>
+            </div>
           </div>
 
           {/* Decorative Elements */}
