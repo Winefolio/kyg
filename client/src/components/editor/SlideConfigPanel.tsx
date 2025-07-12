@@ -24,6 +24,7 @@ interface SlideConfigPanelProps {
     ) => void;
     onDelete: (slideId: string) => void;
     onPreviewUpdate?: (slideId: string, livePayload: any) => void;
+    onWineUpdate?: (wineId: string, updates: any) => void;
 }
 
 // Improved debounce helper with stable callback reference
@@ -66,10 +67,19 @@ export function SlideConfigPanel({
     onUpdate,
     onDelete,
     onPreviewUpdate,
+    onWineUpdate,
 }: SlideConfigPanelProps) {
     const payload = slide.payloadJson as any;
     const [localPayload, setLocalPayload] = useState(payload);
     const [isSaving, setIsSaving] = useState(false);
+
+    // Detect if this is a wine introduction slide
+    const isWineIntroSlide = slide.type === 'interlude' && 
+        slide.section_type === 'intro' && 
+        slide.packageWineId && 
+        !payload?.is_package_intro &&
+        (payload?.is_welcome || payload?.title?.toLowerCase().includes('meet '));
+
 
     // Update local state when slide changes
     useEffect(() => {
@@ -78,10 +88,18 @@ export function SlideConfigPanel({
 
     // Debounced update function with proper saving state management
     const debouncedUpdate = useDebounce((updates: any) => {
-        onUpdate(slide.id, updates);
+        
+        if (updates.isWineUpdate && onWineUpdate && updates.wineId) {
+            // Call wine update function
+            onWineUpdate(updates.wineId, updates.updates);
+        } else {
+            // Call slide update function
+            onUpdate(slide.id, updates);
+        }
     }, 500);
 
     const handlePayloadChange = useCallback((newPayload: any) => {
+        
         setLocalPayload(newPayload);
         
         // Trigger immediate preview update first (most important for UX)
@@ -93,9 +111,24 @@ export function SlideConfigPanel({
         setIsSaving(true);
         setTimeout(() => setIsSaving(false), 1000);
         
-        // Trigger debounced save to server
-        debouncedUpdate({ payloadJson: newPayload });
-    }, [debouncedUpdate, onPreviewUpdate, slide.id]);
+        // For wine intro slides, update the wine description in the package_wines table
+        if (isWineIntroSlide && onWineUpdate && slide.packageWineId) {
+            
+            // Update wine description
+            debouncedUpdate({ 
+                wineId: slide.packageWineId,
+                updates: { 
+                    wineDescription: newPayload.description || '',
+                    // Also update wine name if it was changed
+                    ...(newPayload.wine_name && { wineName: newPayload.wine_name })
+                },
+                isWineUpdate: true
+            });
+        }
+        
+        // Always update the slide payload for display purposes
+        debouncedUpdate({ payloadJson: newPayload, isWineUpdate: false });
+    }, [debouncedUpdate, onPreviewUpdate, slide.id, isWineIntroSlide, onWineUpdate, slide.packageWineId]);
 
     const handleFieldChange = useCallback((field: string, value: any) => {
         const newPayload = { ...localPayload, [field]: value };

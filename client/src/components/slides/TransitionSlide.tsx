@@ -145,7 +145,7 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
   };
 
   return (
-    <div className="h-[100dvh] relative overflow-hidden flex flex-col">
+    <div className="h-dynamic-screen relative overflow-hidden flex flex-col">
       {/* Background with image support */}
       <div className="fixed inset-0">
         {payload.backgroundImage ? (
@@ -190,9 +190,9 @@ export function TransitionSlide({ payload, onContinue, autoAdvance = true }: Tra
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      <div className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6 overflow-y-auto safe-area-bottom">
         <motion.div
-          className="max-w-2xl w-full text-center py-4"
+          className="max-w-2xl w-full text-center py-4 max-h-full overflow-y-auto"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}

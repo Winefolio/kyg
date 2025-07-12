@@ -1316,10 +1316,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/slides/:id", async (req, res) => {
     try {
       const { id } = req.params;
+      console.log('🎯 API: PATCH /api/slides/:id received request', {
+        slideId: id,
+        requestBody: req.body,
+        requestBodyKeys: Object.keys(req.body || {}),
+        requestBodySize: JSON.stringify(req.body || {}).length,
+        timestamp: new Date().toISOString()
+      });
+      
       const slide = await storage.updateSlide(id, req.body);
+      
+      console.log('✅ API: PATCH /api/slides/:id successful', {
+        slideId: id,
+        updatedSlide: slide,
+        slidePayloadJson: slide?.payloadJson,
+        timestamp: new Date().toISOString()
+      });
+      
       res.json({ slide });
     } catch (error) {
-      console.error("Error updating slide:", error);
+      console.error("❌ API: Error updating slide:", {
+        slideId: req.params.id,
+        error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        requestBody: req.body,
+        timestamp: new Date().toISOString()
+      });
       res.status(500).json({ error: "Failed to update slide" });
     }
   });

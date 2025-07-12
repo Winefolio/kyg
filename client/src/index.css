@@ -177,8 +177,8 @@ input:focus, textarea:focus, button:focus {
 
 /* Dynamic viewport height support for mobile */
 .h-dynamic-screen {
-  height: 100vh;
-  height: 100dvh;
+  height: 100vh; /* Fallback for older browsers */
+  height: var(--app-height, 100dvh); /* Use our JS-calculated value first, then dvh as fallback */
 }
 
 /* Safe area padding for iOS devices */

@@ -39,7 +39,7 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
   };
 
   return (
-    <div className="h-[100dvh] relative overflow-hidden flex flex-col">
+    <div className="h-dynamic-screen relative overflow-hidden flex flex-col">
       {/* Animated Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-indigo-900 to-purple-800">
         {/* Orange overlay removed for better mobile visibility */}
@@ -81,7 +81,7 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
 
       <div className="relative z-10 flex-1 flex items-center justify-center p-6 overflow-y-auto">
         <motion.div
-          className="max-w-2xl w-full py-8"
+          className="max-w-2xl w-full py-4 sm:py-8 max-h-full overflow-y-auto"
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
@@ -239,7 +239,7 @@ export function WineTransition({ currentWine, nextWine, onContinue, isComplete, 
 
           {/* Continue Button */}
           <motion.div
-            className="text-center"
+            className="text-center safe-area-bottom"
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 1.5 }}

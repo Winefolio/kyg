@@ -298,8 +298,21 @@ export default function PackageEditor() {
   });
 
   const updateSlideMutation = useMutation({
-    mutationFn: ({ slideId, data }: { slideId: string; data: any }) => apiRequest('PATCH', `/api/slides/${slideId}`, data),
-    onSuccess: (_, variables) => {
+    mutationFn: ({ slideId, data }: { slideId: string; data: any }) => {
+      console.log('🌐 PackageEditor: Making API request PATCH /api/slides/' + slideId, {
+        slideId,
+        requestData: data,
+        url: `/api/slides/${slideId}`,
+        timestamp: new Date().toISOString()
+      });
+      return apiRequest('PATCH', `/api/slides/${slideId}`, data);
+    },
+    onSuccess: (response, variables) => {
+      console.log('✅ PackageEditor: updateSlideMutation onSuccess (global handler)', {
+        slideId: variables.slideId,
+        response,
+        timestamp: new Date().toISOString()
+      });
       // Remove from pending content changes on successful save
       setPendingContentChanges(prev => {
         const newSet = new Set(prev);
@@ -310,8 +323,13 @@ export default function PackageEditor() {
       // Only show success toast after actual save, not on every keystroke
       console.log('✅ Slide content saved:', variables.slideId);
     },
-    onError: (error: any) => {
-      console.error('❌ Slide update failed:', error);
+    onError: (error: any, variables) => {
+      console.error('❌ PackageEditor: updateSlideMutation onError (global handler)', {
+        slideId: variables.slideId,
+        error,
+        errorMessage: error?.message,
+        timestamp: new Date().toISOString()
+      });
       toast({ title: "Error updating slide", description: error.message, variant: "destructive" });
     },
   });
@@ -618,6 +636,13 @@ export default function PackageEditor() {
   };
 
   const handleSlideUpdate = (slideId: string, data: any) => {
+    console.log('🚀 PackageEditor: handleSlideUpdate called', {
+      slideId,
+      data,
+      dataKeys: Object.keys(data),
+      timestamp: new Date().toISOString()
+    });
+    
     // Apply optimistic update to local state immediately
     setLocalSlides(prev => prev.map(slide => 
       slide.id === slideId ? { ...slide, ...data } : slide
@@ -631,11 +656,21 @@ export default function PackageEditor() {
     });
     setHasUnsavedChanges(true);
     
+    console.log('📡 PackageEditor: Triggering updateSlideMutation', {
+      slideId,
+      mutationData: { slideId, data }
+    });
+    
     // Update with success/error handling
     updateSlideMutation.mutate(
       { slideId, data },
       {
-        onSuccess: () => {
+        onSuccess: (response) => {
+          console.log('✅ PackageEditor: updateSlideMutation success', {
+            slideId,
+            response,
+            timestamp: new Date().toISOString()
+          });
           // The mutation's onSuccess will handle clearing pending changes
           // Just update the unsaved changes flag here
           setPendingContentChanges(prev => {
@@ -645,7 +680,13 @@ export default function PackageEditor() {
             return prev;
           });
         },
-        onError: () => {
+        onError: (error) => {
+          console.error('❌ PackageEditor: updateSlideMutation error', {
+            slideId,
+            error,
+            errorMessage: error?.message,
+            timestamp: new Date().toISOString()
+          });
           // Revert optimistic update on error
           setLocalSlides(prev => prev.map(slide => 
             slide.id === slideId ? slides.find(s => s.id === slideId) || slide : slide
@@ -669,6 +710,38 @@ export default function PackageEditor() {
       return newMap;
     });
   }, []);
+
+  // Handler for wine updates from SlideConfigPanel
+  const handleWineUpdate = useCallback((wineId: string, updates: any) => {
+    // Call the wine update mutation with proper field mapping
+    updateWineMutation.mutate(
+      { 
+        wineId, 
+        data: {
+          wineName: updates.wineName,
+          wineDescription: updates.wineDescription,
+          wineType: updates.wineType,
+          wineImageUrl: updates.wineImageUrl
+        }
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Wine updated",
+            description: "Wine description saved successfully",
+            duration: 2000,
+          });
+        },
+        onError: (error) => {
+          toast({
+            title: "Failed to update wine",
+            description: "Please try again",
+            variant: "destructive"
+          });
+        }
+      }
+    );
+  }, [updateWineMutation, toast]);
 
   const getSlideWithLivePreview = useCallback((slide: Slide): Slide => {
     const livePayload = livePreviewData.get(slide.id);
@@ -1522,6 +1595,7 @@ export default function PackageEditor() {
                     onUpdate={handleSlideUpdate}
                     onDelete={handleSlideDelete}
                     onPreviewUpdate={handlePreviewUpdate}
+                    onWineUpdate={handleWineUpdate}
                   />
                 </motion.div>
               );

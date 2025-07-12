@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { GlossaryProvider } from "@/contexts/GlossaryContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useDynamicViewportHeight } from "@/hooks/useDynamicViewportHeight";
 import Gateway from "@/pages/Gateway";
 import SessionJoin from "@/pages/SessionJoin";
 import TastingSession from "@/pages/TastingSession";
@@ -34,6 +35,9 @@ function Router() {
 }
 
 function App() {
+  // Initialize dynamic viewport height for proper mobile layout
+  useDynamicViewportHeight();
+  
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>

@@ -2577,11 +2577,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSlide(id: string, data: Partial<InsertSlide>): Promise<Slide> {
+    console.log('🗄️ Storage: updateSlide called', {
+      slideId: id,
+      updateData: data,
+      updateDataKeys: Object.keys(data),
+      payloadJsonUpdate: data.payloadJson,
+      timestamp: new Date().toISOString()
+    });
+    
     const [updatedSlide] = await db
       .update(slides)
       .set(data)
       .where(eq(slides.id, id))
       .returning();
+    
+    console.log('✅ Storage: updateSlide completed', {
+      slideId: id,
+      updatedSlide,
+      updatedPayloadJson: updatedSlide?.payloadJson,
+      wasUpdated: !!updatedSlide,
+      timestamp: new Date().toISOString()
+    });
+    
     return updatedSlide;
   }
 
