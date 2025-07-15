@@ -268,3 +268,4 @@ input:focus, textarea:focus, button:focus {
   --button-padding-x: clamp(0.75rem, 3vw, 1.5rem);
   --button-padding-y: clamp(0.5rem, 2vw, 1rem);
 }
+
