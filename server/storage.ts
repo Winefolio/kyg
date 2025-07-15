@@ -31,6 +31,15 @@ import {
 import { db } from "./db";
 import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull, isNotNull } from "drizzle-orm";
 import crypto from "crypto";
+import { 
+  updateSlidePositionSafely, 
+  calculateNewSlidePosition, 
+  renumberSectionSlides,
+  shouldRenumberSection,
+  findNearestFreePosition,
+  getPositionBetween,
+  type SectionType 
+} from "./position-manager";
 
 // Utility function to generate unique short codes
 async function generateUniqueShortCode(length: number = 6): Promise<string> {
@@ -2761,17 +2770,56 @@ export class DatabaseStorage implements IStorage {
     });
   }
   
-  // Simple single slide position update - using fractional indexing
+  // Enhanced slide position update with conflict resolution
   async updateSlidePosition(slideId: string, newPosition: number): Promise<void> {
-    console.log(`🔄 Updating slide ${slideId} to position ${newPosition}`);
+    console.log(`🔄 Updating slide ${slideId.slice(-6)} to position ${newPosition}`);
     
     try {
-      await db
-        .update(slides)
-        .set({ position: newPosition })
-        .where(eq(slides.id, slideId));
+      // Get slide info first to determine package_wine_id and section_type
+      const slide = await db
+        .select({
+          packageWineId: slides.packageWineId,
+          sectionType: slides.section_type,
+          currentPosition: slides.position
+        })
+        .from(slides)
+        .where(eq(slides.id, slideId))
+        .limit(1);
       
-      console.log(`✅ Successfully updated slide ${slideId} position to ${newPosition}`);
+      if (slide.length === 0) {
+        throw new Error(`Slide ${slideId} not found`);
+      }
+      
+      const { packageWineId, sectionType, currentPosition } = slide[0];
+      
+      console.log(`📍 Slide ${slideId.slice(-6)}: ${currentPosition} → ${newPosition} (section: ${sectionType || 'package-level'})`);
+      
+      if (!packageWineId || !sectionType) {
+        // Fallback to simple update for package-level slides
+        await db
+          .update(slides)
+          .set({ position: newPosition })
+          .where(eq(slides.id, slideId));
+        console.log(`✅ Updated package-level slide ${slideId.slice(-6)} position to ${newPosition}`);
+        return;
+      }
+      
+      // Use the enhanced position manager for wine-level slides
+      const finalPosition = await updateSlidePositionSafely(
+        slideId,
+        newPosition,
+        packageWineId,
+        sectionType as SectionType
+      );
+      
+      console.log(`✅ Successfully updated slide ${slideId} position to ${finalPosition}`);
+      
+      // Check if section needs renumbering after this operation
+      if (await shouldRenumberSection(packageWineId, sectionType as SectionType)) {
+        console.log(`🔧 Renumbering section ${sectionType} for wine ${packageWineId}`);
+        await renumberSectionSlides(packageWineId, sectionType as SectionType);
+      }
+      
     } catch (error) {
       console.error(`❌ Failed to update slide position:`, error);
       throw error;
@@ -3246,38 +3294,147 @@ export class DatabaseStorage implements IStorage {
   }
   
   /**
-   * Batch update slide positions - updates all positions in a single transaction
+   * Enhanced batch update slide positions with conflict detection and resolution
    */
   async batchUpdateSlidePositions(updates: Array<{ slideId: string; position: number; section_type?: string }>): Promise<void> {
     console.log(`📦 Batch updating ${updates.length} slide positions`);
     
+    if (updates.length === 0) {
+      return;
+    }
+    
     await db.transaction(async (tx) => {
-      // First, move all slides to temporary positions to avoid conflicts
-      const tempPositionBase = 900000000;
+      // Group updates by package_wine_id and section_type for validation
+      const slideDetails = await Promise.all(
+        updates.map(async (update) => {
+          const slide = await tx
+            .select({
+              id: slides.id,
+              packageWineId: slides.packageWineId,
+              sectionType: slides.section_type,
+              currentPosition: slides.position
+            })
+            .from(slides)
+            .where(eq(slides.id, update.slideId))
+            .limit(1);
+          
+          if (slide.length === 0) {
+            throw new Error(`Slide ${update.slideId} not found`);
+          }
+          
+          return {
+            ...update,
+            ...slide[0]
+          };
+        })
+      );
       
-      for (let i = 0; i < updates.length; i++) {
-        const update = updates[i];
+      // Validate that all slides within the same wine don't have position conflicts
+      const wineGroups = new Map<string, typeof slideDetails>();
+      for (const detail of slideDetails) {
+        const wineKey = detail.packageWineId || 'package-level';
+        if (!wineGroups.has(wineKey)) {
+          wineGroups.set(wineKey, []);
+        }
+        wineGroups.get(wineKey)!.push(detail);
+      }
+      
+      // Check for position conflicts within each wine group
+      for (const [wineId, wineSlides] of Array.from(wineGroups.entries())) {
+        const positions = new Set<number>();
+        const duplicatePositions = new Set<number>();
+        
+        for (const slide of wineSlides) {
+          if (positions.has(slide.position)) {
+            duplicatePositions.add(slide.position);
+          }
+          positions.add(slide.position);
+        }
+        
+        if (duplicatePositions.size > 0) {
+          console.log(`⚠️ Detected position conflicts in wine ${wineId}:`, Array.from(duplicatePositions));
+          
+          // Resolve conflicts by spreading slides with unique positions
+          for (const conflictPosition of Array.from(duplicatePositions)) {
+            const conflictingSlides = wineSlides.filter((s: any) => s.position === conflictPosition);
+            
+            // Keep the first slide at the original position, adjust others
+            for (let i = 1; i < conflictingSlides.length; i++) {
+              try {
+                if (wineId !== 'package-level' && conflictingSlides[i].sectionType) {
+                  const freePosition = await findNearestFreePosition(
+                    wineId,
+                    conflictPosition + i * 0.1,
+                    conflictingSlides[i].sectionType as SectionType
+                  );
+                  conflictingSlides[i].position = freePosition;
+                  console.log(`🔧 Adjusted slide ${conflictingSlides[i].slideId} to position ${freePosition}`);
+                } else {
+                  // Simple increment for package-level slides
+                  conflictingSlides[i].position = conflictPosition + i * 0.1;
+                }
+              } catch (error) {
+                // If we can't find a free position, use a temporary high position
+                conflictingSlides[i].position = 900000000 + i;
+                console.log(`⚠️ Using temporary position for slide ${conflictingSlides[i].slideId}`);
+              }
+            }
+          }
+        }
+      }
+      
+      // First phase: Move all slides to temporary positions to avoid conflicts
+      const tempPositionBase = 950000000; // Higher base to avoid conflicts
+      
+      for (let i = 0; i < slideDetails.length; i++) {
         await tx
           .update(slides)
           .set({ position: tempPositionBase + i })
-          .where(eq(slides.id, update.slideId));
+          .where(eq(slides.id, slideDetails[i].slideId));
       }
       
-      // Then assign final positions and section types
-      for (const update of updates) {
-        const updateData: any = { position: update.position };
-        if (update.section_type) {
-          updateData.section_type = update.section_type;
+      // Second phase: Assign final positions and section types
+      for (const detail of slideDetails) {
+        const updateData: any = { position: detail.position };
+        if (detail.section_type) {
+          updateData.section_type = detail.section_type;
         }
         
         await tx
           .update(slides)
           .set(updateData)
-          .where(eq(slides.id, update.slideId));
+          .where(eq(slides.id, detail.slideId));
       }
       
       console.log(`✅ Batch updated ${updates.length} slide positions successfully`);
     });
+    
+    // After batch update, check if any sections need renumbering
+    const processedWines = new Set<string>();
+    
+    for (const update of updates) {
+      const slide = await db
+        .select({
+          packageWineId: slides.packageWineId,
+          sectionType: slides.section_type
+        })
+        .from(slides)
+        .where(eq(slides.id, update.slideId))
+        .limit(1);
+      
+      if (slide.length > 0 && slide[0].packageWineId && slide[0].sectionType) {
+        const wineKey = `${slide[0].packageWineId}-${slide[0].sectionType}`;
+        
+        if (!processedWines.has(wineKey)) {
+          processedWines.add(wineKey);
+          
+          if (await shouldRenumberSection(slide[0].packageWineId, slide[0].sectionType as SectionType)) {
+            console.log(`🔧 Renumbering section ${slide[0].sectionType} for wine ${slide[0].packageWineId}`);
+            await renumberSectionSlides(slide[0].packageWineId, slide[0].sectionType as SectionType);
+          }
+        }
+      }
+    }
   }
   
   /**

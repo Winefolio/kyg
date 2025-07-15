@@ -35,6 +35,28 @@ const sectionDetails = {
   ending: { title: 'Ending', icon: '🏁' },
 };
 
+// Position configuration to match the backend position manager
+const POSITION_CONFIG = {
+  INTRO: { start: 0, end: 10000 },
+  DEEP_DIVE: { start: 10000, end: 20000 },
+  ENDING: { start: 20000, end: 30000 },
+  STANDARD_GAP: 1000
+};
+
+const getSectionRange = (sectionType: string) => {
+  switch (sectionType) {
+    case 'intro': return POSITION_CONFIG.INTRO;
+    case 'deep_dive': return POSITION_CONFIG.DEEP_DIVE;
+    case 'ending': return POSITION_CONFIG.ENDING;
+    default: return POSITION_CONFIG.INTRO;
+  }
+};
+
+const isPositionInCorrectSection = (position: number, sectionType: string): boolean => {
+  const range = getSectionRange(sectionType);
+  return position >= range.start && position < range.end;
+};
+
 type EditorData = Package & { wines: PackageWine[]; slides: Slide[] };
 
 // Debounce helper hook
@@ -125,29 +147,40 @@ export default function PackageEditor() {
       const sortedWines = [...(editorData.wines || [])].sort((a, b) => a.position - b.position);
       let sortedSlides = [...(editorData.slides || [])].sort((a, b) => a.position - b.position);
       
-      // Convert legacy positions to gap-based positions
-      const needsPositionMigration = sortedSlides.some(s => s.position < 100000);
+      // Convert legacy positions to the new section-based positioning system
+      const needsPositionMigration = sortedSlides.some(s => 
+        s.position >= 100000 || // Old system positions
+        (s.section_type && !isPositionInCorrectSection(s.position, s.section_type))
+      );
+      
       if (needsPositionMigration) {
-        console.log('🔄 Migrating legacy slide positions to gap-based system');
-        const slidesByWine = new Map<string, typeof sortedSlides>();
+        console.log('🔄 Migrating slide positions to new section-based system');
+        const slidesByWineAndSection = new Map<string, typeof sortedSlides>();
         
-        // Group slides by wine
+        // Group slides by wine and section
         sortedSlides.forEach(slide => {
           const wineId = slide.packageWineId!;
-          if (!slidesByWine.has(wineId)) {
-            slidesByWine.set(wineId, []);
+          const sectionType = slide.section_type || 'intro';
+          const key = `${wineId}-${sectionType}`;
+          
+          if (!slidesByWineAndSection.has(key)) {
+            slidesByWineAndSection.set(key, []);
           }
-          slidesByWine.get(wineId)!.push(slide);
+          slidesByWineAndSection.get(key)!.push(slide);
         });
         
-        // Assign new gap-based positions
+        // Assign new positions within correct section ranges
         const updatedSlides: typeof sortedSlides = [];
-        slidesByWine.forEach((wineSlides, wineId) => {
-          const sortedWineSlides = wineSlides.sort((a, b) => a.position - b.position);
-          sortedWineSlides.forEach((slide, index) => {
+        slidesByWineAndSection.forEach((sectionSlides, key) => {
+          const [wineId, sectionType] = key.split('-');
+          const range = getSectionRange(sectionType);
+          const sortedSectionSlides = sectionSlides.sort((a, b) => a.position - b.position);
+          
+          sortedSectionSlides.forEach((slide, index) => {
+            const newPosition = range.start + POSITION_CONFIG.STANDARD_GAP * (index + 1);
             updatedSlides.push({
               ...slide,
-              position: 100000 + (index * 1000)
+              position: newPosition
             });
           });
         });
@@ -544,26 +577,41 @@ export default function PackageEditor() {
 
 
   // --- HELPER FUNCTIONS ---
-  const getNextPositionForWine = (wineId: string): number => {
-    const wineSlides = localSlides.filter(s => s.packageWineId === wineId);
+  const getNextPositionForWine = (wineId: string, sectionType: string = 'intro'): number => {
+    const wineSlides = localSlides.filter(s => 
+      s.packageWineId === wineId && s.section_type === sectionType
+    );
     
-    // Use gap-based positioning system consistent with backend
-    const GAP_SIZE = 1000;
-    const BASE_POSITION = 100000;
+    const range = getSectionRange(sectionType);
     
     if (wineSlides.length === 0) {
-      // Start at base position for new wines
-      return BASE_POSITION;
+      // Start at the beginning of the section with a gap
+      return range.start + POSITION_CONFIG.STANDARD_GAP;
     }
     
-    // Find the highest position for this wine and add gap
-    const maxWinePosition = Math.max(...wineSlides.map(s => s.position));
+    // Find the highest position in this section for this wine
+    const maxSectionPosition = Math.max(...wineSlides.map(s => s.position));
     
-    // Calculate next position with consistent gap
-    const nextPosition = Math.ceil(maxWinePosition / GAP_SIZE) * GAP_SIZE + GAP_SIZE;
+    // Calculate next position within the section
+    const nextPosition = maxSectionPosition + POSITION_CONFIG.STANDARD_GAP;
     
-    // Ensure minimum position
-    return Math.max(nextPosition, BASE_POSITION);
+    // Ensure we don't exceed the section boundary
+    if (nextPosition >= range.end) {
+      // Find a gap in the existing positions
+      const sortedPositions = wineSlides.map(s => s.position).sort((a, b) => a - b);
+      for (let i = 0; i < sortedPositions.length - 1; i++) {
+        const gap = sortedPositions[i + 1] - sortedPositions[i];
+        if (gap >= POSITION_CONFIG.STANDARD_GAP) {
+          return sortedPositions[i] + (gap / 2);
+        }
+      }
+      
+      // If no gaps, we need to compress positions or warn
+      console.warn(`Section ${sectionType} is full for wine ${wineId}`);
+      return maxSectionPosition + 1; // Minimal increment
+    }
+    
+    return nextPosition;
   };
 
 
@@ -608,7 +656,7 @@ export default function PackageEditor() {
 
   const handleAddSlide = (wineId: string, template: any, sectionType?: 'intro' | 'deep_dive' | 'ending') => {
     const targetSection = sectionType || template.sectionType || 'deep_dive';
-    const nextPosition = getNextPositionForWine(wineId);
+    const nextPosition = getNextPositionForWine(wineId, targetSection);
     const wine = wines.find(w => w.id === wineId);
 
     // Clone the payload template and replace placeholders
@@ -960,28 +1008,26 @@ export default function PackageEditor() {
       return;
     }
     
-    // Create updates with proper position calculations
+    // Create updates with proper position calculations using new section ranges
     const updates: Array<{ slideId: string; position: number; section_type?: string }> = [];
-    const baseTime = Date.now();
+    const targetSectionType = sectionType || reorderedSlides[0]?.section_type || 'intro';
+    const range = getSectionRange(targetSectionType);
     
     reorderedSlides.forEach((slide, index) => {
-      // Calculate section-specific position ranges
-      let positionBase = 0;
-      if (sectionType === 'intro') positionBase = 100000;
-      else if (sectionType === 'deep_dive') positionBase = 200000;
-      else if (sectionType === 'ending') positionBase = 300000;
+      // Calculate position within the correct section range
+      const newPosition = range.start + (index + 1) * POSITION_CONFIG.STANDARD_GAP;
       
-      // Create unique positions within the section
-      const newPosition = positionBase + (index + 1) * 1000 + (baseTime % 1000);
+      // Ensure position doesn't exceed section boundary
+      const finalPosition = Math.min(newPosition, range.end - 100);
       
-      const updateData: any = { slideId: slide.id, position: newPosition };
+      const updateData: any = { slideId: slide.id, position: finalPosition };
       
       // If we're moving to a different section, update the section_type
       if (sectionType && slide.section_type !== sectionType) {
         updateData.section_type = sectionType;
       }
       
-      if (slide.position !== newPosition || (sectionType && slide.section_type !== sectionType)) {
+      if (slide.position !== finalPosition || (sectionType && slide.section_type !== sectionType)) {
         updates.push(updateData);
       }
     });
