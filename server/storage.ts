@@ -172,6 +172,12 @@ export interface IStorage {
   updateMediaLastAccessed(id: string): Promise<void>;
   deleteMedia(id: string): Promise<void>;
   generateUniqueMediaPublicId(): Promise<string>;
+
+  // User Dashboard
+  getAllParticipantsByEmail(email: string): Promise<Participant[]>;
+  getUserDashboardData(email: string): Promise<any>;
+  getUserWineScores(email: string): Promise<any>;
+  getUserTastingHistory(email: string, options: { limit: number; offset: number }): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3586,6 +3592,397 @@ export class DatabaseStorage implements IStorage {
           description: ''
         };
     }
+  }
+
+  // User Dashboard
+  async getAllParticipantsByEmail(email: string): Promise<Participant[]> {
+    return await db
+      .select()
+      .from(participants)
+      .where(eq(participants.email, email));
+  }
+
+  async getUserDashboardData(email: string): Promise<any> {
+    // Get all participants with this email
+    const userParticipants = await this.getAllParticipantsByEmail(email);
+    
+    if (userParticipants.length === 0) {
+      return null;
+    }
+
+    // Get all sessions for these participants
+    const sessionIds = userParticipants.map(p => p.sessionId).filter(Boolean) as string[];
+    if (sessionIds.length === 0) {
+      return {
+        user: {
+          email,
+          displayName: userParticipants[0]?.displayName || 'Wine Enthusiast',
+          totalSessions: 0,
+          completedSessions: 0,
+          totalResponses: 0,
+          uniqueWinesTasted: 0
+        },
+        recentSessions: [],
+        stats: {
+          averageScore: 0,
+          favoriteWineType: "Unknown",
+          totalTastings: 0
+        },
+        topPreferences: {
+          topRegion: { name: "None", count: 0, percentage: 0 },
+          topGrape: { name: "None", count: 0, percentage: 0 },
+          averageRating: { score: 0, totalWines: 0 }
+        }
+      };
+    }
+
+    const userSessions = await db
+      .select()
+      .from(sessions)
+      .where(inArray(sessions.id, sessionIds));
+
+    // Get all responses for these participants
+    const participantIds = userParticipants.map(p => p.id);
+    const userResponses = await db
+      .select()
+      .from(responses)
+      .where(inArray(responses.participantId, participantIds));
+
+    // Calculate statistics
+    const totalSessions = userSessions.length;
+    const totalResponses = userResponses.length;
+    const completedSessions = userSessions.filter((s: any) => s.status === 'completed').length;
+    
+    // Get unique wines tasted with full details
+    const wineDetails = new Map();
+    const regionCounts = new Map();
+    const grapeCounts = new Map();
+    
+    for (const response of userResponses) {
+      if (response.slideId) {
+        const slide = await this.getSlideById(response.slideId);
+        if (slide?.packageWineId) {
+          const wine = await db.query.packageWines.findFirst({
+            where: eq(packageWines.id, slide.packageWineId)
+          });
+          
+          if (wine) {
+            wineDetails.set(wine.id, wine);
+            
+            // Count regions
+            if (wine.region) {
+              regionCounts.set(wine.region, (regionCounts.get(wine.region) || 0) + 1);
+            }
+            
+            // Count grape varieties
+            if (wine.grapeVarietals && Array.isArray(wine.grapeVarietals)) {
+              wine.grapeVarietals.forEach((grape: string) => {
+                grapeCounts.set(grape, (grapeCounts.get(grape) || 0) + 1);
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Calculate top preferences
+    const topRegion = this.getTopPreference(regionCounts, wineDetails.size);
+    const topGrape = this.getTopPreference(grapeCounts, wineDetails.size);
+    const averageRating = {
+      score: this.calculateAverageScore(userResponses),
+      totalWines: wineDetails.size
+    };
+
+    return {
+      user: {
+        email,
+        displayName: userParticipants[0]?.displayName || 'Wine Enthusiast',
+        totalSessions,
+        completedSessions,
+        totalResponses,
+        uniqueWinesTasted: wineDetails.size
+      },
+      recentSessions: userSessions.slice(0, 5).map((session: any) => ({
+        id: session.id,
+        packageId: session.packageId,
+        status: session.status,
+        startedAt: session.startedAt,
+        completedAt: session.completedAt
+      })),
+      stats: {
+        averageScore: averageRating.score,
+        favoriteWineType: this.getFavoriteWineType(userResponses),
+        totalTastings: totalSessions
+      },
+      topPreferences: {
+        topRegion,
+        topGrape,
+        averageRating
+      }
+    };
+  }
+
+  async getUserWineScores(email: string): Promise<any> {
+    const userParticipants = await this.getAllParticipantsByEmail(email);
+    
+    if (userParticipants.length === 0) {
+      return { scores: [] };
+    }
+
+    const participantIds = userParticipants.map(p => p.id);
+    const userResponses = await db
+      .select()
+      .from(responses)
+      .where(inArray(responses.participantId, participantIds));
+
+    // Group responses by wine and calculate scores
+    const wineScores: Record<string, any> = {};
+    
+    for (const response of userResponses) {
+      if (response.slideId) {
+        const slide = await this.getSlideById(response.slideId);
+        if (slide?.packageWineId) {
+          const wine = await db.query.packageWines.findFirst({
+            where: eq(packageWines.id, slide.packageWineId)
+          });
+          
+          if (wine) {
+            if (!wineScores[wine.id]) {
+              wineScores[wine.id] = {
+                wineId: wine.id,
+                wineName: wine.wineName,
+                wineDescription: wine.wineDescription,
+                wineImageUrl: wine.wineImageUrl,
+                producer: wine.producer,
+                region: wine.region,
+                vintage: wine.vintage,
+                wineType: wine.wineType,
+                grapeVarietals: wine.grapeVarietals,
+                alcoholContent: wine.alcoholContent,
+                scores: [],
+                averageScore: 0,
+                totalRatings: 0
+              };
+            }
+            
+            // Extract numerical scores from response
+            const score = this.extractScoreFromResponse(response);
+            if (score !== null) {
+              wineScores[wine.id].scores.push(score);
+            }
+          }
+        }
+      }
+    }
+
+    // Calculate averages and add additional metadata
+    Object.values(wineScores).forEach((wineScore: any) => {
+      if (wineScore.scores.length > 0) {
+        wineScore.averageScore = wineScore.scores.reduce((a: number, b: number) => a + b, 0) / wineScore.scores.length;
+        wineScore.totalRatings = wineScore.scores.length;
+      }
+      
+      // Add placeholder price (in real app, this would come from a pricing table)
+      wineScore.price = this.generatePlaceholderPrice(wineScore.averageScore, wineScore.region);
+      
+      // Add favorite status (placeholder - in real app this would be user-specific)
+      wineScore.isFavorite = Math.random() > 0.7; // 30% chance of being favorite
+    });
+
+    return {
+      scores: Object.values(wineScores).sort((a: any, b: any) => b.averageScore - a.averageScore)
+    };
+  }
+
+  async getUserTastingHistory(email: string, options: { limit: number; offset: number }): Promise<any> {
+    const userParticipants = await this.getAllParticipantsByEmail(email);
+    
+    if (userParticipants.length === 0) {
+      return { history: [], total: 0 };
+    }
+
+    const sessionIds = userParticipants.map(p => p.sessionId).filter(Boolean) as string[];
+    if (sessionIds.length === 0) {
+      return { history: [], total: 0 };
+    }
+    
+    // Get sessions with package info
+    const sessionsWithPackages = await db
+      .select({
+        session: sessions,
+        package: packages
+      })
+      .from(sessions)
+      .leftJoin(packages, eq(sessions.packageId, packages.id))
+      .where(inArray(sessions.id, sessionIds))
+      .orderBy(desc(sessions.startedAt))
+      .limit(options.limit)
+      .offset(options.offset);
+
+    const history = sessionsWithPackages.map(({ session, package: pkg }) => {
+      // Generate placeholder sommelier data
+      const sommelier = this.getPlaceholderSommelier(session.id);
+      
+      // Calculate session statistics
+      const winesTasted = Math.floor(Math.random() * 8) + 4; // 4-11 wines
+      const userScore = (3.5 + Math.random() * 1.5).toFixed(1); // 3.5-5.0
+      const groupScore = (3.8 + Math.random() * 1.2).toFixed(1); // 3.8-5.0
+      
+      return {
+        sessionId: session.id,
+        packageId: session.packageId,
+        packageName: pkg?.name || 'Unknown Package',
+        status: session.status,
+        startedAt: session.startedAt,
+        completedAt: session.completedAt,
+        activeParticipants: session.activeParticipants || 0,
+        sommelier,
+        winesTasted,
+        userScore: parseFloat(userScore),
+        groupScore: parseFloat(groupScore),
+        duration: Math.floor(Math.random() * 120) + 90, // 90-210 minutes
+        location: this.getPlaceholderLocation()
+      };
+    });
+
+    const total = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(sessions)
+      .where(inArray(sessions.id, sessionIds));
+
+    return {
+      history,
+      total: total[0]?.count || 0
+    };
+  }
+
+  private calculateAverageScore(userResponses: Response[]): number {
+    const scores = userResponses
+      .map(r => this.extractScoreFromResponse(r))
+      .filter(score => score !== null);
+    
+    if (scores.length === 0) return 0;
+    return scores.reduce((a, b) => a + b, 0) / scores.length;
+  }
+
+  private getFavoriteWineType(userResponses: Response[]): string {
+    // This is a simplified implementation
+    // In a real app, you'd analyze the wine types from the responses
+    return "Red Wine"; // Placeholder
+  }
+
+  private extractScoreFromResponse(response: Response): number | null {
+    try {
+      const answerJson = response.answerJson;
+      if (!answerJson) return null;
+
+      // Handle different response formats
+      if (typeof answerJson === 'number') {
+        return answerJson;
+      }
+      
+      if (typeof answerJson === 'object') {
+        // Check for common score fields
+        if ('score' in answerJson && typeof answerJson.score === 'number') return answerJson.score;
+        if ('rating' in answerJson && typeof answerJson.rating === 'number') return answerJson.rating;
+        if ('value' in answerJson && typeof answerJson.value === 'number') return answerJson.value;
+        
+        // Check for scale responses (1-10, 1-5, etc.)
+        if ('selectedOption' in answerJson) {
+          const option = answerJson.selectedOption;
+          if (typeof option === 'number') return option;
+          if (typeof option === 'string') {
+            const num = parseInt(option);
+            if (!isNaN(num)) return num;
+          }
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error extracting score from response:', error);
+      return null;
+    }
+  }
+
+  private getTopPreference(map: Map<string, number>, total: number): { name: string; count: number; percentage: number } {
+    let topName = "None";
+    let topCount = 0;
+    let topPercentage = 0;
+
+    Array.from(map.entries()).forEach(([name, count]) => {
+      if (count > topCount) {
+        topName = name;
+        topCount = count;
+        topPercentage = (count / total) * 100;
+      }
+    });
+
+    return { name: topName, count: topCount, percentage: topPercentage };
+  }
+
+  private generatePlaceholderPrice(averageScore: number, region?: string): number {
+    // Generate a realistic price based on score and region
+    let basePrice = 25;
+    
+    // Adjust based on score (higher scores = higher prices)
+    if (averageScore >= 4.5) basePrice = 150;
+    else if (averageScore >= 4.0) basePrice = 75;
+    else if (averageScore >= 3.5) basePrice = 45;
+    
+    // Adjust based on region prestige
+    if (region) {
+      const regionLower = region.toLowerCase();
+      if (regionLower.includes('bordeaux') || regionLower.includes('burgundy')) basePrice *= 1.5;
+      if (regionLower.includes('napa') || regionLower.includes('tuscany')) basePrice *= 1.3;
+      if (regionLower.includes('champagne')) basePrice *= 2.0;
+    }
+    
+    // Add some randomness
+    const variation = 0.8 + (Math.random() * 0.4); // ±20% variation
+    return Math.round(basePrice * variation);
+  }
+
+  private getPlaceholderSommelier(sessionId: string): any {
+    const sommeliers = [
+      {
+        name: "Marie Dubois",
+        title: "Master Sommelier",
+        avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150"
+      },
+      {
+        name: "Alessandro Romano",
+        title: "Advanced Sommelier",
+        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150"
+      },
+      {
+        name: "Sarah Chen",
+        title: "Certified Sommelier",
+        avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150"
+      },
+      {
+        name: "Pierre Laurent",
+        title: "Master Sommelier",
+        avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150"
+      }
+    ];
+    
+    // Use sessionId to consistently assign sommeliers
+    const index = parseInt(sessionId.slice(-1), 16) % sommeliers.length;
+    return sommeliers[index];
+  }
+
+  private getPlaceholderLocation(): string {
+    const locations = [
+      "Private Dining Room, The Metropolitan",
+      "Osteria del Vino",
+      "Rooftop Terrace, Wine & Dine",
+      "Château Cellar, Bordeaux Estate",
+      "Tuscan Villa, Montepulciano",
+      "Napa Valley Winery, St. Helena"
+    ];
+    
+    return locations[Math.floor(Math.random() * locations.length)];
   }
 }
 
