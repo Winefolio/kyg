@@ -334,7 +334,7 @@ export default function Gateway() {
 
         {/* Sommelier Access Link */}
         <motion.div
-          className="absolute bottom-6 right-6"
+          className="absolute bottom-6 right-6 flex flex-col items-end space-y-2"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2 }}
@@ -344,6 +344,12 @@ export default function Gateway() {
             className="text-white/30 hover:text-white/70 text-xs transition-colors duration-300"
           >
             Sommelier
+          </a>
+          <a
+            href="/login"
+            className="text-white/30 hover:text-white/70 text-xs transition-colors duration-300"
+          >
+            Login
           </a>
         </motion.div>
       </div>

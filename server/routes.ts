@@ -15,6 +15,8 @@ import { z } from "zod";
 // Note: Removed problematic reorderSlidesForWineSimple function
 // Now using proven storage.batchUpdateSlidePositions instead
 import { registerMediaProxyRoutes } from './routes/media-proxy';
+import { registerDashboardRoutes } from './routes/dashboard';
+import { registerSupabaseTestRoutes } from './routes/supabase-test';
 
 // Configure multer for file uploads with comprehensive image support
 const upload = multer({
@@ -1871,8 +1873,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Register dashboard routes
+  registerDashboardRoutes(app);
+
   // Register media proxy routes
   registerMediaProxyRoutes(app);
+  
+  // Register Supabase test routes
+  registerSupabaseTestRoutes(app);
   
   console.log("✅ All routes registered successfully!");
   const httpServer = createServer(app);
