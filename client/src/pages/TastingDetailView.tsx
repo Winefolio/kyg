@@ -128,7 +128,7 @@ export default function TastingDetailView() {
               className="text-white hover:bg-white/10"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
+              <span className="hidden sm:inline">Back to Dashboard</span>
             </Button>
             <div>
               <h1 className="text-3xl font-bold text-white">{session.title}</h1>
@@ -140,7 +140,7 @@ export default function TastingDetailView() {
         {/* Session Overview Card */}
         <Card className="bg-[#2d1b4e] border-[#4c2a85] mb-8">
           <CardContent className="p-8">
-            <div className="flex items-start space-x-6">
+            <div className="flex flex-col md:flex-row items-start space-y-6 md:space-y-0 md:space-x-6">
               {/* Sommelier Info */}
               <div className="flex items-center space-x-4">
                 <Avatar className="h-16 w-16">
@@ -159,16 +159,16 @@ export default function TastingDetailView() {
                   </div>
                   <div className="flex flex-wrap gap-1 mt-2">
                     {session.sommelier.specialties.map((specialty, index) => (
-                      <Badge key={index} variant="outline" className="text-purple-200 border-purple-400 text-xs">
-                        {specialty}
-                      </Badge>
+                        <Badge key={index} variant="outline" className="text-purple-200 border-purple-400 text-xs">
+                          {specialty}
+                        </Badge>
                     ))}
                   </div>
                 </div>
               </div>
 
               {/* Session Details */}
-              <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="flex-1 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
                   <Calendar className="w-6 h-6 text-purple-300 mx-auto mb-2" />
                   <p className="text-sm text-purple-200">Date</p>

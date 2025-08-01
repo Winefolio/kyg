@@ -14,7 +14,7 @@ import {
   Wine, BarChart3, Clock, Star, MapPin, Filter, 
   ArrowLeft, Search, Calendar, Trophy, TrendingUp,
   Heart, Eye, Share2, Download, MoreHorizontal,
-  Globe, Users, Mic, Map, Menu,
+  Globe, Users, Mic, Map
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -118,11 +118,10 @@ export default function UserDashboard() {
   const { email } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<'overview' | 'collection' | 'tastings'>('overview');
+  const [activeTab, setActiveTab] = useState<'taste-profile' | 'wine-collection' | 'tastings'>('taste-profile');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Fetch dashboard data
   const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError } = useQuery<UserDashboardData>({
@@ -248,7 +247,7 @@ export default function UserDashboard() {
               className="text-white hover:bg-white/10"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Back</span>
+              Back
             </Button>
             <div>
               <h1 className="text-3xl font-bold text-white">KnowYourGrape</h1>
@@ -256,60 +255,29 @@ export default function UserDashboard() {
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            {/* Hamburger menu for mobile */}
-            <Button
-                variant="ghost"
-                className="text-white hover:bg-white/10 md:hidden"
-                onClick={() => setMobileMenuOpen((v) => !v)}
-                aria-label="Open menu"
-            >
-              <Menu className="w-6 h-6" />
+            <Button variant="ghost" className="text-white hover:bg-white/10">
+              <Search className="w-4 h-4" />
             </Button>
-
-            {/* Inline actions for desktop */}
-            <div className="hidden md:flex items-center space-x-4">
-              <Button variant="ghost" className="text-white hover:bg-white/10">
-                <Search className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" className="text-white hover:bg-white/10">
-                <MoreHorizontal className="w-4 h-4" />
-              </Button>
-              <Avatar className="h-10 w-10">
-                <AvatarImage src="" />
-                <AvatarFallback className="bg-white/20 text-white">
-                  {finalDashboardData.user.displayName.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            </div>
-
-            {/* Mobile dropdown menu */}
-            {mobileMenuOpen && (
-                <div className="absolute right-4 top-16 z-50 flex flex-col bg-white/90 rounded-lg shadow-lg p-4 space-y-3 md:hidden">
-                  <Button variant="ghost" className="text-purple-900 hover:bg-purple-100">
-                    <Search className="w-5 h-5" />
-                  </Button>
-                  <Button variant="ghost" className="text-purple-900 hover:bg-purple-100">
-                    <MoreHorizontal className="w-5 h-5" />
-                  </Button>
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src="" />
-                    <AvatarFallback className="bg-purple-200 text-purple-900">
-                      {finalDashboardData.user.displayName.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
-            )}
+            <Button variant="ghost" className="text-white hover:bg-white/10">
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+            <Avatar className="h-10 w-10">
+              <AvatarImage src="" />
+              <AvatarFallback className="bg-white/20 text-white">
+                {finalDashboardData.user.displayName.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
           </div>
         </div>
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-6">
           <TabsList className="bg-white/10 backdrop-blur-xl border-white/20">
-            <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
+            <TabsTrigger value="taste-profile" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
               <BarChart3 className="w-4 h-4 mr-2" />
               Taste Profile
             </TabsTrigger>
-            <TabsTrigger value="collection" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
+            <TabsTrigger value="wine-collection" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
               <Wine className="w-4 h-4 mr-2" />
               Wine Collection
             </TabsTrigger>
@@ -320,7 +288,7 @@ export default function UserDashboard() {
           </TabsList>
 
           {/* Taste Profile Tab */}
-          <TabsContent value="overview" className="space-y-6">
+          <TabsContent value="taste-profile" className="space-y-6">
             {/* Stats Overview - Only visible on Taste Profile tab */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <Card className="bg-white/10 backdrop-blur-xl border-white/20">
@@ -573,7 +541,7 @@ export default function UserDashboard() {
           </TabsContent>
 
           {/* Wine Collection Tab */}
-          <TabsContent value="collection" className="space-y-6">
+          <TabsContent value="wine-collection" className="space-y-6">
             {/* Search and Filters */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="relative flex-1">
@@ -586,22 +554,22 @@ export default function UserDashboard() {
                 />
               </div>
               <select className="px-4 py-2 bg-white/10 border border-white/20 text-white rounded-md">
-                <option className="bg-black" value="all">All Years</option>
-                <option className="bg-black" value="2024">2024</option>
-                <option className="bg-black" value="2023">2023</option>
-                <option className="bg-black" value="2022">2022</option>
+                <option value="all">All Years</option>
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+                <option value="2022">2022</option>
               </select>
               <select className="px-4 py-2 bg-white/10 border border-white/20 text-white rounded-md">
-                <option className="bg-black" value="all">All Regions</option>
-                <option className="bg-black" value="Bordeaux">Bordeaux</option>
-                <option className="bg-black" value="Burgundy">Burgundy</option>
-                <option className="bg-black" value="Napa Valley">Napa Valley</option>
+                <option value="all">All Regions</option>
+                <option value="Bordeaux">Bordeaux</option>
+                <option value="Burgundy">Burgundy</option>
+                <option value="Napa Valley">Napa Valley</option>
               </select>
               <select className="px-4 py-2 bg-white/10 border border-white/20 text-white rounded-md">
-                <option className="bg-black" value="all">All Varieties</option>
-                <option className="bg-black" value="Cabernet Sauvignon">Cabernet Sauvignon</option>
-                <option className="bg-black" value="Chardonnay">Chardonnay</option>
-                <option className="bg-black" value="Pinot Noir">Pinot Noir</option>
+                <option value="all">All Varieties</option>
+                <option value="Cabernet Sauvignon">Cabernet Sauvignon</option>
+                <option value="Chardonnay">Chardonnay</option>
+                <option value="Pinot Noir">Pinot Noir</option>
               </select>
               <div className="flex items-center space-x-2">
                 <Label className="text-white text-sm">Min Rating:</Label>
@@ -624,9 +592,9 @@ export default function UserDashboard() {
               <p className="text-white">Showing {filteredWines.length} wines</p>
               <div className="flex items-center space-x-4">
                 <select className="px-3 py-1 bg-white/10 border border-white/20 text-white rounded text-sm">
-                  <option className="bg-black" value="rating">Sort by Rating</option>
-                  <option className="bg-black" value="name">Sort by Name</option>
-                  <option className="bg-black" value="price">Sort by Price</option>
+                  <option value="rating">Sort by Rating</option>
+                  <option value="name">Sort by Name</option>
+                  <option value="price">Sort by Price</option>
                 </select>
                 <div className="flex border border-white/20 rounded">
                   <Button
@@ -835,10 +803,10 @@ export default function UserDashboard() {
                 onChange={(e) => setFilterType(e.target.value)}
                 className="px-4 py-2 bg-white/10 border border-white/20 text-white rounded-md"
               >
-                <option className="bg-black" value="all">All Status</option>
-                <option className="bg-black" value="waiting">Waiting</option>
-                <option className="bg-black" value="active">Active</option>
-                <option className="bg-black" value="completed">Completed</option>
+                <option value="all">All Status</option>
+                <option value="waiting">Waiting</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
               </select>
             </div>
 
@@ -894,7 +862,7 @@ export default function UserDashboard() {
                           </div>
                         </div>
                         
-                        <div className="flex flex-col md:flex-row items-center justify-between mt-4 pt-4 border-t border-white/10">
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
                           <div className="flex items-center space-x-4 text-sm">
                             <span className="text-purple-200">Wines Tasted: {session.winesTasted}</span>
                             <div className="flex items-center space-x-1">
@@ -908,7 +876,7 @@ export default function UserDashboard() {
                               <span className="text-white">{session.groupScore}</span>
                             </div>
                           </div>
-                          <div className="text-purple-200 text-sm mt-2 md:mt-0">
+                          <div className="text-purple-200 text-sm">
                             Click to view details →
                           </div>
                         </div>
