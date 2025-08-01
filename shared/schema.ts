@@ -524,3 +524,11 @@ export interface ValidationRules {
     condition: string; // JS expression
   }>;
 }
+
+export interface SommelierTips {
+  preferenceProfile: string;
+  redDescription: string;
+  whiteDescription: string;
+  questions: string[];
+  priceGuidance: string;
+}

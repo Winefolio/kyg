@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { storage } from "../storage";
+import { storage, generateSommelierTips } from "../storage";
 
 export function registerDashboardRoutes(app: Express) {
   console.log("👤 Registering user dashboard endpoints...");
@@ -233,19 +233,31 @@ export function registerDashboardRoutes(app: Express) {
         return res.status(400).json({ message: "Email parameter is required" });
       }
 
-      const dashboardData = await storage.getUserDashboardData(email);
-      const scores = await storage.getUserWineScores(email);
-      
-      if (!dashboardData) {
-        return res.status(404).json({ message: "No data found for this email" });
-      }
-
-      const sommelierTips = generateSommelierTips(dashboardData, scores.scores);
+      // Step 6: Add Error Handling - Use the new LLM-powered function with try/catch
+      const sommelierTips = await generateSommelierTips(email);
       
       res.json(sommelierTips);
     } catch (error) {
-      console.error("Error generating sommelier tips:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      console.error("Error generating AI sommelier tips:", error);
+      
+      // Fallback to basic tips if LLM fails
+      try {
+        const dashboardData = await storage.getUserDashboardData(email);
+        const scores = await storage.getUserWineScores(email);
+        
+        if (dashboardData && scores.scores) {
+          const fallbackTips = generateLegacySommelierTips(dashboardData, scores.scores);
+          res.json(fallbackTips);
+        } else {
+          throw new Error("No user data available");
+        }
+      } catch (fallbackError) {
+        console.error("Fallback also failed:", fallbackError);
+        res.status(500).json({ 
+          message: "Unable to generate sommelier tips", 
+          error: "Both AI and fallback methods failed" 
+        });
+      }
     }
   });
 }
@@ -357,7 +369,7 @@ function generateFlavorNotes(type: string, regions: any[], varieties: any[]) {
   return typeFlavors.default;
 }
 
-function generateSommelierTips(dashboardData: any, wines: any[]) {
+function generateLegacySommelierTips(dashboardData: any, wines: any[]) {
   const topRegion = dashboardData.topPreferences?.topRegion?.name || "various regions";
   const topGrape = dashboardData.topPreferences?.topGrape?.name || "different grape varieties";
   const avgRating = dashboardData.stats.averageScore;
