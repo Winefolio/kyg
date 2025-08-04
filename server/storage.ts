@@ -446,8 +446,8 @@ export class DatabaseStorage implements IStorage {
         payloadJson: {
           title: "Sommelier's Tasting Notes",
           description: "Expert insights on this Bordeaux wine",
-          video_url: "https://placeholder-video-url.com/bordeaux-tasting.mp4",
-          poster_url: "https://placeholder-video-url.com/bordeaux-poster.jpg",
+          video_url: null, // No video content available
+          poster_url: null, // No poster image available
           autoplay: false,
           show_controls: true,
         },
@@ -3674,18 +3674,21 @@ export class DatabaseStorage implements IStorage {
           });
           
           if (wine) {
-            wineDetails.set(wine.id, wine);
-            
-            // Count regions
-            if (wine.region) {
-              regionCounts.set(wine.region, (regionCounts.get(wine.region) || 0) + 1);
-            }
-            
-            // Count grape varieties
-            if (wine.grapeVarietals && Array.isArray(wine.grapeVarietals)) {
-              wine.grapeVarietals.forEach((grape: string) => {
-                grapeCounts.set(grape, (grapeCounts.get(grape) || 0) + 1);
-              });
+            // Only process each unique wine once
+            if (!wineDetails.has(wine.id)) {
+              wineDetails.set(wine.id, wine);
+              
+              // Count regions (only once per unique wine)
+              if (wine.region) {
+                regionCounts.set(wine.region, (regionCounts.get(wine.region) || 0) + 1);
+              }
+              
+              // Count grape varieties (only once per unique wine)
+              if (wine.grapeVarietals && Array.isArray(wine.grapeVarietals)) {
+                wine.grapeVarietals.forEach((grape: string) => {
+                  grapeCounts.set(grape, (grapeCounts.get(grape) || 0) + 1);
+                });
+              }
             }
           }
         }
@@ -3789,11 +3792,8 @@ export class DatabaseStorage implements IStorage {
         wineScore.totalRatings = wineScore.scores.length;
       }
       
-      // Add placeholder price (in real app, this would come from a pricing table)
-      wineScore.price = this.generatePlaceholderPrice(wineScore.averageScore, wineScore.region);
-      
-      // Add favorite status (placeholder - in real app this would be user-specific)
-      wineScore.isFavorite = Math.random() > 0.7; // 30% chance of being favorite
+      // Set default favorite status to false (will be updated with real user preferences later)
+      wineScore.isFavorite = false;
     });
 
     return {
@@ -3826,15 +3826,58 @@ export class DatabaseStorage implements IStorage {
       .limit(options.limit)
       .offset(options.offset);
 
-    const history = sessionsWithPackages.map(({ session, package: pkg }) => {
-      // Generate placeholder sommelier data
-      const sommelier = this.getPlaceholderSommelier(session.id);
+    const history = await Promise.all(sessionsWithPackages.map(async ({ session, package: pkg }) => {
+      // Get real data for this session
+      const participantIds = userParticipants.filter(p => p.sessionId === session.id).map(p => p.id);
       
-      // Calculate session statistics
-      const winesTasted = Math.floor(Math.random() * 8) + 4; // 4-11 wines
-      const userScore = (3.5 + Math.random() * 1.5).toFixed(1); // 3.5-5.0
-      const groupScore = (3.8 + Math.random() * 1.2).toFixed(1); // 3.8-5.0
-      
+      // Get user's responses for this session
+      const userResponses = await db
+        .select()
+        .from(responses)
+        .where(inArray(responses.participantId, participantIds));
+
+      // Get slides for this package to count wines
+      const packageSlides = session.packageId ? await db
+        .select()
+        .from(slides)
+        .where(eq(slides.packageId, session.packageId)) : [];
+
+      // Count unique wines in this package
+      const wineSlides = packageSlides.filter(slide => slide.packageWineId);
+      const uniqueWineIds = new Set(wineSlides.map(slide => slide.packageWineId));
+      const winesTasted = uniqueWineIds.size;
+
+      // Calculate user's average score for this session
+      const userScores = userResponses
+        .map(r => this.extractScoreFromResponse(r))
+        .filter((score): score is number => score !== null && score > 0);
+      const userScore = userScores.length > 0 ? 
+        userScores.reduce((a, b) => a + b, 0) / userScores.length : 0;
+
+      // Get all participants for this session to calculate group average
+      const allSessionParticipants = await db
+        .select()
+        .from(participants)
+        .where(eq(participants.sessionId, session.id));
+
+      const allSessionResponses = await db
+        .select()
+        .from(responses)
+        .where(inArray(responses.participantId, allSessionParticipants.map(p => p.id)));
+
+      const allScores = allSessionResponses
+        .map(r => this.extractScoreFromResponse(r))
+        .filter((score): score is number => score !== null && score > 0);
+      const groupScore = allScores.length > 0 ?
+        allScores.reduce((a, b) => a + b, 0) / allScores.length : 0;
+
+      // Calculate session duration
+      const startTime = session.startedAt ? new Date(session.startedAt) : null;
+      const endTime = session.completedAt ? new Date(session.completedAt) : null;
+      const duration = startTime && endTime ? 
+        Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)) : // minutes
+        90; // default fallback
+
       return {
         sessionId: session.id,
         packageId: session.packageId,
@@ -3842,15 +3885,15 @@ export class DatabaseStorage implements IStorage {
         status: session.status,
         startedAt: session.startedAt,
         completedAt: session.completedAt,
-        activeParticipants: session.activeParticipants || 0,
-        sommelier,
+        activeParticipants: session.activeParticipants || allSessionParticipants.length,
+        sommelier: null, // Removed placeholder sommelier data
         winesTasted,
-        userScore: parseFloat(userScore),
-        groupScore: parseFloat(groupScore),
-        duration: Math.floor(Math.random() * 120) + 90, // 90-210 minutes
-        location: this.getPlaceholderLocation()
+        userScore: parseFloat(userScore.toFixed(1)),
+        groupScore: parseFloat(groupScore.toFixed(1)),
+        duration,
+        location: null // Removed placeholder location data
       };
-    });
+    }));
 
     const total = await db
       .select({ count: sql<number>`count(*)` })
@@ -3873,9 +3916,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   private getFavoriteWineType(userResponses: Response[]): string {
-    // This is a simplified implementation
-    // In a real app, you'd analyze the wine types from the responses
-    return "Red Wine"; // Placeholder
+    // Return null since we don't have enough wine data to determine preference
+    // This would require complex database relationships to wine catalog
+    return "Mixed";
   }
 
   private extractScoreFromResponse(response: Response): number | null {
@@ -3926,70 +3969,6 @@ export class DatabaseStorage implements IStorage {
     });
 
     return { name: topName, count: topCount, percentage: topPercentage };
-  }
-
-  private generatePlaceholderPrice(averageScore: number, region?: string): number {
-    // Generate a realistic price based on score and region
-    let basePrice = 25;
-    
-    // Adjust based on score (higher scores = higher prices)
-    if (averageScore >= 4.5) basePrice = 150;
-    else if (averageScore >= 4.0) basePrice = 75;
-    else if (averageScore >= 3.5) basePrice = 45;
-    
-    // Adjust based on region prestige
-    if (region) {
-      const regionLower = region.toLowerCase();
-      if (regionLower.includes('bordeaux') || regionLower.includes('burgundy')) basePrice *= 1.5;
-      if (regionLower.includes('napa') || regionLower.includes('tuscany')) basePrice *= 1.3;
-      if (regionLower.includes('champagne')) basePrice *= 2.0;
-    }
-    
-    // Add some randomness
-    const variation = 0.8 + (Math.random() * 0.4); // ±20% variation
-    return Math.round(basePrice * variation);
-  }
-
-  private getPlaceholderSommelier(sessionId: string): any {
-    const sommeliers = [
-      {
-        name: "Marie Dubois",
-        title: "Master Sommelier",
-        avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150"
-      },
-      {
-        name: "Alessandro Romano",
-        title: "Advanced Sommelier",
-        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150"
-      },
-      {
-        name: "Sarah Chen",
-        title: "Certified Sommelier",
-        avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150"
-      },
-      {
-        name: "Pierre Laurent",
-        title: "Master Sommelier",
-        avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150"
-      }
-    ];
-    
-    // Use sessionId to consistently assign sommeliers
-    const index = parseInt(sessionId.slice(-1), 16) % sommeliers.length;
-    return sommeliers[index];
-  }
-
-  private getPlaceholderLocation(): string {
-    const locations = [
-      "Private Dining Room, The Metropolitan",
-      "Osteria del Vino",
-      "Rooftop Terrace, Wine & Dine",
-      "Château Cellar, Bordeaux Estate",
-      "Tuscan Villa, Montepulciano",
-      "Napa Valley Winery, St. Helena"
-    ];
-    
-    return locations[Math.floor(Math.random() * locations.length)];
   }
 
   async generateSommelierTips(email: string): Promise<SommelierTips> {

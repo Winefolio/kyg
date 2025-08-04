@@ -260,6 +260,28 @@ export function registerDashboardRoutes(app: Express) {
       }
     }
   });
+
+  // Get session details for a specific user
+  app.get("/api/dashboard/session/:sessionId/details", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { userEmail } = req.query;
+
+      if (!userEmail || typeof userEmail !== 'string') {
+        return res.status(400).json({ message: "userEmail parameter is required" });
+      }
+
+      // For now, return a simple response indicating the functionality is being migrated
+      res.status(501).json({ 
+        message: "Session details endpoint is being migrated from test routes to production routes",
+        sessionId,
+        userEmail
+      });
+    } catch (error) {
+      console.error("Error getting session details:", error);
+      res.status(500).json({ message: "Internal server error", error: String(error) });
+    }
+  });
 }
 
 // Helper functions for generating enhanced dashboard data
