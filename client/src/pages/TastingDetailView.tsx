@@ -61,9 +61,9 @@ export default function TastingDetailView() {
 
   // Fetch tasting session details
   const { data: tastingData, isLoading } = useQuery<TastingDetailData>({
-    queryKey: [`/api/supabase-test/session/${sessionId}/details`, email],
+    queryKey: [`/api/dashboard/session/${sessionId}/details`, email],
     queryFn: async () => {
-      const response = await apiRequest('GET', `/api/supabase-test/session/${sessionId}/details?userEmail=${email}`, null);
+      const response = await apiRequest('GET', `/api/dashboard/session/${sessionId}/details?userEmail=${email}`, null);
       return response.json();
     },
     enabled: !!sessionId && !!email,

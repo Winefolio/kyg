@@ -7,14 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { 
   Wine, BarChart3, Clock, Star, MapPin, Filter, 
   ArrowLeft, Search, Calendar, Trophy, TrendingUp,
   Heart, Eye, Share2, Download, MoreHorizontal,
-  Globe, Users, Mic, Map, Menu,
+  Globe, Users, Mic, Map, Menu, AlertCircle, RefreshCcw, Wifi, WifiOff
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -120,9 +121,123 @@ export default function UserDashboard() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'overview' | 'collection' | 'tastings'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
+  const [wineSearchTerm, setWineSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Wine collection filters
+  const [selectedVintage, setSelectedVintage] = useState('all');
+  const [selectedRegion, setSelectedRegion] = useState('all');
+  const [selectedVariety, setSelectedVariety] = useState('all');
+  const [minRating, setMinRating] = useState(1);
+  const [sortBy, setSortBy] = useState('rating');
+
+  // Error Component for consistent error display
+  const ErrorCard = ({ 
+    title, 
+    message, 
+    error, 
+    onRetry, 
+    actionLabel = "Try Again",
+    icon: Icon = AlertCircle 
+  }: { 
+    title: string; 
+    message: string; 
+    error?: any; 
+    onRetry?: () => void; 
+    actionLabel?: string;
+    icon?: any;
+  }) => (
+    <Card className="bg-red-50 border-red-200">
+      <CardContent className="p-6 text-center">
+        <Icon className="w-12 h-12 text-red-500 mx-auto mb-4" />
+        <h3 className="text-lg font-semibold text-red-800 mb-2">{title}</h3>
+        <p className="text-red-600 mb-4">{message}</p>
+        {error && (
+          <details className="text-sm text-red-500 mb-4">
+            <summary className="cursor-pointer hover:text-red-700">Technical Details</summary>
+            <p className="mt-2 p-2 bg-red-100 rounded text-left">
+              {error?.message || JSON.stringify(error, null, 2)}
+            </p>
+          </details>
+        )}
+        {onRetry && (
+          <Button onClick={onRetry} variant="outline" className="text-red-600 border-red-300 hover:bg-red-100">
+            <RefreshCcw className="w-4 h-4 mr-2" />
+            {actionLabel}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  // Empty State Component
+  const EmptyState = ({ 
+    title, 
+    message, 
+    action,
+    icon: Icon = Wine 
+  }: { 
+    title: string; 
+    message: string; 
+    action?: { label: string; onClick: () => void };
+    icon?: any;
+  }) => (
+    <Card className="bg-purple-50 border-purple-200">
+      <CardContent className="p-8 text-center">
+        <Icon className="w-16 h-16 text-purple-300 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-purple-800 mb-2">{title}</h3>
+        <p className="text-purple-600 mb-4">{message}</p>
+        {action && (
+          <Button onClick={action.onClick} className="bg-purple-600 hover:bg-purple-700">
+            {action.label}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  // Network status checking
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Show offline message if no internet connection
+  if (!isOnline) {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
+        <Card className="bg-white/10 backdrop-blur-xl border-white/20 max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <WifiOff className="w-16 h-16 text-white/60 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-4">You're Offline</h2>
+            <p className="text-white/80 mb-6">
+              Please check your internet connection and try again.
+            </p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              variant="outline" 
+              className="text-white border-white hover:bg-white/10"
+            >
+              <RefreshCcw className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Fetch dashboard data
   const { data: dashboardData, isLoading: dashboardLoading, error: dashboardError } = useQuery<UserDashboardData>({
@@ -131,46 +246,28 @@ export default function UserDashboard() {
     retry: false, // Don't retry 404 errors
   });
 
-  // Fetch Supabase data as fallback
-  const { data: supabaseData, isLoading: supabaseLoading } = useQuery<any>({
-    queryKey: [`/api/supabase-test/user/${email}`],
-    enabled: !!email && (dashboardError?.message?.includes('404') || !dashboardData?.user),
-  });
-
-  // Use Supabase data if regular dashboard returns no data or 404
-  const finalDashboardData = (dashboardData?.user && !dashboardError) ? dashboardData : supabaseData;
+  // Use dashboard data directly
+  const finalDashboardData = dashboardData;
 
   // Fetch wine scores
-  const { data: wineScores, isLoading: scoresLoading, error: scoresError } = useQuery<{ scores: WineScore[] }>({
+  const { data: wineScores, isLoading: scoresLoading, error: scoresError, refetch: refetchScores } = useQuery<{ scores: WineScore[] }>({
     queryKey: [`/api/dashboard/${email}/scores`],
     enabled: !!email,
     retry: false, // Don't retry 404 errors
   });
 
-  // Fetch Supabase wine scores as fallback
-  const { data: supabaseWineScores, isLoading: supabaseScoresLoading } = useQuery<{ scores: WineScore[] }>({
-    queryKey: [`/api/supabase-test/user/${email}/scores`],
-    enabled: !!email && (scoresError?.message?.includes('404') || !wineScores?.scores?.length),
-  });
-
-  // Use Supabase wine scores if regular scores returns no data or 404
-  const finalWineScores = (wineScores?.scores?.length && !scoresError) ? wineScores : supabaseWineScores;
+  // Use wine scores directly
+  const finalWineScores = wineScores;
 
   // Fetch tasting history
-  const { data: tastingHistory, isLoading: historyLoading, error: historyError } = useQuery<{ history: TastingHistory[], total: number }>({
+  const { data: tastingHistory, isLoading: historyLoading, error: historyError, refetch: refetchHistory } = useQuery<{ history: TastingHistory[], total: number }>({
     queryKey: [`/api/dashboard/${email}/history`],
     enabled: !!email,
     retry: false, // Don't retry 404 errors
   });
 
-  // Fetch Supabase tasting history as fallback
-  const { data: supabaseTastingHistory, isLoading: supabaseHistoryLoading } = useQuery<{ history: TastingHistory[], total: number }>({
-    queryKey: [`/api/supabase-test/user/${email}/history`],
-    enabled: !!email && (historyError?.message?.includes('404') || !tastingHistory?.history?.length),
-  });
-
-  // Use Supabase tasting history if regular history returns no data or 404
-  const finalTastingHistory = (tastingHistory?.history?.length && !historyError) ? tastingHistory : supabaseTastingHistory;
+  // Use tasting history directly
+  const finalTastingHistory = tastingHistory;
 
   // Fetch taste profile
   const { data: tasteProfile, isLoading: profileLoading, error: profileError } = useQuery<TasteProfile>({
@@ -179,62 +276,210 @@ export default function UserDashboard() {
     retry: false, // Don't retry 404 errors
   });
 
-  // Fetch Supabase taste profile as fallback
-  const { data: supabaseTasteProfile, isLoading: supabaseProfileLoading } = useQuery<TasteProfile>({
-    queryKey: [`/api/supabase-test/user/${email}/taste-profile`],
-    enabled: !!email && (profileError?.message?.includes('404') || !tasteProfile),
-  });
-
-  // Use Supabase taste profile if regular profile returns no data or 404
-  const finalTasteProfile = (tasteProfile && !profileError) ? tasteProfile : supabaseTasteProfile;
+  // Use taste profile directly
+  const finalTasteProfile = tasteProfile;
 
   // Fetch sommelier tips
-  const { data: sommelierTips, isLoading: tipsLoading, error: tipsError } = useQuery<SommelierTips>({
+  const { data: sommelierTips, isLoading: tipsLoading, error: tipsError, refetch: refetchTips } = useQuery<SommelierTips>({
     queryKey: [`/api/dashboard/${email}/sommelier-tips`],
     enabled: !!email,
     retry: false, // Don't retry 404 errors
   });
 
-  // Fetch Supabase sommelier tips as fallback
-  const { data: supabaseSommelierTips, isLoading: supabaseTipsLoading } = useQuery<SommelierTips>({
-    queryKey: [`/api/supabase-test/user/${email}/sommelier-tips`],
-    enabled: !!email && (tipsError?.message?.includes('404') || !sommelierTips),
-  });
+  // Use sommelier tips directly
+  const finalSommelierTips = sommelierTips;
 
-  // Use Supabase sommelier tips if regular tips returns no data or 404
-  const finalSommelierTips = (sommelierTips && !tipsError) ? sommelierTips : supabaseSommelierTips;
+  // Comprehensive error checking
+  const hasServerError = dashboardError && !dashboardError.message?.includes('404');
+  const hasNetworkError = dashboardError?.message?.includes('Network') || 
+                          scoresError?.message?.includes('Network') ||
+                          historyError?.message?.includes('Network') ||
+                          profileError?.message?.includes('Network') ||
+                          tipsError?.message?.includes('Network');
 
-  if (dashboardLoading || supabaseLoading) {
+  // Show loading state
+  if (dashboardLoading) {
     return (
       <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
-        <div className="text-white">Loading your dashboard...</div>
-      </div>
-    );
-  }
-
-  if (!finalDashboardData) {
-    return (
-      <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
-        <div className="text-center text-white">
-          <h1 className="text-2xl font-bold mb-4">No Data Found</h1>
-          <p className="mb-6">We couldn't find any tasting data for this email address.</p>
-          <Button onClick={() => setLocation('/')} variant="outline" className="text-white border-white hover:bg-white/10">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Button>
+        <div className="text-white">
+          <LoadingOverlay
+              isVisible={dashboardLoading}
+              message="Loading your wine dashboard..."
+          />
         </div>
       </div>
     );
   }
 
-  const filteredWines = finalWineScores?.scores.filter(wine => 
-    wine.wineName.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  // Show network error
+  if (hasNetworkError) {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
+        <Card className="bg-white/10 backdrop-blur-xl border-white/20 max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <WifiOff className="w-16 h-16 text-white/60 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-4">Connection Error</h2>
+            <p className="text-white/80 mb-6">
+              Unable to connect to our servers. Please check your internet connection.
+            </p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              variant="outline" 
+              className="text-white border-white hover:bg-white/10"
+            >
+              <RefreshCcw className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show server error
+  if (hasServerError) {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
+        <Card className="bg-white/10 backdrop-blur-xl border-white/20 max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <AlertCircle className="w-16 h-16 text-white/60 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-4">Server Error</h2>
+            <p className="text-white/80 mb-4">
+              We're experiencing technical difficulties. Our team has been notified.
+            </p>
+            <details className="text-sm text-white/60 mb-6 text-left">
+              <summary className="cursor-pointer hover:text-white/80 text-center">Technical Details</summary>
+              <p className="mt-2 p-3 bg-white/10 rounded">
+                {dashboardError?.message || "Unknown server error"}
+              </p>
+            </details>
+            <div className="space-y-2">
+              <Button 
+                onClick={() => window.location.reload()} 
+                variant="outline" 
+                className="text-white border-white hover:bg-white/10 w-full"
+              >
+                <RefreshCcw className="w-4 h-4 mr-2" />
+                Try Again
+              </Button>
+              <Button 
+                onClick={() => setLocation('/')} 
+                variant="ghost" 
+                className="text-white/60 hover:text-white hover:bg-white/10 w-full"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Home
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show no data found
+  if (!finalDashboardData) {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
+        <Card className="bg-white/10 backdrop-blur-xl border-white/20 max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <Wine className="w-16 h-16 text-white/60 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-4">No Tasting Data Found</h2>
+            <p className="text-white/80 mb-6">
+              We couldn't find any wine tasting data for <strong>{email}</strong>. 
+              Have you participated in any wine tasting sessions yet?
+            </p>
+            <div className="space-y-2">
+              <Button 
+                onClick={() => setLocation('/join')} 
+                className="bg-white/20 hover:bg-white/30 text-white w-full"
+              >
+                Join a Tasting Session
+              </Button>
+              <Button 
+                onClick={() => setLocation('/')} 
+                variant="ghost" 
+                className="text-white/60 hover:text-white hover:bg-white/10 w-full"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Home
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Helper functions to get unique filter values
+  const getUniqueVintages = (wines: WineScore[]) => {
+    const vintages = wines.map(wine => wine.vintage).filter(Boolean);
+    return Array.from(new Set(vintages)).sort((a, b) => (b || 0) - (a || 0));
+  };
+
+  const getUniqueRegions = (wines: WineScore[]) => {
+    const regions = wines.map(wine => wine.region).filter(Boolean);
+    return Array.from(new Set(regions)).sort();
+  };
+
+  const getUniqueVarieties = (wines: WineScore[]) => {
+    const varieties = wines.flatMap(wine => wine.grapeVarietals || []);
+    return Array.from(new Set(varieties)).sort();
+  };
+
+  // Apply all filters and sorting
+  const filteredWines = finalWineScores?.scores.filter(wine => {
+    // Search term filter
+    const matchesSearch = wine.wineName.toLowerCase().includes(wineSearchTerm.toLowerCase()) ||
+      (wine.producer && wine.producer.toLowerCase().includes(wineSearchTerm.toLowerCase()));
+    
+    // Vintage filter
+    const matchesVintage = selectedVintage === 'all' || wine.vintage === parseInt(selectedVintage);
+    
+    // Region filter
+    const matchesRegion = selectedRegion === 'all' || wine.region === selectedRegion;
+    
+    // Variety filter
+    const matchesVariety = selectedVariety === 'all' || 
+      (wine.grapeVarietals && wine.grapeVarietals.includes(selectedVariety));
+    
+    // Rating filter - ensure we're comparing numbers
+    const matchesRating = wine.averageScore >= Number(minRating);
+    
+    return matchesSearch && matchesVintage && matchesRegion && matchesVariety && matchesRating;
+  }).sort((a, b) => {
+    switch (sortBy) {
+      case 'name':
+        return a.wineName.localeCompare(b.wineName);
+      case 'rating':
+        return b.averageScore - a.averageScore;
+      case 'vintage':
+        return (b.vintage || 0) - (a.vintage || 0);
+      default:
+        return b.averageScore - a.averageScore;
+    }
+  }) || [];
 
   const filteredHistory = finalTastingHistory?.history.filter(session =>
     session.packageName.toLowerCase().includes(searchTerm.toLowerCase()) &&
     (filterType === 'all' || session.status === filterType)
   ) || [];
+
+  // Get unique values for dropdowns
+  const availableWines = finalWineScores?.scores || [];
+  const uniqueVintages = getUniqueVintages(availableWines);
+  const uniqueRegions = getUniqueRegions(availableWines);
+  const uniqueVarieties = getUniqueVarieties(availableWines);
+
+  // Clear all filters function
+  const clearAllFilters = () => {
+    setWineSearchTerm('');
+    setSelectedVintage('all');
+    setSelectedRegion('all');
+    setSelectedVariety('all');
+    setMinRating(1);
+    setSortBy('rating');
+  };
 
   return (
     <div className="min-h-screen bg-gradient-primary">
@@ -275,7 +520,6 @@ export default function UserDashboard() {
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
               <Avatar className="h-10 w-10">
-                <AvatarImage src="" />
                 <AvatarFallback className="bg-white/20 text-white">
                   {finalDashboardData.user.displayName.charAt(0).toUpperCase()}
                 </AvatarFallback>
@@ -292,7 +536,6 @@ export default function UserDashboard() {
                     <MoreHorizontal className="w-5 h-5" />
                   </Button>
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src="" />
                     <AvatarFallback className="bg-purple-200 text-purple-900">
                       {finalDashboardData.user.displayName.charAt(0).toUpperCase()}
                     </AvatarFallback>
@@ -321,6 +564,46 @@ export default function UserDashboard() {
 
           {/* Taste Profile Tab */}
           <TabsContent value="overview" className="space-y-6">
+            {/* Network status warning */}
+            {!isOnline && (
+              <div className="bg-orange-500/20 border border-orange-500 rounded-lg p-4 text-orange-200">
+                <div className="flex items-center">
+                  <WifiOff className="w-5 h-5 mr-2" />
+                  You're currently offline. Data may not be up to date.
+                </div>
+              </div>
+            )}
+
+            {/* Error states for overview data */}
+            {(scoresError || historyError || tipsError) && (
+              <ErrorCard
+                title="Unable to Load Dashboard Data"
+                message={
+                  !isOnline 
+                    ? "You're offline. Please check your internet connection and try again."
+                    : "There was an error loading your dashboard data. Please try again."
+                }
+                onRetry={() => {
+                  refetchScores();
+                  refetchHistory();
+                  refetchTips();
+                }}
+              />
+            )}
+
+            {/* Loading overlay - show loading state for all data except sommelier tips */}
+            {(scoresLoading || historyLoading || dashboardLoading || profileLoading) && (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-300 mx-auto mb-4"></div>
+                  <p className="text-purple-200">Loading your taste profile...</p>
+                </div>
+              </div>
+            )}
+
+            {/* Only show content when main data is loaded */}
+            {!scoresLoading && !historyLoading && !dashboardLoading && !profileLoading && !(scoresError || historyError || tipsError) && (
+              <>
             {/* Stats Overview - Only visible on Taste Profile tab */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <Card className="bg-white/10 backdrop-blur-xl border-white/20">
@@ -538,8 +821,10 @@ export default function UserDashboard() {
                 </CardContent>
               </Card>
             </div>
+              </>
+            )}
 
-            {/* Sommelier Conversation Starters */}
+            {/* Sommelier Conversation Starters - Always visible with independent loading */}
             <Card className="bg-white/10 backdrop-blur-xl border-white/20">
               <CardHeader>
                 <CardTitle className="text-white flex items-center space-x-2">
@@ -548,73 +833,125 @@ export default function UserDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <h4 className="text-white font-medium">Your Preference Profile</h4>
-                  <div className="space-y-2 text-purple-200">
-                    <p>{finalSommelierTips?.preferenceProfile}</p>
-                    {finalSommelierTips?.redDescription && <p>{finalSommelierTips.redDescription}</p>}
-                    {finalSommelierTips?.whiteDescription && <p>{finalSommelierTips.whiteDescription}</p>}
+                {tipsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <LoadingOverlay
+                      isVisible={true}
+                      message="Loading sommelier tips..."
+                    />
                   </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <h4 className="text-white font-medium">Questions to Ask</h4>
-                  <ul className="space-y-2 text-purple-200">
-                    {finalSommelierTips?.questions.map((question, index) => (
-                      <li key={index} className="flex items-start space-x-2">
-                        <span className="text-white mt-1">•</span>
-                        <span>{question}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                ) : finalSommelierTips ? (
+                  <>
+                    <div className="space-y-4">
+                      <h4 className="text-white font-medium">Your Preference Profile</h4>
+                      <div className="space-y-2 text-purple-200">
+                        <p>{finalSommelierTips.preferenceProfile}</p>
+                        {finalSommelierTips.redDescription && <p>{finalSommelierTips.redDescription}</p>}
+                        {finalSommelierTips.whiteDescription && <p>{finalSommelierTips.whiteDescription}</p>}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <h4 className="text-white font-medium">Questions to Ask</h4>
+                      <ul className="space-y-2 text-purple-200">
+                        {finalSommelierTips.questions.map((question, index) => (
+                          <li key={index} className="flex items-start space-x-2">
+                            <span className="text-white mt-1">•</span>
+                            <span>{question}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-purple-200">
+                    <p>No sommelier tips available at the moment.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Wine Collection Tab */}
           <TabsContent value="collection" className="space-y-6">
-            {/* Search and Filters */}
-            <div className="flex flex-col sm:flex-row gap-4">
+            {/* Error handling for wine scores */}
+            {scoresError && !finalWineScores && (
+              <ErrorCard
+                title="Unable to Load Wine Collection"
+                message="We couldn't load your wine collection data. This might be due to a temporary server issue."
+                error={scoresError}
+                onRetry={() => window.location.reload()}
+                actionLabel="Refresh Page"
+              />
+            )}
+
+            {/* Loading state for wine scores */}
+            {scoresLoading && (
+              <Card className="bg-white/10 backdrop-blur-xl border-white/20">
+                <CardContent className="p-8 text-center">
+                  <LoadingOverlay
+                    isVisible={true}
+                    message="Loading your wine collection..."
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Wine collection content */}
+            {finalWineScores && finalWineScores.scores && finalWineScores.scores.length > 0 ? (
+              <>
+                {/* Search and Filters */}
+                <div className="flex flex-col sm:flex-row gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-300 w-4 h-4" />
                 <Input
                   placeholder="Search by names..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={wineSearchTerm}
+                  onChange={(e) => setWineSearchTerm(e.target.value)}
                   className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-purple-300"
                 />
               </div>
-              <select className="px-4 py-2 bg-white/10 border border-white/20 text-white rounded-md">
+              <select 
+                value={selectedVintage}
+                onChange={(e) => setSelectedVintage(e.target.value)}
+                className="px-4 py-2 bg-white/10 border border-white/20 text-white rounded-md"
+              >
                 <option className="bg-black" value="all">All Years</option>
-                <option className="bg-black" value="2024">2024</option>
-                <option className="bg-black" value="2023">2023</option>
-                <option className="bg-black" value="2022">2022</option>
+                {uniqueVintages.map(vintage => (
+                  <option key={vintage} className="bg-black" value={vintage?.toString()}>
+                    {vintage}
+                  </option>
+                ))}
               </select>
-              <select className="px-4 py-2 bg-white/10 border border-white/20 text-white rounded-md">
+              <select 
+                value={selectedRegion}
+                onChange={(e) => setSelectedRegion(e.target.value)}
+                className="px-4 py-2 bg-white/10 border border-white/20 text-white rounded-md"
+              >
                 <option className="bg-black" value="all">All Regions</option>
-                <option className="bg-black" value="Bordeaux">Bordeaux</option>
-                <option className="bg-black" value="Burgundy">Burgundy</option>
-                <option className="bg-black" value="Napa Valley">Napa Valley</option>
+                {uniqueRegions.map(region => (
+                  <option key={region} className="bg-black" value={region}>
+                    {region}
+                  </option>
+                ))}
               </select>
-              <select className="px-4 py-2 bg-white/10 border border-white/20 text-white rounded-md">
+              <select 
+                value={selectedVariety}
+                onChange={(e) => setSelectedVariety(e.target.value)}
+                className="px-4 py-2 bg-white/10 border border-white/20 text-white rounded-md"
+              >
                 <option className="bg-black" value="all">All Varieties</option>
-                <option className="bg-black" value="Cabernet Sauvignon">Cabernet Sauvignon</option>
-                <option className="bg-black" value="Chardonnay">Chardonnay</option>
-                <option className="bg-black" value="Pinot Noir">Pinot Noir</option>
+                {uniqueVarieties.map(variety => (
+                  <option key={variety} className="bg-black" value={variety}>
+                    {variety}
+                  </option>
+                ))}
               </select>
-              <div className="flex items-center space-x-2">
-                <Label className="text-white text-sm">Min Rating:</Label>
-                <input 
-                  type="range" 
-                  min="1" 
-                  max="5" 
-                  step="0.1" 
-                  defaultValue="1"
-                  className="w-20"
-                />
-              </div>
-              <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
+              <Button 
+                variant="outline" 
+                className="border-white/20 text-white hover:bg-white/10"
+                onClick={clearAllFilters}
+              >
                 Clear All Filters
               </Button>
             </div>
@@ -623,10 +960,14 @@ export default function UserDashboard() {
             <div className="flex items-center justify-between">
               <p className="text-white">Showing {filteredWines.length} wines</p>
               <div className="flex items-center space-x-4">
-                <select className="px-3 py-1 bg-white/10 border border-white/20 text-white rounded text-sm">
+                <select 
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-3 py-1 bg-white/10 border border-white/20 text-white rounded text-sm"
+                >
                   <option className="bg-black" value="rating">Sort by Rating</option>
                   <option className="bg-black" value="name">Sort by Name</option>
-                  <option className="bg-black" value="price">Sort by Price</option>
+                  <option className="bg-black" value="vintage">Sort by Vintage</option>
                 </select>
                 <div className="flex border border-white/20 rounded">
                   <Button
@@ -768,12 +1109,52 @@ export default function UserDashboard() {
             {filteredWines.length > 0 && (
               <WineMap wines={filteredWines} />
             )}
+              </>
+            ) : (
+              /* Empty state for wine collection */
+              !scoresLoading && (
+                <EmptyState
+                  title="No Wines in Your Collection"
+                  message="Start tasting wines to build your personal collection and track your preferences."
+                  action={{ 
+                    label: "Join a Tasting Session", 
+                    onClick: () => setLocation('/join') 
+                  }}
+                />
+              )
+            )}
           </TabsContent>
 
           {/* Tastings Tab */}
           <TabsContent value="tastings" className="space-y-6">
-            {/* Tastings Summary Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            {/* Error handling for tasting history */}
+            {historyError && !finalTastingHistory && (
+              <ErrorCard
+                title="Unable to Load Tasting History"
+                message="We couldn't load your tasting history. This might be due to a temporary server issue."
+                error={historyError}
+                onRetry={() => window.location.reload()}
+                actionLabel="Refresh Page"
+              />
+            )}
+
+            {/* Loading state for tasting history */}
+            {historyLoading && (
+              <Card className="bg-white/10 backdrop-blur-xl border-white/20">
+                <CardContent className="p-8 text-center">
+                  <LoadingOverlay
+                    isVisible={true}
+                    message="Loading your tasting history..."
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Tasting history content */}
+            {finalTastingHistory && finalTastingHistory.history && finalTastingHistory.history.length > 0 ? (
+              <>
+                {/* Tastings Summary Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               <Card className="bg-white/10 backdrop-blur-xl border-white/20">
                 <CardContent className="p-6">
                   <div className="flex items-center space-x-4">
@@ -811,7 +1192,7 @@ export default function UserDashboard() {
                     <div>
                       <p className="text-sm text-purple-200">Wines Tasted</p>
                       <p className="text-2xl font-bold text-white">
-                        {finalTastingHistory?.history.reduce((sum, h) => sum + h.winesTasted, 0) || 0}
+                        {finalDashboardData?.user?.uniqueWinesTasted|| 0}
                       </p>
                     </div>
                   </div>
@@ -853,16 +1234,15 @@ export default function UserDashboard() {
                   <CardContent className="p-6">
                     <div className="flex items-start space-x-4">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage src={session.sommelier.avatar} />
                         <AvatarFallback className="bg-white/20 text-white">
-                          {session.sommelier.name.split(' ').map(n => n[0]).join('')}
+                          <Wine className="w-6 h-6" />
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
                         <div className="flex items-start justify-between mb-2">
                           <div>
                             <h3 className="text-lg font-semibold text-white mb-1">{session.packageName}</h3>
-                            <p className="text-sm text-purple-200 mb-1">Led by {session.sommelier.name}, {session.sommelier.title}</p>
+                            <p className="text-sm text-purple-200 mb-1">Wine Tasting Experience</p>
                             <p className="text-sm text-purple-200 line-clamp-2">
                               An intimate journey through exceptional wines. Taste {session.winesTasted} carefully selected wines with expert guidance.
                             </p>
@@ -875,7 +1255,7 @@ export default function UserDashboard() {
                           </Badge>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                           <div className="flex items-center space-x-1 text-purple-200">
                             <Calendar className="w-4 h-4" />
                             <span>{new Date(session.startedAt).toLocaleDateString()}</span>
@@ -885,10 +1265,6 @@ export default function UserDashboard() {
                             <span>{session.duration} min</span>
                           </div>
                           <div className="flex items-center space-x-1 text-purple-200">
-                            <MapPin className="w-4 h-4" />
-                            <span>{session.location}</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-purple-200">
                             <Users className="w-4 h-4" />
                             <span>{session.activeParticipants} people</span>
                           </div>
@@ -896,7 +1272,7 @@ export default function UserDashboard() {
                         
                         <div className="flex flex-col md:flex-row items-center justify-between mt-4 pt-4 border-t border-white/10">
                           <div className="flex items-center space-x-4 text-sm">
-                            <span className="text-purple-200">Wines Tasted: {session.winesTasted}</span>
+                            {/*<span className="text-purple-200">Wines Tasted: {session.winesTasted}</span>*/}
                             <div className="flex items-center space-x-1">
                               <span className="text-purple-200">Your Score:</span>
                               <Star className="w-4 h-4 text-yellow-400 fill-current" />
@@ -924,6 +1300,20 @@ export default function UserDashboard() {
                 <Clock className="w-12 h-12 text-purple-300 mx-auto mb-4" />
                 <p className="text-purple-200">No tasting sessions found.</p>
               </div>
+            )}
+              </>
+            ) : (
+              /* Empty state for tasting history */
+              !historyLoading && (
+                <EmptyState
+                  title="No Tasting History"
+                  message="You haven't participated in any wine tasting sessions yet. Join a session to start building your tasting history."
+                  action={{ 
+                    label: "Join a Tasting Session", 
+                    onClick: () => setLocation('/join') 
+                  }}
+                />
+              )
             )}
           </TabsContent>
         </Tabs>

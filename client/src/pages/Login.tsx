@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Mail, Wine } from "lucide-react";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { ArrowLeft, Mail, Wine, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
@@ -29,8 +30,8 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // Check if user exists by trying to fetch their Supabase data
-      const response = await fetch(`/api/supabase-test/user/${encodeURIComponent(email.trim())}`);
+      // Check if user exists by trying to fetch their dashboard data
+      const response = await fetch(`/api/dashboard/${encodeURIComponent(email.trim())}`);
       
       if (response.ok) {
         // User exists, redirect to dashboard
