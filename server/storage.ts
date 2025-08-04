@@ -3683,11 +3683,11 @@ export class DatabaseStorage implements IStorage {
                 regionCounts.set(wine.region, (regionCounts.get(wine.region) || 0) + 1);
               }
               
-              // Count grape varieties (only once per unique wine)
-              if (wine.grapeVarietals && Array.isArray(wine.grapeVarietals)) {
-                wine.grapeVarietals.forEach((grape: string) => {
-                  grapeCounts.set(grape, (grapeCounts.get(grape) || 0) + 1);
-                });
+              // Count primary grape variety only (to maintain consistent wine counts)
+              // This ensures that "X wines" in Top Grape card matches the actual wine count logic
+              if (wine.grapeVarietals && Array.isArray(wine.grapeVarietals) && wine.grapeVarietals.length > 0) {
+                const primaryGrape = wine.grapeVarietals[0];
+                grapeCounts.set(primaryGrape, (grapeCounts.get(primaryGrape) || 0) + 1);
               }
             }
           }
