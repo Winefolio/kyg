@@ -676,7 +676,7 @@ export default function UserDashboard() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-purple-200">{finalDashboardData.topPreferences?.topRegion?.count || 0} wines</span>
+                      <span className="text-purple-200">Based on {finalDashboardData.topPreferences?.topRegion?.count || 0} wines</span>
                       <span className="text-white">{finalDashboardData.topPreferences?.topRegion?.percentage?.toFixed(0) || 0}%</span>
                     </div>
                     <Progress value={finalDashboardData.topPreferences?.topRegion?.percentage || 0} className="h-2" />
@@ -695,7 +695,7 @@ export default function UserDashboard() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-purple-200">{finalDashboardData.topPreferences?.topGrape?.count || 0} wines</span>
+                      <span className="text-purple-200">Based on {finalDashboardData.topPreferences?.topGrape?.count || 0} wines</span>
                       <span className="text-white">{finalDashboardData.topPreferences?.topGrape?.percentage?.toFixed(0) || 0}%</span>
                     </div>
                     <Progress value={finalDashboardData.topPreferences?.topGrape?.percentage || 0} className="h-2" />

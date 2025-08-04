@@ -315,13 +315,13 @@ function analyzeWineTypeProfile(wines: any[], type: string) {
     };
   }
   
-  // Analyze grape varieties
+  // Analyze grape varieties - use primary grape only for consistent counting
   const grapeCounts = new Map();
   wines.forEach(wine => {
-    if (wine.grapeVarietals) {
-      wine.grapeVarietals.forEach((grape: string) => {
-        grapeCounts.set(grape, (grapeCounts.get(grape) || 0) + 1);
-      });
+    if (wine.grapeVarietals && wine.grapeVarietals.length > 0) {
+      // Count only the primary (first) grape varietal to maintain consistent wine counts
+      const primaryGrape = wine.grapeVarietals[0];
+      grapeCounts.set(primaryGrape, (grapeCounts.get(primaryGrape) || 0) + 1);
     }
   });
   
