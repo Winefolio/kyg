@@ -164,7 +164,8 @@ export const participants = pgTable("participants", {
   isHost: boolean("is_host").default(false),
   progressPtr: integer("progress_ptr").default(0),
   lastActive: timestamp("last_active").defaultNow(),
-  createdAt: timestamp("created_at").defaultNow()
+  createdAt: timestamp("created_at").defaultNow(),
+  sommelier_feedback: text("sommelier_feedback"),
 }, (table) => ({
   sessionIdx: index("idx_participants_session").on(table.sessionId),
   emailSessionIdx: index("idx_participants_email_session").on(table.email, table.sessionId)

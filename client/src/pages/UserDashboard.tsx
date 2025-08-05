@@ -15,7 +15,7 @@ import {
   Wine, BarChart3, Clock, Star, MapPin, Filter, 
   ArrowLeft, Search, Calendar, Trophy, TrendingUp,
   Heart, Eye, Share2, Download, MoreHorizontal,
-  Globe, Users, Mic, Map, Menu, AlertCircle, RefreshCcw, Wifi, WifiOff
+  Globe, Users, Mic, Map, Menu, AlertCircle, RefreshCcw, Wifi, WifiOff, LogOut
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -125,7 +125,8 @@ export default function UserDashboard() {
   const [filterType, setFilterType] = useState('all');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  
+  const [desktopMenuOpen, setDesktopMenuOpen] = useState(false);
+
   // Wine collection filters
   const [selectedVintage, setSelectedVintage] = useState('all');
   const [selectedRegion, setSelectedRegion] = useState('all');
@@ -213,6 +214,25 @@ export default function UserDashboard() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (desktopMenuOpen || mobileMenuOpen) {
+        const target = event.target as HTMLElement;
+        const isInsideDropdown = target.closest('.dropdown-menu') || target.closest('button');
+        if (!isInsideDropdown) {
+          setDesktopMenuOpen(false);
+          setMobileMenuOpen(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [desktopMenuOpen, mobileMenuOpen]);
 
   // Show offline message if no internet connection
   if (!isOnline) {
@@ -487,14 +507,14 @@ export default function UserDashboard() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              onClick={() => setLocation('/')}
-              className="text-white hover:bg-white/10"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Back</span>
-            </Button>
+            {/*<Button*/}
+            {/*  variant="ghost"*/}
+            {/*  onClick={() => setLocation('/')}*/}
+            {/*  className="text-white hover:bg-white/10"*/}
+            {/*>*/}
+            {/*  <ArrowLeft className="w-4 h-4 mr-2" />*/}
+            {/*  <span className="hidden sm:inline">Back</span>*/}
+            {/*</Button>*/}
             <div>
               <h1 className="text-3xl font-bold text-white">KnowYourGrape</h1>
               <p className="text-purple-200">Premium Wine Experience</p>
@@ -512,13 +532,31 @@ export default function UserDashboard() {
             </Button>
 
             {/* Inline actions for desktop */}
-            <div className="hidden md:flex items-center space-x-4">
-              <Button variant="ghost" className="text-white hover:bg-white/10">
-                <Search className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" className="text-white hover:bg-white/10">
+            <div className="hidden md:flex items-center space-x-4 relative">
+              <Button 
+                variant="ghost" 
+                className="text-white hover:bg-white/10"
+                onClick={() => setDesktopMenuOpen(!desktopMenuOpen)}
+              >
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
+              
+              {/* Desktop dropdown menu */}
+             {desktopMenuOpen && (
+               <div className="dropdown-menu absolute right-12 top-12 z-50 bg-white/90 backdrop-blur-xl rounded-lg shadow-lg border border-white/20 py-2 min-w-[150px]">
+                 <div
+                   className="flex items-center w-full px-4 py-2 cursor-pointer text-purple-900 hover:bg-purple-100 hover:text-black rounded transition"
+                   onClick={() => {
+                     setDesktopMenuOpen(false);
+                     setLocation('/',  { replace: true });
+                   }}
+                 >
+                   <LogOut className="w-4 h-4 mr-2" />
+                   Logout
+                 </div>
+               </div>
+             )}
+              
               <Avatar className="h-10 w-10">
                 <AvatarFallback className="bg-white/20 text-white">
                   {finalDashboardData.user.displayName.charAt(0).toUpperCase()}
@@ -528,12 +566,17 @@ export default function UserDashboard() {
 
             {/* Mobile dropdown menu */}
             {mobileMenuOpen && (
-                <div className="absolute right-4 top-16 z-50 flex flex-col bg-white/90 rounded-lg shadow-lg p-4 space-y-3 md:hidden">
-                  <Button variant="ghost" className="text-purple-900 hover:bg-purple-100">
-                    <Search className="w-5 h-5" />
-                  </Button>
-                  <Button variant="ghost" className="text-purple-900 hover:bg-purple-100">
-                    <MoreHorizontal className="w-5 h-5" />
+                <div className="dropdown-menu absolute right-4 top-16 z-50 flex flex-col bg-white/90 rounded-lg shadow-lg p-4 space-y-3 md:hidden">
+                  <Button 
+                    variant="ghost" 
+                    className="text-purple-900 hover:bg-purple-100"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setLocation('/');
+                    }}
+                  >
+                    <LogOut className="w-5 h-5 mr-2" />
+                    Logout
                   </Button>
                   <Avatar className="h-10 w-10">
                     <AvatarFallback className="bg-purple-200 text-purple-900">
@@ -549,19 +592,19 @@ export default function UserDashboard() {
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-6">
           <TabsList className="bg-white/10 backdrop-blur-xl border-white/20">
             <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
-              <BarChart3 className="w-4 h-4 mr-2" />
+              <BarChart3 className="w-4 h-4 mr-2 hide-on-xs" />
               Taste Profile
             </TabsTrigger>
             <TabsTrigger value="collection" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
-              <Wine className="w-4 h-4 mr-2" />
+              <Wine className="w-4 h-4 mr-2 hide-on-xs" />
               Wine Collection
             </TabsTrigger>
             <TabsTrigger value="tastings" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white">
-              <Clock className="w-4 h-4 mr-2" />
+              <Clock className="w-4 h-4 mr-2 hide-on-xs" />
               Tastings
             </TabsTrigger>
           </TabsList>
-
+ 
           {/* Taste Profile Tab */}
           <TabsContent value="overview" className="space-y-6">
             {/* Network status warning */}
@@ -605,7 +648,7 @@ export default function UserDashboard() {
             {!scoresLoading && !historyLoading && !dashboardLoading && !profileLoading && !(scoresError || historyError || tipsError) && (
               <>
             {/* Stats Overview - Only visible on Taste Profile tab */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               <Card className="bg-white/10 backdrop-blur-xl border-white/20">
                 <CardContent className="p-6">
                   <div className="flex items-center space-x-4">
@@ -648,23 +691,23 @@ export default function UserDashboard() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/10 backdrop-blur-xl border-white/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-red-500/20 rounded-full">
-                      <Heart className="w-6 h-6 text-red-300" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-purple-200">Favorites</p>
-                      <p className="text-2xl font-bold text-white">{Math.floor(finalDashboardData.user.uniqueWinesTasted * 0.3)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/*<Card className="bg-white/10 backdrop-blur-xl border-white/20">*/}
+              {/*  <CardContent className="p-6">*/}
+              {/*    <div className="flex items-center space-x-4">*/}
+              {/*      <div className="p-3 bg-red-500/20 rounded-full">*/}
+              {/*        <Heart className="w-6 h-6 text-red-300" />*/}
+              {/*      </div>*/}
+              {/*      <div>*/}
+              {/*        <p className="text-sm text-purple-200">Favorites</p>*/}
+              {/*        <p className="text-2xl font-bold text-white">{Math.floor(finalDashboardData.user.uniqueWinesTasted * 0.3)}</p>*/}
+              {/*      </div>*/}
+              {/*    </div>*/}
+              {/*  </CardContent>*/}
+              {/*</Card>*/}
             </div>
 
             {/* Top Preferences - Only visible on Taste Profile tab */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               <Card className="bg-white/10 backdrop-blur-xl border-white/20">
                 <CardContent className="p-6">
                   <div className="flex items-center space-x-3 mb-4">
@@ -703,23 +746,6 @@ export default function UserDashboard() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white/10 backdrop-blur-xl border-white/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <Star className="w-5 h-5 text-purple-300" />
-                    <div>
-                      <p className="text-sm text-purple-200">Average Rating</p>
-                      <p className="text-lg font-semibold text-white">{finalDashboardData.topPreferences?.averageRating?.score?.toFixed(1) || finalDashboardData.stats.averageScore?.toFixed(1) || "0.0"}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-purple-200">Based on {finalDashboardData.topPreferences?.averageRating?.totalWines || finalDashboardData.user.uniqueWinesTasted} wines</span>
-                    </div>
-                    <Progress value={((finalDashboardData.topPreferences?.averageRating?.score || finalDashboardData.stats.averageScore || 0) / 5) * 100} className="h-2" />
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -732,42 +758,54 @@ export default function UserDashboard() {
                   <div className="flex items-center justify-between">
                     <span className="text-purple-200">Body Preference</span>
                     <Badge variant="secondary" className="bg-purple-500/20 text-purple-200">
-                      {finalTasteProfile?.redWineProfile.stylePreference || "Medium-bodied"}
+                      {finalTasteProfile?.redWineProfile?.stylePreference || "Medium-bodied"}
                     </Badge>
                   </div>
                   
                   <div className="space-y-3">
                     <h4 className="text-white font-medium">Preferred Varieties</h4>
-                    {finalTasteProfile?.redWineProfile.preferredVarieties.map((variety, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <span className="text-purple-200">{variety.grape}</span>
-                        <div className="flex items-center space-x-2">
-                          <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                          <span className="text-white">{variety.averageScore.toFixed(1)} ({variety.count})</span>
+                    {finalTasteProfile?.redWineProfile?.preferredVarieties && finalTasteProfile.redWineProfile.preferredVarieties.length > 0 ? (
+                      finalTasteProfile.redWineProfile.preferredVarieties.map((variety, index) => (
+                        <div key={index} className="flex items-center justify-between">
+                          <span className="text-purple-200">{variety.grape}</span>
+                          <div className="flex items-center space-x-2">
+                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                            <span className="text-white">{variety.averageScore.toFixed(1)} ({variety.count})</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-purple-300 text-sm">No data</p>
+                    )}
                   </div>
                   
                   <div className="space-y-3">
                     <h4 className="text-white font-medium">Favorite Red Regions</h4>
-                    {finalTasteProfile?.redWineProfile.favoriteRegions.map((region, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <span className="text-purple-200">{region.region}</span>
-                        <span className="text-white">{region.count} wines</span>
-                      </div>
-                    ))}
+                    {finalTasteProfile?.redWineProfile?.favoriteRegions && finalTasteProfile.redWineProfile.favoriteRegions.length > 0 ? (
+                      finalTasteProfile.redWineProfile.favoriteRegions.map((region, index) => (
+                        <div key={index} className="flex items-center justify-between">
+                          <span className="text-purple-200">{region.region}</span>
+                          <span className="text-white">{region.count} wines</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-purple-300 text-sm">No data</p>
+                    )}
                   </div>
                   
                   <div className="space-y-3">
                     <h4 className="text-white font-medium">Common Flavor Notes</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {finalTasteProfile?.redWineProfile.commonFlavorNotes.map((note, index) => (
-                        <Badge key={index} variant="outline" className="text-purple-200 border-purple-300">
-                          {note}
-                        </Badge>
-                      ))}
-                    </div>
+                    {finalTasteProfile?.redWineProfile?.commonFlavorNotes && finalTasteProfile.redWineProfile.commonFlavorNotes.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {finalTasteProfile.redWineProfile.commonFlavorNotes.map((note, index) => (
+                          <Badge key={index} variant="outline" className="text-purple-200 border-purple-300">
+                            {note}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-purple-300 text-sm">No data</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -781,42 +819,54 @@ export default function UserDashboard() {
                   <div className="flex items-center justify-between">
                     <span className="text-purple-200">Style Preference</span>
                     <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-200">
-                      {finalTasteProfile?.whiteWineProfile.stylePreference || "Rich & Full"}
+                      {finalTasteProfile?.whiteWineProfile?.stylePreference || "Rich & Full"}
                     </Badge>
                   </div>
                   
                   <div className="space-y-3">
                     <h4 className="text-white font-medium">Preferred Varieties</h4>
-                    {finalTasteProfile?.whiteWineProfile.preferredVarieties.map((variety, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <span className="text-purple-200">{variety.grape}</span>
-                        <div className="flex items-center space-x-2">
-                          <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                          <span className="text-white">{variety.averageScore.toFixed(1)} ({variety.count})</span>
+                    {finalTasteProfile?.whiteWineProfile?.preferredVarieties && finalTasteProfile.whiteWineProfile.preferredVarieties.length > 0 ? (
+                      finalTasteProfile.whiteWineProfile.preferredVarieties.map((variety, index) => (
+                        <div key={index} className="flex items-center justify-between">
+                          <span className="text-purple-200">{variety.grape}</span>
+                          <div className="flex items-center space-x-2">
+                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                            <span className="text-white">{variety.averageScore.toFixed(1)} ({variety.count})</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-purple-300 text-sm">No data</p>
+                    )}
                   </div>
                   
                   <div className="space-y-3">
                     <h4 className="text-white font-medium">Favorite White Regions</h4>
-                    {finalTasteProfile?.whiteWineProfile.favoriteRegions.map((region, index) => (
-                      <div key={index} className="flex items-center justify-between">
-                        <span className="text-purple-200">{region.region}</span>
-                        <span className="text-white">{region.count} wines</span>
-                      </div>
-                    ))}
+                    {finalTasteProfile?.whiteWineProfile?.favoriteRegions && finalTasteProfile.whiteWineProfile.favoriteRegions.length > 0 ? (
+                      finalTasteProfile.whiteWineProfile.favoriteRegions.map((region, index) => (
+                        <div key={index} className="flex items-center justify-between">
+                          <span className="text-purple-200">{region.region}</span>
+                          <span className="text-white">{region.count} wines</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-purple-300 text-sm">No data</p>
+                    )}
                   </div>
                   
                   <div className="space-y-3">
                     <h4 className="text-white font-medium">Common Flavor Notes</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {finalTasteProfile?.whiteWineProfile.commonFlavorNotes.map((note, index) => (
-                        <Badge key={index} variant="outline" className="text-yellow-200 border-yellow-300">
-                          {note}
-                        </Badge>
-                      ))}
-                    </div>
+                    {finalTasteProfile?.whiteWineProfile?.commonFlavorNotes && finalTasteProfile.whiteWineProfile.commonFlavorNotes.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {finalTasteProfile.whiteWineProfile.commonFlavorNotes.map((note, index) => (
+                          <Badge key={index} variant="outline" className="text-yellow-200 border-yellow-300">
+                            {note}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-purple-300 text-sm">No data</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -835,10 +885,10 @@ export default function UserDashboard() {
               <CardContent className="space-y-6">
                 {tipsLoading ? (
                   <div className="flex items-center justify-center py-8">
-                    <LoadingOverlay
-                      isVisible={true}
-                      message="Loading sommelier tips..."
-                    />
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-300 mx-auto mb-4"></div>
+                      <p className="text-purple-200">Loading sommelier tips...</p>
+                    </div>
                   </div>
                 ) : finalSommelierTips ? (
                   <>
@@ -1031,15 +1081,16 @@ export default function UserDashboard() {
                         <span className="text-white ml-1">{wine.averageScore.toFixed(1)}</span>
                       </div>
                       <p className="text-sm text-purple-200 mb-4 line-clamp-2">{wine.wineDescription}</p>
-                      <div className="flex items-center justify-between">
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
+
+                      {/* <div className="flex items-center justify-between">
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           className={`${wine.isFavorite ? 'text-red-400' : 'text-purple-300'} hover:bg-purple-500/20`}
                         >
                           <Heart className={`w-4 h-4 ${wine.isFavorite ? 'fill-current' : ''}`} />
                         </Button>
-                      </div>
+                      </div> */}
                     </CardContent>
                   </Card>
                 ))}
@@ -1073,7 +1124,8 @@ export default function UserDashboard() {
                           )}
                           <p className="text-sm text-purple-200 line-clamp-2">{wine.wineDescription}</p>
                         </div>
-                        <div className="flex items-center space-x-1 mb-2">
+                        {/* Desktop Rating - hidden on mobile */}
+                        <div className="hidden sm:flex items-center space-x-1 mb-2">
                           {[...Array(5)].map((_, i) => (
                             <Star 
                               key={i} 
@@ -1082,7 +1134,7 @@ export default function UserDashboard() {
                           ))}
                           <span className="text-white ml-1">{wine.averageScore.toFixed(1)}</span>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        {/* <div className="flex items-center space-x-2">
                           <Button 
                             size="sm" 
                             variant="ghost" 
@@ -1090,7 +1142,17 @@ export default function UserDashboard() {
                           >
                             <Heart className={`w-4 h-4 ${wine.isFavorite ? 'fill-current' : ''}`} />
                           </Button>
-                        </div>
+                        </div> */}
+                      </div>
+                      {/* Mobile Rating - shown only on mobile at bottom */}
+                      <div className="sm:hidden flex items-center justify-center space-x-1 mt-3 pt-3 border-t border-white/10">
+                        {[...Array(5)].map((_, i) => (
+                          <Star 
+                            key={i} 
+                            className={`w-4 h-4 ${i < Math.floor(wine.averageScore) ? 'text-yellow-400 fill-current' : 'text-gray-400'}`} 
+                          />
+                        ))}
+                        <span className="text-white ml-1">{wine.averageScore.toFixed(1)}</span>
                       </div>
                     </CardContent>
                   </Card>

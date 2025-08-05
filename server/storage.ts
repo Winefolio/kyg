@@ -124,6 +124,10 @@ export interface IStorage {
     participantId: string,
     progress: number,
   ): Promise<void>;
+  updateSommelierObservations(
+    sessionId: string,
+    observations: string[],
+  ): Promise<void>;
 
   // Responses
   createResponse(response: InsertResponse): Promise<Response>;
@@ -1274,6 +1278,28 @@ export class DatabaseStorage implements IStorage {
         lastActive: new Date(),
       })
       .where(eq(participants.id, participantId));
+  }
+
+  async updateSommelierObservations(
+    sessionId: string,
+    observations: string[],
+  ): Promise<void> {
+    // For now, we'll store observations in the first participant's sommelier_feedback field
+    // In a production app, you might want a separate table for session-level observations
+    const participantsList = await db
+      .select()
+      .from(participants)
+      .where(eq(participants.sessionId, sessionId))
+      .limit(1);
+    
+    if (participantsList.length > 0) {
+      await db
+        .update(participants)
+        .set({
+          sommelier_feedback: observations.join('\n'),
+        })
+        .where(eq(participants.id, participantsList[0].id));
+    }
   }
 
   // Response methods
@@ -4046,6 +4072,8 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
     try {
       const templatePath = path.join(process.cwd(), 'prompts', 'taste_helper.txt');
       const templateContent = await fs.readFile(templatePath, 'utf-8');
+
+      console.log(`📄 Template loaded from ${templatePath}\n\n`, templateContent);
 
       // Step 2: Replace placeholders with user data
       const prompt = templateContent
