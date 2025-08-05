@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { WineModal } from "@/components/WineModal";
 import { SlideEditor } from "@/components/SlideEditor";
 import { QRCodeModal } from "@/components/QRCodeModal";
+import { SessionCreationModal } from "@/components/SessionCreationModal";
 import { ImageUpload } from "@/components/ui/image-upload";
 import {
   WINE_TEMPLATES,
@@ -159,6 +160,8 @@ export default function SommelierDashboard() {
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedSessionForQR, setSelectedSessionForQR] =
     useState<Session | null>(null);
+  const [showSessionCreationModal, setShowSessionCreationModal] = useState(false);
+  const [selectedPackageForSession, setSelectedPackageForSession] = useState<Package | null>(null);
   const [expandedPackages, setExpandedPackages] = useState<Set<string>>(
     new Set(),
   );
@@ -387,6 +390,16 @@ export default function SommelierDashboard() {
     setLocation(`/video-editor?packageWineId=${wine.id}&wineName=${encodeURIComponent(wine.wineName)}`);
   };
 
+  const openSessionCreationModal = (pkg: Package) => {
+    setSelectedPackageForSession(pkg);
+    setShowSessionCreationModal(true);
+  };
+
+  const handleSessionCreated = (session: any) => {
+    setSelectedSessionForQR(session);
+    setShowQRModal(true);
+  };
+
   const togglePackageExpansion = (packageId: string) => {
     setExpandedPackages((prev) => {
       const newSet = new Set(prev);
@@ -417,7 +430,7 @@ export default function SommelierDashboard() {
                 className="text-white hover:bg-white/10"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
+                <span className="hidden sm:inline">Back</span>
               </Button>
               <div className="flex items-center space-x-2">
                 <Wine className="w-6 h-6 text-white flex items-center" />
@@ -558,11 +571,8 @@ export default function SommelierDashboard() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() =>
-                                  createSessionMutation.mutate(pkg.code)
-                                }
+                                onClick={() => openSessionCreationModal(pkg)}
                                 className="text-white hover:bg-white/10"
-                                disabled={createSessionMutation.isPending}
                               >
                                 <QrCode className="w-4 h-4 mr-2" />
                                 Create Session
@@ -1121,6 +1131,17 @@ export default function SommelierDashboard() {
           session={selectedSessionForQR}
           isOpen={showQRModal}
           onClose={() => setShowQRModal(false)}
+        />
+      )}
+
+      {/* Session Creation Modal */}
+      {showSessionCreationModal && selectedPackageForSession && (
+        <SessionCreationModal
+          packageCode={selectedPackageForSession.code}
+          packageName={selectedPackageForSession.name}
+          isOpen={showSessionCreationModal}
+          onClose={() => setShowSessionCreationModal(false)}
+          onSessionCreated={handleSessionCreated}
         />
       )}
     </div>

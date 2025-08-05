@@ -36,8 +36,9 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
 
   // Generate the session join URL
   const baseUrl = window.location.origin;
-  const sessionUrl = `${baseUrl}/join`;
   const sessionCode = session.short_code || session.packageCode;
+  const sessionUrl = `${baseUrl}/join?sessionId=${sessionCode}`;
+  const joinUrl = sessionUrl;
 
   // Fetch participants when expanded
   const toggleParticipants = async () => {
@@ -135,12 +136,12 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
             <div class="session-info">
               <div class="session-id">SESSION: ${sessionCode}</div>
               <p>Package: ${session.packageName || session.packageCode}</p>
-              <p>Scan QR code or visit:<br><strong>${sessionUrl}</strong></p>
+              <p>Scan QR code or visit:<br><strong>${joinUrl}</strong></p>
             </div>
             <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
             <script>
               const qr = qrcode(0, 'M');
-              qr.addData('${sessionUrl}');
+              qr.addData('${joinUrl}');
               qr.make();
               document.getElementById('qr-code').innerHTML = qr.createImgTag(6, 8);
             </script>
@@ -153,7 +154,7 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md bg-gray-900 border-gray-700">
+      <DialogContent className="max-w-md max-h-[90vh] bg-gray-900 border-gray-700 overflow-hidden">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <QrCode className="w-5 h-5" />
@@ -161,7 +162,7 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-4 overflow-y-auto max-h-[calc(90vh-8rem)] pr-2">{/* Add scrolling container */}
           {/* Session Info */}
           <Card className="bg-gray-800 border-gray-700">
             <CardHeader className="pb-3">
@@ -220,7 +221,7 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
                   <Users className="w-4 h-4" />
                   Participants
                 </h4>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
+                <div className="space-y-2 max-h-20 overflow-y-auto">
                   {loadingParticipants ? (
                     <div className="text-gray-400 text-xs p-2 text-center">Loading participants...</div>
                   ) : participants.length > 0 ? (
@@ -256,10 +257,10 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
           )}
 
           {/* QR Code */}
-          <div className="bg-white p-6 rounded-lg flex justify-center">
+          <div className="bg-white p-4 rounded-lg flex justify-center">
             <QRCodeSVG
-              value={sessionCode}
-              size={200}
+              value={joinUrl}
+              size={160}
               level="M"
               includeMargin={true}
             />
@@ -286,38 +287,48 @@ export function QRCodeModal({ session, isOpen, onClose }: QRCodeModalProps) {
           </div>
           
           {/* Instructions */}
-          <div className="text-center text-gray-400 text-sm">
+          <div className="text-center text-gray-400 text-xs space-y-1">
             <p>Participants can scan the QR code or enter the session code at:</p>
-            <p className="font-mono text-purple-400 mt-1">{baseUrl}/join</p>
+            <p className="font-mono text-purple-400">{baseUrl}/join</p>
+            <p className="text-gray-500">Or use direct link:</p>
+            <button
+              onClick={() => copyToClipboard(joinUrl)}
+              className="font-mono text-purple-400 hover:text-purple-300 underline cursor-pointer break-all"
+            >
+              {joinUrl}
+            </button>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <Button
               onClick={openInNewWindow}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+              size="sm"
+              className="bg-purple-600 hover:bg-purple-700 text-white text-xs"
             >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Open in New Window
+              <ExternalLink className="w-3 h-3 mr-1" />
+              Open
             </Button>
             
             <Button
-              onClick={() => copyToClipboard(session.id.slice(0, 8).toUpperCase())}
+              onClick={() => copyToClipboard(sessionCode)}
+              size="sm"
               variant="outline"
-              className="border-gray-600 text-gray-300 hover:bg-gray-700"
+              className="border-gray-600 text-gray-300 hover:bg-gray-700 text-xs"
             >
-              <Copy className="w-4 h-4 mr-2" />
-              Copy Code
+              <Copy className="w-3 h-3 mr-1" />
+              Code
             </Button>
-          </div>
-
-          <div className="text-center">
-            <p className="text-gray-400 text-xs">
-              Participants can join by scanning the QR code or entering session code: 
-              <span className="font-mono font-bold text-white ml-1">
-                {session.id.slice(0, 8).toUpperCase()}
-              </span>
-            </p>
+            
+            <Button
+              onClick={() => copyToClipboard(joinUrl)}
+              size="sm"
+              variant="outline"
+              className="border-gray-600 text-gray-300 hover:bg-gray-700 text-xs"
+            >
+              <Copy className="w-3 h-3 mr-1" />
+              Link
+            </Button>
           </div>
         </div>
       </DialogContent>
