@@ -1,6 +1,9 @@
 // Test script for generateSommelierTips function
 // Run with: npx tsx test-sommelier-tips.ts
 
+// Load environment variables first
+import 'dotenv/config';
+
 import { generateSommelierTips } from './server/storage';
 
 async function testSommelierTips() {
