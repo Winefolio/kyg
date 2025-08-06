@@ -28,6 +28,7 @@ import {
   media,
   glossaryTerms,
   wineCharacteristics,
+  wineResponseAnalytics,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull, isNotNull } from "drizzle-orm";
@@ -139,6 +140,14 @@ export interface IStorage {
   getAggregatedSessionAnalytics(sessionId: string): Promise<any>;
   getParticipantAnalytics(sessionId: string, participantId: string): Promise<any>;
   getSessionResponses(sessionId: string): Promise<any[]>;
+  getSessionCompletionStatus(sessionId: string, wineId: string): Promise<any>;
+  
+  // Sentiment analysis methods
+  getWineTextResponses(sessionId: string, wineId: string): Promise<any[]>;
+  saveSentimentAnalysis(sessionId: string, wineId: string, results: any[]): Promise<void>;
+  
+  // Step 4: Average calculation methods
+  calculateWineQuestionAverages(sessionId: string, wineId: string): Promise<any[]>;
 
   // Package management for sommelier dashboard
   getAllPackages(): Promise<Package[]>;
@@ -2252,6 +2261,555 @@ export class DatabaseStorage implements IStorage {
         answeredAt: response.answeredAt,
       };
     });
+  }
+
+  // Get completion status for all participants in a session for a specific wine
+  async getSessionCompletionStatus(sessionId: string, wineId: string): Promise<any> {
+    // 1. Validate session exists and get the actual session UUID
+    const session = await this.getSessionById(sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    // Use the actual session UUID for subsequent queries
+    const actualSessionId = session.id;
+
+    // 2. Get all participants for this session (excluding hosts)
+    const sessionParticipants = await db
+      .select()
+      .from(participants)
+      .where(and(
+        eq(participants.sessionId, actualSessionId),
+        eq(participants.isHost, false)
+      ));
+
+    // 3. Get all question slides for this specific wine
+    const wineQuestionSlides = await db
+      .select({
+        id: slides.id,
+        position: slides.position,
+        globalPosition: slides.globalPosition
+      })
+      .from(slides)
+      .where(and(
+        eq(slides.packageWineId, wineId),
+        eq(slides.type, "question")
+      ))
+      .orderBy(slides.globalPosition);
+
+    if (wineQuestionSlides.length === 0) {
+      return {
+        sessionId,
+        wineId,
+        totalParticipants: sessionParticipants.length,
+        completedParticipants: [],
+        pendingParticipants: sessionParticipants.map(p => ({
+          id: p.id,
+          displayName: p.displayName,
+          email: p.email,
+          questionsAnswered: 0,
+          totalQuestions: 0
+        })),
+        allCompleted: false,
+        completionPercentage: 0
+      };
+    }
+
+    const slideIds = wineQuestionSlides.map(s => s.id);
+    const totalQuestions = wineQuestionSlides.length;
+
+    // 4. Get all responses from all participants for these wine question slides
+    const wineResponses = await db
+      .select({
+        participantId: responses.participantId,
+        slideId: responses.slideId
+      })
+      .from(responses)
+      .where(and(
+        inArray(responses.participantId, sessionParticipants.map(p => p.id)),
+        inArray(responses.slideId, slideIds)
+      ));
+
+    // 5. Calculate completion status for each participant
+    const participantCompletionMap = new Map();
+    
+    // Initialize all participants with zero responses
+    sessionParticipants.forEach(participant => {
+      participantCompletionMap.set(participant.id, {
+        id: participant.id,
+        displayName: participant.displayName,
+        email: participant.email,
+        questionsAnswered: 0,
+        totalQuestions,
+        completedAt: null
+      });
+    });
+
+    // Count responses for each participant
+    wineResponses.forEach(response => {
+      const participantData = participantCompletionMap.get(response.participantId);
+      if (participantData) {
+        participantData.questionsAnswered += 1;
+      }
+    });
+
+    // 6. Separate completed and pending participants
+    const completedParticipants: any[] = [];
+    const pendingParticipants: any[] = [];
+    
+    participantCompletionMap.forEach(participantData => {
+      if (participantData.questionsAnswered >= totalQuestions) {
+        completedParticipants.push(participantData);
+      } else {
+        pendingParticipants.push(participantData);
+      }
+    });
+
+    const allCompleted = completedParticipants.length === sessionParticipants.length;
+    const completionPercentage = sessionParticipants.length > 0 
+      ? Math.round((completedParticipants.length / sessionParticipants.length) * 100)
+      : 0;
+
+    return {
+      sessionId: actualSessionId,
+      originalSessionId: sessionId, // Keep the original input for reference
+      wineId,
+      totalParticipants: sessionParticipants.length,
+      completedParticipants,
+      pendingParticipants,
+      allCompleted,
+      completionPercentage,
+      wineQuestions: {
+        totalQuestions,
+        questionSlides: wineQuestionSlides
+      }
+    };
+  }
+
+  // Sentiment analysis methods for Step 3
+  async getWineTextResponses(sessionId: string, wineId: string): Promise<any[]> {
+    // 1. Get session and validate
+    const session = await this.getSessionById(sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    // Use the actual session UUID for database queries
+    const actualSessionId = session.id;
+
+    // 2. Get all participants for this session (excluding hosts)
+    const sessionParticipants = await db
+      .select()
+      .from(participants)
+      .where(and(
+        eq(participants.sessionId, actualSessionId),
+        eq(participants.isHost, false)
+      ));
+
+    if (sessionParticipants.length === 0) {
+      return [];
+    }
+
+    // 3. Get all text question slides for this wine
+    const textQuestionSlides = await db
+      .select({
+        id: slides.id,
+        payloadJson: slides.payloadJson,
+        genericQuestions: slides.genericQuestions
+      })
+      .from(slides)
+      .where(and(
+        eq(slides.packageWineId, wineId),
+        eq(slides.type, "question")
+      ));
+
+    // Filter to only text questions
+    const textSlides = textQuestionSlides.filter(slide => {
+      // Check generic questions format
+      if (slide.genericQuestions && typeof slide.genericQuestions === 'object') {
+        const genericQ = slide.genericQuestions as any;
+        if (genericQ.format === 'text') {
+          return true;
+        }
+      }
+      
+      // Check legacy payloadJson format
+      const payload = slide.payloadJson as any;
+      return payload?.questionType === 'text' || 
+             payload?.question_type === 'text' ||
+             payload?.questionType === 'free_response' || 
+             payload?.question_type === 'free_response';
+    });
+
+    if (textSlides.length === 0) {
+      return [];
+    }
+
+    const textSlideIds = textSlides.map(s => s.id);
+
+    // 4. Get all text responses from participants for these slides
+    const textResponses = await db
+      .select({
+        slideId: responses.slideId,
+        participantId: responses.participantId,
+        answerJson: responses.answerJson,
+        createdAt: responses.answeredAt,
+        participant: {
+          displayName: participants.displayName,
+          email: participants.email
+        }
+      })
+      .from(responses)
+      .leftJoin(participants, eq(responses.participantId, participants.id))
+      .where(and(
+        inArray(responses.participantId, sessionParticipants.map(p => p.id)),
+        inArray(responses.slideId, textSlideIds)
+      ))
+      .orderBy(responses.answeredAt);
+
+    // 5. Format responses for sentiment analysis
+    return textResponses.map(response => {
+      const slide = textSlides.find(s => s.id === response.slideId);
+      let questionText = 'Unknown Question';
+      
+      if (slide?.genericQuestions && typeof slide.genericQuestions === 'object') {
+        const genericQ = slide.genericQuestions as any;
+        if (genericQ.config?.title) {
+          questionText = genericQ.config.title;
+        }
+      } else if (slide?.payloadJson) {
+        const payload = slide.payloadJson as any;
+        questionText = payload.title || payload.question || 'Unknown Question';
+      }
+
+      return {
+        slideId: response.slideId,
+        participantId: response.participantId,
+        participantName: response.participant?.displayName || 'Anonymous',
+        questionText,
+        answerText: typeof response.answerJson === 'string' 
+          ? response.answerJson 
+          : ((response.answerJson as any)?.text || (response.answerJson as any)?.answer || String(response.answerJson || '')),
+        timestamp: response.createdAt
+      };
+    });
+  }
+
+  async saveSentimentAnalysis(sessionId: string, wineId: string, results: any[]): Promise<void> {
+    // For now, we'll just log the sentiment analysis results
+    // In a production system, you would store these in a dedicated sentiment_analytics table
+    
+    const session = await this.getSessionById(sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    console.log(`✅ Would save ${results.length} sentiment analysis results for wine ${wineId} in session ${sessionId}`);
+    console.log('Sentiment results:', results);
+    
+    // TODO: Create a proper sentiment_analytics table and store results there
+    // For now, just acknowledge the analysis was completed
+  }
+
+  // Step 4: Average calculation methods
+  async calculateWineQuestionAverages(sessionId: string, wineId: string): Promise<any[]> {
+    // 1. Get session and validate
+    const session = await this.getSessionById(sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    // Use the actual session UUID for database queries
+    const actualSessionId = session.id;
+
+    // 2. Get all participants for this session (excluding hosts)
+    const sessionParticipants = await db
+      .select()
+      .from(participants)
+      .where(and(
+        eq(participants.sessionId, actualSessionId),
+        eq(participants.isHost, false)
+      ));
+
+    if (sessionParticipants.length === 0) {
+      return [];
+    }
+
+    // 3. Get all question slides for this wine
+    const wineQuestionSlides = await db
+      .select({
+        id: slides.id,
+        position: slides.position,
+        globalPosition: slides.globalPosition,
+        type: slides.type,
+        payloadJson: slides.payloadJson,
+        genericQuestions: slides.genericQuestions
+      })
+      .from(slides)
+      .where(and(
+        eq(slides.packageWineId, wineId),
+        eq(slides.type, "question")
+      ))
+      .orderBy(slides.globalPosition);
+
+    if (wineQuestionSlides.length === 0) {
+      return [];
+    }
+
+    const slideIds = wineQuestionSlides.map(s => s.id);
+    const participantIds = sessionParticipants.map(p => p.id);
+
+    // 4. Get all responses for these questions
+    const allResponses = await db
+      .select({
+        slideId: responses.slideId,
+        participantId: responses.participantId,
+        answerJson: responses.answerJson,
+        answeredAt: responses.answeredAt
+      })
+      .from(responses)
+      .where(and(
+        inArray(responses.slideId, slideIds),
+        inArray(responses.participantId, participantIds)
+      ));
+
+    // 5. Calculate averages for each question slide
+    const questionAverages = [];
+
+    for (const slide of wineQuestionSlides) {
+      const slideResponses = allResponses.filter(r => r.slideId === slide.id);
+      
+      if (slideResponses.length === 0) {
+        // No responses yet
+        questionAverages.push({
+          slideId: slide.id,
+          position: slide.position,
+          globalPosition: slide.globalPosition,
+          questionType: this.getQuestionType(slide),
+          questionTitle: this.getQuestionTitle(slide),
+          totalResponses: 0,
+          averageScore: null,
+          responseDistribution: {},
+          timestamp: new Date().toISOString()
+        });
+        continue;
+      }
+
+      const questionType = this.getQuestionType(slide);
+      let averageScore: number | null = null;
+      let responseDistribution: any = {};
+
+      switch (questionType) {
+        case 'scale':
+          averageScore = this.calculateScaleAverage(slideResponses);
+          responseDistribution = this.getScaleDistribution(slideResponses);
+          break;
+
+        case 'multiple_choice':
+          responseDistribution = this.getMultipleChoiceDistribution(slideResponses, slide);
+          averageScore = this.calculateMultipleChoiceScore(responseDistribution);
+          break;
+
+        case 'boolean':
+          responseDistribution = this.getBooleanDistribution(slideResponses);
+          averageScore = this.calculateBooleanScore(responseDistribution);
+          break;
+
+        case 'text':
+          // For text questions, try to get sentiment scores if available
+          const sentimentAverage = await this.calculateTextSentimentAverage(sessionId, wineId, slide.id);
+          averageScore = sentimentAverage;
+          responseDistribution = { textResponseCount: slideResponses.length };
+          break;
+
+        default:
+          // Generic handling for unknown question types
+          averageScore = null;
+          responseDistribution = { unknownType: slideResponses.length };
+      }
+
+      questionAverages.push({
+        slideId: slide.id,
+        position: slide.position,
+        globalPosition: slide.globalPosition,
+        questionType,
+        questionTitle: this.getQuestionTitle(slide),
+        totalResponses: slideResponses.length,
+        averageScore,
+        responseDistribution,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    return questionAverages;
+  }
+
+  // Helper methods for Step 4 calculations
+  private getQuestionType(slide: any): string {
+    // Check genericQuestions first
+    if (slide.genericQuestions && typeof slide.genericQuestions === 'object') {
+      const genericQ = slide.genericQuestions as any;
+      if (genericQ.question_type) return genericQ.question_type;
+      if (genericQ.format === 'text') return 'text';
+    }
+
+    // Check payloadJson
+    if (slide.payloadJson && typeof slide.payloadJson === 'object') {
+      const payload = slide.payloadJson as any;
+      if (payload.question_type) return payload.question_type;
+      if (payload.questionType) return payload.questionType;
+    }
+
+    return 'unknown';
+  }
+
+  private getQuestionTitle(slide: any): string {
+    // Check genericQuestions first
+    if (slide.genericQuestions && typeof slide.genericQuestions === 'object') {
+      const genericQ = slide.genericQuestions as any;
+      if (genericQ.title) return genericQ.title;
+      if (genericQ.config?.title) return genericQ.config.title;
+    }
+
+    // Check payloadJson
+    if (slide.payloadJson && typeof slide.payloadJson === 'object') {
+      const payload = slide.payloadJson as any;
+      if (payload.title) return payload.title;
+      if (payload.question) return payload.question;
+    }
+
+    return 'Untitled Question';
+  }
+
+  private calculateScaleAverage(responses: any[]): number {
+    const validScores = responses
+      .map(r => {
+        let score: number;
+        if (typeof r.answerJson === 'number') {
+          score = r.answerJson;
+        } else if (r.answerJson && typeof r.answerJson === 'object') {
+          const answerObj = r.answerJson as any;
+          score = answerObj.value || answerObj.selectedScore || answerObj.score || 0;
+        } else {
+          score = 0;
+        }
+        
+        // Clamp to reasonable scale range (1-10)
+        return Math.max(1, Math.min(10, score));
+      })
+      .filter(score => score > 0);
+
+    if (validScores.length === 0) return 0;
+    
+    const sum = validScores.reduce((acc, score) => acc + score, 0);
+    return Math.round((sum / validScores.length) * 100) / 100; // Round to 2 decimal places
+  }
+
+  private getScaleDistribution(responses: any[]): any {
+    const distribution: { [key: string]: number } = {};
+    
+    responses.forEach(r => {
+      let score: number;
+      if (typeof r.answerJson === 'number') {
+        score = r.answerJson;
+      } else if (r.answerJson && typeof r.answerJson === 'object') {
+        const answerObj = r.answerJson as any;
+        score = answerObj.value || answerObj.selectedScore || answerObj.score || 0;
+      } else {
+        score = 0;
+      }
+      
+      // Clamp to reasonable range
+      score = Math.max(1, Math.min(10, score));
+      const scoreKey = score.toString();
+      distribution[scoreKey] = (distribution[scoreKey] || 0) + 1;
+    });
+
+    return distribution;
+  }
+
+  private getMultipleChoiceDistribution(responses: any[], slide: any): any {
+    const distribution: { [key: string]: number } = {};
+    
+    responses.forEach(r => {
+      if (r.answerJson && typeof r.answerJson === 'object') {
+        const answerObj = r.answerJson as any;
+        
+        // Handle different multiple choice answer formats
+        if (answerObj.selectedOptionId) {
+          const optionId = answerObj.selectedOptionId;
+          distribution[optionId] = (distribution[optionId] || 0) + 1;
+        } else if (answerObj.selectedOptionIds && Array.isArray(answerObj.selectedOptionIds)) {
+          // Multi-select
+          answerObj.selectedOptionIds.forEach((id: string) => {
+            distribution[id] = (distribution[id] || 0) + 1;
+          });
+        } else if (answerObj.selectedOptions && Array.isArray(answerObj.selectedOptions)) {
+          answerObj.selectedOptions.forEach((option: any) => {
+            const optionId = option.id || option;
+            distribution[optionId] = (distribution[optionId] || 0) + 1;
+          });
+        }
+      }
+    });
+
+    return distribution;
+  }
+
+  private calculateMultipleChoiceScore(distribution: any): number {
+    // For multiple choice, we can calculate a "popularity score" 
+    // based on the most selected options
+    const totalResponses = Object.values(distribution).reduce((sum: number, count: any) => sum + count, 0);
+    if (totalResponses === 0) return 0;
+
+    // Get the highest count
+    const maxCount = Math.max(...Object.values(distribution) as number[]);
+    
+    // Calculate percentage of consensus (0-10 scale)
+    const consensusPercentage = (maxCount / totalResponses);
+    return Math.round(consensusPercentage * 10 * 100) / 100; // Scale to 0-10, round to 2 decimals
+  }
+
+  private getBooleanDistribution(responses: any[]): any {
+    const distribution: { [key: string]: number } = { true: 0, false: 0 };
+    
+    responses.forEach(r => {
+      if (r.answerJson && typeof r.answerJson === 'object') {
+        const answerObj = r.answerJson as any;
+        const value = answerObj.value || answerObj.answer;
+        
+        if (typeof value === 'boolean') {
+          distribution[value.toString()] += 1;
+        } else if (typeof value === 'string') {
+          const lowerValue = value.toLowerCase();
+          if (lowerValue === 'yes' || lowerValue === 'true') {
+            distribution.true += 1;
+          } else if (lowerValue === 'no' || lowerValue === 'false') {
+            distribution.false += 1;
+          }
+        }
+      }
+    });
+
+    return distribution;
+  }
+
+  private calculateBooleanScore(distribution: any): number {
+    const total = distribution.true + distribution.false;
+    if (total === 0) return 0;
+    
+    // Return percentage of "true" responses (0-10 scale)
+    const truePercentage = distribution.true / total;
+    return Math.round(truePercentage * 10 * 100) / 100;
+  }
+
+  private async calculateTextSentimentAverage(sessionId: string, wineId: string, slideId: string): Promise<number | null> {
+    // For now, since we don't have a proper sentiment analytics table,
+    // we'll return null and let the text questions show as "text responses"
+    // In a production system, you would have a dedicated sentiment_analytics table
+    
+    console.log(`📊 Text sentiment average calculation not available yet for slide ${slideId}`);
+    return null; // Will be implemented when proper analytics table is created
   }
 
   // Package management methods for sommelier dashboard

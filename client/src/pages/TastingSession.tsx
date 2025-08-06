@@ -20,6 +20,7 @@ import { DynamicTextRenderer } from "@/components/ui/DynamicTextRenderer";
 import { WineTransition } from "@/components/WineTransition";
 import { WineIntroduction } from "@/components/WineIntroduction";
 import { SectionTransition } from "@/components/SectionTransition";
+import { WineCompletionStatus } from "@/components/WineCompletionStatus";
 import { VideoMessageSlide } from "@/components/slides/VideoMessageSlide";
 import { AudioMessageSlide } from "@/components/slides/AudioMessageSlide";
 import { TransitionSlide } from "@/components/slides/TransitionSlide";
@@ -77,9 +78,225 @@ export default function TastingSession() {
     isFirstWine: boolean;
   } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Timer state for blocking wine completion screen
+  const [blockingTimer, setBlockingTimer] = useState(120); // 2 minutes in seconds
+  const [showSkipButton, setShowSkipButton] = useState(false); // Show skip button after timer starts running
+  
+  // Wine completion tracking state
+  const [currentWineCompletionStatus, setCurrentWineCompletionStatus] = useState<{
+    wineId: string | null;
+    isParticipantFinished: boolean;
+    showingCompletionStatus: boolean;
+    hasTriggeredProcessing: boolean; // Add flag to prevent double-triggering
+    isBlocking: boolean; // Add flag to block navigation until skip/timer expires
+    showingAverages: boolean; // Add flag to show averages after processing
+    averagesData: any; // Store the calculated averages
+    isLoadingAverages: boolean; // Add flag to show loading state when calculating averages
+  }>({
+    wineId: null,
+    isParticipantFinished: false,
+    showingCompletionStatus: false,
+    hasTriggeredProcessing: false,
+    isBlocking: false,
+    showingAverages: false,
+    averagesData: null,
+    isLoadingAverages: false
+  });
+  
   const { saveResponse, syncStatus, initializeForSession, endSession } = useSessionPersistence();
   const { triggerHaptic } = useHaptics();
   const queryClient = useQueryClient();
+
+  // Step 3: Sentiment Analysis Mutation
+  const sentimentAnalysisMutation = useMutation({
+    mutationFn: async ({ sessionId, wineId }: { sessionId: string; wineId: string }) => {
+      return await apiRequest('POST', `/api/sessions/${sessionId}/wines/${wineId}/sentiment-analysis`, {});
+    },
+    onSuccess: (data, variables) => {
+      console.log('🎯 Sentiment analysis completed for wine:', variables.wineId, data);
+    },
+    onError: (error) => {
+      console.error('❌ Sentiment analysis failed:', error);
+      // Non-blocking error - sentiment analysis is supplementary
+    }
+  });
+
+  // Step 4: Average Calculation Mutation
+  const averageCalculationMutation = useMutation({
+    mutationFn: async ({ sessionId, wineId }: { sessionId: string; wineId: string }) => {
+      console.log('🚀 Making averages API call for:', { sessionId, wineId });
+      const response = await apiRequest('POST', `/api/sessions/${sessionId}/wines/${wineId}/calculate-averages`, {});
+      const data = await response.json();
+      console.log('🚀 Raw response before parsing:', data);
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      console.log('🧮 Step 6: Average calculation completed for wine:', variables.wineId);
+      console.log('🧮 Step 6: Raw API response structure:', JSON.stringify(data, null, 2));
+      
+      // Enhanced data parsing to match the backend's new format
+      let averagesData;
+      if (data && typeof data === 'object') {
+        // The backend now returns data in enhanced format with multiple access paths
+        const apiData = data as any;
+        
+        console.log('🔍 Step 6: Debug parsing - apiData keys:', Object.keys(apiData));
+        console.log('🔍 Step 6: Debug parsing - apiData.questions exists:', !!apiData.questions);
+        console.log('🔍 Step 6: Debug parsing - apiData.questions type:', typeof apiData.questions);
+        console.log('🔍 Step 6: Debug parsing - apiData.questions keys length:', apiData.questions ? Object.keys(apiData.questions).length : 'N/A');
+        
+        // FIXED: Always try to find valid data instead of falling back to errors
+        // Try all possible data access paths from backend
+        if (apiData.questions && typeof apiData.questions === 'object' && Object.keys(apiData.questions).length > 0) {
+          // Primary path: questions object with question details
+          averagesData = {
+            questions: apiData.questions,
+            data: apiData.questions,
+            averages: apiData.questions,
+            sessionId: apiData.sessionId,
+            wineId: apiData.wineId,
+            totalQuestions: apiData.totalQuestions,
+            scaleQuestions: apiData.scaleQuestions,
+            timestamp: apiData.timestamp
+          };
+          console.log('✅ Step 6: Using questions data path with', Object.keys(apiData.questions).length, 'questions');
+        } else if (apiData.data && typeof apiData.data === 'object' && Object.keys(apiData.data).length > 0) {
+          // Alternative path 1: data object
+          averagesData = {
+            questions: apiData.data,
+            data: apiData.data,
+            averages: apiData.data,
+            sessionId: apiData.sessionId,
+            wineId: apiData.wineId,
+            totalQuestions: apiData.totalQuestions,
+            scaleQuestions: apiData.scaleQuestions,
+            timestamp: apiData.timestamp
+          };
+          console.log('✅ Step 6: Using data object path');
+        } else if (apiData.averages && typeof apiData.averages === 'object' && Object.keys(apiData.averages).length > 0) {
+          // Alternative path 2: averages object  
+          averagesData = {
+            questions: apiData.averages,
+            data: apiData.averages,
+            averages: apiData.averages,
+            sessionId: apiData.sessionId,
+            wineId: apiData.wineId,
+            totalQuestions: apiData.totalQuestions,
+            scaleQuestions: apiData.scaleQuestions,
+            timestamp: apiData.timestamp
+          };
+          console.log('✅ Step 6: Using averages object path');
+        } else if (apiData.results && Array.isArray(apiData.results) && apiData.results.length > 0) {
+          // Handle array format from backend
+          console.log('🔄 Step 6: Using results array path with', apiData.results.length, 'total results');
+          const questionsObj: Record<string, any> = {};
+          apiData.results.forEach((result: any, index: number) => {
+            if (result.questionType === 'scale' && result.averageScore !== null && result.averageScore !== undefined) {
+              const questionId = result.slideId || `question-${index}`;
+              questionsObj[questionId] = {
+                id: questionId,
+                questionId: questionId,
+                slideId: result.slideId,
+                questionTitle: result.questionTitle,
+                title: result.questionTitle,
+                question: result.questionTitle,
+                average: result.averageScore,
+                avg: result.averageScore,
+                value: result.averageScore,
+                participantCount: result.totalResponses,
+                participants: result.totalResponses,
+                count: result.totalResponses,
+                responseCount: result.totalResponses,
+                scaleMax: 10,
+                scale_max: 10,
+                questionType: result.questionType,
+                responseDistribution: result.responseDistribution,
+                timestamp: result.timestamp
+              };
+            }
+          });
+          
+          if (Object.keys(questionsObj).length > 0) {
+            averagesData = {
+              questions: questionsObj,
+              data: questionsObj,
+              averages: questionsObj,
+              sessionId: apiData.sessionId,
+              wineId: apiData.wineId,
+              totalQuestions: apiData.results.length,
+              scaleQuestions: Object.keys(questionsObj).length,
+              timestamp: apiData.timestamp
+            };
+            console.log('✅ Step 6: Using results array path with', Object.keys(questionsObj).length, 'scale questions');
+          } else {
+            // Even if no scale questions, show something rather than error
+            averagesData = {
+              questions: {},
+              data: apiData,
+              averages: apiData,
+              sessionId: apiData.sessionId,
+              wineId: apiData.wineId,
+              totalQuestions: apiData.results?.length || 0,
+              scaleQuestions: 0,
+              timestamp: apiData.timestamp,
+              message: 'No scale questions found for this wine'
+            };
+            console.log('⚠️ Step 6: No scale questions in results array, but showing empty state');
+          }
+        } else {
+          // Last resort: show the raw data without error
+          console.log('⚠️ Step 6: Using fallback raw data - no structured questions found');
+          console.log('⚠️ Step 6: Available data keys:', Object.keys(apiData));
+          averagesData = {
+            questions: {},
+            data: apiData,
+            averages: apiData,
+            sessionId: apiData.sessionId,
+            wineId: apiData.wineId,
+            totalQuestions: apiData.totalQuestions || 0,
+            scaleQuestions: apiData.scaleQuestions || 0,
+            timestamp: apiData.timestamp,
+            message: 'Raw data available but no structured averages'
+          };
+          console.log('⚠️ Step 6: Using raw data fallback');
+        }
+      } else {
+        // Handle invalid response format, but don't show error - show empty state
+        console.log('⚠️ Step 6: Invalid API response format, showing empty state');
+        averagesData = {
+          questions: {},
+          data: {},
+          averages: {},
+          message: 'No data received from server'
+        };
+      }
+      
+      console.log('🧮 Step 6: Final processed averages data for display:', JSON.stringify(averagesData, null, 2));
+      
+      // ALWAYS show the averages modal, even if there are no questions
+      setCurrentWineCompletionStatus(prev => ({
+        ...prev,
+        showingAverages: true,
+        averagesData: averagesData,
+        isBlocking: false, // Stop blocking timer
+        isLoadingAverages: false // Stop showing loading state
+      }));
+      
+      console.log('🧮 Step 6: Averages modal should now be visible');
+    },
+    onError: (error) => {
+      console.error('❌ Step 6: Average calculation failed:', error);
+      // Even if averages fail, we should still show the modal with an error message
+      setCurrentWineCompletionStatus(prev => ({
+        ...prev,
+        showingAverages: true,
+        averagesData: { error: 'Failed to calculate averages' },
+        isBlocking: false, // Stop blocking timer, but start blocking with error message
+        isLoadingAverages: false // Stop showing loading state
+      }));
+    }
+  });
 
   // Initialize session storage when component mounts
   useEffect(() => {
@@ -402,6 +619,104 @@ export default function TastingSession() {
     // Extract processed data
     const { slides, wines, sortedSlidesByWine, packageIntroSlides, getSlideSection, isLastSlideOfSection } = processedSlidesData;
 
+  // Wine completion tracking function - defined as callback to follow Rules of Hooks
+  const checkWineCompletion = useCallback((wineId: string): boolean => {
+    if (!wineId || !slides || slides.length === 0 || !responses) {
+      console.log('🍷 Wine completion check failed - missing data:', {
+        wineId: !!wineId,
+        slides: slides?.length || 0,
+        responses: responses?.length || 0
+      });
+      return false;
+    }
+    
+    try {
+      // Get all question slides for this wine
+      const wineQuestionSlides = slides.filter(slide => 
+        slide.packageWineId === wineId && slide.type === 'question'
+      );
+      
+      if (wineQuestionSlides.length === 0) {
+        console.log('🍷 Wine completion check - no question slides found for wine:', wineId);
+        return false;
+      }
+      
+      // Check if we have responses for all question slides
+      const answeredSlideIds = new Set(responses.map((r: any) => r.slideId));
+      const answeredQuestionSlides = wineQuestionSlides.filter(slide => 
+        answeredSlideIds.has(slide.id)
+      );
+      const allQuestionsAnswered = wineQuestionSlides.length === answeredQuestionSlides.length;
+      
+      console.log('🍷 Wine completion check:', {
+        wineId,
+        totalQuestions: wineQuestionSlides.length,
+        answeredQuestions: answeredQuestionSlides.length,
+        allCompleted: allQuestionsAnswered,
+        currentSlideId: currentSlide?.id,
+        currentSlideWineId: currentSlide?.packageWineId,
+        questionSlideIds: wineQuestionSlides.map(s => s.id),
+        answeredSlideIds: Array.from(answeredSlideIds)
+      });
+      
+      return allQuestionsAnswered;
+    } catch (error) {
+      console.error('Error checking wine completion:', error);
+      return false;
+    }
+  }, [slides, responses]);
+
+  // Helper function to check if current slide is the last slide of current wine
+  const isLastSlideOfCurrentWine = useCallback((slideIndex: number, currentWineId?: string): boolean => {
+    if (!slides || slideIndex < 0 || slideIndex >= slides.length || !currentWineId) {
+      return false;
+    }
+    
+    // Find all slides for current wine
+    const wineSlides = slides.filter(slide => slide.packageWineId === currentWineId);
+    if (wineSlides.length === 0) return false;
+    
+    // Get the last slide of this wine
+    const lastWineSlide = wineSlides[wineSlides.length - 1];
+    const lastWineSlideIndex = slides.findIndex(slide => slide.id === lastWineSlide.id);
+    
+    const isLast = slideIndex === lastWineSlideIndex;
+    
+    console.log('🍷 isLastSlideOfCurrentWine check:', {
+      wineId: currentWineId,
+      currentSlideIndex: slideIndex,
+      lastWineSlideIndex,
+      totalWineSlides: wineSlides.length,
+      isLastSlide: isLast,
+      currentSlideId: slides[slideIndex]?.id,
+      lastSlideId: lastWineSlide.id
+    });
+    
+    return isLast;
+  }, [slides]);
+
+  // Helper function to check if navigating to next slide would leave current wine
+  const isNavigatingToNextWine = useCallback((currentIndex: number): boolean => {
+    if (!slides || currentIndex < 0 || currentIndex >= slides.length - 1) {
+      return false;
+    }
+    
+    const currentSlideWineId = slides[currentIndex]?.packageWineId;
+    const nextSlideWineId = slides[currentIndex + 1]?.packageWineId;
+    
+    const isLeavingWine = currentSlideWineId && nextSlideWineId && currentSlideWineId !== nextSlideWineId;
+    
+    console.log('🔄 isNavigatingToNextWine check:', {
+      currentIndex,
+      currentSlideWineId,
+      nextSlideWineId,
+      isLeavingWine,
+      nextSlideIndex: currentIndex + 1
+    });
+    
+    return isLeavingWine;
+  }, [slides]);
+
   // Prefetch upcoming media when slide changes or slides are loaded
   useEffect(() => {
     if (slides && slides.length > 0 && currentSlideIndex >= 0) {
@@ -508,6 +823,132 @@ export default function TastingSession() {
     }
   }, [responses, slides]);
 
+  // CRITICAL STATE CALCULATION - moved before early returns for hooks consistency
+  const currentSlide = slides && slides[currentSlideIndex] ? slides[currentSlideIndex] : null;
+  
+  // Reset wine completion status when changing wines (simplified logic)
+  useEffect(() => {
+    if (!currentSlide || !sessionId || !participantId || !slides || slides.length === 0) return;
+    
+    const currentWineId = currentSlide.packageWineId;
+    if (!currentWineId) {
+      console.log('🍷 Wine completion check: No current wine ID from slide - resetting status');
+      setCurrentWineCompletionStatus(prev => ({
+        ...prev,
+        wineId: null,
+        isParticipantFinished: false,
+        showingCompletionStatus: false,
+        hasTriggeredProcessing: false,
+        isBlocking: false,
+        showingAverages: false,
+        averagesData: null
+      }));
+      return;
+    }
+    
+    // Only reset status when changing to a different wine (don't trigger blocking here)
+    setCurrentWineCompletionStatus(prev => {
+      if (prev.wineId !== currentWineId) {
+        console.log('🍷 Wine changed - resetting completion status:', {
+          from: prev.wineId,
+          to: currentWineId
+        });
+        return {
+          wineId: currentWineId,
+          isParticipantFinished: false,
+          showingCompletionStatus: false,
+          hasTriggeredProcessing: false,
+          isBlocking: false,
+          showingAverages: false,
+          averagesData: null,
+          isLoadingAverages: false
+        };
+      }
+      return prev;
+    });
+    
+  }, [currentSlide?.packageWineId, sessionId, participantId, slides]);
+
+  // Timer countdown for blocking wine completion screen
+  useEffect(() => {
+    if (!currentWineCompletionStatus.isBlocking) {
+      setBlockingTimer(120); // Reset timer when not blocking
+      setShowSkipButton(false); // Reset skip button visibility
+      return;
+    }
+
+    console.log('⏰ Step 5: Starting countdown timer');
+    
+    // Show skip button immediately when timer starts running (as per requirement)
+    setShowSkipButton(true);
+    console.log('⏰ Step 5: Skip button is now available');
+    
+    const interval = setInterval(() => {
+      setBlockingTimer((prev) => {
+        if (prev <= 1) {
+          // Timer expired, trigger processing
+          console.log('⏰ Step 5: Timer expired, triggering processing');
+          const wineId = currentWineCompletionStatus.wineId;
+          if (wineId) {
+            handleWineCompletionTimerExpired();
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      console.log('⏰ Step 5: Cleaning up timer');
+      clearInterval(interval);
+    };
+  }, [currentWineCompletionStatus.isBlocking, currentWineCompletionStatus.wineId]);
+
+  // Format timer display
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Step 5: Wine completion polling - DISABLED (no longer using blocking approach)
+  useEffect(() => {
+    // Polling functionality removed - Group Results are triggered directly
+    return;
+  }, []);
+
+  // Step 3: Auto-trigger sentiment analysis and averages when blocking starts
+  useEffect(() => {
+    if (!sessionId || !currentWineCompletionStatus.wineId || !currentWineCompletionStatus.isBlocking || currentWineCompletionStatus.hasTriggeredProcessing) {
+      return;
+    }
+
+    // Only trigger when blocking starts for the first time
+    const wineId = currentWineCompletionStatus.wineId;
+    
+    console.log('🍷 Step 5: Wine completion blocking started - triggering auto-processing for wine:', wineId);
+    
+    // Mark as triggered immediately to prevent multiple calls
+    setCurrentWineCompletionStatus(prev => ({
+      ...prev,
+      hasTriggeredProcessing: true
+    }));
+    
+    // Debounce to prevent multiple triggers
+    const timeoutId = setTimeout(() => {
+      console.log('📊 Step 3: Auto-triggering sentiment analysis for wine:', wineId);
+      sentimentAnalysisMutation.mutate({ sessionId, wineId });
+      
+      // Step 4: Also trigger average calculation after sentiment analysis
+      setTimeout(() => {
+        console.log('🧮 Step 4: Auto-triggering average calculation for wine:', wineId);
+        averageCalculationMutation.mutate({ sessionId, wineId });
+      }, 500); // Small delay after sentiment analysis
+    }, 1000); // 1 second delay to ensure responses are saved
+
+    return () => clearTimeout(timeoutId);
+  }, [sessionId, currentWineCompletionStatus.wineId, currentWineCompletionStatus.isBlocking, currentWineCompletionStatus.hasTriggeredProcessing, sentimentAnalysisMutation, averageCalculationMutation]);
+
   if (sessionDetailsLoading || isLoading) {
     return (
       <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
@@ -588,20 +1029,6 @@ export default function TastingSession() {
     );
   }
 
-  // CRITICAL STATE CALCULATION
-  const currentSlide = slides && slides[currentSlideIndex] ? slides[currentSlideIndex] : null;
-  // console.log('🔍 [CURRENT SLIDE CALC]:', {
-  //   currentSlideIndex,
-  //   slidesLength: slides?.length,
-  //   currentSlideExists: !!currentSlide,
-  //   currentSlideId: currentSlide?.id,
-  //   currentSlideType: currentSlide?.type,
-  //   currentSlideTitle: currentSlide?.payloadJson?.title,
-  //   isNavigating,
-  //   isSaving,
-  //   timestamp: new Date().toISOString()
-  // });
-  
   // Prevent rendering if slides aren't loaded yet or if we're in an invalid state
   if (!slides || slides.length === 0) {
     // console.log('⚠️ [RENDER GUARD] Preventing render due to missing slides');
@@ -692,29 +1119,70 @@ export default function TastingSession() {
 
   // Navigation functions
   const goToNextSlide = async () => {
-    // console.log('🚀 [NAVIGATION START] goToNextSlide called:', {
-    //   currentSlideIndex,
-    //   totalSlides: slides?.length,
-    //   isSaving,
-    //   isNavigating,
-    //   activeElement: document.activeElement?.tagName,
-    //   activeElementClass: document.activeElement?.className,
-    //   timestamp: new Date().toISOString()
-    // });
+    const currentWineId = currentWine?.id;
+    
+    console.log(' [NAVIGATION START] goToNextSlide called:', {
+      currentSlideIndex,
+      totalSlides: slides?.length,
+      currentWineId,
+      isLastSlideOfWine: isLastSlideOfCurrentWine(currentSlideIndex, currentWineId),
+      isNavigatingToNextWine: isNavigatingToNextWine(currentSlideIndex),
+      timestamp: new Date().toISOString()
+    });
     
     if (!slides || slides.length === 0) return;
     
-    // Don't block navigation for saves - let them happen in background
-    // if (isSaving) {
-    //   console.log('⚠️ [NAVIGATION WITH SAVE] Navigation proceeding while save in progress');
-    // }
+    // CRITICAL: Block navigation if wine completion is blocking OR if showing averages
+    if (currentWineCompletionStatus.isBlocking || currentWineCompletionStatus.showingAverages) {
+      console.log('🚫 Step 5: Navigation blocked - waiting for wine completion timer/skip or averages display', {
+        isBlocking: currentWineCompletionStatus.isBlocking,
+        showingAverages: currentWineCompletionStatus.showingAverages
+      });
+      return;
+    }
     
-    // Check if we're dealing with a text question
-    // if (currentSlide?.type === 'question' && 
-    //     (currentSlide?.payloadJson?.questionType === 'text' || 
-    //      currentSlide?.payloadJson?.question_type === 'text')) {
-    //   console.log('🔍 [TEXT SLIDE] Navigating from text response slide');
-    // }
+    // NEW LOGIC: Check for wine completion at the right time
+    // Case 1: We're at the last slide of the current wine
+    // Case 2: We're navigating to a different wine (transition detection)
+    const shouldCheckWineCompletion = currentWineId && (
+      isLastSlideOfCurrentWine(currentSlideIndex, currentWineId) || 
+      isNavigatingToNextWine(currentSlideIndex)
+    );
+    
+    if (shouldCheckWineCompletion) {
+      const isWineComplete = checkWineCompletion(currentWineId);
+      
+      console.log('🍷 Wine completion check triggered:', {
+        currentWine: currentWineId,
+        wineName: currentWine?.wineName,
+        isWineComplete,
+        isLastSlide: isLastSlideOfCurrentWine(currentSlideIndex, currentWineId),
+        isNavigatingToNext: isNavigatingToNextWine(currentSlideIndex),
+        hasTriggeredProcessing: currentWineCompletionStatus.hasTriggeredProcessing,
+        showingAverages: currentWineCompletionStatus.showingAverages,
+        reason: isLastSlideOfCurrentWine(currentSlideIndex, currentWineId) ? 'last slide of wine' : 'navigating to next wine'
+      });
+      
+      // RESTORED: Show blocking timer after finishing last slide
+      // This matches requirement: "after each wine. After slides of a wine is finished show timer"
+      if (!currentWineCompletionStatus.hasTriggeredProcessing && !currentWineCompletionStatus.showingAverages) {
+        console.log('🍷 Step 5: Triggering wine completion timer for wine (last slide reached):', currentWineId);
+        
+        // Show blocking timer modal
+        setCurrentWineCompletionStatus(prev => ({
+          ...prev,
+          wineId: currentWineId,
+          isParticipantFinished: true,
+          hasTriggeredProcessing: false, // Keep false so auto-processing can trigger
+          isBlocking: true, // Block navigation and show timer modal
+          isLoadingAverages: false
+        }));
+        
+        return; // Block navigation until user skips timer or processing is complete
+      }
+    }
+    
+    console.log('✅ Step 5: Navigation allowed - proceeding to next slide');
     
     if (currentSlideIndex < slides.length - 1) {
       const nextSlide = slides[currentSlideIndex + 1];
@@ -737,7 +1205,7 @@ export default function TastingSession() {
         setTransitionSectionName(nextWine.wineName);
         triggerHaptic('success');
         
-        // Show wine transition for 2.5 seconds, then check if wine introduction needed
+        // Show wine transition for 2.5 seconds, then show wine introduction
         setTimeout(() => {
           const nextWinePosition = nextWine.position; // Use the actual position from the wine object
           const isFirstWine = nextWinePosition === 1;
@@ -755,7 +1223,7 @@ export default function TastingSession() {
             isFirstWine
           });
           setShowingWineIntroduction(true);
-        }, 0);
+        }, 2500); // 2.5 seconds to show the transition properly
       } 
       // Check if we're transitioning to a new section within the same wine
       // ONLY trigger section transition when completing the LAST slide of current section
@@ -934,6 +1402,172 @@ export default function TastingSession() {
     
     // Round to nearest integer for cleaner display
     return Math.round(numericValue);
+  };
+
+  // Step 5: Timer and Skip Option handlers
+  const processTextAnswersAndShowAverages = (wineId: string, trigger: string) => {
+    if (!sessionId) {
+      console.error('❌ Step 5: Cannot process answers - sessionId is undefined');
+      return;
+    }
+    
+    console.log(`🚀 Step 5: Processing text answers and showing averages triggered by: ${trigger} for wine: ${wineId}`);
+    console.log('🧮 Current wine completion status before processing:', currentWineCompletionStatus);
+    
+    // Mark as triggered to prevent auto-processing and unblock navigation
+    setCurrentWineCompletionStatus(prev => ({
+      ...prev,
+      hasTriggeredProcessing: true,
+      isBlocking: false, // Unblock navigation after processing
+      isLoadingAverages: true // Show loading state while calculating averages
+    }));
+    
+    // Step 3: Perform sentiment analysis on text responses (optional, non-blocking)
+    console.log('📊 Step 5 -> Step 3: Triggering sentiment analysis for wine:', wineId);
+    sentimentAnalysisMutation.mutate({ sessionId, wineId });
+    
+    // Step 4: Calculate and display averages immediately (don't wait for sentiment)
+    console.log('🧮 Step 5 -> Step 4: Triggering average calculation for wine:', wineId);
+    console.log('🧮 Using session ID:', sessionId, 'and wine ID:', wineId);
+    
+    // Call averages calculation immediately
+    averageCalculationMutation.mutate({ sessionId, wineId });
+  };
+
+  const handleWineCompletionSkip = () => {
+    console.log('⏭️ Step 5: Wine completion timer skipped by user');
+    console.log('⏭️ Current wine completion status before skip:', currentWineCompletionStatus);
+    const wineId = currentWineCompletionStatus.wineId;
+    console.log('⏭️ Wine ID for skip:', wineId);
+    
+    // Unblock navigation and hide timer, but show loading state for Group Results
+    setCurrentWineCompletionStatus(prev => ({
+      ...prev,
+      showingCompletionStatus: false,
+      isBlocking: false,
+      isLoadingAverages: true // Show loading state while calculating averages
+    }));
+    
+    // Reset timer and skip button for next wine
+    setBlockingTimer(120);
+    setShowSkipButton(false);
+    
+    if (wineId && sessionId) {
+      console.log('⏭️ Triggering Group Results after skip for wineId:', wineId);
+      
+      // Trigger sentiment analysis and averages calculation immediately
+      console.log('📊 Step 3: Triggering sentiment analysis for wine:', wineId);
+      sentimentAnalysisMutation.mutate({ sessionId, wineId });
+      
+      // Step 4: Also trigger average calculation after sentiment analysis
+      setTimeout(() => {
+        console.log('🧮 Step 4: Triggering average calculation for wine:', wineId);
+        averageCalculationMutation.mutate({ sessionId, wineId });
+      }, 500); // Small delay after sentiment analysis
+    } else {
+      console.error('⏭️ ERROR: Missing wineId or sessionId for Group Results');
+    }
+  };
+
+  const handleWineCompletionAllCompleted = () => {
+    console.log('✅ Step 5: All participants completed the wine - directly showing Group Results');
+    const wineId = currentWineCompletionStatus.wineId;
+    
+    if (wineId && sessionId) {
+      // Directly trigger Group Results
+      setCurrentWineCompletionStatus(prev => ({
+        ...prev,
+        hasTriggeredProcessing: true,
+        isBlocking: false,
+        isLoadingAverages: true // Show loading state while calculating averages
+      }));
+      
+      // Trigger sentiment analysis and averages calculation immediately
+      console.log('📊 Step 3: Triggering sentiment analysis for wine:', wineId);
+      sentimentAnalysisMutation.mutate({ sessionId, wineId });
+      
+      setTimeout(() => {
+        console.log('🧮 Step 4: Triggering average calculation for wine:', wineId);
+        averageCalculationMutation.mutate({ sessionId, wineId });
+      }, 500);
+    }
+  };
+
+  const handleWineCompletionTimerExpired = () => {
+    console.log('⏰ Step 5: Wine completion timer expired');
+    const wineId = currentWineCompletionStatus.wineId;
+    
+    // Unblock navigation and hide timer, show loading state
+    setCurrentWineCompletionStatus(prev => ({
+      ...prev,
+      showingCompletionStatus: false,
+      isBlocking: false,
+      isLoadingAverages: true // Show loading state while calculating averages
+    }));
+    
+    // Reset timer and skip button for next wine
+    setBlockingTimer(120);
+    setShowSkipButton(false);
+    
+    if (wineId && sessionId) {
+      console.log('⏰ Triggering Group Results after timer expiry for wineId:', wineId);
+      
+      // Trigger sentiment analysis and averages calculation immediately
+      console.log('📊 Step 3: Triggering sentiment analysis for wine:', wineId);
+      sentimentAnalysisMutation.mutate({ sessionId, wineId });
+      
+      setTimeout(() => {
+        console.log('🧮 Step 4: Triggering average calculation for wine:', wineId);
+        averageCalculationMutation.mutate({ sessionId, wineId });
+      }, 500);
+    }
+  };
+
+  // Step 6: Handle completion of averages display and progress to next wine
+  const handleAveragesComplete = () => {
+    console.log('📊 Step 6: Averages display complete, progressing to next wine');
+    
+    // Reset wine completion status for next wine
+    setCurrentWineCompletionStatus({
+      wineId: null,
+      isParticipantFinished: false,
+      showingCompletionStatus: false,
+      hasTriggeredProcessing: false,
+      isBlocking: false,
+      showingAverages: false,
+      averagesData: null,
+      isLoadingAverages: false
+    });
+    
+    // Check if we should show wine introduction when moving to next wine
+    if (currentSlideIndex < slides.length - 1) {
+      const nextSlide = slides[currentSlideIndex + 1];
+      const nextWine = nextSlide && wines ? wines.find(w => w.id === nextSlide.packageWineId) : null;
+      const currentWineId = currentSlide?.packageWineId;
+      
+      // If moving to a different wine, show wine introduction
+      if (nextWine && currentWineId !== nextWine.id) {
+        console.log('🍷 Moving to new wine after averages, showing wine introduction:', nextWine.wineName);
+        
+        setWineIntroductionData({
+          wine: {
+            wineName: nextWine.wineName,
+            wineDescription: nextWine.wineDescription,
+            wineImageUrl: nextWine.wineImageUrl,
+            position: nextWine.position
+          },
+          isFirstWine: nextWine.position === 1
+        });
+        setShowingWineIntroduction(true);
+      } else {
+        // Same wine or no wine transition, just navigate normally
+        setCurrentSlideIndex(currentSlideIndex + 1);
+        setCompletedSlides(prev => [...prev, currentSlideIndex]);
+      }
+    } else {
+      // End of session
+      handleComplete();
+    }
   };
 
 
@@ -1786,6 +2420,419 @@ export default function TastingSession() {
           wineName={sectionTransitionData.wineName}
           onComplete={handleSectionTransitionComplete}
           duration={3000}
+        />
+      )}
+
+
+
+      {/* Wine Completion Status - Blocking Timer Modal */}
+      {(() => {
+        const shouldShow = sessionId && participantId && currentWineCompletionStatus.wineId && currentWineCompletionStatus.isBlocking;
+        console.log('🖥️ Blocking timer modal render check:', {
+          sessionId: !!sessionId,
+          participantId: !!participantId,
+          wineId: !!currentWineCompletionStatus.wineId,
+          isBlocking: currentWineCompletionStatus.isBlocking,
+          shouldShow,
+          currentWineCompletionStatus
+        });
+        return shouldShow;
+      })() && (
+        <div 
+          className="fixed inset-0 z-[9999] bg-gradient-primary/95 backdrop-blur-lg"
+          style={{ 
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9999
+          }}
+        >
+          <div className="h-full w-full flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-gradient-card backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl max-w-md w-full text-center"
+            >
+              <div className="mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  Wine Completed! 🍷
+                </h2>
+                <p className="text-white/80 text-lg">
+                  {currentWine?.wineName || 'Unknown Wine'}
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-white/70 mb-4">
+                  Waiting for others to finish their tasting...
+                </p>
+
+                <div className="bg-white/10 rounded-2xl p-4 mb-4">
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <Clock className="h-5 w-5 text-amber-400" />
+                    <span className="text-white font-medium">Time Remaining</span>
+                  </div>
+                  <div className="text-3xl font-mono text-white mb-2">{formatTimer(blockingTimer)}</div>
+                  <div className="text-white/60 text-sm">
+                    Processing will begin automatically when timer expires
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {showSkipButton && (
+                  <Button
+                    onClick={handleWineCompletionSkip}
+                    className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium py-3"
+                    size="lg"
+                  >
+                    Skip Wait & Continue
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                )}
+
+                <p className="text-white/60 text-sm">
+                  {showSkipButton ?
+                    'Or wait for the timer to automatically continue' :
+                    'Skip option will be available in a few seconds...'}
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 5: Loading state for Group Results calculation */}
+      {(() => {
+        const shouldShow = sessionId && participantId && currentWineCompletionStatus.wineId && 
+                          currentWineCompletionStatus.isLoadingAverages && 
+                          !currentWineCompletionStatus.showingAverages;
+        console.log('🔄 Loading Group Results render check:', {
+          sessionId: !!sessionId,
+          participantId: !!participantId,
+          wineId: !!currentWineCompletionStatus.wineId,
+          isLoadingAverages: currentWineCompletionStatus.isLoadingAverages,
+          showingAverages: currentWineCompletionStatus.showingAverages,
+          shouldShow
+        });
+        return shouldShow;
+      })() && (
+        <div 
+          className="fixed inset-0 z-[9999] bg-gradient-primary/95 backdrop-blur-lg"
+          style={{ 
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9999
+          }}
+        >
+          <div className="h-full w-full flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-gradient-card backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl max-w-md w-full text-center"
+            >
+              <div className="mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full flex items-center justify-center">
+                  <Users className="w-8 h-8 text-white animate-pulse" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  Preparing Group Results 📊
+                </h2>
+                <p className="text-white/80 text-lg">
+                  {currentWine?.wineName || 'Wine'}
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-white/70 mb-4">
+                  Analyzing responses and calculating averages...
+                </p>
+
+                <div className="bg-white/10 rounded-2xl p-4 mb-4">
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-white/20 border-t-purple-400"></div>
+                    <span className="text-white font-medium">Processing Results</span>
+                  </div>
+                  <div className="text-white/60 text-sm">
+                    This will only take a moment...
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 6: Wine Averages Display - Show after processing completes */}
+      {(() => {
+        const shouldShow = sessionId && participantId && currentWineCompletionStatus.showingAverages && currentWineCompletionStatus.averagesData;
+        
+        // Additional check: Only show if there are actually questions with averages to display
+        let hasValidAverages = false;
+        if (currentWineCompletionStatus.averagesData) {
+          const data = currentWineCompletionStatus.averagesData;
+          const questionsData = data.questions || data.data || data.averages;
+          if (questionsData && typeof questionsData === 'object' && Object.keys(questionsData).length > 0) {
+            hasValidAverages = true;
+          }
+        }
+        
+        const finalShouldShow = shouldShow && hasValidAverages;
+        
+        console.log('📊 Averages modal render check:', {
+          sessionId: !!sessionId,
+          participantId: !!participantId,
+          showingAverages: currentWineCompletionStatus.showingAverages,
+          hasAveragesData: !!currentWineCompletionStatus.averagesData,
+          hasValidAverages,
+          shouldShow,
+          finalShouldShow,
+          averagesData: currentWineCompletionStatus.averagesData
+        });
+        
+        // If we don't have valid averages to show, automatically complete and continue
+        if (shouldShow && !hasValidAverages && currentWineCompletionStatus.averagesData) {
+          console.log('📊 No valid averages to show, auto-completing...');
+          setTimeout(() => handleAveragesComplete(), 100);
+          return false;
+        }
+        
+        return finalShouldShow;
+      })() && (
+        <div 
+          className="fixed inset-0 z-[9999] bg-gradient-primary/95 backdrop-blur-lg"
+          style={{ 
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9999
+          }}
+        >
+          <div className="h-full w-full flex items-center justify-center p-4 overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              className="bg-gradient-card backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl max-w-4xl w-full text-center my-8"
+            >
+              <div className="mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full flex items-center justify-center">
+                  <Users className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  Group Results 📊
+                </h2>
+                <p className="text-white/80 text-lg">
+                  {currentWine?.wineName || 'Wine'} - Average Scores
+                </p>
+              </div>
+
+              <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+                {/* Always try to show averages data, even if there's a message */}
+                {currentWineCompletionStatus.averagesData.questions || currentWineCompletionStatus.averagesData.data || currentWineCompletionStatus.averagesData.averages ? (
+                  (() => {
+                    // Enhanced data parsing to handle different API response structures
+                    const questionsData = currentWineCompletionStatus.averagesData.questions || 
+                                        currentWineCompletionStatus.averagesData.data?.questions ||
+                                        currentWineCompletionStatus.averagesData.averages?.questions ||
+                                        currentWineCompletionStatus.averagesData.data ||
+                                        currentWineCompletionStatus.averagesData.averages ||
+                                        currentWineCompletionStatus.averagesData;
+                    
+                    console.log('🧮 Parsing questions data:', questionsData);
+                    
+                    if (!questionsData || typeof questionsData !== 'object') {
+                      return (
+                        <div className="bg-white/10 rounded-2xl p-4">
+                          <h3 className="text-white font-medium mb-2">
+                            Processing Results...
+                          </h3>
+                          <div className="flex justify-center">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    // Convert to array format for consistent processing
+                    const questionsArray = Array.isArray(questionsData) 
+                      ? questionsData 
+                      : Object.entries(questionsData).map(([key, value]) => ({
+                          id: key,
+                          ...((typeof value === 'object' && value !== null) ? value : { average: value })
+                        }));
+                    
+                    if (questionsArray.length === 0) {
+                      return (
+                        <div className="bg-white/10 rounded-2xl p-4">
+                          <h3 className="text-white font-medium mb-2">
+                            No Questions Found
+                          </h3>
+                          <p className="text-white/60 text-sm">
+                            No rating questions were found for this wine.
+                          </p>
+                        </div>
+                      );
+                    }
+                    
+                    return questionsArray.map((questionData: any, index: number) => {
+                      const questionId = questionData.id || questionData.questionId || `question-${index}`;
+                      const questionTitle = questionData.questionTitle || 
+                                          questionData.title || 
+                                          questionData.question || 
+                                          questionData.name ||
+                                          `Question ${index + 1}`;
+                      const average = questionData.average || questionData.avg || questionData.value || 0;
+                      const participantCount = questionData.participantCount || 
+                                             questionData.participants || 
+                                             questionData.count || 
+                                             questionData.responseCount || 0;
+                      const scaleMax = questionData.scaleMax || questionData.scale_max || 10;
+                      const responseDistribution = questionData.responseDistribution;
+                      
+                      // Format average to show meaningful precision
+                      const formattedAverage = typeof average === 'number' ? 
+                        (average % 1 === 0 ? average.toString() : average.toFixed(1)) : 
+                        average;
+                      
+                      return (
+                        <div key={questionId} className="bg-white/10 rounded-2xl p-6 border border-white/10 hover:border-white/20 transition-colors">
+                          <h3 className="text-white font-semibold mb-4 text-left text-lg leading-tight">
+                            {questionTitle}
+                          </h3>
+                          
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="text-white/70 text-sm font-medium">
+                              Group Average
+                            </div>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-4xl font-bold text-white">
+                                {formattedAverage}
+                              </span>
+                              <span className="text-xl text-white/60 font-medium">
+                                /{scaleMax}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* Enhanced visual progress bar */}
+                          <div className="w-full bg-white/20 rounded-full h-4 mb-3 overflow-hidden">
+                            <div 
+                              className="bg-gradient-to-r from-emerald-400 via-blue-400 to-indigo-500 h-4 rounded-full transition-all duration-1500 ease-out shadow-sm"
+                              style={{ 
+                                width: `${Math.min(100, Math.max(0, (typeof average === 'number' ? average : 0) / scaleMax * 100))}%` 
+                              }}
+                            >
+                              <div className="w-full h-full bg-white/20 animate-pulse"></div>
+                            </div>
+                          </div>
+                          
+                          {/* Participant count and additional info */}
+                          <div className="flex items-center justify-between text-sm">
+                            <div className="text-white/50">
+                              {participantCount > 0 ? (
+                                <>
+                                  <Users className="inline w-4 h-4 mr-1" />
+                                  {participantCount} participant{participantCount !== 1 ? 's' : ''}
+                                </>
+                              ) : (
+                                <span>No responses</span>
+                              )}
+                            </div>
+                            
+                            {typeof average === 'number' && average > 0 && (
+                              <div className="text-white/60 font-medium">
+                                {average >= 8 ? '🌟 Excellent' :
+                                 average >= 7 ? '😊 Great' :
+                                 average >= 6 ? '👍 Good' :
+                                 average >= 5 ? '😐 Average' :
+                                 average >= 4 ? '👎 Below Average' :
+                                 '😞 Poor'}
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Response distribution if available */}
+                          {responseDistribution && typeof responseDistribution === 'object' && (
+                            <div className="mt-3 pt-3 border-t border-white/10">
+                              <div className="text-xs text-white/50 mb-2">Response Distribution:</div>
+                              <div className="flex gap-1">
+                                {Object.entries(responseDistribution).map(([score, count]: [string, any]) => (
+                                  <div 
+                                    key={score}
+                                    className="flex-1 bg-white/5 rounded text-center py-1"
+                                    title={`Score ${score}: ${count} response${count !== 1 ? 's' : ''}`}
+                                  >
+                                    <div className="text-xs text-white/70">{score}</div>
+                                    <div className="text-xs text-white/50">{count}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()
+                ) : (
+                  <div className="bg-white/10 rounded-2xl p-4">
+                    <h3 className="text-white font-medium mb-2">
+                      {currentWineCompletionStatus.averagesData.message || 'Processing Results...'}
+                    </h3>
+                    {currentWineCompletionStatus.averagesData.message ? (
+                      <p className="text-white/70 text-sm">
+                        {currentWineCompletionStatus.averagesData.scaleQuestions > 0 
+                          ? `Found ${currentWineCompletionStatus.averagesData.scaleQuestions} questions but couldn't display them properly.`
+                          : 'No scale questions found for this wine.'}
+                      </p>
+                    ) : (
+                      <div className="flex justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="text-white/60 text-sm mb-4">
+                🍷 Ready to continue to the next wine when you are!
+              </div>
+              
+              <Button 
+                onClick={handleAveragesComplete}
+                className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-medium py-4 px-8 text-lg"
+                size="lg"
+              >
+                Continue to Next Wine
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+            </motion.div>
+          </div>
+        </div>
+      )}
+
+      {/* Wine Completion Status - Non-blocking banner (when not blocking AND not showing averages) */}
+      {sessionId && participantId && currentWineCompletionStatus.wineId && 
+       !currentWineCompletionStatus.isBlocking && 
+       !currentWineCompletionStatus.showingAverages && (
+        <WineCompletionStatus
+          sessionId={sessionId}
+          wineId={currentWineCompletionStatus.wineId}
+          wineName={currentWine?.wineName || 'Unknown Wine'}
+          participantId={participantId}
+          isParticipantFinished={currentWineCompletionStatus.isParticipantFinished}
+          onSkipTimer={handleWineCompletionSkip}
+          onAllCompleted={handleWineCompletionAllCompleted}
+          onTimerExpired={handleWineCompletionTimerExpired}
         />
       )}
     </>
