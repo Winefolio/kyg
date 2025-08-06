@@ -844,6 +844,220 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get completion status for all participants in a session for a specific wine
+  app.get("/api/sessions/:sessionId/completion-status", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { wineId } = req.query;
+      
+      if (!wineId) {
+        return res.status(400).json({ message: "wineId query parameter is required" });
+      }
+      
+      console.log(`🔍 Step 8: Checking completion status for session ${sessionId}, wine ${wineId}`);
+      
+      const completionStatus = await storage.getSessionCompletionStatus(sessionId, wineId as string);
+      
+      // Add debugging info for wine completion flow
+      console.log(`📊 Completion status result:`, {
+        sessionId: completionStatus.sessionId,
+        wineId: completionStatus.wineId,
+        totalParticipants: completionStatus.totalParticipants,
+        completedCount: completionStatus.completedParticipants.length,
+        completionPercentage: completionStatus.completionPercentage,
+        allCompleted: completionStatus.allCompleted
+      });
+      
+      res.json(completionStatus);
+    } catch (error) {
+      console.error("Error fetching session completion status:", error);
+      if (error instanceof Error && error.message === 'Session not found') {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Analyze sentiment for wine text responses
+  app.post("/api/sessions/:sessionId/wines/:wineId/sentiment-analysis", async (req, res) => {
+    try {
+      const { sessionId, wineId } = req.params;
+      
+      console.log('🧠 Step 8: Sentiment analysis request:', { sessionId, wineId });
+      
+      // Get all text responses for this wine from all participants
+      const textResponses = await storage.getWineTextResponses(sessionId, wineId);
+      
+      console.log(`📝 Found ${textResponses.length} text responses for sentiment analysis`);
+      
+      if (textResponses.length === 0) {
+        return res.json({
+          sessionId,
+          wineId,
+          message: "No text responses found for sentiment analysis",
+          results: []
+        });
+      }
+      
+      // Import OpenAI client dynamically to avoid dependency issues if not configured
+      const { analyzeWineTextResponses } = await import('./openai-client.js');
+      
+      // Perform sentiment analysis - convert format for OpenAI client
+      const formattedResponses = textResponses.map(response => ({
+        slideId: response.slideId,
+        questionTitle: response.questionText,
+        textContent: response.answerText
+      }));
+      
+      console.log('🔄 Processing sentiment analysis with OpenAI...');
+      const sentimentResults = await analyzeWineTextResponses(formattedResponses, wineId, sessionId);
+      
+      // Save sentiment results to database - convert WineTextAnalysis to array format
+      const resultsArray = [{
+        wineId,
+        participantId: sentimentResults.participantId,
+        overallSentiment: sentimentResults.overallSentiment,
+        textResponses: sentimentResults.textResponses,
+        timestamp: new Date().toISOString()
+      }];
+      
+      await storage.saveSentimentAnalysis(sessionId, wineId, resultsArray);
+      
+      console.log('✅ Sentiment analysis completed and saved');
+      
+      res.json({
+        sessionId,
+        wineId,
+        totalResponses: textResponses.length,
+        results: sentimentResults,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error("❌ Error performing sentiment analysis:", error);
+      
+      // Provide fallback analysis if OpenAI fails
+      if (error instanceof Error && (error.message?.includes('OpenAI') || error.message?.includes('API'))) {
+        try {
+          console.log('🔄 Attempting fallback sentiment analysis...');
+          const { getFallbackSentimentAnalysis } = await import('./openai-client.js');
+          const textResponses = await storage.getWineTextResponses(req.params.sessionId, req.params.wineId);
+          
+          // Create fallback analysis for each response
+          const fallbackResults = textResponses.map(response => ({
+            ...response,
+            sentiment: getFallbackSentimentAnalysis(response.answerText)
+          }));
+          
+          console.log('✅ Fallback sentiment analysis completed');
+          
+          res.json({
+            sessionId: req.params.sessionId,
+            wineId: req.params.wineId,
+            totalResponses: textResponses.length,
+            results: fallbackResults,
+            fallback: true,
+            timestamp: new Date().toISOString()
+          });
+        } catch (fallbackError) {
+          console.error("❌ Fallback sentiment analysis failed:", fallbackError);
+          res.status(500).json({ message: "Sentiment analysis unavailable" });
+        }
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  // Step 4: Calculate question averages for a wine
+  app.post('/api/sessions/:sessionId/wines/:wineId/calculate-averages', async (req, res) => {
+    try {
+      const { sessionId, wineId } = req.params;
+      
+      if (!sessionId || !wineId) {
+        return res.status(400).json({ 
+          message: "sessionId and wineId parameters are required" 
+        });
+      }
+
+      console.log(`🧮 Calculating averages for wine ${wineId} in session ${sessionId}`);
+      
+      // Calculate averages for all questions in this wine
+      const questionAverages = await storage.calculateWineQuestionAverages(sessionId, wineId);
+      
+      if (questionAverages.length === 0) {
+        return res.json({
+          sessionId,
+          wineId,
+          message: "No questions found for average calculation",
+          questions: {},
+          results: []
+        });
+      }
+      
+      // Transform data into the format expected by frontend
+      const questionsMap: Record<string, any> = {};
+      
+      questionAverages.forEach((question, index) => {
+        const questionId = question.slideId || `question-${index}`;
+        
+        // Only include scale questions in the averages display
+        if (question.questionType === 'scale' && question.averageScore !== null) {
+          questionsMap[questionId] = {
+            id: questionId,
+            questionId: questionId,
+            slideId: question.slideId,
+            questionTitle: question.questionTitle,
+            title: question.questionTitle,
+            question: question.questionTitle,
+            average: parseFloat(question.averageScore.toFixed(1)),
+            avg: parseFloat(question.averageScore.toFixed(1)),
+            value: parseFloat(question.averageScore.toFixed(1)),
+            participantCount: question.totalResponses,
+            participants: question.totalResponses,
+            count: question.totalResponses,
+            responseCount: question.totalResponses,
+            scaleMax: 10, // Default scale max
+            scale_max: 10,
+            questionType: question.questionType,
+            responseDistribution: question.responseDistribution,
+            timestamp: question.timestamp
+          };
+        }
+      });
+      
+      console.log(`🧮 Processed ${Object.keys(questionsMap).length} scale questions for averages display`);
+      
+      res.json({
+        sessionId,
+        wineId,
+        totalQuestions: questionAverages.length,
+        scaleQuestions: Object.keys(questionsMap).length,
+        questions: questionsMap, // Frontend expects this structure
+        data: questionsMap, // Alternative path for frontend parsing
+        averages: questionsMap, // Another alternative path
+        results: questionAverages, // Keep original for compatibility
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error("Error calculating question averages:", error);
+      res.status(500).json({ 
+        message: "Failed to calculate question averages",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // Step 5: Timer and Skip Option
+  // Note: Step 5 is implemented on the frontend by orchestrating Steps 3 and 4.
+  // When a participant finishes early and the 2-minute timer is running:
+  // - Skip button triggers processTextAnswersAndShowAverages()
+  // - Timer expiry also triggers processTextAnswersAndShowAverages()
+  // - This function calls the Step 3 sentiment-analysis endpoint followed by Step 4 calculate-averages endpoint
+
+  // Data export endpoints
+
   // Export session analytics as CSV
   app.get("/api/sessions/:sessionId/export/csv", async (req, res) => {
     try {

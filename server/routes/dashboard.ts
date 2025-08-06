@@ -226,13 +226,13 @@ export function registerDashboardRoutes(app: Express) {
 
   // Get AI-generated sommelier conversation starters
   app.get("/api/dashboard/:email/sommelier-tips", async (req, res) => {
-    try {
-      const { email } = req.params;
-      
-      if (!email) {
-        return res.status(400).json({ message: "Email parameter is required" });
-      }
+    const { email } = req.params;
+    
+    if (!email) {
+      return res.status(400).json({ message: "Email parameter is required" });
+    }
 
+    try {
       // Step 6: Add Error Handling - Use the new LLM-powered function with try/catch
       const sommelierTips = await generateSommelierTips(email);
       
@@ -407,6 +407,8 @@ export function registerDashboardRoutes(app: Express) {
   });
 
   // Add a new route to update sommelier observations
+  // TODO: Implement updateSommelierObservations method in storage
+  /*
   app.post('/api/dashboard/session/:sessionId/update-observations', async (req, res) => {
     const { sessionId } = req.params;
     const { observations } = req.body;
@@ -425,6 +427,7 @@ export function registerDashboardRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to update observations.' });
     }
   });
+  */
 }
 
 // Helper functions for generating enhanced dashboard data
