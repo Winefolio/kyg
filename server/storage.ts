@@ -197,6 +197,9 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // In-memory storage for sentiment analysis results
+  private sentimentAnalysisResults: Map<string, any[]> = new Map();
+  
   constructor() {
     this.initializeWineTastingData();
   }
@@ -2274,14 +2277,15 @@ export class DatabaseStorage implements IStorage {
     // Use the actual session UUID for subsequent queries
     const actualSessionId = session.id;
 
-    // 2. Get all participants for this session (excluding hosts)
-    const sessionParticipants = await db
+    // 2. Get all participants for this session
+    const allSessionParticipants = await db
       .select()
       .from(participants)
-      .where(and(
-        eq(participants.sessionId, actualSessionId),
-        eq(participants.isHost, false)
-      ));
+      .where(eq(participants.sessionId, actualSessionId));
+
+    // Separate host and non-host participants
+    const hostParticipants = allSessionParticipants.filter(p => p.isHost);
+    const nonHostParticipants = allSessionParticipants.filter(p => !p.isHost);
 
     // 3. Get all question slides for this specific wine
     const wineQuestionSlides = await db
@@ -2301,9 +2305,9 @@ export class DatabaseStorage implements IStorage {
       return {
         sessionId,
         wineId,
-        totalParticipants: sessionParticipants.length,
+        totalParticipants: allSessionParticipants.length,
         completedParticipants: [],
-        pendingParticipants: sessionParticipants.map(p => ({
+        pendingParticipants: allSessionParticipants.map((p: any) => ({
           id: p.id,
           displayName: p.displayName,
           email: p.email,
@@ -2311,6 +2315,10 @@ export class DatabaseStorage implements IStorage {
           totalQuestions: 0
         })),
         allCompleted: false,
+        allParticipantsCompleted: false,
+        allNonHostParticipantsCompleted: false,
+        completedNonHostParticipants: 0,
+        totalNonHostParticipants: nonHostParticipants.length,
         completionPercentage: 0
       };
     }
@@ -2326,7 +2334,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(responses)
       .where(and(
-        inArray(responses.participantId, sessionParticipants.map(p => p.id)),
+        inArray(responses.participantId, allSessionParticipants.map((p: any) => p.id)),
         inArray(responses.slideId, slideIds)
       ));
 
@@ -2334,11 +2342,12 @@ export class DatabaseStorage implements IStorage {
     const participantCompletionMap = new Map();
     
     // Initialize all participants with zero responses
-    sessionParticipants.forEach(participant => {
+    allSessionParticipants.forEach((participant: any) => {
       participantCompletionMap.set(participant.id, {
         id: participant.id,
         displayName: participant.displayName,
         email: participant.email,
+        isHost: participant.isHost,
         questionsAnswered: 0,
         totalQuestions,
         completedAt: null
@@ -2356,28 +2365,42 @@ export class DatabaseStorage implements IStorage {
     // 6. Separate completed and pending participants
     const completedParticipants: any[] = [];
     const pendingParticipants: any[] = [];
+    const completedNonHostParticipants: any[] = [];
+    const completedHostParticipants: any[] = [];
     
     participantCompletionMap.forEach(participantData => {
       if (participantData.questionsAnswered >= totalQuestions) {
         completedParticipants.push(participantData);
+        if (participantData.isHost) {
+          completedHostParticipants.push(participantData);
+        } else {
+          completedNonHostParticipants.push(participantData);
+        }
       } else {
         pendingParticipants.push(participantData);
       }
     });
 
-    const allCompleted = completedParticipants.length === sessionParticipants.length;
-    const completionPercentage = sessionParticipants.length > 0 
-      ? Math.round((completedParticipants.length / sessionParticipants.length) * 100)
+    // Calculate various completion statuses
+    const allParticipantsCompleted = completedParticipants.length === allSessionParticipants.length;
+    const allNonHostParticipantsCompleted = completedNonHostParticipants.length === nonHostParticipants.length && nonHostParticipants.length > 0;
+    
+    const completionPercentage = allSessionParticipants.length > 0 
+      ? Math.round((completedParticipants.length / allSessionParticipants.length) * 100)
       : 0;
 
     return {
       sessionId: actualSessionId,
       originalSessionId: sessionId, // Keep the original input for reference
       wineId,
-      totalParticipants: sessionParticipants.length,
+      totalParticipants: allSessionParticipants.length,
       completedParticipants,
       pendingParticipants,
-      allCompleted,
+      allCompleted: allParticipantsCompleted, // Legacy field
+      allParticipantsCompleted,
+      allNonHostParticipantsCompleted,
+      completedNonHostParticipants: completedNonHostParticipants.length,
+      totalNonHostParticipants: nonHostParticipants.length,
       completionPercentage,
       wineQuestions: {
         totalQuestions,
@@ -2496,19 +2519,41 @@ export class DatabaseStorage implements IStorage {
   }
 
   async saveSentimentAnalysis(sessionId: string, wineId: string, results: any[]): Promise<void> {
-    // For now, we'll just log the sentiment analysis results
-    // In a production system, you would store these in a dedicated sentiment_analytics table
-    
+    // Store sentiment analysis results in memory for this session
     const session = await this.getSessionById(sessionId);
     if (!session) {
       throw new Error("Session not found");
     }
 
-    console.log(`✅ Would save ${results.length} sentiment analysis results for wine ${wineId} in session ${sessionId}`);
-    console.log('Sentiment results:', results);
+    // Create a unique key for this session and wine combination
+    const key = `${sessionId}-${wineId}`;
     
-    // TODO: Create a proper sentiment_analytics table and store results there
-    // For now, just acknowledge the analysis was completed
+    // Extract individual sentiment scores from the results
+    const sentimentData: any[] = [];
+    
+    results.forEach(result => {
+      if (result.textResponses && Array.isArray(result.textResponses)) {
+        // Extract each text response with its sentiment score
+        result.textResponses.forEach((response: any) => {
+          if (response.analysis && response.analysis.sentimentScore) {
+            sentimentData.push({
+              slideId: response.slideId,
+              questionTitle: response.questionTitle,
+              textContent: response.textContent,
+              sentimentScore: response.analysis.sentimentScore,
+              sentiment: response.analysis.sentiment,
+              confidence: response.analysis.confidence,
+              participantId: result.participantId || 'aggregate'
+            });
+          }
+        });
+      }
+    });
+    
+    this.sentimentAnalysisResults.set(key, sentimentData);
+
+    console.log(`✅ Saved ${sentimentData.length} sentiment analysis results for wine ${wineId} in session ${sessionId}`);
+    console.log('Processed sentiment data:', sentimentData);
   }
 
   // Step 4: Average calculation methods
@@ -2803,13 +2848,36 @@ export class DatabaseStorage implements IStorage {
     return Math.round(truePercentage * 10 * 100) / 100;
   }
 
-  private async calculateTextSentimentAverage(sessionId: string, wineId: string, slideId: string): Promise<number | null> {
-    // For now, since we don't have a proper sentiment analytics table,
-    // we'll return null and let the text questions show as "text responses"
-    // In a production system, you would have a dedicated sentiment_analytics table
+  async calculateTextSentimentAverage(sessionId: string, wineId: string, slideId: string): Promise<number | null> {
+    // Get sentiment analysis results for this session and wine
+    const key = `${sessionId}-${wineId}`;
+    const sentimentResults = this.sentimentAnalysisResults.get(key);
     
-    console.log(`📊 Text sentiment average calculation not available yet for slide ${slideId}`);
-    return null; // Will be implemented when proper analytics table is created
+    if (!sentimentResults || sentimentResults.length === 0) {
+      console.log(`📊 No sentiment analysis results available for slide ${slideId} in wine ${wineId}`);
+      return null;
+    }
+
+    // Filter results for this specific slide and calculate average sentiment score
+    const slideResults = sentimentResults.filter(result => result.slideId === slideId);
+    
+    if (slideResults.length === 0) {
+      console.log(`📊 No sentiment analysis results for slide ${slideId}`);
+      return null;
+    }
+
+    // Calculate average sentiment score (1-10 scale)
+    const sentimentScores = slideResults.map(result => result.sentimentScore).filter(score => score !== null && score !== undefined);
+    
+    if (sentimentScores.length === 0) {
+      console.log(`📊 No valid sentiment scores for slide ${slideId}`);
+      return null;
+    }
+
+    const average = sentimentScores.reduce((sum, score) => sum + score, 0) / sentimentScores.length;
+    console.log(`📊 Calculated sentiment average ${average.toFixed(2)} for slide ${slideId} (${sentimentScores.length} responses)`);
+    
+    return Math.round(average * 100) / 100; // Round to 2 decimal places
   }
 
   // Package management methods for sommelier dashboard
