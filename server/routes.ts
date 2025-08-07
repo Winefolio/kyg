@@ -95,26 +95,19 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  console.log("🚀 Starting route registration...");
-  
-  
   // Verify Supabase Storage configuration if configured
   if (isSupabaseConfigured()) {
-    console.log("🔍 Checking Supabase Storage configuration...");
     const storageCheck = await verifyStorageBucket();
     if (!storageCheck.success) {
       console.error("⚠️  Supabase Storage verification failed:", storageCheck.error);
       console.error("⚠️  Media uploads will not work properly until this is fixed.");
     }
-  } else {
-    console.log("ℹ️  Supabase not configured - media uploads will use base64 encoding (development mode)");
   }
   
   // Validate package code
   app.get("/api/packages/:code", async (req, res) => {
     try {
       const { code } = req.params;
-      console.log(`Looking for package with code: ${code}`);
       const pkg = await storage.getPackageByCode(code.toUpperCase());
       
       if (!pkg) {
@@ -342,10 +335,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { sessionIdOrShortCode } = req.params; // This can be either UUID or short_code
       
-      // Enhanced logging for debugging
-      console.log(`[JOIN_ATTEMPT] Starting join process with identifier: ${sessionIdOrShortCode}`);
-      console.log(`[JOIN_ATTEMPT] Request body:`, JSON.stringify(req.body, null, 2));
-      
       // Validate the identifier parameter
       if (!sessionIdOrShortCode || sessionIdOrShortCode === 'undefined' || sessionIdOrShortCode === 'null') {
         console.error(`[JOIN_ERROR] Invalid session identifier provided: ${sessionIdOrShortCode}`);
@@ -354,15 +343,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 1. Fetch the session using the provided identifier
       // storage.getSessionById handles both UUIDs and short_codes
-      console.log(`[JOIN_ATTEMPT] Looking up session with identifier: ${sessionIdOrShortCode}`);
       const session = await storage.getSessionById(sessionIdOrShortCode);
       
       if (!session) {
-        console.log(`[JOIN_ATTEMPT_FAIL] Session not found with identifier: ${sessionIdOrShortCode}`);
         return res.status(404).json({ message: "Session not found. Please check the session code and try again." });
       }
-      
-      console.log(`[JOIN_ATTEMPT] Found session: ${session.id} (short_code: ${session.short_code})`);
       
       // Validate session.id is a proper UUID
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -373,7 +358,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 2. Check session status
       if (session.status !== 'active') {
-        console.log(`[JOIN_ATTEMPT_FAIL] Attempt to join inactive session ${session.id} (status: ${session.status}). Identifier used: ${sessionIdOrShortCode}`);
         return res.status(400).json({ message: "Session is not active. Please check with the host." });
       }
 
@@ -384,7 +368,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         participantInputData = insertParticipantSchema
           .omit({ sessionId: true })
           .parse(req.body);
-        console.log(`[JOIN_ATTEMPT] Parsed participant data:`, JSON.stringify(participantInputData, null, 2));
       } catch (parseError) {
         console.error(`[JOIN_ERROR] Failed to parse participant data:`, parseError);
         if (parseError instanceof z.ZodError) {
@@ -397,12 +380,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 4. Verify active host using the actual session UUID
-      console.log(`[JOIN_ATTEMPT] Checking for active host in session ${session.id}`);
       const currentParticipants = await storage.getParticipantsBySessionId(session.id);
       const hasActiveHost = currentParticipants.some(p => p.isHost);
       
       if (!hasActiveHost) {
-        console.log(`[JOIN_ATTEMPT_FAIL] Session ${session.id} has no active host. Identifier used: ${sessionIdOrShortCode}`);
         return res.status(400).json({ message: "Session does not have an active host. Please contact the session organizer." });
       }
 
@@ -412,8 +393,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         existingParticipant = await storage.getParticipantByEmailInSession(session.id, participantInputData.email);
         
         if (existingParticipant) {
-          console.log(`[JOIN_RESUME] Found existing participant with email ${participantInputData.email} in session ${session.id}`);
-          
           // Update their display name if it changed
           if (existingParticipant.displayName !== participantInputData.displayName) {
             await storage.updateParticipantDisplayName(existingParticipant.id, participantInputData.displayName);
@@ -423,7 +402,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Update their last active time
           await storage.updateParticipantProgress(existingParticipant.id, existingParticipant.progressPtr || 0);
           
-          console.log(`[JOIN_RESUME] Participant ${existingParticipant.displayName} (ID: ${existingParticipant.id}) resuming session ${session.id}`);
           return res.json({
             ...existingParticipant,
             isReturning: true
@@ -436,8 +414,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...participantInputData,
         sessionId: session.id  // CRITICAL FIX: Use actual session UUID, not short code
       };
-      
-      console.log(`[JOIN_ATTEMPT] Creating participant with payload:`, JSON.stringify(participantPayload, null, 2));
       
       let newParticipant;
       try {
@@ -470,7 +446,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedParticipantsList = await storage.getParticipantsBySessionId(session.id);
       await storage.updateSessionParticipantCount(session.id, updatedParticipantsList.length);
 
-      console.log(`[JOIN_SUCCESS] Participant ${newParticipant.displayName} (ID: ${newParticipant.id}) joined session ${session.id} (Short Code: ${session.short_code || 'N/A'})`);
       res.json(newParticipant);
 
     } catch (error) {
@@ -642,12 +617,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertResponseSchema.parse(req.body);
       
-      console.log('[API] POST /api/responses - participantId:', validatedData.participantId);
-      
       // First check if participant exists
       const participant = await storage.getParticipantById(validatedData.participantId!);
       if (!participant) {
-        console.log(`[API] Participant ${validatedData.participantId} not found - likely from stale offline sync`);
         return res.status(404).json({ message: "Participant not found" });
       }
       
@@ -695,14 +667,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   participant.id,
                   slideIndex
                 );
-                console.log(`Updated progress for participant ${participant.id} to slide ${slideIndex} of ${allSlides.length}`);
               } else {
                 // Still update lastActive even if not moving forward
                 await storage.updateParticipantProgress(
                   participant.id,
                   currentProgress
                 );
-                console.log(`Participant ${participant.id} on slide ${slideIndex}. Progress maintained at ${currentProgress}.`);
               }
             }
           }
@@ -854,23 +824,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "wineId query parameter is required" });
       }
       
-      console.log(`🔍 Step 8: Checking completion status for session ${sessionId}, wine ${wineId}`);
-      
       const completionStatus = await storage.getSessionCompletionStatus(sessionId, wineId as string);
-      
-      // Add debugging info for wine completion flow
-      console.log(`📊 Completion status result:`, {
-        sessionId: completionStatus.sessionId,
-        wineId: completionStatus.wineId,
-        totalParticipants: completionStatus.totalParticipants,
-        completedCount: completionStatus.completedParticipants.length,
-        completionPercentage: completionStatus.completionPercentage,
-        allCompleted: completionStatus.allCompleted
-      });
       
       res.json(completionStatus);
     } catch (error) {
       console.error("Error fetching session completion status:", error);
+      if (error instanceof Error && error.message === 'Session not found') {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get completion status for all participants in a session for a specific wine (RESTful URL format)
+  app.get("/api/sessions/:sessionId/wines/:wineId/completion-status", async (req, res) => {
+    try {
+      const { sessionId, wineId } = req.params;
+      
+      const completionStatus = await storage.getSessionCompletionStatus(sessionId, wineId);
+      
+      res.json(completionStatus);
+    } catch (error) {
+      console.error("Error fetching wine completion status:", error);
       if (error instanceof Error && error.message === 'Session not found') {
         return res.status(404).json({ message: "Session not found" });
       }
@@ -883,12 +858,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { sessionId, wineId } = req.params;
       
-      console.log('🧠 Step 8: Sentiment analysis request:', { sessionId, wineId });
-      
       // Get all text responses for this wine from all participants
       const textResponses = await storage.getWineTextResponses(sessionId, wineId);
-      
-      console.log(`📝 Found ${textResponses.length} text responses for sentiment analysis`);
       
       if (textResponses.length === 0) {
         return res.json({
@@ -909,7 +880,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         textContent: response.answerText
       }));
       
-      console.log('🔄 Processing sentiment analysis with OpenAI...');
       const sentimentResults = await analyzeWineTextResponses(formattedResponses, wineId, sessionId);
       
       // Save sentiment results to database - convert WineTextAnalysis to array format
@@ -922,8 +892,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }];
       
       await storage.saveSentimentAnalysis(sessionId, wineId, resultsArray);
-      
-      console.log('✅ Sentiment analysis completed and saved');
       
       res.json({
         sessionId,
@@ -939,7 +907,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Provide fallback analysis if OpenAI fails
       if (error instanceof Error && (error.message?.includes('OpenAI') || error.message?.includes('API'))) {
         try {
-          console.log('🔄 Attempting fallback sentiment analysis...');
           const { getFallbackSentimentAnalysis } = await import('./openai-client.js');
           const textResponses = await storage.getWineTextResponses(req.params.sessionId, req.params.wineId);
           
@@ -948,8 +915,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...response,
             sentiment: getFallbackSentimentAnalysis(response.answerText)
           }));
-          
-          console.log('✅ Fallback sentiment analysis completed');
           
           res.json({
             sessionId: req.params.sessionId,
@@ -980,8 +945,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      console.log(`🧮 Calculating averages for wine ${wineId} in session ${sessionId}`);
-      
       // Calculate averages for all questions in this wine
       const questionAverages = await storage.calculateWineQuestionAverages(sessionId, wineId);
       
@@ -1001,8 +964,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       questionAverages.forEach((question, index) => {
         const questionId = question.slideId || `question-${index}`;
         
-        // Only include scale questions in the averages display
-        if (question.questionType === 'scale' && question.averageScore !== null) {
+        // Include scale, multiple_choice, and boolean questions with valid scores in the averages display
+        if ((question.questionType === 'scale' || question.questionType === 'multiple_choice' || question.questionType === 'boolean') && 
+            question.averageScore !== null && question.averageScore !== undefined) {
           questionsMap[questionId] = {
             id: questionId,
             questionId: questionId,
@@ -1017,16 +981,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
             participants: question.totalResponses,
             count: question.totalResponses,
             responseCount: question.totalResponses,
-            scaleMax: 10, // Default scale max
-            scale_max: 10,
+            scaleMax: question.questionType === 'scale' ? 10 : (question.questionType === 'multiple_choice' ? 10 : 1), // Adjust max based on type
+            scale_max: question.questionType === 'scale' ? 10 : (question.questionType === 'multiple_choice' ? 10 : 1),
             questionType: question.questionType,
             responseDistribution: question.responseDistribution,
             timestamp: question.timestamp
           };
         }
+        // Also include text questions - try to get sentiment-based averages
+        else if (question.questionType === 'text' && question.totalResponses > 0) {
+          // Check if we have sentiment analysis results for this text question
+          const sentimentAverage = question.averageScore; // This comes from calculateTextSentimentAverage
+          
+          questionsMap[questionId] = {
+            id: questionId,
+            questionId: questionId,
+            slideId: question.slideId,
+            questionTitle: question.questionTitle,
+            title: question.questionTitle,
+            question: question.questionTitle,
+            average: sentimentAverage ? parseFloat(sentimentAverage.toFixed(1)) : null,
+            avg: sentimentAverage ? parseFloat(sentimentAverage.toFixed(1)) : null,
+            value: sentimentAverage ? parseFloat(sentimentAverage.toFixed(1)) : null,
+            participantCount: question.totalResponses,
+            participants: question.totalResponses,
+            count: question.totalResponses,
+            responseCount: question.totalResponses,
+            scaleMax: sentimentAverage ? 10 : null, // Sentiment analysis uses 1-10 scale
+            scale_max: sentimentAverage ? 10 : null,
+            questionType: question.questionType,
+            responseDistribution: question.responseDistribution,
+            timestamp: question.timestamp,
+            hasTextResponses: true,
+            hasSentimentAnalysis: sentimentAverage !== null // Flag to indicate sentiment analysis was performed
+          };
+        }
       });
-      
-      console.log(`🧮 Processed ${Object.keys(questionsMap).length} scale questions for averages display`);
       
       res.json({
         sessionId,
@@ -1488,7 +1478,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/slides", async (req, res) => {
     try {
       const validatedData = insertSlideSchema.parse(req.body);
-      console.log(`📝 Creating slide with type: ${validatedData.type}`);
       const slide = await storage.createSlide(validatedData);
       res.json({ slide });
     } catch (error: any) {
@@ -1531,22 +1520,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/slides/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      console.log('🎯 API: PATCH /api/slides/:id received request', {
-        slideId: id,
-        requestBody: req.body,
-        requestBodyKeys: Object.keys(req.body || {}),
-        requestBodySize: JSON.stringify(req.body || {}).length,
-        timestamp: new Date().toISOString()
-      });
       
       const slide = await storage.updateSlide(id, req.body);
-      
-      console.log('✅ API: PATCH /api/slides/:id successful', {
-        slideId: id,
-        updatedSlide: slide,
-        slidePayloadJson: slide?.payloadJson,
-        timestamp: new Date().toISOString()
-      });
       
       res.json({ slide });
     } catch (error) {
@@ -1574,12 +1549,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Update single slide position - using fractional indexing
   app.put("/api/slides/:slideId/position", async (req, res) => {
-    console.log(`🔄 SLIDE POSITION UPDATE:`, {
-      slideId: req.params.slideId,
-      newPosition: req.body.newPosition,
-      timestamp: new Date().toISOString()
-    });
-    
     try {
       const { slideId } = req.params;
       const { newPosition } = req.body;
