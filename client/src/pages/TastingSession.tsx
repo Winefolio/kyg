@@ -113,11 +113,8 @@ export default function TastingSession() {
     mutationFn: async ({ sessionId, wineId }: { sessionId: string; wineId: string }) => {
       return await apiRequest('POST', `/api/sessions/${sessionId}/wines/${wineId}/sentiment-analysis`, {});
     },
-    onSuccess: (data, variables) => {
-      console.log('🎯 Sentiment analysis completed for wine:', variables.wineId, data);
-    },
     onError: (error) => {
-      console.error('❌ Sentiment analysis failed:', error);
+      console.error('Sentiment analysis failed:', error);
       // Non-blocking error - sentiment analysis is supplementary
     }
   });
@@ -125,28 +122,17 @@ export default function TastingSession() {
   // Step 4: Average Calculation Mutation
   const averageCalculationMutation = useMutation({
     mutationFn: async ({ sessionId, wineId }: { sessionId: string; wineId: string }) => {
-      console.log('🚀 Making averages API call for:', { sessionId, wineId });
       const response = await apiRequest('POST', `/api/sessions/${sessionId}/wines/${wineId}/calculate-averages`, {});
       const data = await response.json();
-      console.log('🚀 Raw response before parsing:', data);
       return data;
     },
     onSuccess: (data, variables) => {
-      console.log('🧮 Step 6: Average calculation completed for wine:', variables.wineId);
-      console.log('🧮 Step 6: Raw API response structure:', JSON.stringify(data, null, 2));
-      
       // Enhanced data parsing to match the backend's new format
       let averagesData;
       if (data && typeof data === 'object') {
         // The backend now returns data in enhanced format with multiple access paths
         const apiData = data as any;
         
-        console.log('🔍 Step 6: Debug parsing - apiData keys:', Object.keys(apiData));
-        console.log('🔍 Step 6: Debug parsing - apiData.questions exists:', !!apiData.questions);
-        console.log('🔍 Step 6: Debug parsing - apiData.questions type:', typeof apiData.questions);
-        console.log('🔍 Step 6: Debug parsing - apiData.questions keys length:', apiData.questions ? Object.keys(apiData.questions).length : 'N/A');
-        
-        // FIXED: Always try to find valid data instead of falling back to errors
         // Try all possible data access paths from backend
         if (apiData.questions && typeof apiData.questions === 'object' && Object.keys(apiData.questions).length > 0) {
           // Primary path: questions object with question details
@@ -160,7 +146,6 @@ export default function TastingSession() {
             scaleQuestions: apiData.scaleQuestions,
             timestamp: apiData.timestamp
           };
-          console.log('✅ Step 6: Using questions data path with', Object.keys(apiData.questions).length, 'questions');
         } else if (apiData.data && typeof apiData.data === 'object' && Object.keys(apiData.data).length > 0) {
           // Alternative path 1: data object
           averagesData = {
@@ -173,7 +158,6 @@ export default function TastingSession() {
             scaleQuestions: apiData.scaleQuestions,
             timestamp: apiData.timestamp
           };
-          console.log('✅ Step 6: Using data object path');
         } else if (apiData.averages && typeof apiData.averages === 'object' && Object.keys(apiData.averages).length > 0) {
           // Alternative path 2: averages object  
           averagesData = {
@@ -186,10 +170,8 @@ export default function TastingSession() {
             scaleQuestions: apiData.scaleQuestions,
             timestamp: apiData.timestamp
           };
-          console.log('✅ Step 6: Using averages object path');
         } else if (apiData.results && Array.isArray(apiData.results) && apiData.results.length > 0) {
           // Handle array format from backend
-          console.log('🔄 Step 6: Using results array path with', apiData.results.length, 'total results');
           const questionsObj: Record<string, any> = {};
           apiData.results.forEach((result: any, index: number) => {
             if (result.questionType === 'scale' && result.averageScore !== null && result.averageScore !== undefined) {
@@ -228,7 +210,6 @@ export default function TastingSession() {
               scaleQuestions: Object.keys(questionsObj).length,
               timestamp: apiData.timestamp
             };
-            console.log('✅ Step 6: Using results array path with', Object.keys(questionsObj).length, 'scale questions');
           } else {
             // Even if no scale questions, show something rather than error
             averagesData = {
@@ -242,12 +223,9 @@ export default function TastingSession() {
               timestamp: apiData.timestamp,
               message: 'No scale questions found for this wine'
             };
-            console.log('⚠️ Step 6: No scale questions in results array, but showing empty state');
           }
         } else {
           // Last resort: show the raw data without error
-          console.log('⚠️ Step 6: Using fallback raw data - no structured questions found');
-          console.log('⚠️ Step 6: Available data keys:', Object.keys(apiData));
           averagesData = {
             questions: {},
             data: apiData,
@@ -259,11 +237,9 @@ export default function TastingSession() {
             timestamp: apiData.timestamp,
             message: 'Raw data available but no structured averages'
           };
-          console.log('⚠️ Step 6: Using raw data fallback');
         }
       } else {
         // Handle invalid response format, but don't show error - show empty state
-        console.log('⚠️ Step 6: Invalid API response format, showing empty state');
         averagesData = {
           questions: {},
           data: {},
@@ -271,8 +247,6 @@ export default function TastingSession() {
           message: 'No data received from server'
         };
       }
-      
-      console.log('🧮 Step 6: Final processed averages data for display:', JSON.stringify(averagesData, null, 2));
       
       // ALWAYS show the averages modal, even if there are no questions
       setCurrentWineCompletionStatus(prev => ({
@@ -282,11 +256,9 @@ export default function TastingSession() {
         isBlocking: false, // Stop blocking timer
         isLoadingAverages: false // Stop showing loading state
       }));
-      
-      console.log('🧮 Step 6: Averages modal should now be visible');
     },
     onError: (error) => {
-      console.error('❌ Step 6: Average calculation failed:', error);
+      console.error('Average calculation failed:', error);
       // Even if averages fail, we should still show the modal with an error message
       setCurrentWineCompletionStatus(prev => ({
         ...prev,
@@ -387,9 +359,6 @@ export default function TastingSession() {
   
   // Log participant fetch status
   useEffect(() => {
-    if (participant) {
-      console.log('[TASTING_SESSION] Participant loaded:', participant.id);
-    }
     if (participantError) {
       console.error('[TASTING_SESSION] Error loading participant:', participantError);
     }
@@ -432,6 +401,17 @@ export default function TastingSession() {
   //     timestamp: new Date().toISOString()
   //   });
   // }, [slidesData]);
+
+  // Get session participants to determine if we need timers/results
+  const { data: sessionParticipants, isLoading: participantsLoading } = useQuery<any[]>({
+    queryKey: [`/api/sessions/${sessionId}/participants`],
+    queryFn: async () => {
+      const response = await apiRequest('GET', `/api/sessions/${sessionId}/participants`, null);
+      return response.json();
+    },
+    enabled: !!sessionId,
+    staleTime: 30000, // Cache for 30 seconds
+  });
 
   // Get participant responses
   const { data: responses } = useQuery<Response[]>({
@@ -622,11 +602,6 @@ export default function TastingSession() {
   // Wine completion tracking function - defined as callback to follow Rules of Hooks
   const checkWineCompletion = useCallback((wineId: string): boolean => {
     if (!wineId || !slides || slides.length === 0 || !responses) {
-      console.log('🍷 Wine completion check failed - missing data:', {
-        wineId: !!wineId,
-        slides: slides?.length || 0,
-        responses: responses?.length || 0
-      });
       return false;
     }
     
@@ -637,7 +612,6 @@ export default function TastingSession() {
       );
       
       if (wineQuestionSlides.length === 0) {
-        console.log('🍷 Wine completion check - no question slides found for wine:', wineId);
         return false;
       }
       
@@ -647,17 +621,6 @@ export default function TastingSession() {
         answeredSlideIds.has(slide.id)
       );
       const allQuestionsAnswered = wineQuestionSlides.length === answeredQuestionSlides.length;
-      
-      console.log('🍷 Wine completion check:', {
-        wineId,
-        totalQuestions: wineQuestionSlides.length,
-        answeredQuestions: answeredQuestionSlides.length,
-        allCompleted: allQuestionsAnswered,
-        currentSlideId: currentSlide?.id,
-        currentSlideWineId: currentSlide?.packageWineId,
-        questionSlideIds: wineQuestionSlides.map(s => s.id),
-        answeredSlideIds: Array.from(answeredSlideIds)
-      });
       
       return allQuestionsAnswered;
     } catch (error) {
@@ -682,16 +645,6 @@ export default function TastingSession() {
     
     const isLast = slideIndex === lastWineSlideIndex;
     
-    console.log('🍷 isLastSlideOfCurrentWine check:', {
-      wineId: currentWineId,
-      currentSlideIndex: slideIndex,
-      lastWineSlideIndex,
-      totalWineSlides: wineSlides.length,
-      isLastSlide: isLast,
-      currentSlideId: slides[slideIndex]?.id,
-      lastSlideId: lastWineSlide.id
-    });
-    
     return isLast;
   }, [slides]);
 
@@ -706,16 +659,44 @@ export default function TastingSession() {
     
     const isLeavingWine = currentSlideWineId && nextSlideWineId && currentSlideWineId !== nextSlideWineId;
     
-    console.log('🔄 isNavigatingToNextWine check:', {
-      currentIndex,
-      currentSlideWineId,
-      nextSlideWineId,
-      isLeavingWine,
-      nextSlideIndex: currentIndex + 1
-    });
-    
     return isLeavingWine;
   }, [slides]);
+
+  // Helper function to determine if we should show timer/results based on participant count
+  const shouldShowWineCompletionTimer = useCallback((): boolean => {
+    // If participants are still loading, default to false (no timer)
+    if (participantsLoading) {
+      return false;
+    }
+    
+    // If we don't have session participants data yet, default to false (no timer)
+    if (!sessionParticipants || sessionParticipants.length === 0) {
+      return false;
+    }
+    
+    // If 2 or fewer participants, no need for timer or results
+    if (sessionParticipants.length <= 2) {
+      return false;
+    }
+    
+    // 3+ participants - show timer and results
+    return true;
+  }, [sessionParticipants, participantsLoading]);
+
+  // Force reset wine completion status for sessions with only 1 participant
+  useEffect(() => {
+    if (!participantsLoading && sessionParticipants && sessionParticipants.length <= 2) {
+      setCurrentWineCompletionStatus(prev => ({
+        ...prev,
+        isBlocking: false,
+        showingCompletionStatus: false,
+        hasTriggeredProcessing: false,
+        showingAverages: false,
+        averagesData: null,
+        isLoadingAverages: false
+      }));
+    }
+  }, [sessionParticipants, participantsLoading]);
 
   // Prefetch upcoming media when slide changes or slides are loaded
   useEffect(() => {
@@ -760,7 +741,6 @@ export default function TastingSession() {
     
     // Save response in background without blocking UI
     if (participantId && participant) {
-      console.log('[TASTING_SESSION] Saving response with participantId:', participantId);
       setIsSaving(true);
       try {
         await saveResponse(participantId, slideId, answer);
@@ -778,8 +758,6 @@ export default function TastingSession() {
   // Clean up corrupted scale data when both responses and slides are available
   useEffect(() => {
     if (responses && responses.length > 0 && slides.length > 0) {
-      console.log('[TASTING_SESSION] Validating scale data...');
-      
       let corruptedCount = 0;
       
       responses.forEach((response: any) => {
@@ -832,7 +810,6 @@ export default function TastingSession() {
     
     const currentWineId = currentSlide.packageWineId;
     if (!currentWineId) {
-      console.log('🍷 Wine completion check: No current wine ID from slide - resetting status');
       setCurrentWineCompletionStatus(prev => ({
         ...prev,
         wineId: null,
@@ -849,10 +826,6 @@ export default function TastingSession() {
     // Only reset status when changing to a different wine (don't trigger blocking here)
     setCurrentWineCompletionStatus(prev => {
       if (prev.wineId !== currentWineId) {
-        console.log('🍷 Wine changed - resetting completion status:', {
-          from: prev.wineId,
-          to: currentWineId
-        });
         return {
           wineId: currentWineId,
           isParticipantFinished: false,
@@ -869,6 +842,32 @@ export default function TastingSession() {
     
   }, [currentSlide?.packageWineId, sessionId, participantId, slides]);
 
+  // Handle wine completion timer expiry
+  const handleWineCompletionTimerExpired = () => {
+    const wineId = currentWineCompletionStatus.wineId;
+    
+    // Unblock navigation and hide timer, show loading state
+    setCurrentWineCompletionStatus(prev => ({
+      ...prev,
+      showingCompletionStatus: false,
+      isBlocking: false,
+      isLoadingAverages: true // Show loading state while calculating averages
+    }));
+    
+    // Reset timer and skip button for next wine
+    setBlockingTimer(120);
+    setShowSkipButton(false);
+    
+    if (wineId && sessionId) {
+      // Trigger sentiment analysis and averages calculation immediately
+      sentimentAnalysisMutation.mutate({ sessionId, wineId });
+      
+      setTimeout(() => {
+        averageCalculationMutation.mutate({ sessionId, wineId });
+      }, 500);
+    }
+  };
+
   // Timer countdown for blocking wine completion screen
   useEffect(() => {
     if (!currentWineCompletionStatus.isBlocking) {
@@ -876,22 +875,13 @@ export default function TastingSession() {
       setShowSkipButton(false); // Reset skip button visibility
       return;
     }
-
-    console.log('⏰ Step 5: Starting countdown timer');
-    
-    // Show skip button immediately when timer starts running (as per requirement)
-    setShowSkipButton(true);
-    console.log('⏰ Step 5: Skip button is now available');
     
     const interval = setInterval(() => {
       setBlockingTimer((prev) => {
         if (prev <= 1) {
-          // Timer expired, trigger processing
-          console.log('⏰ Step 5: Timer expired, triggering processing');
-          const wineId = currentWineCompletionStatus.wineId;
-          if (wineId) {
-            handleWineCompletionTimerExpired();
-          }
+          // Timer expired, show skip button but don't auto-trigger processing
+          setShowSkipButton(true);
+          // Don't call handleWineCompletionTimerExpired() here - wait for user to click skip
           return 0;
         }
         return prev - 1;
@@ -899,10 +889,9 @@ export default function TastingSession() {
     }, 1000);
 
     return () => {
-      console.log('⏰ Step 5: Cleaning up timer');
       clearInterval(interval);
     };
-  }, [currentWineCompletionStatus.isBlocking, currentWineCompletionStatus.wineId]);
+  }, [currentWineCompletionStatus.isBlocking, currentWineCompletionStatus.wineId, handleWineCompletionTimerExpired]);
 
   // Format timer display
   const formatTimer = (seconds: number) => {
@@ -911,22 +900,117 @@ export default function TastingSession() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Step 5: Wine completion polling - DISABLED (no longer using blocking approach)
+  // Handle completion of all participants
+  const handleWineCompletionAllCompleted = useCallback(() => {
+    const wineId = currentWineCompletionStatus.wineId;
+    
+    if (wineId && sessionId) {
+      // Directly trigger Group Results when all non-host participants are done
+      // This allows the session to continue even if the host hasn't finished
+      setCurrentWineCompletionStatus(prev => ({
+        ...prev,
+        hasTriggeredProcessing: true,
+        isBlocking: false,
+        isLoadingAverages: true // Show loading state while calculating averages
+      }));
+      
+      // Reset timer and skip button since we're proceeding automatically
+      setBlockingTimer(120);
+      setShowSkipButton(false);
+      
+      // Trigger sentiment analysis and averages calculation immediately
+      sentimentAnalysisMutation.mutate({ sessionId, wineId });
+      
+      setTimeout(() => {
+        averageCalculationMutation.mutate({ sessionId, wineId });
+      }, 500);
+    }
+  }, [sessionId, currentWineCompletionStatus.wineId, sentimentAnalysisMutation, averageCalculationMutation]);
+
+  // Step 5: Wine completion polling - Check if all participants have finished while timer is running
+  // HOST BEHAVIOR: If the current participant is the host, we don't poll for completion
+  // since the host can manually control when to proceed. Only non-host participants
+  // benefit from automatic progression when all other non-host participants finish.
   useEffect(() => {
-    // Polling functionality removed - Group Results are triggered directly
-    return;
-  }, []);
+    // Only start polling when blocking starts for the first time
+    if (!sessionId || !currentWineCompletionStatus.wineId || !currentWineCompletionStatus.isBlocking || currentWineCompletionStatus.hasTriggeredProcessing) {
+      return;
+    }
+
+    // Only poll if we should show timer (3+ participants) - check at start only
+    if (participantsLoading || !sessionParticipants || sessionParticipants.length <= 2) {
+      return;
+    }
+
+    // Only poll if current participant is not the host - check at start only
+    if (!participant || participant.isHost) {
+      return;
+    }
+
+    const wineId = currentWineCompletionStatus.wineId;
+
+    // Capture mutations at the start to avoid stale references
+    const currentSentimentMutation = sentimentAnalysisMutation;
+    const currentAverageMutation = averageCalculationMutation;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        // Check completion status for all participants
+        const response = await apiRequest('GET', `/api/sessions/${sessionId}/wines/${wineId}/completion-status`, null);
+        const completionData = await response.json();
+        
+        // Check if all non-host participants have completed their questions
+        // This allows progression even if the host hasn't finished
+        if (completionData.allNonHostParticipantsCompleted || completionData.allParticipantsCompleted) {
+          // Clear the polling interval
+          clearInterval(pollInterval);
+          
+          // Directly trigger Group Results when all non-host participants are done
+          setCurrentWineCompletionStatus(prev => ({
+            ...prev,
+            hasTriggeredProcessing: true,
+            isBlocking: false,
+            isLoadingAverages: true // Show loading state while calculating averages
+          }));
+          
+          // Reset timer and skip button since we're proceeding automatically
+          setBlockingTimer(120);
+          setShowSkipButton(false);
+          
+          // Trigger sentiment analysis and averages calculation immediately
+          currentSentimentMutation.mutate({ sessionId, wineId });
+          
+          setTimeout(() => {
+            currentAverageMutation.mutate({ sessionId, wineId });
+          }, 500);
+        }
+      } catch (error) {
+        console.error('Error polling wine completion status:', error);
+        // Continue polling despite errors
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [sessionId, currentWineCompletionStatus.wineId, currentWineCompletionStatus.isBlocking]);
 
   // Step 3: Auto-trigger sentiment analysis and averages when blocking starts
+  // ONLY for sessions with 2 or fewer participants OR when current participant is host
+  // For 3+ participant sessions with non-host participants, let polling handle the timing
   useEffect(() => {
     if (!sessionId || !currentWineCompletionStatus.wineId || !currentWineCompletionStatus.isBlocking || currentWineCompletionStatus.hasTriggeredProcessing) {
       return;
     }
 
+    // Skip auto-triggering if we should be polling instead
+    // This allows the polling mechanism to control when averages are shown
+    if (shouldShowWineCompletionTimer() && participant && !participant.isHost) {
+      return;
+    }
+
     // Only trigger when blocking starts for the first time
     const wineId = currentWineCompletionStatus.wineId;
-    
-    console.log('🍷 Step 5: Wine completion blocking started - triggering auto-processing for wine:', wineId);
     
     // Mark as triggered immediately to prevent multiple calls
     setCurrentWineCompletionStatus(prev => ({
@@ -936,18 +1020,16 @@ export default function TastingSession() {
     
     // Debounce to prevent multiple triggers
     const timeoutId = setTimeout(() => {
-      console.log('📊 Step 3: Auto-triggering sentiment analysis for wine:', wineId);
       sentimentAnalysisMutation.mutate({ sessionId, wineId });
       
       // Step 4: Also trigger average calculation after sentiment analysis
       setTimeout(() => {
-        console.log('🧮 Step 4: Auto-triggering average calculation for wine:', wineId);
         averageCalculationMutation.mutate({ sessionId, wineId });
       }, 500); // Small delay after sentiment analysis
     }, 1000); // 1 second delay to ensure responses are saved
 
     return () => clearTimeout(timeoutId);
-  }, [sessionId, currentWineCompletionStatus.wineId, currentWineCompletionStatus.isBlocking, currentWineCompletionStatus.hasTriggeredProcessing, sentimentAnalysisMutation, averageCalculationMutation]);
+  }, [sessionId, currentWineCompletionStatus.wineId, currentWineCompletionStatus.isBlocking, currentWineCompletionStatus.hasTriggeredProcessing, sentimentAnalysisMutation, averageCalculationMutation, shouldShowWineCompletionTimer, participant]);
 
   if (sessionDetailsLoading || isLoading) {
     return (
@@ -1121,68 +1203,49 @@ export default function TastingSession() {
   const goToNextSlide = async () => {
     const currentWineId = currentWine?.id;
     
-    console.log(' [NAVIGATION START] goToNextSlide called:', {
-      currentSlideIndex,
-      totalSlides: slides?.length,
-      currentWineId,
-      isLastSlideOfWine: isLastSlideOfCurrentWine(currentSlideIndex, currentWineId),
-      isNavigatingToNextWine: isNavigatingToNextWine(currentSlideIndex),
-      timestamp: new Date().toISOString()
-    });
-    
     if (!slides || slides.length === 0) return;
     
     // CRITICAL: Block navigation if wine completion is blocking OR if showing averages
     if (currentWineCompletionStatus.isBlocking || currentWineCompletionStatus.showingAverages) {
-      console.log('🚫 Step 5: Navigation blocked - waiting for wine completion timer/skip or averages display', {
-        isBlocking: currentWineCompletionStatus.isBlocking,
-        showingAverages: currentWineCompletionStatus.showingAverages
-      });
       return;
     }
     
     // NEW LOGIC: Check for wine completion at the right time
-    // Case 1: We're at the last slide of the current wine
-    // Case 2: We're navigating to a different wine (transition detection)
+    // Only trigger wine completion when we're actually leaving a wine AND all questions are answered
+    // Case 1: We're at the last slide of the current wine AND all questions are completed
+    // Case 2: We're navigating to a different wine AND all questions for current wine are completed
     const shouldCheckWineCompletion = currentWineId && (
-      isLastSlideOfCurrentWine(currentSlideIndex, currentWineId) || 
-      isNavigatingToNextWine(currentSlideIndex)
+      (isLastSlideOfCurrentWine(currentSlideIndex, currentWineId) && checkWineCompletion(currentWineId)) || 
+      (isNavigatingToNextWine(currentSlideIndex) && checkWineCompletion(currentWineId))
     );
     
     if (shouldCheckWineCompletion) {
       const isWineComplete = checkWineCompletion(currentWineId);
       
-      console.log('🍷 Wine completion check triggered:', {
-        currentWine: currentWineId,
-        wineName: currentWine?.wineName,
-        isWineComplete,
-        isLastSlide: isLastSlideOfCurrentWine(currentSlideIndex, currentWineId),
-        isNavigatingToNext: isNavigatingToNextWine(currentSlideIndex),
-        hasTriggeredProcessing: currentWineCompletionStatus.hasTriggeredProcessing,
-        showingAverages: currentWineCompletionStatus.showingAverages,
-        reason: isLastSlideOfCurrentWine(currentSlideIndex, currentWineId) ? 'last slide of wine' : 'navigating to next wine'
-      });
-      
-      // RESTORED: Show blocking timer after finishing last slide
-      // This matches requirement: "after each wine. After slides of a wine is finished show timer"
-      if (!currentWineCompletionStatus.hasTriggeredProcessing && !currentWineCompletionStatus.showingAverages) {
-        console.log('🍷 Step 5: Triggering wine completion timer for wine (last slide reached):', currentWineId);
+      // Only proceed with wine completion if ALL questions have been answered
+      if (isWineComplete && !currentWineCompletionStatus.hasTriggeredProcessing && !currentWineCompletionStatus.showingAverages) {
+        const shouldShowTimer = shouldShowWineCompletionTimer();
         
-        // Show blocking timer modal
-        setCurrentWineCompletionStatus(prev => ({
-          ...prev,
-          wineId: currentWineId,
-          isParticipantFinished: true,
-          hasTriggeredProcessing: false, // Keep false so auto-processing can trigger
-          isBlocking: true, // Block navigation and show timer modal
-          isLoadingAverages: false
-        }));
-        
-        return; // Block navigation until user skips timer or processing is complete
+        if (!shouldShowTimer) {
+          // Single participant: skip timer and results completely
+          // Just continue navigation normally without blocking
+        } else {
+          // 2+ participants: show timer and results as before
+          
+          // Show blocking timer modal
+          setCurrentWineCompletionStatus(prev => ({
+            ...prev,
+            wineId: currentWineId,
+            isParticipantFinished: true,
+            hasTriggeredProcessing: false, // Keep false so auto-processing can trigger
+            isBlocking: true, // Block navigation and show timer modal
+            isLoadingAverages: false
+          }));
+          
+          return; // Block navigation until user skips timer or processing is complete
+        }
       }
     }
-    
-    console.log('✅ Step 5: Navigation allowed - proceeding to next slide');
     
     if (currentSlideIndex < slides.length - 1) {
       const nextSlide = slides[currentSlideIndex + 1];
@@ -1190,8 +1253,6 @@ export default function TastingSession() {
       
       const currentSection = getSlideSection(currentSlide);
       const nextSection = getSlideSection(nextSlide);
-      
-
       
       // Check if we're leaving package intro or transitioning to a new wine
       const isLeavingPackageIntro = currentSlide?.payloadJson?.is_package_intro === true;
@@ -1384,22 +1445,6 @@ export default function TastingSession() {
     const originalValue = numericValue;
     numericValue = Math.max(scaleMin, Math.min(scaleMax, numericValue));
     
-    // Log corrupted data for debugging and potential data cleanup
-    if (originalValue !== numericValue) {
-      console.error(`🚨 CORRUPTED SCALE DATA DETECTED:`, {
-        slideId: 'unknown',
-        slideTitle: 'unknown',
-        originalAnswer,
-        originalValue,
-        clampedValue: numericValue,
-        scaleRange: `${scaleMin}-${scaleMax}`,
-        participantId,
-        timestamp: new Date().toISOString()
-      });
-      
-      // Note: Corrupted data will be detected and corrected by validation useEffect
-    }
-    
     // Round to nearest integer for cleaner display
     return Math.round(numericValue);
   };
@@ -1407,12 +1452,9 @@ export default function TastingSession() {
   // Step 5: Timer and Skip Option handlers
   const processTextAnswersAndShowAverages = (wineId: string, trigger: string) => {
     if (!sessionId) {
-      console.error('❌ Step 5: Cannot process answers - sessionId is undefined');
+      console.error('Cannot process answers - sessionId is undefined');
       return;
     }
-    
-    console.log(`🚀 Step 5: Processing text answers and showing averages triggered by: ${trigger} for wine: ${wineId}`);
-    console.log('🧮 Current wine completion status before processing:', currentWineCompletionStatus);
     
     // Mark as triggered to prevent auto-processing and unblock navigation
     setCurrentWineCompletionStatus(prev => ({
@@ -1423,22 +1465,14 @@ export default function TastingSession() {
     }));
     
     // Step 3: Perform sentiment analysis on text responses (optional, non-blocking)
-    console.log('📊 Step 5 -> Step 3: Triggering sentiment analysis for wine:', wineId);
     sentimentAnalysisMutation.mutate({ sessionId, wineId });
     
     // Step 4: Calculate and display averages immediately (don't wait for sentiment)
-    console.log('🧮 Step 5 -> Step 4: Triggering average calculation for wine:', wineId);
-    console.log('🧮 Using session ID:', sessionId, 'and wine ID:', wineId);
-    
-    // Call averages calculation immediately
     averageCalculationMutation.mutate({ sessionId, wineId });
   };
 
   const handleWineCompletionSkip = () => {
-    console.log('⏭️ Step 5: Wine completion timer skipped by user');
-    console.log('⏭️ Current wine completion status before skip:', currentWineCompletionStatus);
     const wineId = currentWineCompletionStatus.wineId;
-    console.log('⏭️ Wine ID for skip:', wineId);
     
     // Unblock navigation and hide timer, but show loading state for Group Results
     setCurrentWineCompletionStatus(prev => ({
@@ -1453,80 +1487,21 @@ export default function TastingSession() {
     setShowSkipButton(false);
     
     if (wineId && sessionId) {
-      console.log('⏭️ Triggering Group Results after skip for wineId:', wineId);
-      
       // Trigger sentiment analysis and averages calculation immediately
-      console.log('📊 Step 3: Triggering sentiment analysis for wine:', wineId);
       sentimentAnalysisMutation.mutate({ sessionId, wineId });
       
       // Step 4: Also trigger average calculation after sentiment analysis
       setTimeout(() => {
-        console.log('🧮 Step 4: Triggering average calculation for wine:', wineId);
         averageCalculationMutation.mutate({ sessionId, wineId });
       }, 500); // Small delay after sentiment analysis
     } else {
-      console.error('⏭️ ERROR: Missing wineId or sessionId for Group Results');
+      console.error('ERROR: Missing wineId or sessionId for Group Results');
     }
   };
 
-  const handleWineCompletionAllCompleted = () => {
-    console.log('✅ Step 5: All participants completed the wine - directly showing Group Results');
-    const wineId = currentWineCompletionStatus.wineId;
-    
-    if (wineId && sessionId) {
-      // Directly trigger Group Results
-      setCurrentWineCompletionStatus(prev => ({
-        ...prev,
-        hasTriggeredProcessing: true,
-        isBlocking: false,
-        isLoadingAverages: true // Show loading state while calculating averages
-      }));
-      
-      // Trigger sentiment analysis and averages calculation immediately
-      console.log('📊 Step 3: Triggering sentiment analysis for wine:', wineId);
-      sentimentAnalysisMutation.mutate({ sessionId, wineId });
-      
-      setTimeout(() => {
-        console.log('🧮 Step 4: Triggering average calculation for wine:', wineId);
-        averageCalculationMutation.mutate({ sessionId, wineId });
-      }, 500);
-    }
-  };
-
-  const handleWineCompletionTimerExpired = () => {
-    console.log('⏰ Step 5: Wine completion timer expired');
-    const wineId = currentWineCompletionStatus.wineId;
-    
-    // Unblock navigation and hide timer, show loading state
-    setCurrentWineCompletionStatus(prev => ({
-      ...prev,
-      showingCompletionStatus: false,
-      isBlocking: false,
-      isLoadingAverages: true // Show loading state while calculating averages
-    }));
-    
-    // Reset timer and skip button for next wine
-    setBlockingTimer(120);
-    setShowSkipButton(false);
-    
-    if (wineId && sessionId) {
-      console.log('⏰ Triggering Group Results after timer expiry for wineId:', wineId);
-      
-      // Trigger sentiment analysis and averages calculation immediately
-      console.log('📊 Step 3: Triggering sentiment analysis for wine:', wineId);
-      sentimentAnalysisMutation.mutate({ sessionId, wineId });
-      
-      setTimeout(() => {
-        console.log('🧮 Step 4: Triggering average calculation for wine:', wineId);
-        averageCalculationMutation.mutate({ sessionId, wineId });
-      }, 500);
-    }
-  };
 
   // Step 6: Handle completion of averages display and progress to next wine
   const handleAveragesComplete = () => {
-    console.log('📊 Step 6: Averages display complete, progressing to next wine');
-    
     // Reset wine completion status for next wine
     setCurrentWineCompletionStatus({
       wineId: null,
@@ -1547,7 +1522,6 @@ export default function TastingSession() {
       
       // If moving to a different wine, show wine introduction
       if (nextWine && currentWineId !== nextWine.id) {
-        console.log('🍷 Moving to new wine after averages, showing wine introduction:', nextWine.wineName);
         
         setWineIntroductionData({
           wine: {
@@ -2427,15 +2401,10 @@ export default function TastingSession() {
 
       {/* Wine Completion Status - Blocking Timer Modal */}
       {(() => {
-        const shouldShow = sessionId && participantId && currentWineCompletionStatus.wineId && currentWineCompletionStatus.isBlocking;
-        console.log('🖥️ Blocking timer modal render check:', {
-          sessionId: !!sessionId,
-          participantId: !!participantId,
-          wineId: !!currentWineCompletionStatus.wineId,
-          isBlocking: currentWineCompletionStatus.isBlocking,
-          shouldShow,
-          currentWineCompletionStatus
-        });
+        const shouldShowBasedOnParticipants = shouldShowWineCompletionTimer();
+        const shouldShow = sessionId && participantId && currentWineCompletionStatus.wineId && 
+                          currentWineCompletionStatus.isBlocking && shouldShowBasedOnParticipants;
+        
         return shouldShow;
       })() && (
         <div 
@@ -2509,17 +2478,10 @@ export default function TastingSession() {
 
       {/* Step 5: Loading state for Group Results calculation */}
       {(() => {
+        const shouldShowBasedOnParticipants = shouldShowWineCompletionTimer();
         const shouldShow = sessionId && participantId && currentWineCompletionStatus.wineId && 
                           currentWineCompletionStatus.isLoadingAverages && 
-                          !currentWineCompletionStatus.showingAverages;
-        console.log('🔄 Loading Group Results render check:', {
-          sessionId: !!sessionId,
-          participantId: !!participantId,
-          wineId: !!currentWineCompletionStatus.wineId,
-          isLoadingAverages: currentWineCompletionStatus.isLoadingAverages,
-          showingAverages: currentWineCompletionStatus.showingAverages,
-          shouldShow
-        });
+                          !currentWineCompletionStatus.showingAverages && shouldShowBasedOnParticipants;
         return shouldShow;
       })() && (
         <div 
@@ -2573,7 +2535,9 @@ export default function TastingSession() {
 
       {/* Step 6: Wine Averages Display - Show after processing completes */}
       {(() => {
-        const shouldShow = sessionId && participantId && currentWineCompletionStatus.showingAverages && currentWineCompletionStatus.averagesData;
+        const shouldShowBasedOnParticipants = shouldShowWineCompletionTimer();
+        const shouldShow = sessionId && participantId && currentWineCompletionStatus.showingAverages && 
+                          currentWineCompletionStatus.averagesData && shouldShowBasedOnParticipants;
         
         // Additional check: Only show if there are actually questions with averages to display
         let hasValidAverages = false;
@@ -2586,17 +2550,6 @@ export default function TastingSession() {
         }
         
         const finalShouldShow = shouldShow && hasValidAverages;
-        
-        console.log('📊 Averages modal render check:', {
-          sessionId: !!sessionId,
-          participantId: !!participantId,
-          showingAverages: currentWineCompletionStatus.showingAverages,
-          hasAveragesData: !!currentWineCompletionStatus.averagesData,
-          hasValidAverages,
-          shouldShow,
-          finalShouldShow,
-          averagesData: currentWineCompletionStatus.averagesData
-        });
         
         // If we don't have valid averages to show, automatically complete and continue
         if (shouldShow && !hasValidAverages && currentWineCompletionStatus.averagesData) {
@@ -2698,11 +2651,49 @@ export default function TastingSession() {
                                              questionData.responseCount || 0;
                       const scaleMax = questionData.scaleMax || questionData.scale_max || 10;
                       const responseDistribution = questionData.responseDistribution;
+                      const questionType = questionData.questionType || 'scale';
+                      const hasTextResponses = questionData.hasTextResponses;
+                      const hasSentimentAnalysis = questionData.hasSentimentAnalysis;
                       
-                      // Format average to show meaningful precision
-                      const formattedAverage = typeof average === 'number' ? 
-                        (average % 1 === 0 ? average.toString() : average.toFixed(1)) : 
-                        average;
+                      // Debug logging for text questions
+                      if (questionType === 'text') {
+                        console.log('🔍 Text question debug:', {
+                          questionTitle: questionTitle,
+                          hasTextResponses,
+                          hasSentimentAnalysis,
+                          average: average,
+                          averageType: typeof average
+                        });
+                      }
+                      
+                      // Format average to show meaningful precision and handle different types
+                      let formattedAverage = '';
+                      let displayUnit = '';
+                      
+                      if ((hasTextResponses || questionType === 'text') && !hasSentimentAnalysis && typeof average !== 'number') {
+                        // Only show response count if we don't have sentiment analysis and no numeric average
+                        formattedAverage = `${participantCount} response${participantCount !== 1 ? 's' : ''}`;
+                        displayUnit = '';
+                      } else if (typeof average === 'number') {
+                        if (questionType === 'multiple_choice') {
+                          formattedAverage = `${(average * 10).toFixed(0)}%`;
+                          displayUnit = 'consensus';
+                        } else if (questionType === 'boolean') {
+                          formattedAverage = `${(average * 100).toFixed(0)}%`;
+                          displayUnit = 'agreement';
+                        } else if (questionType === 'text' && hasSentimentAnalysis) {
+                          // Sentiment analysis scores (1-10 scale)
+                          formattedAverage = average % 1 === 0 ? average.toString() : average.toFixed(1);
+                          displayUnit = '/10';
+                        } else {
+                          // Scale questions
+                          formattedAverage = average % 1 === 0 ? average.toString() : average.toFixed(1);
+                          displayUnit = `/${scaleMax}`;
+                        }
+                      } else {
+                        formattedAverage = average || 'N/A';
+                        displayUnit = '';
+                      }
                       
                       return (
                         <div key={questionId} className="bg-white/10 rounded-2xl p-6 border border-white/10 hover:border-white/20 transition-colors">
@@ -2712,29 +2703,42 @@ export default function TastingSession() {
                           
                           <div className="flex items-center justify-between mb-4">
                             <div className="text-white/70 text-sm font-medium">
-                              Group Average
+                              {questionType === 'multiple_choice' ? 'Most Popular' : 
+                               questionType === 'boolean' ? 'Group Agreement' :
+                               questionType === 'text' && hasSentimentAnalysis ? 'Sentiment Average' :
+                               questionType === 'text' ? 'Text Responses' :
+                               'Group Average'}
                             </div>
                             <div className="flex items-baseline gap-1">
                               <span className="text-4xl font-bold text-white">
                                 {formattedAverage}
                               </span>
-                              <span className="text-xl text-white/60 font-medium">
-                                /{scaleMax}
-                              </span>
+                              {displayUnit && (
+                                <span className="text-xl text-white/60 font-medium">
+                                  {displayUnit}
+                                </span>
+                              )}
                             </div>
                           </div>
                           
-                          {/* Enhanced visual progress bar */}
-                          <div className="w-full bg-white/20 rounded-full h-4 mb-3 overflow-hidden">
-                            <div 
-                              className="bg-gradient-to-r from-emerald-400 via-blue-400 to-indigo-500 h-4 rounded-full transition-all duration-1500 ease-out shadow-sm"
-                              style={{ 
-                                width: `${Math.min(100, Math.max(0, (typeof average === 'number' ? average : 0) / scaleMax * 100))}%` 
-                              }}
-                            >
-                              <div className="w-full h-full bg-white/20 animate-pulse"></div>
+                          {/* Enhanced visual progress bar - show for numeric averages including sentiment scores */}
+                          {typeof average === 'number' && (questionType !== 'text' || hasSentimentAnalysis) && (
+                            <div className="w-full bg-white/20 rounded-full h-4 mb-3 overflow-hidden">
+                              <div 
+                                className="bg-gradient-to-r from-emerald-400 via-blue-400 to-indigo-500 h-4 rounded-full transition-all duration-1500 ease-out shadow-sm"
+                                style={{ 
+                                  width: `${Math.min(100, Math.max(0, 
+                                    questionType === 'multiple_choice' ? average * 10 : 
+                                    questionType === 'boolean' ? average * 100 : 
+                                    questionType === 'text' && hasSentimentAnalysis ? (average / 10 * 100) :
+                                    (average / scaleMax * 100)
+                                  ))}%` 
+                                }}
+                              >
+                                <div className="w-full h-full bg-white/20 animate-pulse"></div>
+                              </div>
                             </div>
-                          </div>
+                          )}
                           
                           {/* Participant count and additional info */}
                           <div className="flex items-center justify-between text-sm">
