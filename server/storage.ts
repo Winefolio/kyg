@@ -2794,6 +2794,11 @@ export class DatabaseStorage implements IStorage {
             const optionId = option.id || option;
             distribution[optionId] = (distribution[optionId] || 0) + 1;
           });
+        } else if (answerObj.selected && Array.isArray(answerObj.selected)) {
+          // Handle "selected" array format (e.g., ["1", "2"])
+          answerObj.selected.forEach((optionId: string) => {
+            distribution[optionId] = (distribution[optionId] || 0) + 1;
+          });
         }
       }
     });
@@ -2802,17 +2807,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   private calculateMultipleChoiceScore(distribution: any): number {
-    // For multiple choice, we can calculate a "popularity score" 
-    // based on the most selected options
+    // For multiple choice, calculate the percentage of responses that chose the most popular option
     const totalResponses = Object.values(distribution).reduce((sum: number, count: any) => sum + count, 0);
     if (totalResponses === 0) return 0;
 
-    // Get the highest count
+    // Get the highest count (most popular option)
     const maxCount = Math.max(...Object.values(distribution) as number[]);
     
-    // Calculate percentage of consensus (0-10 scale)
-    const consensusPercentage = (maxCount / totalResponses);
-    return Math.round(consensusPercentage * 10 * 100) / 100; // Scale to 0-10, round to 2 decimals
+    // Return percentage as decimal (0-1) for frontend to display correctly
+    const consensusPercentage = maxCount / totalResponses;
+    return Math.round(consensusPercentage * 100) / 100; // Round to 2 decimals (0.00-1.00)
   }
 
   private getBooleanDistribution(responses: any[]): any {
