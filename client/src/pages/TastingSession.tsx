@@ -82,6 +82,7 @@ export default function TastingSession() {
   // Timer state for blocking wine completion screen
   const [blockingTimer, setBlockingTimer] = useState(120); // 2 minutes in seconds
   const [showSkipButton, setShowSkipButton] = useState(false); // Show skip button after timer starts running
+  const [isCheckingCompletion, setIsCheckingCompletion] = useState(false); // Loading overlay before timer
   
   // Wine completion tracking state
   const [currentWineCompletionStatus, setCurrentWineCompletionStatus] = useState<{
@@ -284,6 +285,61 @@ export default function TastingSession() {
     };
   }, []);
   
+  // Check if all participants have replied before timer starts
+  useEffect(() => {
+    // Check when WineCompletionStatus component would be rendered (same conditions)
+    const shouldShowWineCompletion = sessionId && participantId && currentWineCompletionStatus.wineId && 
+       !currentWineCompletionStatus.isBlocking && 
+       !currentWineCompletionStatus.showingAverages;
+       
+    if (shouldShowWineCompletion && currentWineCompletionStatus.wineId && sessionId && !isCheckingCompletion) {
+      console.log('🔍 Checking if all participants have replied...', {
+        sessionId,
+        wineId: currentWineCompletionStatus.wineId
+      });
+      
+      setIsCheckingCompletion(true);
+      
+      // Check backend to see if all participants have replied
+      apiRequest('GET', `/api/sessions/${sessionId}/wines/${currentWineCompletionStatus.wineId}/all-participants-replied`, {})
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            console.log('✅ Participants check response:', data);
+            
+            if (data && data.allParticipantsReplied) {
+              console.log('🚀 All participants replied, skipping timer and showing averages');
+              // Skip timer, show averages immediately
+              setCurrentWineCompletionStatus(prev => ({
+                ...prev,
+                isBlocking: false,
+                showingAverages: true,
+                isLoadingAverages: true
+              }));
+              // Trigger averages calculation
+              if (currentWineCompletionStatus.wineId) {
+                averageCalculationMutation.mutate({ sessionId, wineId: currentWineCompletionStatus.wineId });
+              }
+            } else {
+              console.log('⏱️ Not all participants replied, showing timer');
+              // Not all replied, proceed with timer as normal (let WineCompletionStatus handle it)
+            }
+          } else {
+            console.warn('⚠️ API call failed with status:', res.status);
+            // API call failed, proceed with timer as normal
+          }
+        })
+        .catch((error) => {
+          console.error('❌ Error checking participants:', error);
+          // If the API call fails, proceed with timer as normal
+        })
+        .finally(() => {
+          console.log('🏁 Finished checking participants');
+          setIsCheckingCompletion(false);
+        });
+    }
+  }, [currentWineCompletionStatus.isBlocking, currentWineCompletionStatus.showingAverages, sessionId, participantId, currentWineCompletionStatus.wineId, averageCalculationMutation, isCheckingCompletion]);
+  
   // Log state changes
   // useEffect(() => {
   //   console.log('🔄 [STATE CHANGE] currentSlideIndex changed:', {
@@ -367,7 +423,8 @@ export default function TastingSession() {
   // Memoize query key dependencies to prevent unnecessary refetches
   const slidesQueryKey = useMemo(() => {
     return [
-      `/api/packages/${currentSession?.packageCode}/slides`,
+      'slides', 
+      currentSession?.packageCode, 
       participantId,
       currentSession?.status
     ];
@@ -673,7 +730,11 @@ export default function TastingSession() {
     if (!sessionParticipants || sessionParticipants.length === 0) {
       return false;
     }
-    
+
+    console.log("=============================================================================");
+    console.warn('Session Participants: ', sessionParticipants);
+    console.log("=============================================================================");
+
     // If 2 or fewer participants, no need for timer or results
     if (sessionParticipants.length <= 2) {
       return false;
@@ -2442,13 +2503,11 @@ export default function TastingSession() {
                 </p>
 
                 <div className="bg-white/10 rounded-2xl p-4 mb-4">
-                  <div className="flex items-center justify-center gap-2 mb-3">
-                    <Clock className="h-5 w-5 text-amber-400" />
-                    <span className="text-white font-medium">Time Remaining</span>
+                  <div className="flex justify-center py-2">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
                   </div>
-                  <div className="text-3xl font-mono text-white mb-2">{formatTimer(blockingTimer)}</div>
                   <div className="text-white/60 text-sm">
-                    Processing will begin automatically when timer expires
+                    Please wait while we calculate averages
                   </div>
                 </div>
               </div>
@@ -2476,11 +2535,11 @@ export default function TastingSession() {
         </div>
       )}
 
-      {/* Step 5: Loading state for Group Results calculation */}
+      {/* Step 5: Loading state for Group Results calculation OR checking participants */}
       {(() => {
         const shouldShowBasedOnParticipants = shouldShowWineCompletionTimer();
         const shouldShow = sessionId && participantId && currentWineCompletionStatus.wineId && 
-                          currentWineCompletionStatus.isLoadingAverages && 
+                          (currentWineCompletionStatus.isLoadingAverages || isCheckingCompletion) && 
                           !currentWineCompletionStatus.showingAverages && shouldShowBasedOnParticipants;
         return shouldShow;
       })() && (
@@ -2515,13 +2574,18 @@ export default function TastingSession() {
 
               <div className="mb-6">
                 <p className="text-white/70 mb-4">
-                  Analyzing responses and calculating averages...
+                  {isCheckingCompletion ? 
+                    'Checking if all participants have finished...' :
+                    'Analyzing responses and calculating averages...'
+                  }
                 </p>
 
                 <div className="bg-white/10 rounded-2xl p-4 mb-4">
                   <div className="flex items-center justify-center gap-2 mb-3">
                     <div className="animate-spin rounded-full h-6 w-6 border-2 border-white/20 border-t-purple-400"></div>
-                    <span className="text-white font-medium">Processing Results</span>
+                    <span className="text-white font-medium">
+                      {isCheckingCompletion ? 'Checking Participants' : 'Processing Results'}
+                    </span>
                   </div>
                   <div className="text-white/60 text-sm">
                     This will only take a moment...
@@ -2589,7 +2653,7 @@ export default function TastingSession() {
                 </p>
               </div>
 
-              <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+              <div className="space-y-4 mb-6 max-h-96 overflow-y-auto custom-scrollbar overflow-y-scroll">
                 {/* Always try to show averages data, even if there's a message */}
                 {currentWineCompletionStatus.averagesData.questions || currentWineCompletionStatus.averagesData.data || currentWineCompletionStatus.averagesData.averages ? (
                   (() => {
@@ -2676,8 +2740,15 @@ export default function TastingSession() {
                         displayUnit = '';
                       } else if (typeof average === 'number') {
                         if (questionType === 'multiple_choice') {
-                          formattedAverage = `${(average * 100).toFixed(0)}%`;
-                          displayUnit = 'consensus';
+                          // For multiple choice, show the highest percentage from the distribution
+                          if (responseDistribution && Array.isArray(responseDistribution) && responseDistribution.length > 0) {
+                            const maxPercentage = Math.max(...responseDistribution.map((opt: any) => opt.percentage || 0));
+                            formattedAverage = `${maxPercentage.toFixed(0)}%`;
+                            displayUnit = '';
+                          } else {
+                            formattedAverage = `${(average * 100).toFixed(0)}%`;
+                            displayUnit = 'consensus';
+                          }
                         } else if (questionType === 'boolean') {
                           formattedAverage = `${(average * 100).toFixed(0)}%`;
                           displayUnit = 'agreement';
@@ -2702,37 +2773,53 @@ export default function TastingSession() {
                           </h3>
                           
                           <div className="flex items-center justify-between mb-4">
-                            <div className="text-white/70 text-sm font-medium">
-                              {questionType === 'multiple_choice' ? 'Most Popular' : 
-                               questionType === 'boolean' ? 'Group Agreement' :
-                               questionType === 'text' && hasSentimentAnalysis ? 'Sentiment Average' :
-                               questionType === 'text' ? 'Text Responses' :
-                               'Group Average'}
-                            </div>
-                            <div className="flex items-baseline gap-1">
-                              <span className="text-4xl font-bold text-white">
-                                {formattedAverage}
-                              </span>
-                              {displayUnit && (
-                                <span className="text-xl text-white/60 font-medium">
-                                  {displayUnit}
-                                </span>
-                              )}
-                            </div>
+                            {(questionType !== 'text' || hasSentimentAnalysis) && (
+                              <>
+                                <div className="text-white/70 text-sm font-medium">
+                                  {questionType === 'multiple_choice' ? 'Top Choice' : 
+                                   questionType === 'boolean' ? 'Group Agreement' :
+                                   questionType === 'text' && hasSentimentAnalysis ? 'Sentiment Average' :
+                                   'Group Average'}
+                                </div>
+                                <div className="flex items-baseline gap-1">
+                                  <span className="text-4xl font-bold text-white">
+                                    {formattedAverage}
+                                  </span>
+                                  {displayUnit && (
+                                    <span className="text-xl text-white/60 font-medium">
+                                      {displayUnit}
+                                    </span>
+                                  )}
+                                </div>
+                              </>
+                            )}
                           </div>
                           
-                          {/* Enhanced visual progress bar - show for numeric averages including sentiment scores */}
-                          {typeof average === 'number' && (questionType !== 'text' || hasSentimentAnalysis) && (
+                          {/* Enhanced visual progress bar - show for numeric averages including sentiment scores, but not for multiple choice with distribution */}
+                          {typeof average === 'number' && (questionType !== 'text' || hasSentimentAnalysis) && questionType !== 'multiple_choice' && (
                             <div className="w-full bg-white/20 rounded-full h-4 mb-3 overflow-hidden">
                               <div 
                                 className="bg-gradient-to-r from-emerald-400 via-blue-400 to-indigo-500 h-4 rounded-full transition-all duration-1500 ease-out shadow-sm"
                                 style={{ 
                                   width: `${Math.min(100, Math.max(0, 
-                                    questionType === 'multiple_choice' ? average * 100 : 
                                     questionType === 'boolean' ? average * 100 : 
                                     questionType === 'text' && hasSentimentAnalysis ? (average / 10 * 100) :
                                     (average / scaleMax * 100)
                                   ))}%` 
+                                }}
+                              >
+                                <div className="w-full h-full bg-white/20 animate-pulse"></div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Simple progress bar for multiple choice showing highest percentage */}
+                          {questionType === 'multiple_choice' && responseDistribution && Array.isArray(responseDistribution) && responseDistribution.length > 0 && (
+                            <div className="w-full bg-white/20 rounded-full h-4 mb-3 overflow-hidden">
+                              <div 
+                                className="bg-gradient-to-r from-emerald-400 via-blue-400 to-indigo-500 h-4 rounded-full transition-all duration-1500 ease-out shadow-sm"
+                                style={{ 
+                                  width: `${Math.min(100, Math.max(0, Math.max(...responseDistribution.map((opt: any) => opt.percentage || 0))))}%` 
                                 }}
                               >
                                 <div className="w-full h-full bg-white/20 animate-pulse"></div>
@@ -2753,7 +2840,7 @@ export default function TastingSession() {
                               )}
                             </div>
                             
-                            {typeof average === 'number' && average > 0 && (
+                            {typeof average === 'number' && average > 0 && questionType !== 'multiple_choice' && (
                               <div className="text-white/60 font-medium">
                                 {average >= 8 ? '🌟 Excellent' :
                                  average >= 7 ? '😊 Great' :
@@ -2765,24 +2852,74 @@ export default function TastingSession() {
                             )}
                           </div>
                           
-                          {/* Response distribution if available */}
-                          {responseDistribution && typeof responseDistribution === 'object' && (
-                            <div className="mt-3 pt-3 border-t border-white/10">
-                              <div className="text-xs text-white/50 mb-2">Response Distribution:</div>
-                              <div className="flex gap-1">
-                                {Object.entries(responseDistribution).map(([score, count]: [string, any]) => (
-                                  <div 
-                                    key={score}
-                                    className="flex-1 bg-white/5 rounded text-center py-1"
-                                    title={`Score ${score}: ${count} response${count !== 1 ? 's' : ''}`}
-                                  >
-                                    <div className="text-xs text-white/70">{score}</div>
-                                    <div className="text-xs text-white/50">{count}</div>
-                                  </div>
-                                ))}
+                          {/* Enhanced Response distribution for multiple choice */}
+                          {questionType === 'multiple_choice' && responseDistribution && Array.isArray(responseDistribution) && responseDistribution.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-white/10">
+                              <div className="text-sm text-white/70 mb-3 font-medium">Answer Distribution:</div>
+                              <div className="space-y-3">
+                                {responseDistribution.map((option: any, index: number) => {
+                                  const percentage = option.percentage || 0;
+                                  const count = option.count || 0;
+                                  const optionText = option.optionText || `Option ${option.optionNumber || index + 1}`;
+                                  
+                                  return (
+                                    <div key={option.optionNumber || index} className="space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <div className="text-white text-sm font-medium flex-1 pr-3 text-left">
+                                          {optionText}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-white/80 text-sm font-semibold">
+                                            {percentage}%
+                                          </span>
+                                          <span className="text-white/50 text-xs">
+                                            ({count} vote{count !== 1 ? 's' : ''})
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden">
+                                        <div 
+                                          className="bg-gradient-to-r from-emerald-400 via-blue-400 to-indigo-500 h-2 rounded-full transition-all duration-1000 ease-out"
+                                          style={{ 
+                                            width: `${Math.min(100, Math.max(0, percentage))}%` 
+                                          }}
+                                        >
+                                          <div className="w-full h-full bg-white/10 animate-pulse"></div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
+                          
+                          {/* Text question summary and sentiment analysis (no key themes) */}
+                          {questionType === 'text' && (questionData.textSummary || questionData.summary || questionData.responseDistribution?.summary) && (
+                            <div className="mt-4 pt-4 border-t border-white/10">
+                              <div className="text-sm text-white/70 mb-3 font-medium">Response Summary:</div>
+                              <div className="bg-white/5 rounded-lg p-3 mb-3">
+                                <p className="text-white/90 text-sm leading-relaxed">
+                                  {questionData.textSummary || questionData.summary || questionData.responseDistribution?.summary}
+                                </p>
+                              </div>
+                              {/* Sentiment if available */}
+                              {(questionData.sentiment || questionData.responseDistribution?.sentiment) && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-white/50">Overall sentiment:</span>
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    (questionData.sentiment || questionData.responseDistribution?.sentiment) === 'positive' ? 'bg-green-500/20 text-green-300' :
+                                    (questionData.sentiment || questionData.responseDistribution?.sentiment) === 'negative' ? 'bg-red-500/20 text-red-300' :
+                                    'bg-gray-500/20 text-gray-300'
+                                  }`}>
+                                    {questionData.sentiment || questionData.responseDistribution?.sentiment}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* No response distribution for scale questions as requested */}
                         </div>
                       );
                     });

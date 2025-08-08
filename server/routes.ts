@@ -853,6 +853,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check if all participants have replied to all questions for a specific wine
+  app.get("/api/sessions/:sessionId/wines/:wineId/all-participants-replied", async (req, res) => {
+    try {
+      const { sessionId, wineId } = req.params;
+      
+      const allReplied = await storage.checkAllParticipantsReplied(sessionId, wineId);
+      
+      res.json({ allParticipantsReplied: allReplied });
+    } catch (error) {
+      console.error("Error checking if all participants replied:", error);
+      if (error instanceof Error && error.message === 'Session not found') {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Analyze sentiment for wine text responses
   app.post("/api/sessions/:sessionId/wines/:wineId/sentiment-analysis", async (req, res) => {
     try {
@@ -871,23 +888,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Import OpenAI client dynamically to avoid dependency issues if not configured
-      const { analyzeWineTextResponses } = await import('./openai-client.js');
+      const { analyzeWineTextResponsesForSummary } = await import('./openai-client.js');
       
-      // Perform sentiment analysis - convert format for OpenAI client
+      // Perform summary analysis instead of sentiment scoring - convert format for OpenAI client
       const formattedResponses = textResponses.map(response => ({
         slideId: response.slideId,
         questionTitle: response.questionText,
         textContent: response.answerText
       }));
       
-      const sentimentResults = await analyzeWineTextResponses(formattedResponses, wineId, sessionId);
+      const summaryResults = await analyzeWineTextResponsesForSummary(formattedResponses, wineId, sessionId);
       
-      // Save sentiment results to database - convert WineTextAnalysis to array format
+      // Save sentiment results to database - convert WineTextAnalysis to array format for compatibility
       const resultsArray = [{
         wineId,
-        participantId: sentimentResults.participantId,
-        overallSentiment: sentimentResults.overallSentiment,
-        textResponses: sentimentResults.textResponses,
+        participantId: summaryResults.participantId,
+        overallSentiment: summaryResults.overallSentiment,
+        textResponses: summaryResults.textResponses,
         timestamp: new Date().toISOString()
       }];
       
@@ -897,12 +914,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionId,
         wineId,
         totalResponses: textResponses.length,
-        results: sentimentResults,
+        results: summaryResults,
+        analysisType: 'summary', // Indicate this is summary-based analysis
         timestamp: new Date().toISOString()
       });
       
     } catch (error) {
-      console.error("❌ Error performing sentiment analysis:", error);
+      console.error("❌ Error performing text summary analysis:", error);
       
       // Provide fallback analysis if OpenAI fails
       if (error instanceof Error && (error.message?.includes('OpenAI') || error.message?.includes('API'))) {
@@ -910,10 +928,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { getFallbackSentimentAnalysis } = await import('./openai-client.js');
           const textResponses = await storage.getWineTextResponses(req.params.sessionId, req.params.wineId);
           
-          // Create fallback analysis for each response
+          // Create fallback analysis for each response with summary focus
           const fallbackResults = textResponses.map(response => ({
             ...response,
-            sentiment: getFallbackSentimentAnalysis(response.answerText)
+            sentiment: getFallbackSentimentAnalysis(response.answerText),
+            summary: `Fallback summary for: ${response.answerText.substring(0, 100)}...`
           }));
           
           res.json({
@@ -922,11 +941,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalResponses: textResponses.length,
             results: fallbackResults,
             fallback: true,
+            analysisType: 'fallback_summary',
             timestamp: new Date().toISOString()
           });
         } catch (fallbackError) {
-          console.error("❌ Fallback sentiment analysis failed:", fallbackError);
-          res.status(500).json({ message: "Sentiment analysis unavailable" });
+          console.error("❌ Fallback text summary analysis failed:", fallbackError);
+          res.status(500).json({ message: "Text summary analysis unavailable" });
         }
       } else {
         res.status(500).json({ message: "Internal server error" });
@@ -988,11 +1008,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             timestamp: question.timestamp
           };
         }
-        // Also include text questions - try to get sentiment-based averages
+        // Handle text questions differently - include summaries instead of scores
         else if (question.questionType === 'text' && question.totalResponses > 0) {
-          // Check if we have sentiment analysis results for this text question
-          const sentimentAverage = question.averageScore; // This comes from calculateTextSentimentAverage
-          
+          // For text questions, we don't show numerical averages but include the summary
           questionsMap[questionId] = {
             id: questionId,
             questionId: questionId,
@@ -1000,20 +1018,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             questionTitle: question.questionTitle,
             title: question.questionTitle,
             question: question.questionTitle,
-            average: sentimentAverage ? parseFloat(sentimentAverage.toFixed(1)) : null,
-            avg: sentimentAverage ? parseFloat(sentimentAverage.toFixed(1)) : null,
-            value: sentimentAverage ? parseFloat(sentimentAverage.toFixed(1)) : null,
+            average: null, // No numerical average for text questions
+            avg: null,
+            value: null,
             participantCount: question.totalResponses,
             participants: question.totalResponses,
             count: question.totalResponses,
             responseCount: question.totalResponses,
-            scaleMax: sentimentAverage ? 10 : null, // Sentiment analysis uses 1-10 scale
-            scale_max: sentimentAverage ? 10 : null,
+            scaleMax: null, // No scale for text questions
+            scale_max: null,
             questionType: question.questionType,
             responseDistribution: question.responseDistribution,
+            textSummary: question.responseDistribution?.summary || 'No summary available',
+            keywords: question.responseDistribution?.keywords || [],
+            sentiment: question.responseDistribution?.sentiment || 'neutral',
             timestamp: question.timestamp,
             hasTextResponses: true,
-            hasSentimentAnalysis: sentimentAverage !== null // Flag to indicate sentiment analysis was performed
+            isTextQuestion: true // Flag to help frontend handle differently
           };
         }
       });

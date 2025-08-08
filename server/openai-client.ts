@@ -208,6 +208,245 @@ export async function analyzeWineTextResponses(
 }
 
 /**
+ * Analyze multiple text responses and generate a comprehensive summary instead of scores
+ */
+export async function analyzeWineTextResponsesForSummary(
+  textResponses: Array<{
+    slideId: string;
+    questionTitle: string;
+    textContent: string;
+  }>,
+  wineId: string,
+  participantId: string
+): Promise<WineTextAnalysis> {
+  try {
+    console.log(`🤖 Generating text summaries for ${textResponses.length} responses for wine ${wineId}`);
+
+    if (!isOpenAIConfigured()) {
+      console.log('⚠️ OpenAI not configured, using fallback summary analysis');
+      return getFallbackWineTextAnalysis(textResponses, wineId, participantId);
+    }
+
+    // Group responses by question/slide for better analysis
+    const responsesBySlide = new Map<string, { questionTitle: string; responses: string[] }>();
+    
+    textResponses.forEach(response => {
+      if (!responsesBySlide.has(response.slideId)) {
+        responsesBySlide.set(response.slideId, {
+          questionTitle: response.questionTitle,
+          responses: []
+        });
+      }
+      responsesBySlide.get(response.slideId)!.responses.push(response.textContent);
+    });
+
+    // Analyze each question separately to generate meaningful summaries
+    const analyzedResponses: Array<{
+      slideId: string;
+      questionTitle: string;
+      textContent: string;
+      analysis: TextAnalysisResult;
+    }> = [];
+
+    for (const [slideId, { questionTitle, responses }] of Array.from(responsesBySlide.entries())) {
+      if (responses.length === 0) continue;
+      
+      const combinedText = responses.join('\n---\n');
+      const analysis = await analyzeTextForSummary(combinedText, questionTitle);
+      
+      analyzedResponses.push({
+        slideId,
+        questionTitle,
+        textContent: combinedText,
+        analysis
+      });
+    }
+
+    // Generate overall summary from all responses
+    const allTexts = textResponses.map(r => r.textContent).filter(text => text.trim()).join('\n\n');
+    const overallAnalysis = await analyzeTextForSummary(allTexts, "Overall wine experience");
+    
+    return {
+      wineId,
+      participantId,
+      textResponses: analyzedResponses,
+      overallSentiment: {
+        sentiment: overallAnalysis.sentiment,
+        sentimentScore: overallAnalysis.sentimentScore,
+        confidence: overallAnalysis.confidence,
+        keywords: overallAnalysis.keywords,
+        summary: overallAnalysis.summary || "Overall wine experience analysis"
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ Error in analyzeWineTextResponsesForSummary:', error);
+    
+    // Return fallback analysis
+    return getFallbackWineTextAnalysis(textResponses, wineId, participantId);
+  }
+}
+
+/**
+ * Analyze text content and generate a comprehensive summary instead of numerical scores
+ */
+async function analyzeTextForSummary(textContent: string, questionContext: string): Promise<TextAnalysisResult> {
+  if (!textContent.trim()) {
+    return {
+      sentiment: 'neutral',
+      sentimentScore: 5,
+      confidence: 0.1,
+      keywords: [],
+      summary: 'No response provided'
+    };
+  }
+
+  try {
+    const prompt = `Analyze the following wine tasting responses for the question "${questionContext}":
+
+"${textContent}"
+
+Please provide a comprehensive written summary that captures the essence of these responses. Focus on:
+
+1. Common themes and observations mentioned by participants
+2. Overall sentiment and emotional tone expressed
+3. Key descriptive elements about the wine characteristics
+4. Notable patterns or consensus among responses
+5. Specific wine attributes highlighted (aroma, taste, texture, finish, etc.)
+
+Create a narrative summary that synthesizes the main points and provides meaningful insights about what participants experienced collectively.
+
+Please provide:
+1. Overall sentiment (positive, neutral, or negative)
+2. A sentiment score from 1-10 (for internal processing only)
+3. Confidence level (0-1) based on clarity and consistency
+4. Key descriptive words/phrases (maximum 8 most relevant terms)
+5. A comprehensive summary (50-150 words) that tells the story of the collective tasting experience
+
+Focus on wine-specific language and create a narrative that would be valuable for understanding the group's tasting experience.
+
+Respond in JSON format only:
+{
+  "sentiment": "positive|neutral|negative",
+  "sentimentScore": 1-10,
+  "confidence": 0-1,
+  "keywords": ["word1", "word2", "word3"],
+  "summary": "comprehensive narrative summary of the responses focusing on wine characteristics and collective experience"
+}`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: "You are an expert wine sommelier and text analyst specializing in synthesizing wine tasting notes. Your task is to create coherent, informative summaries that capture the collective tasting experience from multiple participants. Focus on creating meaningful narrative summaries that highlight consensus, interesting observations, and key wine characteristics. Avoid numerical evaluations and instead provide rich, descriptive insights."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      max_tokens: 600, // Increased for comprehensive summaries
+      temperature: 0.3, // Balanced for creative yet consistent summaries
+      response_format: { type: "json_object" }
+    });
+
+    const response = completion.choices[0].message.content;
+    if (!response) {
+      throw new Error('No response from OpenAI');
+    }
+
+    let analysis: TextAnalysisResult;
+    try {
+      analysis = JSON.parse(response) as TextAnalysisResult;
+    } catch (parseError) {
+      console.error('Failed to parse OpenAI response as JSON:', response);
+      throw new Error('Invalid JSON response from OpenAI');
+    }
+    
+    // Validate and sanitize the response
+    return {
+      sentiment: ['positive', 'neutral', 'negative'].includes(analysis.sentiment) 
+        ? analysis.sentiment as 'positive' | 'neutral' | 'negative'
+        : 'neutral',
+      sentimentScore: Math.min(10, Math.max(1, Math.round(analysis.sentimentScore || 5))),
+      confidence: Math.min(1, Math.max(0, analysis.confidence || 0.5)),
+      keywords: Array.isArray(analysis.keywords) 
+        ? analysis.keywords.slice(0, 8).filter(k => typeof k === 'string' && k.length > 0)
+        : [],
+      summary: typeof analysis.summary === 'string' 
+        ? analysis.summary.substring(0, 500) // Allow longer summaries
+        : 'Analysis could not be completed'
+    };
+
+  } catch (error) {
+    console.error('❌ Error in text summary analysis:', error);
+    
+    // Return fallback analysis
+    return getFallbackSentimentAnalysis(textContent);
+  }
+}
+
+/**
+ * Fallback text analysis that generates summaries when OpenAI is unavailable
+ */
+function getFallbackWineTextAnalysis(
+  textResponses: Array<{
+    slideId: string;
+    questionTitle: string;
+    textContent: string;
+  }>,
+  wineId: string,
+  participantId: string
+): WineTextAnalysis {
+  const analyzedResponses = textResponses.map(response => ({
+    slideId: response.slideId,
+    questionTitle: response.questionTitle,
+    textContent: response.textContent,
+    analysis: getFallbackTextSummary(response.textContent, response.questionTitle)
+  }));
+
+  // Create overall summary
+  const allTexts = textResponses.map(r => r.textContent).filter(text => text.trim());
+  const overallSummary = getFallbackTextSummary(allTexts.join(' '), 'Overall wine experience');
+
+  return {
+    wineId,
+    participantId,
+    textResponses: analyzedResponses,
+    overallSentiment: overallSummary
+  };
+}
+
+/**
+ * Generate a fallback text summary using keyword analysis
+ */
+function getFallbackTextSummary(textContent: string, questionContext: string): TextAnalysisResult {
+  if (!textContent.trim()) {
+    return {
+      sentiment: 'neutral',
+      sentimentScore: 5,
+      confidence: 0.1,
+      keywords: [],
+      summary: 'No response provided for this question.'
+    };
+  }
+
+  const fallbackAnalysis = getFallbackSentimentAnalysis(textContent);
+  
+  // Create a basic summary based on the text content
+  const words = textContent.split(/\s+/).filter(word => word.length > 2);
+  const summary = words.length > 20 
+    ? `Participants provided detailed responses for "${questionContext}". Key themes include: ${fallbackAnalysis.keywords.join(', ')}. Overall sentiment appears ${fallbackAnalysis.sentiment}.`
+    : `Brief responses were provided for "${questionContext}" with ${fallbackAnalysis.sentiment} sentiment noted.`;
+
+  return {
+    ...fallbackAnalysis,
+    summary: summary.substring(0, 200) // Keep summaries concise
+  };
+}
+
+/**
  * Fallback sentiment analysis using enhanced keyword matching
  */
 export function getFallbackSentimentAnalysis(textContent: string): TextAnalysisResult {

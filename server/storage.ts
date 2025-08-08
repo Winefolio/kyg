@@ -141,6 +141,7 @@ export interface IStorage {
   getParticipantAnalytics(sessionId: string, participantId: string): Promise<any>;
   getSessionResponses(sessionId: string): Promise<any[]>;
   getSessionCompletionStatus(sessionId: string, wineId: string): Promise<any>;
+  checkAllParticipantsReplied(sessionId: string, wineId: string): Promise<boolean>;
   
   // Sentiment analysis methods
   getWineTextResponses(sessionId: string, wineId: string): Promise<any[]>;
@@ -2409,6 +2410,21 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  // Check if all participants have replied to all questions for a specific wine
+  async checkAllParticipantsReplied(sessionId: string, wineId: string): Promise<boolean> {
+    try {
+      const completionStatus = await this.getSessionCompletionStatus(sessionId, wineId);
+      
+      // Return true if all non-host participants have completed
+      // This allows the session to proceed even if the host hasn't finished
+      return completionStatus.allNonHostParticipantsCompleted;
+    } catch (error) {
+      console.error('Error checking if all participants replied:', error);
+      // If there's an error, default to false (show timer)
+      return false;
+    }
+  }
+
   // Sentiment analysis methods for Step 3
   async getWineTextResponses(sessionId: string, wineId: string): Promise<any[]> {
     // 1. Get session and validate
@@ -2653,6 +2669,10 @@ export class DatabaseStorage implements IStorage {
         case 'multiple_choice':
           responseDistribution = this.getMultipleChoiceDistribution(slideResponses, slide);
           averageScore = this.calculateMultipleChoiceScore(responseDistribution);
+          console.info("=========================================================== ======================================= ");
+          console.log("🔍 Multiple choice distribution:", averageScore,  responseDistribution);
+          console.info("=========================================================== ======================================= ");
+
           break;
 
         case 'boolean':
@@ -2661,10 +2681,15 @@ export class DatabaseStorage implements IStorage {
           break;
 
         case 'text':
-          // For text questions, try to get sentiment scores if available
-          const sentimentAverage = await this.calculateTextSentimentAverage(sessionId, wineId, slide.id);
-          averageScore = sentimentAverage;
-          responseDistribution = { textResponseCount: slideResponses.length };
+          // For text questions, get the summary instead of sentiment scores
+          const textSummary = await this.calculateTextSummaryAverage(sessionId, wineId, slide.id);
+          averageScore = null; // No numerical score for text questions
+          responseDistribution = { 
+            textResponseCount: slideResponses.length,
+            summary: textSummary?.summary || 'No summary available',
+            keywords: textSummary?.keywords || [],
+            sentiment: textSummary?.sentiment || 'neutral'
+          };
           break;
 
         default:
@@ -2774,7 +2799,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   private getMultipleChoiceDistribution(responses: any[], slide: any): any {
-    const distribution: { [key: string]: number } = {};
+    const distribution: { [key: string]: { count: number, optionText: string } } = {};
+    
+    // First, extract option details from slide configuration
+    const optionDetails = this.getOptionDetails(slide);
     
     responses.forEach(r => {
       if (r.answerJson && typeof r.answerJson === 'object') {
@@ -2783,40 +2811,119 @@ export class DatabaseStorage implements IStorage {
         // Handle different multiple choice answer formats
         if (answerObj.selectedOptionId) {
           const optionId = answerObj.selectedOptionId;
-          distribution[optionId] = (distribution[optionId] || 0) + 1;
+          if (!distribution[optionId]) {
+            distribution[optionId] = {
+              count: 0,
+              optionText: optionDetails[optionId] || `Option ${optionId}`
+            };
+          }
+          distribution[optionId].count += 1;
         } else if (answerObj.selectedOptionIds && Array.isArray(answerObj.selectedOptionIds)) {
           // Multi-select
           answerObj.selectedOptionIds.forEach((id: string) => {
-            distribution[id] = (distribution[id] || 0) + 1;
+            if (!distribution[id]) {
+              distribution[id] = {
+                count: 0,
+                optionText: optionDetails[id] || `Option ${id}`
+              };
+            }
+            distribution[id].count += 1;
           });
         } else if (answerObj.selectedOptions && Array.isArray(answerObj.selectedOptions)) {
           answerObj.selectedOptions.forEach((option: any) => {
             const optionId = option.id || option;
-            distribution[optionId] = (distribution[optionId] || 0) + 1;
+            if (!distribution[optionId]) {
+              distribution[optionId] = {
+                count: 0,
+                optionText: optionDetails[optionId] || `Option ${optionId}`
+              };
+            }
+            distribution[optionId].count += 1;
           });
         } else if (answerObj.selected && Array.isArray(answerObj.selected)) {
           // Handle "selected" array format (e.g., ["1", "2"])
           answerObj.selected.forEach((optionId: string) => {
-            distribution[optionId] = (distribution[optionId] || 0) + 1;
+            if (!distribution[optionId]) {
+              distribution[optionId] = {
+                count: 0,
+                optionText: optionDetails[optionId] || `Option ${optionId}`
+              };
+            }
+            distribution[optionId].count += 1;
           });
         }
       }
     });
 
-    return distribution;
+    // Convert to array format with option number, text, count, and percentage
+    const totalResponses = responses.length;
+    const distributionArray = Object.entries(distribution).map(([optionId, data]) => ({
+      optionNumber: parseInt(optionId) || optionId, // Convert to number if possible, otherwise keep as string
+      optionText: data.optionText,
+      count: data.count,
+      percentage: totalResponses > 0 ? Math.round((data.count / totalResponses) * 100 * 100) / 100 : 0 // Round to 2 decimal places
+    }));
+
+    // Sort by option number/id for consistent ordering
+    distributionArray.sort((a, b) => {
+      if (typeof a.optionNumber === 'number' && typeof b.optionNumber === 'number') {
+        return a.optionNumber - b.optionNumber;
+      }
+      return String(a.optionNumber).localeCompare(String(b.optionNumber));
+    });
+
+    return distributionArray;
+  }
+
+  private getOptionDetails(slide: any): { [key: string]: string } {
+    const optionDetails: { [key: string]: string } = {};
+    
+    // Check genericQuestions first
+    if (slide.genericQuestions && typeof slide.genericQuestions === 'object') {
+      const genericQ = slide.genericQuestions as any;
+      if (genericQ.options && Array.isArray(genericQ.options)) {
+        genericQ.options.forEach((option: any, index: number) => {
+          if (typeof option === 'string') {
+            optionDetails[index.toString()] = option;
+          } else if (option && typeof option === 'object') {
+            const id = option.id || option.value || index.toString();
+            const text = option.text || option.label || option.title || option.value || `Option ${index + 1}`;
+            optionDetails[id] = text;
+          }
+        });
+      }
+    }
+    
+    // Check payloadJson for options
+    if (slide.payloadJson && typeof slide.payloadJson === 'object') {
+      const payload = slide.payloadJson as any;
+      if (payload.options && Array.isArray(payload.options)) {
+        payload.options.forEach((option: any, index: number) => {
+          if (typeof option === 'string') {
+            optionDetails[index.toString()] = option;
+          } else if (option && typeof option === 'object') {
+            const id = option.id || option.value || index.toString();
+            const text = option.text || option.label || option.title || option.value || `Option ${index + 1}`;
+            optionDetails[id] = text;
+          }
+        });
+      }
+    }
+    
+    return optionDetails;
   }
 
   private calculateMultipleChoiceScore(distribution: any): number {
     // For multiple choice, calculate the percentage of responses that chose the most popular option
-    const totalResponses = Object.values(distribution).reduce((sum: number, count: any) => sum + count, 0);
-    if (totalResponses === 0) return 0;
+    if (!Array.isArray(distribution) || distribution.length === 0) {
+      return 0;
+    }
 
-    // Get the highest count (most popular option)
-    const maxCount = Math.max(...Object.values(distribution) as number[]);
+    // Get the highest percentage (most popular option)
+    const maxPercentage = Math.max(...distribution.map((option: any) => option.percentage || 0));
     
     // Return percentage as decimal (0-1) for frontend to display correctly
-    const consensusPercentage = maxCount / totalResponses;
-    return Math.round(consensusPercentage * 100) / 100; // Round to 2 decimals (0.00-1.00)
+    return Math.round(maxPercentage) / 100; // Convert percentage back to decimal (0.00-1.00)
   }
 
   private getBooleanDistribution(responses: any[]): any {
@@ -2850,6 +2957,55 @@ export class DatabaseStorage implements IStorage {
     // Return percentage of "true" responses (0-10 scale)
     const truePercentage = distribution.true / total;
     return Math.round(truePercentage * 10 * 100) / 100;
+  }
+
+  async calculateTextSummaryAverage(sessionId: string, wineId: string, slideId: string): Promise<{ summary: string; keywords: string[]; sentiment: string } | null> {
+    try {
+      // Get all text responses for this specific slide
+      const textResponses = await this.getWineTextResponses(sessionId, wineId);
+      const slideTextResponses = textResponses.filter(response => response.slideId === slideId);
+      
+      if (slideTextResponses.length === 0) {
+        console.log(`📊 No text responses available for slide ${slideId} in wine ${wineId}`);
+        return null;
+      }
+
+      // Import the summary analysis function
+      const { analyzeWineTextResponsesForSummary } = await import('./openai-client.js');
+      
+      // Format responses for analysis
+      const formattedResponses = slideTextResponses.map(response => ({
+        slideId: response.slideId,
+        questionTitle: response.questionText || 'Wine question',
+        textContent: response.answerText
+      }));
+      
+      // Get summary analysis
+      const analysisResult = await analyzeWineTextResponsesForSummary(formattedResponses, wineId, sessionId);
+      
+      if (analysisResult.textResponses.length > 0) {
+        const slideAnalysis = analysisResult.textResponses.find(resp => resp.slideId === slideId);
+        if (slideAnalysis) {
+          console.log(`📊 Generated text summary for slide ${slideId}: ${slideAnalysis.analysis.summary?.substring(0, 100)}...`);
+          return {
+            summary: slideAnalysis.analysis.summary || 'Summary not available',
+            keywords: slideAnalysis.analysis.keywords || [],
+            sentiment: slideAnalysis.analysis.sentiment || 'neutral'
+          };
+        }
+      }
+      
+      // Fallback to overall sentiment if slide-specific analysis not found
+      return {
+        summary: analysisResult.overallSentiment.summary || 'Summary not available',
+        keywords: analysisResult.overallSentiment.keywords || [],
+        sentiment: analysisResult.overallSentiment.sentiment || 'neutral'
+      };
+      
+    } catch (error) {
+      console.error(`📊 Error calculating text summary for slide ${slideId}:`, error);
+      return null;
+    }
   }
 
   async calculateTextSentimentAverage(sessionId: string, wineId: string, slideId: string): Promise<number | null> {
