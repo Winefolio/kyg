@@ -2676,7 +2676,7 @@ export default function TastingSession() {
                         displayUnit = '';
                       } else if (typeof average === 'number') {
                         if (questionType === 'multiple_choice') {
-                          formattedAverage = `${(average * 10).toFixed(0)}%`;
+                          formattedAverage = `${(average * 100).toFixed(0)}%`;
                           displayUnit = 'consensus';
                         } else if (questionType === 'boolean') {
                           formattedAverage = `${(average * 100).toFixed(0)}%`;
@@ -2728,7 +2728,7 @@ export default function TastingSession() {
                                 className="bg-gradient-to-r from-emerald-400 via-blue-400 to-indigo-500 h-4 rounded-full transition-all duration-1500 ease-out shadow-sm"
                                 style={{ 
                                   width: `${Math.min(100, Math.max(0, 
-                                    questionType === 'multiple_choice' ? average * 10 : 
+                                    questionType === 'multiple_choice' ? average * 100 : 
                                     questionType === 'boolean' ? average * 100 : 
                                     questionType === 'text' && hasSentimentAnalysis ? (average / 10 * 100) :
                                     (average / scaleMax * 100)
