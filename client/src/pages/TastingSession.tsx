@@ -83,6 +83,7 @@ export default function TastingSession() {
   const [blockingTimer, setBlockingTimer] = useState(120); // 2 minutes in seconds
   const [showSkipButton, setShowSkipButton] = useState(false); // Show skip button after timer starts running
   const [isCheckingCompletion, setIsCheckingCompletion] = useState(false); // Loading overlay before timer
+  const [disableNextButton, setDisableNextButton] = useState(false);
   
   // Wine completion tracking state
   const [currentWineCompletionStatus, setCurrentWineCompletionStatus] = useState<{
@@ -621,7 +622,7 @@ export default function TastingSession() {
       
       // Check if we have answers for all question slides (use local state, not server responses)
       const answeredQuestionSlides = wineQuestionSlides.filter(slide => 
-        answers[slide.id] !== undefined && answers[slide.id] !== null && answers[slide.id] !== ''
+        answers[slide.id] !== undefined && answers[slide.id] !== null
       );
       const allQuestionsAnswered = wineQuestionSlides.length === answeredQuestionSlides.length;
       
@@ -958,7 +959,7 @@ export default function TastingSession() {
         console.error('Error polling wine completion status:', error);
         // Continue polling despite errors
       }
-    }, 3000); // Poll every 3 seconds
+    }, 15000);
 
     return () => {
       clearInterval(pollInterval);
@@ -1177,7 +1178,7 @@ export default function TastingSession() {
     // Case 1: We're at the last slide of the current wine AND all questions are completed
     // Case 2: We're navigating to a different wine AND all questions for current wine are completed
     const shouldCheckWineCompletion = currentWineId && (
-      (isLastSlideOfCurrentWine(currentSlideIndex, currentWineId) && checkWineCompletion(currentWineId)) || 
+      (isLastSlideOfCurrentWine(currentSlideIndex, currentWineId) && checkWineCompletion(currentWineId)) ||
       (isNavigatingToNextWine(currentSlideIndex) && checkWineCompletion(currentWineId))
     );
     
@@ -1713,6 +1714,8 @@ export default function TastingSession() {
                   }}
                   value={answers[currentSlide.id] || { selected: [], notes: '' }}
                   onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+                  disableNext={disableNextButton}
+                  setDisableNext={setDisableNextButton}
                 />
               );
             
@@ -2388,7 +2391,7 @@ export default function TastingSession() {
               <Button
                 variant={currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro ? "default" : "ghost"}
                 onClick={currentSlideIndex >= slides.length - 1 ? handleComplete : goToNextSlide}
-                disabled={isNavigating}
+                disabled={isNavigating || disableNextButton}
                 className={
                   currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro
                     ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold px-3 sm:px-4 md:px-6 py-1.5 sm:py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 transform hover:scale-105 active:scale-100 text-[14px] sm:text-sm md:text-base min-h-[44px] flex items-center justify-center"
