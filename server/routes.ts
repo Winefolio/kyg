@@ -853,23 +853,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Check if all participants have replied to all questions for a specific wine
-  app.get("/api/sessions/:sessionId/wines/:wineId/all-participants-replied", async (req, res) => {
-    try {
-      const { sessionId, wineId } = req.params;
-      
-      const allReplied = await storage.checkAllParticipantsReplied(sessionId, wineId);
-      
-      res.json({ allParticipantsReplied: allReplied });
-    } catch (error) {
-      console.error("Error checking if all participants replied:", error);
-      if (error instanceof Error && error.message === 'Session not found') {
-        return res.status(404).json({ message: "Session not found" });
-      }
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
   // Analyze sentiment for wine text responses
   app.post("/api/sessions/:sessionId/wines/:wineId/sentiment-analysis", async (req, res) => {
     try {

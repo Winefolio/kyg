@@ -141,7 +141,6 @@ export interface IStorage {
   getParticipantAnalytics(sessionId: string, participantId: string): Promise<any>;
   getSessionResponses(sessionId: string): Promise<any[]>;
   getSessionCompletionStatus(sessionId: string, wineId: string): Promise<any>;
-  checkAllParticipantsReplied(sessionId: string, wineId: string): Promise<boolean>;
   
   // Sentiment analysis methods
   getWineTextResponses(sessionId: string, wineId: string): Promise<any[]>;
@@ -2408,21 +2407,6 @@ export class DatabaseStorage implements IStorage {
         questionSlides: wineQuestionSlides
       }
     };
-  }
-
-  // Check if all participants have replied to all questions for a specific wine
-  async checkAllParticipantsReplied(sessionId: string, wineId: string): Promise<boolean> {
-    try {
-      const completionStatus = await this.getSessionCompletionStatus(sessionId, wineId);
-      
-      // Return true if all non-host participants have completed
-      // This allows the session to proceed even if the host hasn't finished
-      return completionStatus.allNonHostParticipantsCompleted;
-    } catch (error) {
-      console.error('Error checking if all participants replied:', error);
-      // If there's an error, default to false (show timer)
-      return false;
-    }
   }
 
   // Sentiment analysis methods for Step 3
