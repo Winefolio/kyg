@@ -285,61 +285,6 @@ export default function TastingSession() {
     };
   }, []);
   
-  // Check if all participants have replied before timer starts
-  useEffect(() => {
-    // Check when WineCompletionStatus component would be rendered (same conditions)
-    const shouldShowWineCompletion = sessionId && participantId && currentWineCompletionStatus.wineId && 
-       !currentWineCompletionStatus.isBlocking && 
-       !currentWineCompletionStatus.showingAverages;
-       
-    if (shouldShowWineCompletion && currentWineCompletionStatus.wineId && sessionId && !isCheckingCompletion) {
-      console.log('🔍 Checking if all participants have replied...', {
-        sessionId,
-        wineId: currentWineCompletionStatus.wineId
-      });
-      
-      setIsCheckingCompletion(true);
-      
-      // Check backend to see if all participants have replied
-      apiRequest('GET', `/api/sessions/${sessionId}/wines/${currentWineCompletionStatus.wineId}/all-participants-replied`, {})
-        .then(async (res) => {
-          if (res.ok) {
-            const data = await res.json();
-            console.log('✅ Participants check response:', data);
-            
-            if (data && data.allParticipantsReplied) {
-              console.log('🚀 All participants replied, skipping timer and showing averages');
-              // Skip timer, show averages immediately
-              setCurrentWineCompletionStatus(prev => ({
-                ...prev,
-                isBlocking: false,
-                showingAverages: true,
-                isLoadingAverages: true
-              }));
-              // Trigger averages calculation
-              if (currentWineCompletionStatus.wineId) {
-                averageCalculationMutation.mutate({ sessionId, wineId: currentWineCompletionStatus.wineId });
-              }
-            } else {
-              console.log('⏱️ Not all participants replied, showing timer');
-              // Not all replied, proceed with timer as normal (let WineCompletionStatus handle it)
-            }
-          } else {
-            console.warn('⚠️ API call failed with status:', res.status);
-            // API call failed, proceed with timer as normal
-          }
-        })
-        .catch((error) => {
-          console.error('❌ Error checking participants:', error);
-          // If the API call fails, proceed with timer as normal
-        })
-        .finally(() => {
-          console.log('🏁 Finished checking participants');
-          setIsCheckingCompletion(false);
-        });
-    }
-  }, [currentWineCompletionStatus.isBlocking, currentWineCompletionStatus.showingAverages, sessionId, participantId, currentWineCompletionStatus.wineId, averageCalculationMutation, isCheckingCompletion]);
-  
   // Log state changes
   // useEffect(() => {
   //   console.log('🔄 [STATE CHANGE] currentSlideIndex changed:', {
@@ -658,7 +603,8 @@ export default function TastingSession() {
 
   // Wine completion tracking function - defined as callback to follow Rules of Hooks
   const checkWineCompletion = useCallback((wineId: string): boolean => {
-    if (!wineId || !slides || slides.length === 0 || !responses) {
+    if (!wineId || !slides || slides.length === 0) {
+      console.log('🔍 checkWineCompletion early return:', { wineId, hasSlides: !!slides, slidesLength: slides?.length });
       return false;
     }
     
@@ -669,22 +615,33 @@ export default function TastingSession() {
       );
       
       if (wineQuestionSlides.length === 0) {
+        console.log('🔍 checkWineCompletion no question slides found for wine:', wineId);
         return false;
       }
       
-      // Check if we have responses for all question slides
-      const answeredSlideIds = new Set(responses.map((r: any) => r.slideId));
+      // Check if we have answers for all question slides (use local state, not server responses)
       const answeredQuestionSlides = wineQuestionSlides.filter(slide => 
-        answeredSlideIds.has(slide.id)
+        answers[slide.id] !== undefined && answers[slide.id] !== null && answers[slide.id] !== ''
       );
       const allQuestionsAnswered = wineQuestionSlides.length === answeredQuestionSlides.length;
+      
+      console.log('🔍 checkWineCompletion result:', {
+        wineId,
+        totalQuestions: wineQuestionSlides.length,
+        answeredQuestions: answeredQuestionSlides.length,
+        allQuestionsAnswered,
+        localAnswersCount: Object.keys(answers).length,
+        serverResponseCount: responses?.length || 0,
+        wineQuestionSlideIds: wineQuestionSlides.map(s => s.id),
+        answeredSlideIds: answeredQuestionSlides.map(s => s.id)
+      });
       
       return allQuestionsAnswered;
     } catch (error) {
       console.error('Error checking wine completion:', error);
       return false;
     }
-  }, [slides, responses]);
+  }, [slides, answers, responses]);
 
   // Helper function to check if current slide is the last slide of current wine
   const isLastSlideOfCurrentWine = useCallback((slideIndex: number, currentWineId?: string): boolean => {
@@ -719,45 +676,11 @@ export default function TastingSession() {
     return isLeavingWine;
   }, [slides]);
 
-  // Helper function to determine if we should show timer/results based on participant count
+  // Helper function to determine if we should show timer/results
   const shouldShowWineCompletionTimer = useCallback((): boolean => {
-    // If participants are still loading, default to false (no timer)
-    if (participantsLoading) {
-      return false;
-    }
-    
-    // If we don't have session participants data yet, default to false (no timer)
-    if (!sessionParticipants || sessionParticipants.length === 0) {
-      return false;
-    }
-
-    console.log("=============================================================================");
-    console.warn('Session Participants: ', sessionParticipants);
-    console.log("=============================================================================");
-
-    // If 2 or fewer participants, no need for timer or results
-    if (sessionParticipants.length <= 2) {
-      return false;
-    }
-    
-    // 3+ participants - show timer and results
+    // Always show wine completion timer and results
     return true;
-  }, [sessionParticipants, participantsLoading]);
-
-  // Force reset wine completion status for sessions with only 1 participant
-  useEffect(() => {
-    if (!participantsLoading && sessionParticipants && sessionParticipants.length <= 2) {
-      setCurrentWineCompletionStatus(prev => ({
-        ...prev,
-        isBlocking: false,
-        showingCompletionStatus: false,
-        hasTriggeredProcessing: false,
-        showingAverages: false,
-        averagesData: null,
-        isLoadingAverages: false
-      }));
-    }
-  }, [sessionParticipants, participantsLoading]);
+  }, []);
 
   // Prefetch upcoming media when slide changes or slides are loaded
   useEffect(() => {
@@ -989,22 +912,9 @@ export default function TastingSession() {
   }, [sessionId, currentWineCompletionStatus.wineId, sentimentAnalysisMutation, averageCalculationMutation]);
 
   // Step 5: Wine completion polling - Check if all participants have finished while timer is running
-  // HOST BEHAVIOR: If the current participant is the host, we don't poll for completion
-  // since the host can manually control when to proceed. Only non-host participants
-  // benefit from automatic progression when all other non-host participants finish.
   useEffect(() => {
     // Only start polling when blocking starts for the first time
     if (!sessionId || !currentWineCompletionStatus.wineId || !currentWineCompletionStatus.isBlocking || currentWineCompletionStatus.hasTriggeredProcessing) {
-      return;
-    }
-
-    // Only poll if we should show timer (3+ participants) - check at start only
-    if (participantsLoading || !sessionParticipants || sessionParticipants.length <= 2) {
-      return;
-    }
-
-    // Only poll if current participant is not the host - check at start only
-    if (!participant || participant.isHost) {
       return;
     }
 
@@ -1021,8 +931,7 @@ export default function TastingSession() {
         const completionData = await response.json();
         
         // Check if all non-host participants have completed their questions
-        // This allows progression even if the host hasn't finished
-        if (completionData.allNonHostParticipantsCompleted || completionData.allParticipantsCompleted) {
+        if (completionData.allParticipantsCompleted || completionData.allNonHostParticipantsCompleted) {
           // Clear the polling interval
           clearInterval(pollInterval);
           
@@ -1057,16 +966,8 @@ export default function TastingSession() {
   }, [sessionId, currentWineCompletionStatus.wineId, currentWineCompletionStatus.isBlocking]);
 
   // Step 3: Auto-trigger sentiment analysis and averages when blocking starts
-  // ONLY for sessions with 2 or fewer participants OR when current participant is host
-  // For 3+ participant sessions with non-host participants, let polling handle the timing
   useEffect(() => {
     if (!sessionId || !currentWineCompletionStatus.wineId || !currentWineCompletionStatus.isBlocking || currentWineCompletionStatus.hasTriggeredProcessing) {
-      return;
-    }
-
-    // Skip auto-triggering if we should be polling instead
-    // This allows the polling mechanism to control when averages are shown
-    if (shouldShowWineCompletionTimer() && participant && !participant.isHost) {
       return;
     }
 
@@ -1090,7 +991,7 @@ export default function TastingSession() {
     }, 1000); // 1 second delay to ensure responses are saved
 
     return () => clearTimeout(timeoutId);
-  }, [sessionId, currentWineCompletionStatus.wineId, currentWineCompletionStatus.isBlocking, currentWineCompletionStatus.hasTriggeredProcessing, sentimentAnalysisMutation, averageCalculationMutation, shouldShowWineCompletionTimer, participant]);
+  }, [sessionId, currentWineCompletionStatus.wineId, currentWineCompletionStatus.isBlocking, currentWineCompletionStatus.hasTriggeredProcessing, sentimentAnalysisMutation, averageCalculationMutation]);
 
   if (sessionDetailsLoading || isLoading) {
     return (
@@ -1280,31 +1181,94 @@ export default function TastingSession() {
       (isNavigatingToNextWine(currentSlideIndex) && checkWineCompletion(currentWineId))
     );
     
+    console.log('🔍 goToNextSlide wine completion check:', {
+      currentWineId,
+      currentSlideIndex,
+      isLastSlideOfWine: isLastSlideOfCurrentWine(currentSlideIndex, currentWineId),
+      isNavigatingToNextWine: isNavigatingToNextWine(currentSlideIndex),
+      wineComplete: currentWineId ? checkWineCompletion(currentWineId) : false,
+      shouldCheckWineCompletion,
+      hasTriggeredProcessing: currentWineCompletionStatus.hasTriggeredProcessing,
+      showingAverages: currentWineCompletionStatus.showingAverages
+    });
+    
     if (shouldCheckWineCompletion) {
       const isWineComplete = checkWineCompletion(currentWineId);
       
       // Only proceed with wine completion if ALL questions have been answered
       if (isWineComplete && !currentWineCompletionStatus.hasTriggeredProcessing && !currentWineCompletionStatus.showingAverages) {
-        const shouldShowTimer = shouldShowWineCompletionTimer();
+        console.log('🔍 User completed wine, checking if all participants have completed...', {
+          sessionId,
+          wineId: currentWineId
+        });
         
-        if (!shouldShowTimer) {
-          // Single participant: skip timer and results completely
-          // Just continue navigation normally without blocking
-        } else {
-          // 2+ participants: show timer and results as before
-          
-          // Show blocking timer modal
-          setCurrentWineCompletionStatus(prev => ({
-            ...prev,
-            wineId: currentWineId,
-            isParticipantFinished: true,
-            hasTriggeredProcessing: false, // Keep false so auto-processing can trigger
-            isBlocking: true, // Block navigation and show timer modal
-            isLoadingAverages: false
-          }));
-          
-          return; // Block navigation until user skips timer or processing is complete
-        }
+        // Set loading state while checking
+        setIsCheckingCompletion(true);
+        
+        // Check completion status immediately
+        apiRequest('GET', `/api/sessions/${sessionId}/wines/${currentWineId}/completion-status`, {})
+          .then(async (res) => {
+            if (res.ok) {
+              const data = await res.json();
+              console.log('✅ Completion status response:', data);
+              
+              if (data && (data.allParticipantsCompleted || data.allNonHostParticipantsCompleted)) {
+                console.log('🚀 All participants completed - skipping timer and showing averages');
+                // Skip timer, show averages immediately
+                setCurrentWineCompletionStatus(prev => ({
+                  ...prev,
+                  wineId: currentWineId,
+                  isParticipantFinished: true,
+                  hasTriggeredProcessing: false,
+                  isBlocking: false,
+                  showingAverages: true,
+                  isLoadingAverages: true
+                }));
+                // Trigger averages calculation
+                averageCalculationMutation.mutate({ sessionId, wineId: currentWineId });
+              } else {
+                console.log('⏱️ Not all non-host participants completed - showing timer and starting polling');
+                // Not all completed, show timer with polling
+                setCurrentWineCompletionStatus(prev => ({
+                  ...prev,
+                  wineId: currentWineId,
+                  isParticipantFinished: true,
+                  hasTriggeredProcessing: false,
+                  isBlocking: true, // Block navigation and show timer modal
+                  isLoadingAverages: false
+                }));
+              }
+            } else {
+              console.warn('⚠️ API call failed with status:', res.status);
+              // API call failed, show timer as fallback
+              setCurrentWineCompletionStatus(prev => ({
+                ...prev,
+                wineId: currentWineId,
+                isParticipantFinished: true,
+                hasTriggeredProcessing: false,
+                isBlocking: true,
+                isLoadingAverages: false
+              }));
+            }
+          })
+          .catch((error) => {
+            console.error('❌ Error checking completion status:', error);
+            // If the API call fails, show timer as fallback
+            setCurrentWineCompletionStatus(prev => ({
+              ...prev,
+              wineId: currentWineId,
+              isParticipantFinished: true,
+              hasTriggeredProcessing: false,
+              isBlocking: true,
+              isLoadingAverages: false
+            }));
+          })
+          .finally(() => {
+            console.log('🏁 Finished checking completion status');
+            setIsCheckingCompletion(false);
+          });
+        
+        return; // Block navigation until completion check is done
       }
     }
     
@@ -2527,7 +2491,7 @@ export default function TastingSession() {
                 <p className="text-white/60 text-sm">
                   {showSkipButton ?
                     'Or wait for the timer to automatically continue' :
-                    'Skip option will be available in a few seconds...'}
+                    'Skip option will be available in a few seconds...' + '\n if only you are reviewing you will be redirected next'}
                 </p>
               </div>
             </motion.div>
