@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import {useState, useMemo, useEffect} from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,10 @@ export function BooleanQuestion({ question, value, onChange }: BooleanQuestionPr
   const glossaryContext = useGlossarySafe();
   const terms = glossaryContext?.terms || [];
   const { triggerHaptic } = useHaptics();
+
+  useEffect(() => {
+    onChange(value);
+  }, []);
   
   // Extract all relevant glossary terms from the current slide content
   const relevantTerms = useMemo(() => {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import {useState, useMemo, useEffect} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ModernSlider } from "@/components/ui/modern-slider";
 import { Label } from "@/components/ui/label";
@@ -30,6 +30,9 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
   const glossaryContext = useGlossarySafe();
   const terms = glossaryContext?.terms || [];
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
+  useEffect(() => {
+    onChange(value);
+  }, []);
 
   // Extract all relevant glossary terms from the current slide content
   const relevantTerms = useMemo(() => {
