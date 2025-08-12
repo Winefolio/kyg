@@ -482,7 +482,7 @@ export class DatabaseStorage implements IStorage {
 
     // Create package introduction slide for the first wine (acts as package intro)
     const firstWine = [chateauMargaux, chateauLatour, chateauYquem, brunello, chianti, opusOne, screamingEagle][0];
-    
+
     // Create package introduction slide (position 1)
     await this.createSlide({
       packageWineId: firstWine.id,
@@ -500,7 +500,7 @@ export class DatabaseStorage implements IStorage {
 
     // Create slides for all wines with proper positioning
     let globalPosition = 2; // Start after package intro
-    
+
     for (const wine of [chateauMargaux, chateauLatour, chateauYquem, brunello, chianti, opusOne, screamingEagle]) {
       // Create wine introduction slide first
       await this.createSlide({
@@ -524,7 +524,7 @@ export class DatabaseStorage implements IStorage {
       // Create remaining slides for this wine
       for (const slideTemplate of slideTemplates.slice(1)) { // Skip the first template since we created wine intro
         let payloadJson = { ...slideTemplate.payloadJson };
-        
+
         // Add wine context to all slides
         payloadJson = {
           ...payloadJson,
@@ -589,7 +589,7 @@ export class DatabaseStorage implements IStorage {
       }
       attempts++;
     }
-    
+
     // Fallback if a unique code can't be generated
     console.error(
       `Failed to generate a unique ${length}-char code after ${maxAttempts} attempts. Falling back.`,
@@ -612,9 +612,9 @@ export class DatabaseStorage implements IStorage {
         sommelierId: pkg.sommelierId,
       })
       .returning();
-    
+
     const newPackage = result[0];
-    
+
     // Create package introduction slide directly attached to the package
     await this.createPackageSlide({
       packageId: newPackage.id,
@@ -630,7 +630,7 @@ export class DatabaseStorage implements IStorage {
         background_image: (pkg as any).imageUrl || ""
       },
     });
-    
+
     return newPackage;
   }
 
@@ -649,9 +649,9 @@ export class DatabaseStorage implements IStorage {
         vintage: wine.vintage,
       })
       .returning();
-    
+
     const newWine = result[0];
-    
+
     // Don't create intro slide for the special "Package Introduction" wine
     if (wine.wineName !== "Package Introduction") {
       // Create wine introduction slide
@@ -673,7 +673,7 @@ export class DatabaseStorage implements IStorage {
         },
       });
     }
-    
+
     return newWine;
   }
 
@@ -732,7 +732,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(slides.packageId, slide.packageId))
         .orderBy(desc(slides.position))
         .limit(1);
-      
+
       targetPosition = (existingSlides[0]?.position || 0) + 1;
     }
 
@@ -752,7 +752,7 @@ export class DatabaseStorage implements IStorage {
         genericQuestions: slide.genericQuestions,
       })
       .returning();
-    
+
     return result[0];
   }
 
@@ -767,7 +767,7 @@ export class DatabaseStorage implements IStorage {
       // Provide minimal default payload for empty objects
       slide.payloadJson = this.getDefaultPayloadForSlideType(slide.type);
     }
-    
+
     // Log slide creation for debugging
     console.log('[SLIDE_CREATE] Creating slide:', {
       type: slide.type,
@@ -775,36 +775,36 @@ export class DatabaseStorage implements IStorage {
       position: slide.position,
       payloadKeys: Object.keys(slide.payloadJson)
     });
-    
+
     // For wine-specific slides, get the wine to determine global position
     if (!slide.packageWineId) {
       throw new Error('createSlide requires packageWineId. Use createPackageSlide for package-level slides.');
     }
-    
+
     const wine = await db
       .select()
       .from(packageWines)
       .where(eq(packageWines.id, slide.packageWineId))
       .limit(1);
-    
+
     if (!wine[0]) {
       throw new Error('Wine not found');
     }
 
     // Calculate global position based on wine position
     let targetGlobalPosition: number;
-    
+
     // Special handling for package intro (position 0)
     if (slide.payloadJson?.is_package_intro) {
       targetGlobalPosition = 0;
     } else {
       // Calculate base position for this wine
       const wineBasePosition = wine[0].position * 1000;
-      
+
       // Add section offset
       let sectionOffset = 0;
       const sectionType = slide.section_type || 'intro'; // Default to intro if not specified
-      
+
       if (sectionType === 'intro') {
         sectionOffset = slide.payloadJson?.is_wine_intro ? 10 : 50; // Wine intro at 10, other intros after
       } else if (sectionType === 'deep_dive') {
@@ -812,7 +812,7 @@ export class DatabaseStorage implements IStorage {
       } else if (sectionType === 'ending' || sectionType === 'conclusion') {
         sectionOffset = 200;
       }
-      
+
       // Find the next available position in this section
       const existingSlides = await db
         .select({ globalPosition: slides.globalPosition })
@@ -826,10 +826,10 @@ export class DatabaseStorage implements IStorage {
         )
         .orderBy(desc(slides.globalPosition))
         .limit(1);
-      
+
       const lastPositionInSection = existingSlides[0]?.globalPosition || (wineBasePosition + sectionOffset);
-      targetGlobalPosition = lastPositionInSection === (wineBasePosition + sectionOffset) 
-        ? wineBasePosition + sectionOffset 
+      targetGlobalPosition = lastPositionInSection === (wineBasePosition + sectionOffset)
+        ? wineBasePosition + sectionOffset
         : lastPositionInSection + 10; // Use 10 as gap
     }
 
@@ -841,17 +841,17 @@ export class DatabaseStorage implements IStorage {
         .where(eq(slides.packageWineId, slide.packageWineId!))
         .orderBy(desc(slides.position))
         .limit(1);
-      
+
       targetPosition = (existingSlides[0]?.position || 0) + 1;
     }
-    
+
     // Check for existing slide with same globalPosition to prevent conflicts
     const conflictCheck = await db
       .select({ id: slides.id })
       .from(slides)
       .where(eq(slides.globalPosition, targetGlobalPosition))
       .limit(1);
-    
+
     if (conflictCheck.length > 0) {
       console.log(`[SLIDE_CREATE] Position conflict detected at globalPosition ${targetGlobalPosition}, finding next available`);
       // Find next available globalPosition
@@ -865,7 +865,7 @@ export class DatabaseStorage implements IStorage {
           )
         )
         .orderBy(asc(slides.globalPosition));
-      
+
       // Find gap in positions
       let newGlobalPosition = targetGlobalPosition;
       for (const existing of nextAvailable) {
@@ -915,49 +915,49 @@ export class DatabaseStorage implements IStorage {
           section_type: slide.section_type
         }
       });
-      
+
       // Check for specific constraint violations
       if (dbError.code === '23505') { // Unique constraint violation
         throw new Error(`Position conflict: A slide already exists at position ${targetPosition} for this wine. Please try again.`);
       }
-      
+
       // Re-throw with more context
       throw new Error(`Failed to create slide: ${dbError.message || 'Database error'}`);
     }
-    
+
     const newSlide = result[0];
-    
+
     // Check for orphaned media records that need to be linked to this slide
     // Look for temporary IDs in the payload that might have associated media
     const payloadStr = JSON.stringify(slide.payloadJson);
     const tempIdPattern = /temp-question-\d+/g;
     const tempIds = payloadStr.match(tempIdPattern) || [];
-    
+
     if (tempIds.length > 0) {
       console.log(`[SLIDE_CREATE] Found temporary IDs in payload, checking for orphaned media: ${tempIds.join(', ')}`);
-      
+
       for (const tempId of tempIds) {
         await this.updateMediaEntityId(tempId, newSlide.id, 'slide');
       }
     }
-    
+
     // Also check for media with publicId references in the payload
     if (slide.payloadJson) {
       const publicIds: string[] = [];
-      
+
       // Check for video/audio publicId fields
       if (slide.payloadJson.video_publicId) publicIds.push(slide.payloadJson.video_publicId);
       if (slide.payloadJson.audio_publicId) publicIds.push(slide.payloadJson.audio_publicId);
-      
+
       if (publicIds.length > 0) {
         console.log(`[SLIDE_CREATE] Found media publicIds in payload, updating entity references: ${publicIds.join(', ')}`);
-        
+
         for (const publicId of publicIds) {
           await this.updateMediaByPublicId(publicId, newSlide.id);
         }
       }
     }
-    
+
     return newSlide;
   }
 
@@ -973,15 +973,15 @@ export class DatabaseStorage implements IStorage {
             eq(sql`metadata->>'originalEntityId'`, originalEntityId)
           )
         );
-      
+
       if (orphanedMedia.length > 0) {
         console.log(`[MEDIA_UPDATE] Found ${orphanedMedia.length} orphaned media records for ${originalEntityId}`);
-        
+
         // Update each media record with the real entity ID
         for (const record of orphanedMedia) {
           await db
             .update(media)
-            .set({ 
+            .set({
               entityId: newEntityId,
               metadata: {
                 ...(record.metadata || {}),
@@ -991,7 +991,7 @@ export class DatabaseStorage implements IStorage {
               }
             })
             .where(eq(media.id, record.id));
-          
+
           console.log(`[MEDIA_UPDATE] Updated media ${record.publicId} from temp ID ${originalEntityId} to slide ${newEntityId}`);
         }
       }
@@ -1005,7 +1005,7 @@ export class DatabaseStorage implements IStorage {
     try {
       const result = await db
         .update(media)
-        .set({ 
+        .set({
           entityId: newEntityId,
           metadata: sql`jsonb_set(metadata, '{linkedAt}', to_jsonb(now()::text))`
         })
@@ -1015,7 +1015,7 @@ export class DatabaseStorage implements IStorage {
             isNull(media.entityId) // Only update if not already linked
           )
         );
-      
+
       console.log(`[MEDIA_UPDATE] Updated media ${publicId} to entity ${newEntityId}`);
     } catch (error) {
       console.error(`[MEDIA_UPDATE] Error updating media by publicId:`, error);
@@ -1177,7 +1177,7 @@ export class DatabaseStorage implements IStorage {
       displayName: participant.displayName,
       isHost: participant.isHost
     });
-    
+
     // Validate sessionId is a proper UUID before insertion
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!participant.sessionId || !uuidRegex.test(participant.sessionId)) {
@@ -1188,7 +1188,7 @@ export class DatabaseStorage implements IStorage {
       });
       throw new Error(`Invalid sessionId format: ${participant.sessionId}. Expected UUID format.`);
     }
-    
+
     try {
       console.log(`[STORAGE] Creating participant with data:`, JSON.stringify({
         sessionId: participant.sessionId,
@@ -1196,7 +1196,7 @@ export class DatabaseStorage implements IStorage {
         displayName: participant.displayName,
         isHost: participant.isHost || false
       }, null, 2));
-      
+
       // Log the exact values being inserted
       const insertValues = {
         sessionId: participant.sessionId,
@@ -1205,18 +1205,18 @@ export class DatabaseStorage implements IStorage {
         isHost: participant.isHost || false,
         progressPtr: participant.progressPtr || 0,
       };
-      
+
       console.log(`[STORAGE_TRACE] About to insert participant with values:`, JSON.stringify(insertValues, null, 2));
-      
+
       const result = await db
         .insert(participants)
         .values(insertValues)
         .returning();
-        
+
       if (!result || result.length === 0) {
         throw new Error('Failed to create participant - no record returned from database');
       }
-        
+
       console.log(`[STORAGE] Successfully created participant: ${result[0].id}`);
       return result[0];
     } catch (error: any) {
@@ -1372,9 +1372,9 @@ export class DatabaseStorage implements IStorage {
     // 4. Fetch all package wines and their slides for this package (optimized)
     const packageWines = await this.getPackageWines(session.packageId!);
     const wineIds = packageWines.map(w => w.id);
-    
+
     // Get all slides for all wines in one query
-    const sessionSlides = wineIds.length > 0 
+    const sessionSlides = wineIds.length > 0
       ? await db
           .select()
           .from(slides)
@@ -1484,31 +1484,31 @@ export class DatabaseStorage implements IStorage {
         // Process scale questions with validation
         const scaleMin = slidePayload.scale_min || slidePayload.min_value || 1;
         const scaleMax = slidePayload.scale_max || slidePayload.max_value || 10;
-        
+
         const scores = slideResponses
           .map((response) => {
             const answerData = response.answerJson as any;
             let rawValue: number | null = null;
-            
+
             // Extract numeric value from different answer formats
             if (typeof answerData === "number") {
               rawValue = answerData;
             } else if (typeof answerData === "object" && answerData !== null && typeof answerData.value === "number") {
               rawValue = answerData.value;
             }
-            
+
             // Validate and clamp the value to scale bounds
             if (rawValue !== null) {
               const clampedValue = Math.max(scaleMin, Math.min(scaleMax, rawValue));
-              
+
               // Log if we had to clamp the value (indicates data corruption)
               if (clampedValue !== rawValue) {
                 console.warn(`🔧 Analytics: Scale value clamped from ${rawValue} to ${clampedValue} (scale: ${scaleMin}-${scaleMax})`);
               }
-              
+
               return clampedValue;
             }
-            
+
             return null;
           })
           .filter((score): score is number => score !== null);
@@ -1583,7 +1583,7 @@ export class DatabaseStorage implements IStorage {
     if (!participant) {
       throw new Error("Participant not found");
     }
-    
+
     // CRITICAL FIX: Compare against resolved session.id, not input sessionId
     if (participant.sessionId !== session.id) {
       throw new Error("Participant not found");
@@ -1618,7 +1618,7 @@ export class DatabaseStorage implements IStorage {
         const answer = r.answerJson as any;
         return answer && answer.notes && answer.notes.trim().length > 0;
       }).length,
-      sessionDuration: participant.lastActive && session.startedAt 
+      sessionDuration: participant.lastActive && session.startedAt
         ? Math.round((new Date(participant.lastActive).getTime() - new Date(session.startedAt).getTime()) / 60000)
         : 0
     };
@@ -1626,7 +1626,7 @@ export class DatabaseStorage implements IStorage {
     // 6. Generate wine-by-wine breakdown with comparisons
     const wineBreakdowns = packageWines.map(wine => {
       const wineSlides = allSlides.filter(slide => slide.packageWineId === wine.id && slide.type === "question");
-      const wineResponses = participantResponses.filter(response => 
+      const wineResponses = participantResponses.filter(response =>
         wineSlides.some(slide => slide.id === response.slideId)
       );
 
@@ -1636,19 +1636,19 @@ export class DatabaseStorage implements IStorage {
         const slidePayload = slide.payloadJson as any;
 
         let comparison = null;
-        
+
         // Always create a comparison object if user has answered, even without group data
         if (participantResponse) {
           if (slidePayload.question_type === "scale") {
-            const userAnswer = typeof participantResponse.answerJson === "number" 
-              ? participantResponse.answerJson 
+            const userAnswer = typeof participantResponse.answerJson === "number"
+              ? participantResponse.answerJson
               : (participantResponse.answerJson as any)?.value || 0;
-            
+
             if (slideAnalytics && slideAnalytics.aggregatedData.averageScore !== undefined) {
               // Group data available - calculate comparison
               const groupAverage = slideAnalytics.aggregatedData.averageScore;
               const difference = Math.abs(userAnswer - groupAverage);
-              
+
               // More nuanced alignment calculation
               let alignment: string;
               let alignmentLevel: string;
@@ -1668,7 +1668,7 @@ export class DatabaseStorage implements IStorage {
                 alignment = "unique";
                 alignmentLevel = "Unique Perspective";
               }
-              
+
               comparison = {
                 yourAnswer: userAnswer,
                 groupAverage: groupAverage,
@@ -1694,7 +1694,7 @@ export class DatabaseStorage implements IStorage {
             const userSelections = (participantResponse.answerJson as any)?.selected || [];
             const userSelectionsArray = Array.isArray(userSelections) ? userSelections : [userSelections];
             const optionsSummary = slideAnalytics?.aggregatedData?.optionsSummary || [];
-            
+
             if (optionsSummary.length === 0 || !slideAnalytics) {
               // No group data - show skeleton with user's answer only
               // Get option text from slide payload
@@ -1703,7 +1703,7 @@ export class DatabaseStorage implements IStorage {
                 const option = options.find((opt: any) => opt.id === id);
                 return option?.text || id;
               });
-              
+
               comparison = {
                 yourAnswer: userSelectionsArray,
                 yourAnswerText: userAnswerTexts,
@@ -1719,11 +1719,11 @@ export class DatabaseStorage implements IStorage {
               const sortedOptions = optionsSummary.sort((a: any, b: any) => b.percentage - a.percentage);
               const topTwoOptions = sortedOptions.slice(0, 2);
               const top50PercentOptions = sortedOptions.filter((opt: any) => opt.percentage >= 10); // At least 10% popularity
-              
+
               // Calculate alignment score
               let matchedPopularChoices = 0;
               let totalPopularityMatched = 0;
-              
+
               userSelectionsArray.forEach((userChoice: string) => {
                 const matchedOption = sortedOptions.find((opt: any) => opt.optionId === userChoice);
                 if (matchedOption) {
@@ -1733,18 +1733,18 @@ export class DatabaseStorage implements IStorage {
                   }
                 }
               });
-              
+
               // Determine alignment level
               let alignment: string;
               let alignmentLevel: string;
-              
+
               if (matchedPopularChoices >= 2) {
                 alignment = "strong_consensus";
                 alignmentLevel = "Strong Consensus";
               } else if (userSelectionsArray.includes(sortedOptions[0]?.optionId)) {
                 alignment = "agrees";
                 alignmentLevel = "Aligned";
-              } else if (userSelectionsArray.some((choice: string) => 
+              } else if (userSelectionsArray.some((choice: string) =>
                 top50PercentOptions.find((opt: any) => opt.optionId === choice))) {
                 alignment = "partial";
                 alignmentLevel = "Partial Alignment";
@@ -1752,7 +1752,7 @@ export class DatabaseStorage implements IStorage {
                 alignment = "unique";
                 alignmentLevel = "Unique Taste";
               }
-              
+
               comparison = {
                 yourAnswer: userSelectionsArray,
                 mostPopular: sortedOptions[0]?.optionText || "N/A",
@@ -1815,17 +1815,17 @@ export class DatabaseStorage implements IStorage {
     if (slidePayload.question_type === "scale") {
       const diff = Math.abs(comparison.differenceFromGroup);
       if (diff <= 0.5) return "You aligned closely with the group average";
-      if (diff <= 1.5) return comparison.differenceFromGroup > 0 
-        ? "You rated this higher than most" 
+      if (diff <= 1.5) return comparison.differenceFromGroup > 0
+        ? "You rated this higher than most"
         : "You rated this lower than most";
-      return comparison.differenceFromGroup > 0 
-        ? "You detected much stronger intensity than others" 
+      return comparison.differenceFromGroup > 0
+        ? "You detected much stronger intensity than others"
         : "You found this more subtle than most participants";
     }
 
     if (slidePayload.question_type === "multiple_choice") {
-      return comparison.alignment === "agrees" 
-        ? "You agreed with the majority choice" 
+      return comparison.alignment === "agrees"
+        ? "You agreed with the majority choice"
         : "You had a unique perspective compared to others";
     }
 
@@ -1850,15 +1850,15 @@ export class DatabaseStorage implements IStorage {
 
     const averageRating = scaleResponses.reduce((sum, r) => {
       let rawValue = typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5;
-      
+
       // Validate and clamp scale values to expected range (1-10)
       const clampedValue = Math.max(1, Math.min(10, rawValue));
-      
+
       // Log if we had to clamp the value (indicates data corruption)
       if (clampedValue !== rawValue) {
         console.warn(`🔧 Personality: Scale value clamped from ${rawValue} to ${clampedValue}`);
       }
-      
+
       return sum + clampedValue;
     }, 0) / scaleResponses.length;
 
@@ -1872,7 +1872,7 @@ export class DatabaseStorage implements IStorage {
       };
     } else if (averageRating <= 4.5) {
       return {
-        type: "Subtle Sophisticate", 
+        type: "Subtle Sophisticate",
         description: "You prefer elegant, nuanced wines with delicate complexity",
         characteristics: ["Values subtlety", "Appreciates nuance", "Refined taste"]
       };
@@ -1911,7 +1911,7 @@ export class DatabaseStorage implements IStorage {
     if (notesCount >= 3) {
       achievements.push({
         id: "detailed_notes",
-        name: "Detail Master", 
+        name: "Detail Master",
         description: "Added personal notes to multiple questions",
         icon: "📝",
         rarity: "rare"
@@ -1930,15 +1930,15 @@ export class DatabaseStorage implements IStorage {
       const slideAnalytics = sessionAnalytics.slidesAnalytics.find((s: any) => s.slideId === response.slideId);
       if (slideAnalytics) {
         let rawUserAnswer = typeof response.answerJson === "number" ? response.answerJson : (response.answerJson as any)?.value || 0;
-        
+
         // Validate and clamp user answer to expected scale range (1-10)
         const userAnswer = Math.max(1, Math.min(10, rawUserAnswer));
-        
+
         // Log if we had to clamp the value (indicates data corruption)
         if (userAnswer !== rawUserAnswer) {
           console.warn(`🔧 Achievements: Scale value clamped from ${rawUserAnswer} to ${userAnswer}`);
         }
-        
+
         const groupAverage = slideAnalytics.aggregatedData.averageScore || 0;
         if (Math.abs(userAnswer - groupAverage) <= 1) {
           alignmentCount++;
@@ -1972,15 +1972,15 @@ export class DatabaseStorage implements IStorage {
     if (tanninResponses.length > 0) {
       const avgTanninRating = tanninResponses.reduce((sum, r) => {
         let rawValue = typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5;
-        
+
         // Validate and clamp tannin values to expected scale (1-10)
         const clampedValue = Math.max(1, Math.min(10, rawValue));
-        
+
         // Log if we had to clamp the value (indicates data corruption)
         if (clampedValue !== rawValue) {
           console.warn(`🔧 Tannin insight: Scale value clamped from ${rawValue} to ${clampedValue}`);
         }
-        
+
         return sum + clampedValue;
       }, 0) / tanninResponses.length;
 
@@ -2006,20 +2006,20 @@ export class DatabaseStorage implements IStorage {
     if (scaleResponses.length >= 3) {
       const values = scaleResponses.map(r => {
         let rawValue = typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5;
-        
+
         // Validate and clamp scale values to expected range (1-10)
         const clampedValue = Math.max(1, Math.min(10, rawValue));
-        
+
         // Log if we had to clamp the value (indicates data corruption)
         if (clampedValue !== rawValue) {
           console.warn(`🔧 Insights: Scale value clamped from ${rawValue} to ${clampedValue}`);
         }
-        
+
         return clampedValue;
       });
       const avg = values.reduce((a, b) => a + b, 0) / values.length;
       const variance = values.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / values.length;
-      
+
       if (variance < 2) {
         insights.push("You have a consistent tasting approach across different characteristics");
       } else {
@@ -2061,7 +2061,7 @@ export class DatabaseStorage implements IStorage {
 
   private async initializeGlossaryTerms() {
     console.log("Initializing wine glossary terms...");
-    
+
     const wineTerms = [
       // General Wine Terminology
       {
@@ -2236,12 +2236,12 @@ export class DatabaseStorage implements IStorage {
       const answerJson = response.answerJson as any;
       const questionType = slidePayload?.questionType || 'unknown';
       const slideTitle = slidePayload?.title || slidePayload?.question || 'Untitled Question';
-      
+
       // Extract answer based on question type
       let selectedOptionText = '';
       let scaleValue = null;
       let notes = '';
-      
+
       if (answerJson) {
         if (questionType === 'multiple_choice' && answerJson.selectedOptionId) {
           const selectedOption = slidePayload?.options?.find((opt: any) => opt.id === answerJson.selectedOptionId);
@@ -2251,7 +2251,7 @@ export class DatabaseStorage implements IStorage {
         }
         notes = answerJson.notes || '';
       }
-      
+
       return {
         participantName: response.participantName,
         participantEmail: response.participantEmail,
@@ -2340,7 +2340,7 @@ export class DatabaseStorage implements IStorage {
 
     // 5. Calculate completion status for each participant
     const participantCompletionMap = new Map();
-    
+
     // Initialize all participants with zero responses
     allSessionParticipants.forEach((participant: any) => {
       participantCompletionMap.set(participant.id, {
@@ -2367,7 +2367,7 @@ export class DatabaseStorage implements IStorage {
     const pendingParticipants: any[] = [];
     const completedNonHostParticipants: any[] = [];
     const completedHostParticipants: any[] = [];
-    
+
     participantCompletionMap.forEach(participantData => {
       if (participantData.questionsAnswered >= totalQuestions) {
         completedParticipants.push(participantData);
@@ -2384,8 +2384,8 @@ export class DatabaseStorage implements IStorage {
     // Calculate various completion statuses
     const allParticipantsCompleted = completedParticipants.length === allSessionParticipants.length;
     const allNonHostParticipantsCompleted = completedNonHostParticipants.length === nonHostParticipants.length && nonHostParticipants.length > 0;
-    
-    const completionPercentage = allSessionParticipants.length > 0 
+
+    const completionPercentage = allSessionParticipants.length > 0
       ? Math.round((completedParticipants.length / allSessionParticipants.length) * 100)
       : 0;
 
@@ -2455,12 +2455,12 @@ export class DatabaseStorage implements IStorage {
           return true;
         }
       }
-      
+
       // Check legacy payloadJson format
       const payload = slide.payloadJson as any;
-      return payload?.questionType === 'text' || 
+      return payload?.questionType === 'text' ||
              payload?.question_type === 'text' ||
-             payload?.questionType === 'free_response' || 
+             payload?.questionType === 'free_response' ||
              payload?.question_type === 'free_response';
     });
 
@@ -2494,7 +2494,7 @@ export class DatabaseStorage implements IStorage {
     return textResponses.map(response => {
       const slide = textSlides.find(s => s.id === response.slideId);
       let questionText = 'Unknown Question';
-      
+
       if (slide?.genericQuestions && typeof slide.genericQuestions === 'object') {
         const genericQ = slide.genericQuestions as any;
         if (genericQ.config?.title) {
@@ -2510,8 +2510,8 @@ export class DatabaseStorage implements IStorage {
         participantId: response.participantId,
         participantName: response.participant?.displayName || 'Anonymous',
         questionText,
-        answerText: typeof response.answerJson === 'string' 
-          ? response.answerJson 
+        answerText: typeof response.answerJson === 'string'
+          ? response.answerJson
           : ((response.answerJson as any)?.text || (response.answerJson as any)?.answer || String(response.answerJson || '')),
         timestamp: response.createdAt
       };
@@ -2527,10 +2527,10 @@ export class DatabaseStorage implements IStorage {
 
     // Create a unique key for this session and wine combination
     const key = `${sessionId}-${wineId}`;
-    
+
     // Extract individual sentiment scores from the results
     const sentimentData: any[] = [];
-    
+
     results.forEach(result => {
       if (result.textResponses && Array.isArray(result.textResponses)) {
         // Extract each text response with its sentiment score
@@ -2549,7 +2549,7 @@ export class DatabaseStorage implements IStorage {
         });
       }
     });
-    
+
     this.sentimentAnalysisResults.set(key, sentimentData);
 
     console.log(`✅ Saved ${sentimentData.length} sentiment analysis results for wine ${wineId} in session ${sessionId}`);
@@ -2624,7 +2624,7 @@ export class DatabaseStorage implements IStorage {
 
     for (const slide of wineQuestionSlides) {
       const slideResponses = allResponses.filter(r => r.slideId === slide.id);
-      
+
       if (slideResponses.length === 0) {
         // No responses yet
         questionAverages.push({
@@ -2669,7 +2669,7 @@ export class DatabaseStorage implements IStorage {
           // For text questions, get the summary instead of sentiment scores
           const textSummary = await this.calculateTextSummaryAverage(sessionId, wineId, slide.id);
           averageScore = null; // No numerical score for text questions
-          responseDistribution = { 
+          responseDistribution = {
             textResponseCount: slideResponses.length,
             summary: textSummary?.summary || 'No summary available',
             keywords: textSummary?.keywords || [],
@@ -2736,6 +2736,35 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
+  async updateSlideComparableQuestions(slideId: string){
+    // 1. Get the slide by ID
+    let slide: any = await db
+      .select()
+      .from(slides)
+      .where(eq(slides.id, slideId))
+      .limit(1);
+
+    slide = slide[0]
+
+
+    if (!slide) {
+      throw new Error("Slide not found");
+    }
+
+    // 3. Update the comparable field to true
+    const response = await db
+      .update(slides)
+      .set({ comparable: !slide.comparable })
+      .where(eq(slides.id, slideId));
+
+    console.log(`✅ Slide ${slideId} marked as comparable `, '\n', response );
+    return {
+      success: !slide.comparable,
+      message: `Slide ${slideId} marked as comparable`
+    };
+  }
+
+
   // Helper methods for Step 4 calculations
   private getQuestionType(slide: any): string {
     // Check genericQuestions first
@@ -2785,21 +2814,21 @@ export class DatabaseStorage implements IStorage {
         } else {
           score = 0;
         }
-        
+
         // Clamp to reasonable scale range (1-10)
         return Math.max(1, Math.min(10, score));
       })
       .filter(score => score > 0);
 
     if (validScores.length === 0) return 0;
-    
+
     const sum = validScores.reduce((acc, score) => acc + score, 0);
     return Math.round((sum / validScores.length) * 100) / 100; // Round to 2 decimal places
   }
 
   private getScaleDistribution(responses: any[]): any {
     const distribution: { [key: string]: number } = {};
-    
+
     responses.forEach(r => {
       let score: number;
       if (typeof r.answerJson === 'number') {
@@ -2810,7 +2839,7 @@ export class DatabaseStorage implements IStorage {
       } else {
         score = 0;
       }
-      
+
       // Clamp to reasonable range
       score = Math.max(1, Math.min(10, score));
       const scoreKey = score.toString();
@@ -2822,14 +2851,14 @@ export class DatabaseStorage implements IStorage {
 
   private getMultipleChoiceDistribution(responses: any[], slide: any): any {
     const distribution: { [key: string]: { count: number, optionText: string } } = {};
-    
+
     // First, extract option details from slide configuration
     const optionDetails = this.getOptionDetails(slide);
-    
+
     responses.forEach(r => {
       if (r.answerJson && typeof r.answerJson === 'object') {
         const answerObj = r.answerJson as any;
-        
+
         // Handle different multiple choice answer formats
         if (answerObj.selectedOptionId) {
           const optionId = answerObj.selectedOptionId;
@@ -2899,7 +2928,7 @@ export class DatabaseStorage implements IStorage {
 
   private getOptionDetails(slide: any): { [key: string]: string } {
     const optionDetails: { [key: string]: string } = {};
-    
+
     // Check genericQuestions first
     if (slide.genericQuestions && typeof slide.genericQuestions === 'object') {
       const genericQ = slide.genericQuestions as any;
@@ -2915,7 +2944,7 @@ export class DatabaseStorage implements IStorage {
         });
       }
     }
-    
+
     // Check payloadJson for options
     if (slide.payloadJson && typeof slide.payloadJson === 'object') {
       const payload = slide.payloadJson as any;
@@ -2931,7 +2960,7 @@ export class DatabaseStorage implements IStorage {
         });
       }
     }
-    
+
     return optionDetails;
   }
 
@@ -2943,19 +2972,19 @@ export class DatabaseStorage implements IStorage {
 
     // Get the highest percentage (most popular option)
     const maxPercentage = Math.max(...distribution.map((option: any) => option.percentage || 0));
-    
+
     // Return percentage as decimal (0-1) for frontend to display correctly
     return Math.round(maxPercentage) / 100; // Convert percentage back to decimal (0.00-1.00)
   }
 
   private getBooleanDistribution(responses: any[]): any {
     const distribution: { [key: string]: number } = { true: 0, false: 0 };
-    
+
     responses.forEach(r => {
       if (r.answerJson && typeof r.answerJson === 'object') {
         const answerObj = r.answerJson as any;
         const value = answerObj.value || answerObj.answer;
-        
+
         if (typeof value === 'boolean') {
           distribution[value.toString()] += 1;
         } else if (typeof value === 'string') {
@@ -2975,7 +3004,7 @@ export class DatabaseStorage implements IStorage {
   private calculateBooleanScore(distribution: any): number {
     const total = distribution.true + distribution.false;
     if (total === 0) return 0;
-    
+
     // Return percentage of "true" responses (0-10 scale)
     const truePercentage = distribution.true / total;
     return Math.round(truePercentage * 10 * 100) / 100;
@@ -2986,7 +3015,7 @@ export class DatabaseStorage implements IStorage {
       // Get all text responses for this specific slide
       const textResponses = await this.getWineTextResponses(sessionId, wineId);
       const slideTextResponses = textResponses.filter(response => response.slideId === slideId);
-      
+
       if (slideTextResponses.length === 0) {
         console.log(`📊 No text responses available for slide ${slideId} in wine ${wineId}`);
         return null;
@@ -2994,17 +3023,17 @@ export class DatabaseStorage implements IStorage {
 
       // Import the summary analysis function
       const { analyzeWineTextResponsesForSummary } = await import('./openai-client.js');
-      
+
       // Format responses for analysis
       const formattedResponses = slideTextResponses.map(response => ({
         slideId: response.slideId,
         questionTitle: response.questionText || 'Wine question',
         textContent: response.answerText
       }));
-      
+
       // Get summary analysis
       const analysisResult = await analyzeWineTextResponsesForSummary(formattedResponses, wineId, sessionId);
-      
+
       if (analysisResult.textResponses.length > 0) {
         const slideAnalysis = analysisResult.textResponses.find(resp => resp.slideId === slideId);
         if (slideAnalysis) {
@@ -3016,14 +3045,14 @@ export class DatabaseStorage implements IStorage {
           };
         }
       }
-      
+
       // Fallback to overall sentiment if slide-specific analysis not found
       return {
         summary: analysisResult.overallSentiment.summary || 'Summary not available',
         keywords: analysisResult.overallSentiment.keywords || [],
         sentiment: analysisResult.overallSentiment.sentiment || 'neutral'
       };
-      
+
     } catch (error) {
       console.error(`📊 Error calculating text summary for slide ${slideId}:`, error);
       return null;
@@ -3034,7 +3063,7 @@ export class DatabaseStorage implements IStorage {
     // Get sentiment analysis results for this session and wine
     const key = `${sessionId}-${wineId}`;
     const sentimentResults = this.sentimentAnalysisResults.get(key);
-    
+
     if (!sentimentResults || sentimentResults.length === 0) {
       console.log(`📊 No sentiment analysis results available for slide ${slideId} in wine ${wineId}`);
       return null;
@@ -3042,7 +3071,7 @@ export class DatabaseStorage implements IStorage {
 
     // Filter results for this specific slide and calculate average sentiment score
     const slideResults = sentimentResults.filter(result => result.slideId === slideId);
-    
+
     if (slideResults.length === 0) {
       console.log(`📊 No sentiment analysis results for slide ${slideId}`);
       return null;
@@ -3050,7 +3079,7 @@ export class DatabaseStorage implements IStorage {
 
     // Calculate average sentiment score (1-10 scale)
     const sentimentScores = slideResults.map(result => result.sentimentScore).filter(score => score !== null && score !== undefined);
-    
+
     if (sentimentScores.length === 0) {
       console.log(`📊 No valid sentiment scores for slide ${slideId}`);
       return null;
@@ -3058,14 +3087,14 @@ export class DatabaseStorage implements IStorage {
 
     const average = sentimentScores.reduce((sum, score) => sum + score, 0) / sentimentScores.length;
     console.log(`📊 Calculated sentiment average ${average.toFixed(2)} for slide ${slideId} (${sentimentScores.length} responses)`);
-    
+
     return Math.round(average * 100) / 100; // Round to 2 decimal places
   }
 
   // Package management methods for sommelier dashboard
   async getAllPackages(): Promise<Package[]> {
     const packagesData = await db.select().from(packages).orderBy(packages.createdAt);
-    
+
     // For each package, fetch its wines
     const packagesWithWines = await Promise.all(
       packagesData.map(async (pkg) => {
@@ -3076,7 +3105,7 @@ export class DatabaseStorage implements IStorage {
         };
       })
     );
-    
+
     return packagesWithWines;
   }
 
@@ -3298,7 +3327,7 @@ export class DatabaseStorage implements IStorage {
     // Get the next position for this package
     const existingWines = await this.getPackageWines(wine.packageId);
     const nextPosition = existingWines.length + 1;
-    
+
     const wineData = {
       ...wine,
       position: nextPosition,
@@ -3315,9 +3344,9 @@ export class DatabaseStorage implements IStorage {
         finish: 'Long and elegant'
       }
     };
-    
+
     const [newWine] = await db.insert(packageWines).values(wineData).returning();
-    
+
     // Create wine introduction slide with wine-specific information
     await this.createSlide({
       packageWineId: newWine.id,
@@ -3336,11 +3365,11 @@ export class DatabaseStorage implements IStorage {
         is_wine_intro: true
       },
     });
-    
+
     // Create default slide templates for this wine
     const slideTemplates = this.getDefaultSlideTemplates();
     let position = 2; // Start after the wine intro slide
-    
+
     for (const template of slideTemplates.slice(1)) { // Skip the first template (intro) since we already created wine intro
       // Add wine context to all slides while preserving template structure
       const payloadJson = {
@@ -3369,7 +3398,7 @@ export class DatabaseStorage implements IStorage {
         payloadJson: payloadJson,
       });
     }
-    
+
     return newWine;
   }
 
@@ -3386,17 +3415,17 @@ export class DatabaseStorage implements IStorage {
     // Get the wine to be deleted to know its package and position
     const wineToDelete = await db.select().from(packageWines)
       .where(eq(packageWines.id, id)).limit(1);
-    
+
     if (wineToDelete.length === 0) return;
-    
+
     const { packageId, position } = wineToDelete[0];
-    
+
     // First delete associated slides
     await db.delete(slides).where(eq(slides.packageWineId, id));
-    
+
     // Then delete the wine
     await db.delete(packageWines).where(eq(packageWines.id, id));
-    
+
     // Update positions of wines that came after the deleted one
     await db.update(packageWines)
       .set({ position: sql`position - 1` })
@@ -3414,13 +3443,13 @@ export class DatabaseStorage implements IStorage {
       payloadJsonUpdate: data.payloadJson,
       timestamp: new Date().toISOString()
     });
-    
+
     const [updatedSlide] = await db
       .update(slides)
       .set(data)
       .where(eq(slides.id, id))
       .returning();
-    
+
     console.log('✅ Storage: updateSlide completed', {
       slideId: id,
       updatedSlide,
@@ -3428,7 +3457,7 @@ export class DatabaseStorage implements IStorage {
       wasUpdated: !!updatedSlide,
       timestamp: new Date().toISOString()
     });
-    
+
     return updatedSlide;
   }
 
@@ -3440,18 +3469,18 @@ export class DatabaseStorage implements IStorage {
   async createSessionWineSelections(sessionId: string, selections: InsertSessionWineSelection[]): Promise<SessionWineSelection[]> {
     // First delete existing selections for this session
     await this.deleteSessionWineSelections(sessionId);
-    
+
     // Insert new selections
     const insertData = selections.map(selection => ({
       ...selection,
       sessionId
     }));
-    
+
     const newSelections = await db
       .insert(sessionWineSelections)
       .values(insertData)
       .returning();
-    
+
     return newSelections;
   }
 
@@ -3531,13 +3560,13 @@ export class DatabaseStorage implements IStorage {
     }
 
     const wineIds = wines.map(w => w.id);
-    
+
     // Fetch package-level slides
     const packageSlides = await db.select()
       .from(slides)
       .where(eq(slides.packageId, pkg.id))
       .orderBy(slides.position);
-    
+
     // Fetch wine-level slides
     const wineSlides = await db.select()
       .from(slides)
@@ -3566,7 +3595,7 @@ export class DatabaseStorage implements IStorage {
       ));
     });
   }
-  
+
   // NEW: Normalize slide positions for a wine to ensure clean sequential numbering
   async normalizeSlidePositions(packageWineId: string): Promise<void> {
     await db.transaction(async (tx) => {
@@ -3590,11 +3619,11 @@ export class DatabaseStorage implements IStorage {
       }
     });
   }
-  
+
   // Enhanced slide position update with conflict resolution
   async updateSlidePosition(slideId: string, newPosition: number): Promise<void> {
     console.log(`🔄 Updating slide ${slideId.slice(-6)} to position ${newPosition}`);
-    
+
     try {
       // Get slide info first to determine package_wine_id and section_type
       const slide = await db
@@ -3606,15 +3635,15 @@ export class DatabaseStorage implements IStorage {
         .from(slides)
         .where(eq(slides.id, slideId))
         .limit(1);
-      
+
       if (slide.length === 0) {
         throw new Error(`Slide ${slideId} not found`);
       }
-      
+
       const { packageWineId, sectionType, currentPosition } = slide[0];
-      
+
       console.log(`📍 Slide ${slideId.slice(-6)}: ${currentPosition} → ${newPosition} (section: ${sectionType || 'package-level'})`);
-      
+
       if (!packageWineId || !sectionType) {
         // Fallback to simple update for package-level slides
         await db
@@ -3624,7 +3653,7 @@ export class DatabaseStorage implements IStorage {
         console.log(`✅ Updated package-level slide ${slideId.slice(-6)} position to ${newPosition}`);
         return;
       }
-      
+
       // Use the enhanced position manager for wine-level slides
       const finalPosition = await updateSlidePositionSafely(
         slideId,
@@ -3632,15 +3661,15 @@ export class DatabaseStorage implements IStorage {
         packageWineId,
         sectionType as SectionType
       );
-      
+
       console.log(`✅ Successfully updated slide ${slideId} position to ${finalPosition}`);
-      
+
       // Check if section needs renumbering after this operation
       if (await shouldRenumberSection(packageWineId, sectionType as SectionType)) {
         console.log(`🔧 Renumbering section ${sectionType} for wine ${packageWineId}`);
         await renumberSectionSlides(packageWineId, sectionType as SectionType);
       }
-      
+
     } catch (error) {
       console.error(`❌ Failed to update slide position:`, error);
       throw error;
@@ -3672,26 +3701,26 @@ export class DatabaseStorage implements IStorage {
       // Filter out only wine-specific intro slides, but keep intro questions and assessments
       const slidesToCopy = sourceSlides.filter(slide => {
         const payloadJson = slide.payloadJson as any;
-        
+
         // EXCLUDE wine-specific intro slides (those that introduce a specific wine)
         if (payloadJson?.is_wine_intro === true) {
           console.log(`Excluding wine-specific intro: ${payloadJson.title}`);
           return false;
         }
-        
+
         // EXCLUDE package-level intro slides (general package welcome)
         if (payloadJson?.is_package_intro === true) {
           console.log(`Excluding package intro: ${payloadJson.title}`);
           return false;
         }
-        
+
         // EXCLUDE slides with wine-specific titles as a fallback check
         if (payloadJson?.title && sourceWine[0]) {
           const title = payloadJson.title.toLowerCase();
           const wineName = sourceWine[0].wineName.toLowerCase();
-          
+
           // Check for common wine-specific intro patterns
-          if (title.includes(`meet ${wineName}`) || 
+          if (title.includes(`meet ${wineName}`) ||
               title.includes(`introduction to ${wineName}`) ||
               title.includes(`welcome to ${wineName}`) ||
               title === wineName) {
@@ -3699,7 +3728,7 @@ export class DatabaseStorage implements IStorage {
             return false;
           }
         }
-        
+
         // INCLUDE everything else - intro questions, deep dive, ending, etc.
         return true;
       });
@@ -3724,7 +3753,7 @@ export class DatabaseStorage implements IStorage {
 
       // 4. Use database transaction to ensure data consistency
       const duplicatedSlides: Slide[] = [];
-      
+
       await db.transaction(async (tx) => {
         // Get all existing slides for target wine within transaction
         const existingSlides = await tx.select()
@@ -3733,7 +3762,7 @@ export class DatabaseStorage implements IStorage {
           .orderBy(slides.position);
 
         let startingPosition = 1;
-        
+
         // In replace mode, we may have preserved the wine intro slide
         // We need to account for it when assigning positions
         if (replaceExisting && existingSlides.length > 0) {
@@ -3742,7 +3771,7 @@ export class DatabaseStorage implements IStorage {
             const payload = slide.payloadJson as any;
             return payload?.is_wine_intro === true;
           });
-          
+
           if (hasPreservedIntro) {
             // Start copying at position 2 to avoid conflict with preserved intro
             startingPosition = 2;
@@ -3769,9 +3798,9 @@ export class DatabaseStorage implements IStorage {
 
           // Update wine context in payloadJson if present
           let updatedPayloadJson = { ...(sourceSlide.payloadJson || {}) } as any;
-          
+
           // If the slide contains wine-specific context, update it to target wine
-          if (updatedPayloadJson.wine_name || updatedPayloadJson.wine_context || 
+          if (updatedPayloadJson.wine_name || updatedPayloadJson.wine_context ||
               updatedPayloadJson.wine_type || updatedPayloadJson.wine_region) {
             updatedPayloadJson = {
               ...updatedPayloadJson,
@@ -3782,7 +3811,7 @@ export class DatabaseStorage implements IStorage {
               wine_image: targetWine[0].wineImageUrl || updatedPayloadJson.wine_image
             };
           }
-          
+
           const newSlideData = {
             packageWineId: targetWineId,
             type: sourceSlide.type,
@@ -3801,21 +3830,21 @@ export class DatabaseStorage implements IStorage {
             // If position conflict still occurs, find the next available position
             if (error instanceof Error && error.message.includes('duplicate key')) {
               console.warn(`Position conflict for slide ${sourceSlide.type} at position ${newPosition}, finding next available position`);
-              
+
               // Find the highest position currently in use for this wine
               const currentSlides = await tx.select({ position: slides.position })
                 .from(slides)
                 .where(eq(slides.packageWineId, targetWineId))
                 .orderBy(desc(slides.position))
                 .limit(1);
-              
+
               const nextAvailablePosition = (currentSlides[0]?.position || 0) + 1;
-              
+
               const fallbackSlideData = {
                 ...newSlideData,
                 position: nextAvailablePosition
               };
-              
+
               const [createdSlide] = await tx.insert(slides)
                 .values(fallbackSlideData)
                 .returning();
@@ -3838,10 +3867,10 @@ export class DatabaseStorage implements IStorage {
       console.log(`  Excluded slides: ${sourceSlides.length - slidesToCopy.length}`);
       console.log(`  Mode: ${replaceExisting ? 'Replace' : 'Append'}`);
       console.log(`✅ Successfully duplicated ${duplicatedSlides.length} slides\n`);
-      
+
       // Normalize positions after duplication to ensure clean sequential numbering
       await this.normalizeSlidePositions(targetWineId);
-      
+
       return {
         count: duplicatedSlides.length,
         slides: duplicatedSlides
@@ -3911,16 +3940,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Position Recovery and Smart Reordering Functions
-  
+
   /**
    * Detects and fixes slides stuck at temporary positions (900000000+)
    * This happens when the two-phase reorder process fails, leaving slides at temp positions
    */
   async detectAndFixTemporaryPositions(): Promise<{ fixedCount: number; wines: string[] }> {
     console.log('🔍 Checking for slides stuck at temporary positions...');
-    
+
     const TEMP_BASE_POSITION = 900000000;
-    
+
     // Find all slides stuck at temporary positions
     const stuckSlides = await db
       .select({
@@ -3932,14 +3961,14 @@ export class DatabaseStorage implements IStorage {
       })
       .from(slides)
       .where(gte(slides.position, TEMP_BASE_POSITION));
-    
+
     if (stuckSlides.length === 0) {
       console.log('✅ No slides found at temporary positions');
       return { fixedCount: 0, wines: [] };
     }
-    
+
     console.log(`🚨 Found ${stuckSlides.length} slides stuck at temporary positions`);
-    
+
     // Group slides by wine
     const slidesByWine = new Map<string, typeof stuckSlides>();
     stuckSlides.forEach(slide => {
@@ -3949,34 +3978,34 @@ export class DatabaseStorage implements IStorage {
       }
       slidesByWine.get(wineId)!.push(slide);
     });
-    
+
     const fixedWines: string[] = [];
     let totalFixed = 0;
-    
+
     // Fix each wine's positions
     for (const [wineId, wineStuckSlides] of Array.from(slidesByWine.entries())) {
       console.log(`🔧 Fixing ${wineStuckSlides.length} stuck slides for wine ${wineId}`);
-      
+
       // Get all slides for this wine (including non-stuck ones)
       const allWineSlides = await db
         .select()
         .from(slides)
         .where(eq(slides.packageWineId, wineId))
         .orderBy(slides.position);
-      
+
       // Normalize all positions for this wine
       const fixedCount = await this.normalizeWinePositions(wineId, allWineSlides);
-      
+
       if (fixedCount > 0) {
         fixedWines.push(wineId);
         totalFixed += fixedCount;
       }
     }
-    
+
     console.log(`✅ Fixed ${totalFixed} slides across ${fixedWines.length} wines`);
     return { fixedCount: totalFixed, wines: fixedWines };
   }
-  
+
   /**
    * Normalizes all slide positions for a wine to use sequential gap-based positions
    */
@@ -3988,17 +4017,17 @@ export class DatabaseStorage implements IStorage {
         .where(eq(slides.packageWineId, wineId))
         .orderBy(slides.position);
     }
-    
+
     if (wineSlides.length === 0) {
       return 0;
     }
-    
+
     console.log(`🔄 Normalizing positions for ${wineSlides.length} slides in wine ${wineId}`);
-    
+
     const GAP_SIZE = 1000;
     const BASE_POSITION = 100000;
     let fixedCount = 0;
-    
+
     // Sort slides by current position to maintain relative order
     const sortedSlides = [...wineSlides].sort((a, b) => {
       // Handle temporary positions - sort them last but maintain their relative order
@@ -4009,47 +4038,47 @@ export class DatabaseStorage implements IStorage {
       if (b.position >= 900000000) return -1;
       return a.position - b.position;
     });
-    
+
     // Assign new sequential positions
     for (let i = 0; i < sortedSlides.length; i++) {
       const slide = sortedSlides[i];
       const newPosition = BASE_POSITION + (i * GAP_SIZE);
-      
+
       if (slide.position !== newPosition) {
         await db
           .update(slides)
           .set({ position: newPosition })
           .where(eq(slides.id, slide.id));
-        
+
         console.log(`📍 Fixed slide ${slide.id}: ${slide.position} → ${newPosition}`);
         fixedCount++;
       }
     }
-    
+
     return fixedCount;
   }
-  
+
   /**
    * Smart swap function that only swaps two adjacent slides without using temporary positions
    */
   async smartSwapSlides(slideId1: string, slideId2: string): Promise<void> {
     console.log(`🔄 Smart swapping slides ${slideId1} ↔ ${slideId2}`);
-    
+
     await db.transaction(async (tx) => {
       // Get both slides
       const slide1 = await tx.select().from(slides).where(eq(slides.id, slideId1)).limit(1);
       const slide2 = await tx.select().from(slides).where(eq(slides.id, slideId2)).limit(1);
-      
+
       if (slide1.length === 0 || slide2.length === 0) {
         throw new Error('One or both slides not found');
       }
-      
+
       const pos1 = slide1[0].position;
       const pos2 = slide2[0].position;
-      
+
       // Use temporary position to avoid unique constraint violation
       const tempPosition = Math.max(pos1, pos2) + 1000000; // Temporary position way above normal range
-      
+
       // Three-step swap to avoid constraint violation:
       // 1. Move slide1 to temp position
       await tx.update(slides).set({ position: tempPosition }).where(eq(slides.id, slideId1));
@@ -4057,26 +4086,26 @@ export class DatabaseStorage implements IStorage {
       await tx.update(slides).set({ position: pos1 }).where(eq(slides.id, slideId2));
       // 3. Move slide1 to slide2's original position
       await tx.update(slides).set({ position: pos2 }).where(eq(slides.id, slideId1));
-      
+
       console.log(`✅ Swapped positions: ${slideId1}(${pos1}) ↔ ${slideId2}(${pos2})`);
     });
   }
-  
+
   /**
    * Direct position assignment with conflict resolution
    */
   async assignSlidePosition(slideId: string, targetPosition: number, packageWineId?: string): Promise<void> {
     console.log(`🎯 Assigning slide ${slideId} to position ${targetPosition}`);
-    
+
     await db.transaction(async (tx) => {
       // Get the slide to move
       const slideToMove = await tx.select().from(slides).where(eq(slides.id, slideId)).limit(1);
       if (slideToMove.length === 0) {
         throw new Error('Slide not found');
       }
-      
+
       const currentWineId = packageWineId || slideToMove[0].packageWineId!;
-      
+
       // Check if target position is occupied
       const conflictingSlide = await tx
         .select()
@@ -4087,43 +4116,43 @@ export class DatabaseStorage implements IStorage {
           ne(slides.id, slideId)
         ))
         .limit(1);
-      
+
       if (conflictingSlide.length > 0) {
         // Find next available position
         const nextAvailablePosition = await this.findNextAvailablePosition(currentWineId, targetPosition, tx);
-        
+
         // Move the conflicting slide to the available position
         await tx
           .update(slides)
           .set({ position: nextAvailablePosition })
           .where(eq(slides.id, conflictingSlide[0].id));
-        
+
         console.log(`📍 Moved conflicting slide ${conflictingSlide[0].id} to position ${nextAvailablePosition}`);
       }
-      
+
       // Now assign the target position
       await tx
         .update(slides)
-        .set({ 
+        .set({
           position: targetPosition,
           ...(packageWineId && { packageWineId })
         })
         .where(eq(slides.id, slideId));
-      
+
       console.log(`✅ Assigned slide ${slideId} to position ${targetPosition}`);
     });
   }
-  
+
   /**
    * Enhanced batch update slide positions with conflict detection and resolution
    */
   async batchUpdateSlidePositions(updates: Array<{ slideId: string; position: number; section_type?: string }>): Promise<void> {
     console.log(`📦 Batch updating ${updates.length} slide positions`);
-    
+
     if (updates.length === 0) {
       return;
     }
-    
+
     await db.transaction(async (tx) => {
       // Group updates by package_wine_id and section_type for validation
       const slideDetails = await Promise.all(
@@ -4138,18 +4167,18 @@ export class DatabaseStorage implements IStorage {
             .from(slides)
             .where(eq(slides.id, update.slideId))
             .limit(1);
-          
+
           if (slide.length === 0) {
             throw new Error(`Slide ${update.slideId} not found`);
           }
-          
+
           return {
             ...update,
             ...slide[0]
           };
         })
       );
-      
+
       // Validate that all slides within the same wine don't have position conflicts
       const wineGroups = new Map<string, typeof slideDetails>();
       for (const detail of slideDetails) {
@@ -4159,26 +4188,26 @@ export class DatabaseStorage implements IStorage {
         }
         wineGroups.get(wineKey)!.push(detail);
       }
-      
+
       // Check for position conflicts within each wine group
       for (const [wineId, wineSlides] of Array.from(wineGroups.entries())) {
         const positions = new Set<number>();
         const duplicatePositions = new Set<number>();
-        
+
         for (const slide of wineSlides) {
           if (positions.has(slide.position)) {
             duplicatePositions.add(slide.position);
           }
           positions.add(slide.position);
         }
-        
+
         if (duplicatePositions.size > 0) {
           console.log(`⚠️ Detected position conflicts in wine ${wineId}:`, Array.from(duplicatePositions));
-          
+
           // Resolve conflicts by spreading slides with unique positions
           for (const conflictPosition of Array.from(duplicatePositions)) {
             const conflictingSlides = wineSlides.filter((s: any) => s.position === conflictPosition);
-            
+
             // Keep the first slide at the original position, adjust others
             for (let i = 1; i < conflictingSlides.length; i++) {
               try {

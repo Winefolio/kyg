@@ -1044,7 +1044,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get('/api/sessions/:sessionId/wines/:wineId/comparable-questions', async (req, res) => {
-    // let's check if comparabel questions are available for this wine
     try {
         const { sessionId, wineId } = req.params;
 
@@ -1079,6 +1078,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Failed to fetch comparabel questions",
           error: error instanceof Error ? error.message : String(error)
         });
+    }
+  });
+
+  //endpoint to update comparabel questions for a wine
+  app.put('/api/slides/:slideId/comparable-questions', async (req, res) => {
+    try {
+      const { slideId } = req.params;
+
+      if (!slideId) {
+        return res.status(400).json({ message: "Invalid request data" });
+      }
+
+      // Update the comparable questions for the slide
+      const updatedSlide = await storage.updateSlideComparableQuestions(slideId);
+
+      if (!updatedSlide) {
+        return res.status(404).json({ message: "Slide not found" });
+      }
+
+      res.json(updatedSlide);
+    } catch (error) {
+      console.error("Error updating comparable questions:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
   // Step 5: Timer and Skip Option

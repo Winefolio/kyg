@@ -286,22 +286,10 @@ export default function TastingSession() {
     };
   }, []);
   
-  // Log state changes
-  // useEffect(() => {
-  //   console.log('🔄 [STATE CHANGE] currentSlideIndex changed:', {
-  //     newIndex: currentSlideIndex,
-  //     timestamp: new Date().toISOString()
-  //   });
-  // }, [currentSlideIndex]);
-  
   // Monitor focus changes globally
   useEffect(() => {
     const handleFocusChange = () => {
-      // console.log('🔍 [GLOBAL FOCUS] Focus changed:', {
-      //   activeElement: document.activeElement?.tagName,
-      //   isTextarea: document.activeElement?.tagName === 'TEXTAREA',
-      //   timestamp: new Date().toISOString()
-      // });
+      // Focus change handling can be added here if needed
     };
     
     document.addEventListener('focusin', handleFocusChange);
@@ -395,16 +383,6 @@ export default function TastingSession() {
   // Extract wines data from slides response
   const packageData = slidesData ? { wines: slidesData.wines } : null;
   
-  // Track when slidesData changes
-  // useEffect(() => {
-  //   console.log('📊 [SLIDES DATA] slidesData changed:', {
-  //     exists: !!slidesData,
-  //     slidesCount: slidesData?.slides?.length || 0,
-  //     winesCount: slidesData?.wines?.length || 0,
-  //     timestamp: new Date().toISOString()
-  //   });
-  // }, [slidesData]);
-
   // Get session participants to determine if we need timers/results
   const { data: sessionParticipants, isLoading: participantsLoading } = useQuery<any[]>({
     queryKey: [`/api/sessions/${sessionId}/participants`],
@@ -441,12 +419,6 @@ export default function TastingSession() {
   // Memoize expensive slides processing to prevent recalculation on every render
   // Must be called before any early returns to follow Rules of Hooks
   const processedSlidesData = useMemo(() => {
-    // console.log('🔄 [EXPENSIVE PROCESSING] processedSlidesData useMemo running:', {
-    //   slidesDataExists: !!slidesData,
-    //   slidesCount: slidesData?.slides?.length || 0,
-    //   timestamp: new Date().toISOString()
-    // });
-    
     if (!slidesData || !slidesData.slides || slidesData.slides.length === 0) {
       return {
         slides: [],
@@ -555,15 +527,6 @@ export default function TastingSession() {
     const slides = [...packageIntroSlides, ...wineSlides];
     
     // Debug: Log total slides and section breakdown
-    // console.log(`📊 Total slides loaded: ${slides.length}`, {
-    //   packageIntroSlides: packageIntroSlides.length,
-    //   wineSlides: wineSlides.length,
-    //   slidesBySection: slides.reduce((acc, slide) => {
-    //     const section = slide.section_type || slide.payloadJson?.section_type || 'unknown';
-    //     acc[section] = (acc[section] || 0) + 1;
-    //     return acc;
-    //   }, {} as Record<string, number>)
-    // });
       
     // Define helper functions as function declarations for proper hoisting
     function getSlideSection(slide: any): string {
@@ -605,7 +568,6 @@ export default function TastingSession() {
   // Wine completion tracking function - defined as callback to follow Rules of Hooks
   const checkWineCompletion = useCallback((wineId: string): boolean => {
     if (!wineId || !slides || slides.length === 0) {
-      console.log('🔍 checkWineCompletion early return:', { wineId, hasSlides: !!slides, slidesLength: slides?.length });
       return false;
     }
     
@@ -616,7 +578,6 @@ export default function TastingSession() {
       );
       
       if (wineQuestionSlides.length === 0) {
-        console.log('🔍 checkWineCompletion no question slides found for wine:', wineId);
         return false;
       }
       
@@ -625,17 +586,6 @@ export default function TastingSession() {
         answers[slide.id] !== undefined && answers[slide.id] !== null
       );
       const allQuestionsAnswered = wineQuestionSlides.length === answeredQuestionSlides.length;
-      
-      console.log('🔍 checkWineCompletion result:', {
-        wineId,
-        totalQuestions: wineQuestionSlides.length,
-        answeredQuestions: answeredQuestionSlides.length,
-        allQuestionsAnswered,
-        localAnswersCount: Object.keys(answers).length,
-        serverResponseCount: responses?.length || 0,
-        wineQuestionSlideIds: wineQuestionSlides.map(s => s.id),
-        answeredSlideIds: answeredQuestionSlides.map(s => s.id)
-      });
       
       return allQuestionsAnswered;
     } catch (error) {
@@ -1076,17 +1026,11 @@ export default function TastingSession() {
 
   // Prevent rendering if slides aren't loaded yet or if we're in an invalid state
   if (!slides || slides.length === 0) {
-    // console.log('⚠️ [RENDER GUARD] Preventing render due to missing slides');
     return <LoadingOverlay isVisible={true} message="Loading slides..." />;
   }
   
   // Handle case where currentSlideIndex is out of bounds
   if (currentSlideIndex >= slides.length || currentSlideIndex < 0) {
-    // console.log('⚠️ [RENDER GUARD] currentSlideIndex out of bounds:', {
-    //   currentSlideIndex,
-    //   slidesLength: slides.length,
-    //   timestamp: new Date().toISOString()
-    // });
     // Reset to valid index instead of showing loading
     setCurrentSlideIndex(Math.min(currentSlideIndex, slides.length - 1));
     return <LoadingOverlay isVisible={true} message="Loading..." />;
@@ -1180,7 +1124,6 @@ export default function TastingSession() {
   };
 
   const skipCompletion = () => {
-    console.log('🚀 No comparable questions found - skipping wine completion flow');
     // Skip the wine completion flow and go directly to next wine
     setCurrentWineCompletionStatus(prev => ({
       ...prev,
@@ -1206,15 +1149,9 @@ export default function TastingSession() {
   };
 
   const handleCompletionWithQuestions = (questions: any[]) => {
-    console.log('🔍 Found comparable questions, proceeding with normal completion flow', { questions });
     // Proceed with the normal wine completion flow
     const currentWineId = currentWine?.id;
     if (currentWineId && sessionId) {
-      console.log('🔍 Now checking if all participants have completed...', {
-        sessionId,
-        wineId: currentWineId
-      });
-      
       // Set loading state while checking
       setIsCheckingCompletion(true);
       
@@ -1223,10 +1160,8 @@ export default function TastingSession() {
         .then(async (res) => {
           if (res.ok) {
             const data = await res.json();
-            console.log('✅ Completion status response:', data);
             
             if (data && (data.allParticipantsCompleted || data.allNonHostParticipantsCompleted)) {
-              console.log('🚀 All participants completed - skipping timer and showing averages');
               // Skip timer, show averages immediately
               setCurrentWineCompletionStatus(prev => ({
                 ...prev,
@@ -1242,7 +1177,6 @@ export default function TastingSession() {
                 averageCalculationMutation.mutate({ sessionId, wineId: currentWineId });
               }
             } else {
-              console.log('⏱️ Not all non-host participants completed - showing timer and starting polling');
               // Not all completed, show timer with polling
               setCurrentWineCompletionStatus(prev => ({
                 ...prev,
@@ -1254,7 +1188,6 @@ export default function TastingSession() {
               }));
             }
           } else {
-            console.warn('⚠️ API call failed with status:', res.status);
             // API call failed, show timer as fallback
             setCurrentWineCompletionStatus(prev => ({
               ...prev,
@@ -1293,50 +1226,19 @@ export default function TastingSession() {
     
     // Enhanced validation with detailed logging
     if (!slides || slides.length === 0) {
-      console.log('🚨 NAVIGATION BLOCKED - No slides available:', { 
-        slidesExists: !!slides, 
-        slidesLength: slides?.length,
-        slidesType: typeof slides,
-        isArray: Array.isArray(slides)
-      });
       return;
     }
 
     if (currentSlideIndex < 0 || currentSlideIndex >= slides.length) {
-      console.log('🚨 NAVIGATION BLOCKED - Invalid slide index:', { 
-        currentSlideIndex, 
-        slidesLength: slides.length,
-        isOutOfBounds: currentSlideIndex >= slides.length,
-        isNegative: currentSlideIndex < 0
-      });
       return;
     }
-
-    console.log(`Go to next slide: ${currentSlideIndex} → ${currentSlideIndex + 1}`, {
-      currentSlideIndex,
-      slidesLength: slides.length,
-      isLastSlide: currentSlideIndex === slides.length - 1,
-      actualLastIndex: slides.length - 1,
-      slidesDefined: !!slides,
-      slidesIsArray: Array.isArray(slides),
-      nextSlideWouldBeOutOfBounds: (currentSlideIndex + 1) >= slides.length
-    });
     
     // Fix the condition: check if we would be going beyond the last slide
     if (currentSlideIndex >= slides.length - 1) {
-      console.log('🎯 LAST SLIDE DETECTED - checking comparable questions', {
-        currentSlideIndex,
-        slidesLength: slides.length,
-        sessionId,
-        currentWineId,
-        isExactlyLastSlide: currentSlideIndex === slides.length - 1,
-        isBeyondLastSlide: currentSlideIndex > slides.length - 1
-      });
       // On last slide, check comparable questions before completion
       if (sessionId && currentWineId) {
         await checkComparableQuestionsAndMaybeSkip(sessionId, currentWineId);
       } else {
-        console.log('🎯 No sessionId or currentWineId, calling handleComplete directly');
         handleComplete();
       }
       return; // Prevent further navigation until check completes
@@ -1356,27 +1258,11 @@ export default function TastingSession() {
       (isNavigatingToNextWine(currentSlideIndex) && checkWineCompletion(currentWineId))
     );
     
-    // console.log('🔍 goToNextSlide wine completion check:', {
-    //   currentWineId,
-    //   currentSlideIndex,
-    //   isLastSlideOfWine: isLastSlideOfCurrentWine(currentSlideIndex, currentWineId),
-    //   isNavigatingToNextWine: isNavigatingToNextWine(currentSlideIndex),
-    //   wineComplete: currentWineId ? checkWineCompletion(currentWineId) : false,
-    //   shouldCheckWineCompletion,
-    //   hasTriggeredProcessing: currentWineCompletionStatus.hasTriggeredProcessing,
-    //   showingAverages: currentWineCompletionStatus.showingAverages
-    // });
-    
     if (shouldCheckWineCompletion) {
       const isWineComplete = checkWineCompletion(currentWineId);
       
       // Only proceed with wine completion if ALL questions have been answered
       if (isWineComplete && !currentWineCompletionStatus.hasTriggeredProcessing && !currentWineCompletionStatus.showingAverages) {
-        console.log('🔍 User completed wine, first checking for comparable questions...', {
-          sessionId,
-          wineId: currentWineId
-        });
-        
         // FIRST: Check for comparable questions before proceeding with completion flow
         if (sessionId && currentWineId) {
           await checkComparableQuestionsAndMaybeSkip(sessionId, currentWineId);
@@ -1435,14 +1321,6 @@ export default function TastingSession() {
                isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection, currentWine.id) &&
                !nextSlideIsTransition) {
         
-        // Debug logging for section transitions
-        // console.log('🎯 SECTION TRANSITION DETECTED:');
-        // console.log(`   From: ${currentSection} → To: ${nextSection}`);
-        // console.log(`   Wine: ${currentWine.wineName}`);
-        // console.log(`   Current slide index: ${currentSlideIndex}`);
-        // console.log(`   Current slide in wine: ${currentSlideIndex - currentWineStartIndex}`);
-        // console.log(`   Is last slide of section: ${isLastSlideOfSection(currentSlideIndex, currentWineSlides, currentSection, currentWine.id)}`);
-        
         setSectionTransitionData({
           fromSection: currentSection,
           toSection: nextSection,
@@ -1451,7 +1329,6 @@ export default function TastingSession() {
         setShowSectionTransition(true);
         triggerHaptic('success');
       } else {
-        // console.log('🎬 [NAVIGATION SIMPLE] No transition needed, moving to next slide');
         
         // Force blur before navigation
         const activeElement = document.activeElement;
@@ -2043,7 +1920,6 @@ export default function TastingSession() {
         }
 
         // Enhanced fallback detection for questions that don't match standard patterns
-        // console.log('Question fallback triggered for slide:', currentSlide.id, 'questionData:', questionData);
         
         // Try to detect boolean questions by content analysis
         const title = questionData.title || questionData.question || '';
@@ -2700,7 +2576,6 @@ export default function TastingSession() {
         
         // If we don't have valid averages to show, automatically complete and continue
         if (shouldShow && !hasValidAverages && currentWineCompletionStatus.averagesData) {
-          console.log('📊 No valid averages to show, auto-completing...');
           setTimeout(() => handleAveragesComplete(), 100);
           return false;
         }
@@ -2747,8 +2622,6 @@ export default function TastingSession() {
                                         currentWineCompletionStatus.averagesData.data ||
                                         currentWineCompletionStatus.averagesData.averages ||
                                         currentWineCompletionStatus.averagesData;
-                    
-                    console.log('🧮 Parsing questions data:', questionsData);
                     
                     if (!questionsData || typeof questionsData !== 'object') {
                       return (
@@ -2801,17 +2674,6 @@ export default function TastingSession() {
                       const questionType = questionData.questionType || 'scale';
                       const hasTextResponses = questionData.hasTextResponses;
                       const hasSentimentAnalysis = questionData.hasSentimentAnalysis;
-                      
-                      // Debug logging for text questions
-                      if (questionType === 'text') {
-                        console.log('🔍 Text question debug:', {
-                          questionTitle: questionTitle,
-                          hasTextResponses,
-                          hasSentimentAnalysis,
-                          average: average,
-                          averageType: typeof average
-                        });
-                      }
                       
                       // Format average to show meaningful precision and handle different types
                       let formattedAverage = '';

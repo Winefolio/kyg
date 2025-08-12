@@ -25,6 +25,7 @@ import { QuickQuestionBuilder } from '@/components/editor/QuickQuestionBuilder';
 import { SimpleCopyButton } from '@/components/editor/SimpleCopyButton';
 import { PackageIntroCard } from '@/components/editor/PackageIntroCard';
 import { DraggableSlideList } from '@/components/editor/DraggableSlideList';
+import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
@@ -246,6 +247,37 @@ export default function PackageEditor() {
   }, [isMobileView]); // Only depend on isMobileView, not isPreviewCollapsed
 
   const activeSlide = localSlides.find(s => s.id === activeSlideId);
+
+  const [isComparable, setIsComparable] = useState<boolean>(activeSlide?.comparable ?? false);
+
+  useEffect(() => {
+    setIsComparable(activeSlide?.comparable ?? false);
+
+  }, [activeSlide]);
+
+  const handleComparableToggle = async (checked: boolean) => {
+    setIsComparable(checked);
+    try {
+      await fetch(`/api/slides/${activeSlideId}/comparable-questions`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      //update record in local state
+        setLocalSlides(prevSlides =>
+            prevSlides.map(slide =>
+            slide.id === activeSlideId ? { ...slide, comparable: checked } : slide
+            )
+        );
+    } catch (error) {
+      console.error('Failed to update comparable state:', error);
+        toast({
+            title: "Error updating comparable state",
+            description: error.message,
+            variant: "destructive"
+        });
+    }
+  };
 
   // Navigation functions for preview
   const navigateToSlide = (direction: 'prev' | 'next') => {
@@ -1158,7 +1190,6 @@ export default function PackageEditor() {
       // No slides in this section - start at the beginning of the range
       // Special handling for Wine 1 intro to align with backend expectations
       if (winePosition === 1 && currentWineContext.sectionType === 'intro') {
-        // For Wine 1 intro, use a position that aligns with backend calculation
         // Backend calculates: wineBasePosition (1000) + sectionOffset (50) = 1050
         nextPosition = 1050;
       } else {
@@ -1633,6 +1664,19 @@ export default function PackageEditor() {
                           {activeSlide.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                         </Badge>
                       </div>
+                      {/*let's add a switch here to toggle between the comparable in database current question*/}
+                      {/*TODO: add toggle here*/}
+                      <div className="flex items-center gap-2 my-2">
+                        <label htmlFor="comparable-switch" className="text-white/80 text-sm">
+                          Make answers comparable in Slides
+                        </label>
+                        <Switch
+                            id="comparable-switch"
+                            checked={isComparable}
+                            onCheckedChange={handleComparableToggle}
+                        />
+                      </div>
+
                     </div>
                   </div>
                   
