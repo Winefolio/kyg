@@ -1160,14 +1160,188 @@ export default function TastingSession() {
     };
   });
 
+  // Fetch comparable questions and skip completion if none exist
+  const checkComparableQuestionsAndMaybeSkip = async (sessionId: string, wineId: string) => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/wines/${wineId}/comparable-questions`);
+      const data = await res.json();
+      if (!data.questions || data.questions.length === 0) {
+        // No comparable questions, skip completion logic
+        handleAveragesComplete();
+        return;
+      }
+      // Otherwise, proceed with completion logic
+      handleCompletionWithQuestions(data.questions);
+    } catch (error) {
+      console.error("Failed to fetch comparable questions:", error);
+      // Optionally handle error or skip
+      skipCompletion();
+    }
+  };
+
+  const skipCompletion = () => {
+    console.log('🚀 No comparable questions found - skipping wine completion flow');
+    // Skip the wine completion flow and go directly to next wine
+    setCurrentWineCompletionStatus(prev => ({
+      ...prev,
+      wineId: null,
+      isParticipantFinished: false,
+      showingCompletionStatus: false,
+      hasTriggeredProcessing: false,
+      isBlocking: false,
+      showingAverages: false,
+      averagesData: null,
+      isLoadingAverages: false
+    }));
+    
+    // Navigate to next wine directly
+    const nextSlideIndex = currentSlideIndex + 1;
+    if (nextSlideIndex < slides.length) {
+      setCurrentSlideIndex(nextSlideIndex);
+      setCompletedSlides(prev => [...prev, currentSlideIndex]);
+    } else {
+      // End of session
+      handleComplete();
+    }
+  };
+
+  const handleCompletionWithQuestions = (questions: any[]) => {
+    console.log('🔍 Found comparable questions, proceeding with normal completion flow', { questions });
+    // Proceed with the normal wine completion flow
+    const currentWineId = currentWine?.id;
+    if (currentWineId && sessionId) {
+      console.log('🔍 Now checking if all participants have completed...', {
+        sessionId,
+        wineId: currentWineId
+      });
+      
+      // Set loading state while checking
+      setIsCheckingCompletion(true);
+      
+      // Check completion status immediately
+      apiRequest('GET', `/api/sessions/${sessionId}/wines/${currentWineId}/completion-status`, {})
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            console.log('✅ Completion status response:', data);
+            
+            if (data && (data.allParticipantsCompleted || data.allNonHostParticipantsCompleted)) {
+              console.log('🚀 All participants completed - skipping timer and showing averages');
+              // Skip timer, show averages immediately
+              setCurrentWineCompletionStatus(prev => ({
+                ...prev,
+                wineId: currentWineId,
+                isParticipantFinished: true,
+                hasTriggeredProcessing: false,
+                isBlocking: false,
+                showingAverages: true,
+                isLoadingAverages: true
+              }));
+              // Trigger averages calculation
+              if (sessionId && currentWineId) {
+                averageCalculationMutation.mutate({ sessionId, wineId: currentWineId });
+              }
+            } else {
+              console.log('⏱️ Not all non-host participants completed - showing timer and starting polling');
+              // Not all completed, show timer with polling
+              setCurrentWineCompletionStatus(prev => ({
+                ...prev,
+                wineId: currentWineId,
+                isParticipantFinished: true,
+                hasTriggeredProcessing: false,
+                isBlocking: true, // Block navigation and show timer modal
+                isLoadingAverages: false
+              }));
+            }
+          } else {
+            console.warn('⚠️ API call failed with status:', res.status);
+            // API call failed, show timer as fallback
+            setCurrentWineCompletionStatus(prev => ({
+              ...prev,
+              wineId: currentWineId,
+              isParticipantFinished: true,
+              hasTriggeredProcessing: false,
+              isBlocking: true,
+              isLoadingAverages: false
+            }));
+          }
+        })
+        .catch((error) => {
+          console.error('❌ Error checking completion status:', error);
+          // If the API call fails, show timer as fallback
+          setCurrentWineCompletionStatus(prev => ({
+            ...prev,
+            wineId: currentWineId,
+            isParticipantFinished: true,
+            hasTriggeredProcessing: false,
+            isBlocking: true,
+            isLoadingAverages: false
+          }));
+        })
+        .finally(() => {
+          console.log('🏁 Finished checking completion status');
+          setIsCheckingCompletion(false);
+        });
+    }
+  };
+
 
 
   // Navigation functions
   const goToNextSlide = async () => {
     const currentWineId = currentWine?.id;
     
-    if (!slides || slides.length === 0) return;
+    // Enhanced validation with detailed logging
+    if (!slides || slides.length === 0) {
+      console.log('🚨 NAVIGATION BLOCKED - No slides available:', { 
+        slidesExists: !!slides, 
+        slidesLength: slides?.length,
+        slidesType: typeof slides,
+        isArray: Array.isArray(slides)
+      });
+      return;
+    }
+
+    if (currentSlideIndex < 0 || currentSlideIndex >= slides.length) {
+      console.log('🚨 NAVIGATION BLOCKED - Invalid slide index:', { 
+        currentSlideIndex, 
+        slidesLength: slides.length,
+        isOutOfBounds: currentSlideIndex >= slides.length,
+        isNegative: currentSlideIndex < 0
+      });
+      return;
+    }
+
+    console.log(`Go to next slide: ${currentSlideIndex} → ${currentSlideIndex + 1}`, {
+      currentSlideIndex,
+      slidesLength: slides.length,
+      isLastSlide: currentSlideIndex === slides.length - 1,
+      actualLastIndex: slides.length - 1,
+      slidesDefined: !!slides,
+      slidesIsArray: Array.isArray(slides),
+      nextSlideWouldBeOutOfBounds: (currentSlideIndex + 1) >= slides.length
+    });
     
+    // Fix the condition: check if we would be going beyond the last slide
+    if (currentSlideIndex >= slides.length - 1) {
+      console.log('🎯 LAST SLIDE DETECTED - checking comparable questions', {
+        currentSlideIndex,
+        slidesLength: slides.length,
+        sessionId,
+        currentWineId,
+        isExactlyLastSlide: currentSlideIndex === slides.length - 1,
+        isBeyondLastSlide: currentSlideIndex > slides.length - 1
+      });
+      // On last slide, check comparable questions before completion
+      if (sessionId && currentWineId) {
+        await checkComparableQuestionsAndMaybeSkip(sessionId, currentWineId);
+      } else {
+        console.log('🎯 No sessionId or currentWineId, calling handleComplete directly');
+        handleComplete();
+      }
+      return; // Prevent further navigation until check completes
+    }
+
     // CRITICAL: Block navigation if wine completion is blocking OR if showing averages
     if (currentWineCompletionStatus.isBlocking || currentWineCompletionStatus.showingAverages) {
       return;
@@ -1182,94 +1356,36 @@ export default function TastingSession() {
       (isNavigatingToNextWine(currentSlideIndex) && checkWineCompletion(currentWineId))
     );
     
-    console.log('🔍 goToNextSlide wine completion check:', {
-      currentWineId,
-      currentSlideIndex,
-      isLastSlideOfWine: isLastSlideOfCurrentWine(currentSlideIndex, currentWineId),
-      isNavigatingToNextWine: isNavigatingToNextWine(currentSlideIndex),
-      wineComplete: currentWineId ? checkWineCompletion(currentWineId) : false,
-      shouldCheckWineCompletion,
-      hasTriggeredProcessing: currentWineCompletionStatus.hasTriggeredProcessing,
-      showingAverages: currentWineCompletionStatus.showingAverages
-    });
+    // console.log('🔍 goToNextSlide wine completion check:', {
+    //   currentWineId,
+    //   currentSlideIndex,
+    //   isLastSlideOfWine: isLastSlideOfCurrentWine(currentSlideIndex, currentWineId),
+    //   isNavigatingToNextWine: isNavigatingToNextWine(currentSlideIndex),
+    //   wineComplete: currentWineId ? checkWineCompletion(currentWineId) : false,
+    //   shouldCheckWineCompletion,
+    //   hasTriggeredProcessing: currentWineCompletionStatus.hasTriggeredProcessing,
+    //   showingAverages: currentWineCompletionStatus.showingAverages
+    // });
     
     if (shouldCheckWineCompletion) {
       const isWineComplete = checkWineCompletion(currentWineId);
       
       // Only proceed with wine completion if ALL questions have been answered
       if (isWineComplete && !currentWineCompletionStatus.hasTriggeredProcessing && !currentWineCompletionStatus.showingAverages) {
-        console.log('🔍 User completed wine, checking if all participants have completed...', {
+        console.log('🔍 User completed wine, first checking for comparable questions...', {
           sessionId,
           wineId: currentWineId
         });
         
-        // Set loading state while checking
-        setIsCheckingCompletion(true);
+        // FIRST: Check for comparable questions before proceeding with completion flow
+        if (sessionId && currentWineId) {
+          await checkComparableQuestionsAndMaybeSkip(sessionId, currentWineId);
+        } else {
+          console.log('🎯 No sessionId or currentWineId, calling handleComplete directly');
+          handleComplete();
+        }
         
-        // Check completion status immediately
-        apiRequest('GET', `/api/sessions/${sessionId}/wines/${currentWineId}/completion-status`, {})
-          .then(async (res) => {
-            if (res.ok) {
-              const data = await res.json();
-              console.log('✅ Completion status response:', data);
-              
-              if (data && (data.allParticipantsCompleted || data.allNonHostParticipantsCompleted)) {
-                console.log('🚀 All participants completed - skipping timer and showing averages');
-                // Skip timer, show averages immediately
-                setCurrentWineCompletionStatus(prev => ({
-                  ...prev,
-                  wineId: currentWineId,
-                  isParticipantFinished: true,
-                  hasTriggeredProcessing: false,
-                  isBlocking: false,
-                  showingAverages: true,
-                  isLoadingAverages: true
-                }));
-                // Trigger averages calculation
-                averageCalculationMutation.mutate({ sessionId, wineId: currentWineId });
-              } else {
-                console.log('⏱️ Not all non-host participants completed - showing timer and starting polling');
-                // Not all completed, show timer with polling
-                setCurrentWineCompletionStatus(prev => ({
-                  ...prev,
-                  wineId: currentWineId,
-                  isParticipantFinished: true,
-                  hasTriggeredProcessing: false,
-                  isBlocking: true, // Block navigation and show timer modal
-                  isLoadingAverages: false
-                }));
-              }
-            } else {
-              console.warn('⚠️ API call failed with status:', res.status);
-              // API call failed, show timer as fallback
-              setCurrentWineCompletionStatus(prev => ({
-                ...prev,
-                wineId: currentWineId,
-                isParticipantFinished: true,
-                hasTriggeredProcessing: false,
-                isBlocking: true,
-                isLoadingAverages: false
-              }));
-            }
-          })
-          .catch((error) => {
-            console.error('❌ Error checking completion status:', error);
-            // If the API call fails, show timer as fallback
-            setCurrentWineCompletionStatus(prev => ({
-              ...prev,
-              wineId: currentWineId,
-              isParticipantFinished: true,
-              hasTriggeredProcessing: false,
-              isBlocking: true,
-              isLoadingAverages: false
-            }));
-          })
-          .finally(() => {
-            console.log('🏁 Finished checking completion status');
-            setIsCheckingCompletion(false);
-          });
-        
-        return; // Block navigation until completion check is done
+        return; // Block navigation until check completes
       }
     }
     
