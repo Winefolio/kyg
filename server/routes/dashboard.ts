@@ -394,6 +394,7 @@ export function registerDashboardRoutes(app: Express) {
         },
         wines: wineScores,
         sommelierObservations,
+        userParticipant,
         userNotes: "", // Can be enhanced with stored user notes
         overallRating: Math.round(avgUserScore * 10) / 10 // User's average rating for this session
       };

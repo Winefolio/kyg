@@ -135,7 +135,7 @@ export default function TastingDetailView() {
     );
   }
 
-  const { session, wines, sommelierObservations } = tastingData;
+  const { session, wines, sommelierObservations, userParticipant } = tastingData;
 
   // Find the current user's scores
   const getUserScore = (wine: WineScore): number => {
@@ -401,19 +401,19 @@ export default function TastingDetailView() {
               </div>
             ) : (
               <div>
-                {sommelierObservations.length > 0 ? (
+                {userParticipant?.sommelier_feedback ? (
                     <p className="text-purple-200 whitespace-pre-line">
-                      {sommelierObservations.join('\n')}
+                      {userParticipant.sommelier_feedback}
                     </p>
                 ) : (
                     <p className="text-purple-300">No observations available.</p>
                 )}
-                <Button
-                  onClick={() => setIsEditing(true)}
-                  className="mt-4 bg-purple-600 text-white hover:bg-purple-700"
-                >
-                  Edit Observations
-                </Button>
+                {/*<Button*/}
+                {/*  onClick={() => setIsEditing(true)}*/}
+                {/*  className="mt-4 bg-purple-600 text-white hover:bg-purple-700"*/}
+                {/*>*/}
+                {/*  Edit Observations*/}
+                {/*</Button>*/}
               </div>
             )}
           </CardContent>
