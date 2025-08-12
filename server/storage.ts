@@ -2593,7 +2593,8 @@ export class DatabaseStorage implements IStorage {
       .from(slides)
       .where(and(
         eq(slides.packageWineId, wineId),
-        eq(slides.type, "question")
+        eq(slides.type, "question"),
+        eq(slides.comparable, true),
       ))
       .orderBy(slides.globalPosition);
 
@@ -2696,6 +2697,43 @@ export class DatabaseStorage implements IStorage {
     }
 
     return questionAverages;
+  }
+
+  async getComparabelQuestions(sessionId: string, wineId: string): Promise<any[]> {
+    // 1. Get session and validate
+    const session = await this.getSessionById(sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    // Use the actual session UUID for database queries
+    const actualSessionId = session.id;
+
+    // 2. Get all question slides for this wine that are comparable
+    const comparableSlides = await db
+      .select({
+        id: slides.id,
+        position: slides.position,
+        globalPosition: slides.globalPosition,
+        type: slides.type,
+        payloadJson: slides.payloadJson,
+        genericQuestions: slides.genericQuestions
+      })
+      .from(slides)
+      .where(and(
+        eq(slides.packageWineId, wineId),
+        eq(slides.type, "question"),
+        eq(slides.comparable, true)
+      ))
+      .orderBy(slides.globalPosition);
+
+    return comparableSlides.map(slide => ({
+      slideId: slide.id,
+      position: slide.position,
+      globalPosition: slide.globalPosition,
+      questionType: this.getQuestionType(slide),
+      questionTitle: this.getQuestionTitle(slide)
+    }));
   }
 
   // Helper methods for Step 4 calculations

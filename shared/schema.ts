@@ -118,7 +118,8 @@ export const slides = pgTable("slides", {
   section_type: varchar("section_type", { length: 20 }),
   payloadJson: jsonb("payload_json").notNull(),
   genericQuestions: jsonb("generic_questions"), // New generic questions format
-  createdAt: timestamp("created_at").defaultNow()
+  createdAt: timestamp("created_at").defaultNow(),
+  comparable: boolean().default(false),
 }, (table) => ({
   packageWinePositionIdx: index("idx_slides_package_wine_position").on(table.packageWineId, table.position),
   globalPositionIdx: index("idx_slides_global_position").on(table.packageWineId, table.globalPosition),

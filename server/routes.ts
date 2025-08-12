@@ -1043,6 +1043,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/sessions/:sessionId/wines/:wineId/comparable-questions', async (req, res) => {
+    // let's check if comparabel questions are available for this wine
+    try {
+        const { sessionId, wineId } = req.params;
+
+        if (!sessionId || !wineId) {
+            return res.status(400).json({
+            message: "sessionId and wineId parameters are required"
+            });
+        }
+
+        // Fetch comparabel questions for this wine
+        const comparabelQuestions = await storage.getComparabelQuestions(sessionId, wineId);
+
+        if (comparabelQuestions.length === 0) {
+            return res.json({
+            sessionId,
+            wineId,
+            message: "No comparabel questions found for this wine",
+            questions: []
+            });
+        }
+
+        res.json({
+            sessionId,
+            wineId,
+            totalQuestions: comparabelQuestions.length,
+            questions: comparabelQuestions
+        });
+    }
+    catch (error) {
+        console.error("Error fetching comparabel questions:", error);
+        res.status(500).json({
+          message: "Failed to fetch comparabel questions",
+          error: error instanceof Error ? error.message : String(error)
+        });
+    }
+  });
   // Step 5: Timer and Skip Option
   // Note: Step 5 is implemented on the frontend by orchestrating Steps 3 and 4.
   // When a participant finishes early and the 2-minute timer is running:
