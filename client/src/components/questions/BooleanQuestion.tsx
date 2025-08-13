@@ -22,9 +22,10 @@ interface BooleanQuestionProps {
   };
   value: boolean | null;
   onChange: (value: boolean) => void;
+  setDisableNext?: (disabled: boolean) => void;
 }
 
-export function BooleanQuestion({ question, value, onChange }: BooleanQuestionProps) {
+export function BooleanQuestion({ question, value, onChange, setDisableNext }: BooleanQuestionProps) {
   const trueLabel = question.trueLabel || 'Yes';
   const falseLabel = question.falseLabel || 'No';
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
@@ -33,8 +34,18 @@ export function BooleanQuestion({ question, value, onChange }: BooleanQuestionPr
   const { triggerHaptic } = useHaptics();
 
   useEffect(() => {
-    onChange(value);
+    if (value !== null && setDisableNext) {
+      onChange(value);
+    }else if (setDisableNext){
+      setDisableNext(true);
+    }
   }, []);
+
+  useEffect(() => {
+    if (setDisableNext && value !== null) {
+      setDisableNext(false);
+    }
+  }, [value]);
   
   // Extract all relevant glossary terms from the current slide content
   const relevantTerms = useMemo(() => {

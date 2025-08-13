@@ -1635,6 +1635,7 @@ export default function PackageEditor() {
               const slideNumber = wineSlides.findIndex(s => s.id === activeSlide.id) + 1;
               const totalSlidesInWine = wineSlides.length;
               
+              // @ts-ignore
               return (
                 <motion.div key={activeSlide.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                   {/* Enhanced Breadcrumb Navigation */}
@@ -1666,16 +1667,21 @@ export default function PackageEditor() {
                       </div>
                       {/*let's add a switch here to toggle between the comparable in database current question*/}
                       {/*TODO: add toggle here*/}
-                      <div className="flex items-center gap-2 my-2">
-                        <label htmlFor="comparable-switch" className="text-white/80 text-sm">
-                          Make answers comparable in Slides
-                        </label>
-                        <Switch
-                            id="comparable-switch"
-                            checked={isComparable}
-                            onCheckedChange={handleComparableToggle}
-                        />
-                      </div>
+
+                      {
+                        activeSlide.type !== 'video_message' && activeSlide.type !== 'audio_message' && activeSlide.type !=='interlude' && (
+                            <div className="flex items-center gap-2 my-2">
+                              <label htmlFor="comparable-switch" className="text-white/80 text-sm">
+                                Make answers comparable in Slides
+                              </label>
+                              <Switch
+                                  id="comparable-switch"
+                                  checked={isComparable}
+                                  onCheckedChange={handleComparableToggle}
+                              />
+                            </div>
+                        )
+                      }
 
                     </div>
                   </div>

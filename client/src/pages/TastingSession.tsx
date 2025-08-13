@@ -1765,6 +1765,7 @@ export default function TastingSession() {
                   }}
                   value={answers[currentSlide.id] ?? null}
                   onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+                  setDisableNext={setDisableNextButton}
                 />
               );
             
@@ -1826,6 +1827,8 @@ export default function TastingSession() {
               }}
               value={answers[currentSlide.id] || { selected: [], notes: '' }}
               onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+              disableNext={disableNextButton}
+              setDisableNext={setDisableNextButton}
             />
           );
         }
@@ -1900,6 +1903,7 @@ export default function TastingSession() {
               }}
               value={answers[currentSlide.id] ?? null}
               onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+              setDisableNext={setDisableNextButton}
             />
           );
         }
@@ -1943,6 +1947,7 @@ export default function TastingSession() {
               }}
               value={answers[currentSlide.id] ?? null}
               onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+              setDisableNext={setDisableNextButton}
             />
           );
         }
@@ -1961,6 +1966,8 @@ export default function TastingSession() {
               }}
               value={answers[currentSlide.id] || { selected: [], notes: '' }}
               onChange={(value) => handleAnswerChange(currentSlide.id, value)}
+              setDisableNext={setDisableNextButton}
+              disableNext={disableNextButton}
             />
           );
         }
@@ -2382,7 +2389,7 @@ export default function TastingSession() {
 
               <Button
                 variant={currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro ? "default" : "ghost"}
-                onClick={currentSlideIndex >= slides.length - 1 ? handleComplete : goToNextSlide}
+                onClick={goToNextSlide}
                 disabled={isNavigating || disableNextButton}
                 className={
                   currentSlide?._isPackageIntro || currentSlide?.payloadJson?.is_package_intro
