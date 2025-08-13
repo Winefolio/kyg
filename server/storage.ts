@@ -2654,9 +2654,6 @@ export class DatabaseStorage implements IStorage {
         case 'multiple_choice':
           responseDistribution = this.getMultipleChoiceDistribution(slideResponses, slide);
           averageScore = this.calculateMultipleChoiceScore(responseDistribution);
-          console.info("=========================================================== ======================================= ");
-          console.log("🔍 Multiple choice distribution:", averageScore,  responseDistribution);
-          console.info("=========================================================== ======================================= ");
 
           break;
 
