@@ -62,7 +62,7 @@ export function registerDashboardRoutes(app: Express) {
   app.get("/api/dashboard/:email/scores", async (req, res) => {
     try {
       const { email } = req.params;
-      
+
       if (!email) {
         return res.status(400).json({ message: "Email parameter is required" });
       }
@@ -97,25 +97,26 @@ export function registerDashboardRoutes(app: Express) {
     }
   });
 
-  // Get detailed taste profile analysis
   app.get("/api/dashboard/:email/taste-profile", async (req, res) => {
     try {
       const { email } = req.params;
-      
+
       if (!email) {
         return res.status(400).json({ message: "Email parameter is required" });
       }
 
-      const scores = await storage.getUserWineScores(email);
-      const dashboardData = await storage.getUserDashboardData(email);
-      
-      if (!dashboardData) {
+      // Call the new optimized method to get all data at once
+      const profileData = await storage.getUserTasteProfileData(email);
+
+      if (!profileData) {
         return res.status(404).json({ message: "No data found for this email" });
       }
 
-      // Generate taste profile analysis
-      const tasteProfile = generateTasteProfileAnalysis(scores.scores, dashboardData);
-      
+      const { scores, dashboardData } = profileData;
+
+      // Generate taste profile analysis with the efficiently fetched data
+      const tasteProfile = generateTasteProfileAnalysis(scores, dashboardData);
+
       res.json(tasteProfile);
     } catch (error) {
       console.error("Error generating taste profile:", error);
