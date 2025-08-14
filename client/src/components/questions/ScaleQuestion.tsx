@@ -145,7 +145,7 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
               exit={{ opacity: 0, y: -5 }}
               transition={{ duration: 0.2 }}
             >
-              {feedbackText}
+              {/*{feedbackText}*/}
             </motion.p>
           </AnimatePresence>
         </div>
