@@ -2605,15 +2605,17 @@ export class DatabaseStorage implements IStorage {
     const slideIds = wineQuestionSlides.map(s => s.id);
     const participantIds = sessionParticipants.map(p => p.id);
 
-    // 4. Get all responses for these questions
+    // 4. Get all responses for these questions with participant names
     const allResponses = await db
       .select({
         slideId: responses.slideId,
         participantId: responses.participantId,
         answerJson: responses.answerJson,
-        answeredAt: responses.answeredAt
+        answeredAt: responses.answeredAt,
+        participantName: participants.displayName
       })
       .from(responses)
+      .innerJoin(participants, eq(responses.participantId, participants.id))
       .where(and(
         inArray(responses.slideId, slideIds),
         inArray(responses.participantId, participantIds)
@@ -2652,13 +2654,12 @@ export class DatabaseStorage implements IStorage {
           break;
 
         case 'multiple_choice':
-          responseDistribution = this.getMultipleChoiceDistribution(slideResponses, slide);
+          responseDistribution = this.getMultipleChoiceDistributionWithUsers(slideResponses, slide);
           averageScore = this.calculateMultipleChoiceScore(responseDistribution);
-
           break;
 
         case 'boolean':
-          responseDistribution = this.getBooleanDistribution(slideResponses);
+          responseDistribution = this.getBooleanDistributionWithUsers(slideResponses);
           averageScore = this.calculateBooleanScore(responseDistribution);
           break;
 
@@ -2923,6 +2924,93 @@ export class DatabaseStorage implements IStorage {
     return distributionArray;
   }
 
+  private getMultipleChoiceDistributionWithUsers(responses: any[], slide: any): any {
+    const distribution: { [key: string]: { count: number, optionText: string, users: string[] } } = {};
+
+    // First, extract option details from slide configuration
+    const optionDetails = this.getOptionDetails(slide);
+
+    responses.forEach(r => {
+      if (r.answerJson && typeof r.answerJson === 'object') {
+        const answerObj = r.answerJson as any;
+        const participantName = r.participantName || 'Unknown User';
+
+        // Handle different multiple choice answer formats
+        if (answerObj.selectedOptionId) {
+          const optionId = answerObj.selectedOptionId;
+          if (!distribution[optionId]) {
+            distribution[optionId] = {
+              count: 0,
+              optionText: optionDetails[optionId] || `Option ${optionId}`,
+              users: []
+            };
+          }
+          distribution[optionId].count += 1;
+          distribution[optionId].users.push(participantName);
+        } else if (answerObj.selectedOptionIds && Array.isArray(answerObj.selectedOptionIds)) {
+          // Multi-select
+          answerObj.selectedOptionIds.forEach((id: string) => {
+            if (!distribution[id]) {
+              distribution[id] = {
+                count: 0,
+                optionText: optionDetails[id] || `Option ${id}`,
+                users: []
+              };
+            }
+            distribution[id].count += 1;
+            distribution[id].users.push(participantName);
+          });
+        } else if (answerObj.selectedOptions && Array.isArray(answerObj.selectedOptions)) {
+          answerObj.selectedOptions.forEach((option: any) => {
+            const optionId = option.id || option;
+            if (!distribution[optionId]) {
+              distribution[optionId] = {
+                count: 0,
+                optionText: optionDetails[optionId] || `Option ${optionId}`,
+                users: []
+              };
+            }
+            distribution[optionId].count += 1;
+            distribution[optionId].users.push(participantName);
+          });
+        } else if (answerObj.selected && Array.isArray(answerObj.selected)) {
+          // Handle "selected" array format (e.g., ["1", "2"])
+          answerObj.selected.forEach((optionId: string) => {
+            if (!distribution[optionId]) {
+              distribution[optionId] = {
+                count: 0,
+                optionText: optionDetails[optionId] || `Option ${optionId}`,
+                users: []
+              };
+            }
+            distribution[optionId].count += 1;
+            distribution[optionId].users.push(participantName);
+          });
+        }
+      }
+    });
+
+    // Convert to array format with option number, text, count, percentage, and users
+    const totalResponses = responses.length;
+    const distributionArray = Object.entries(distribution).map(([optionId, data]) => ({
+      optionNumber: parseInt(optionId) || optionId, // Convert to number if possible, otherwise keep as string
+      optionText: data.optionText,
+      count: data.count,
+      percentage: totalResponses > 0 ? Math.round((data.count / totalResponses) * 100 * 100) / 100 : 0, // Round to 2 decimal places
+      users: data.users
+    }));
+
+    // Sort by option number/id for consistent ordering
+    distributionArray.sort((a, b) => {
+      if (typeof a.optionNumber === 'number' && typeof b.optionNumber === 'number') {
+        return a.optionNumber - b.optionNumber;
+      }
+      return String(a.optionNumber).localeCompare(String(b.optionNumber));
+    });
+
+    return distributionArray;
+  }
+
   private getOptionDetails(slide: any): { [key: string]: string } {
     const optionDetails: { [key: string]: string } = {};
 
@@ -2986,7 +3074,7 @@ export class DatabaseStorage implements IStorage {
           distribution[value.toString()] += 1;
         } else if (typeof value === 'string') {
           const lowerValue = value.toLowerCase();
-          if (lowerValue === 'yes' || lowerValue === 'true') {
+          if (lowerValue === 'yes' || lowerValue === 'false') {
             distribution.true += 1;
           } else if (lowerValue === 'no' || lowerValue === 'false') {
             distribution.false += 1;
@@ -2996,6 +3084,51 @@ export class DatabaseStorage implements IStorage {
     });
 
     return distribution;
+  }
+
+  private getBooleanDistributionWithUsers(responses: any[]): any {
+    const distribution: { [key: string]: { count: number, users: string[] } } = { true: { count: 0, users: [] }, false: { count: 0, users: [] } };
+
+    responses.forEach(r => {
+      if (r.answerJson && typeof r.answerJson === 'object') {
+        const answerObj = r.answerJson as any;
+        const value = answerObj.value || answerObj.answer;
+        const participantName = r.participantName || 'Unknown User';
+
+        if (typeof value === 'boolean') {
+          distribution[value.toString()].count += 1;
+          distribution[value.toString()].users.push(participantName);
+        } else if (typeof value === 'string') {
+          const lowerValue = value.toLowerCase();
+          if (lowerValue === 'yes' || lowerValue === 'true') {
+            distribution.true.count += 1;
+            distribution.true.users.push(participantName);
+          } else if (lowerValue === 'no' || lowerValue === 'false') {
+            distribution.false.count += 1;
+            distribution.false.users.push(participantName);
+          }
+        }
+      }
+    });
+
+    // Convert to array format with count, percentage, and users
+    const totalResponses = responses.length;
+    return [
+      {
+        option: 'true',
+        optionText: 'Yes',
+        count: distribution.true.count,
+        percentage: totalResponses > 0 ? Math.round((distribution.true.count / totalResponses) * 100 * 100) / 100 : 0,
+        users: distribution.true.users
+      },
+      {
+        option: 'false',
+        optionText: 'No',
+        count: distribution.false.count,
+        percentage: totalResponses > 0 ? Math.round((distribution.false.count / totalResponses) * 100 * 100) / 100 : 0,
+        users: distribution.false.users
+      }
+    ];
   }
 
   private calculateBooleanScore(distribution: any): number {
