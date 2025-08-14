@@ -4445,8 +4445,9 @@ export class DatabaseStorage implements IStorage {
 
   async getUserDashboardData(email: string): Promise<any> {
     // Get all participants with this email
-    const userParticipants = await this.getAllParticipantsByEmail(email);
-    
+    // const userParticipants = await this.getAllParticipantsByEmail(email);
+    const userParticipants = await db.select().from(participants).where(eq(participants.email, email));
+
     if (userParticipants.length === 0) {
       return null;
     }

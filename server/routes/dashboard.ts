@@ -31,6 +31,7 @@ export function registerDashboardRoutes(app: Express) {
   app.get("/api/dashboard/:email", async (req, res) => {
     try {
       const { email } = req.params;
+      const { login } = req.query;
       
       if (!email) {
         return res.status(400).json({ message: "Email parameter is required" });
@@ -41,6 +42,10 @@ export function registerDashboardRoutes(app: Express) {
       
       if (participants.length === 0) {
         return res.status(404).json({ message: "No participant found with this email" });
+      }
+
+      if (login !== undefined) {
+        return res.json({ exists: true, email });
       }
 
       // Get dashboard data for all sessions

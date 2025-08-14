@@ -250,6 +250,16 @@ export function VideoPlayer({
   };
 
   const toggleFullscreen = () => {
+
+    const videoEl = videoRef.current;
+    if (!videoEl) return;
+
+    if (videoEl.webkitEnterFullscreen) {
+      videoEl.webkitEnterFullscreen();
+      setIsFullscreen(true);
+      return;
+    }
+
     if (!document.fullscreenElement) {
       videoRef.current?.requestFullscreen?.();
       setIsFullscreen(true);

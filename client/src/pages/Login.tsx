@@ -31,7 +31,7 @@ export default function Login() {
 
     try {
       // Check if user exists by trying to fetch their dashboard data
-      const response = await fetch(`/api/dashboard/${encodeURIComponent(email.trim())}`);
+      const response = await fetch(`/api/dashboard/${encodeURIComponent(email.trim())}?login=true`);
       
       if (response.ok) {
         // User exists, redirect to dashboard

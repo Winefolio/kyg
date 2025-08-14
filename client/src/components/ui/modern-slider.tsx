@@ -115,19 +115,19 @@ export function ModernSlider({
           </motion.div>
 
           {/* Energy Hotspot Glow */}
-          <motion.div
-            className="absolute w-8 h-8 rounded-full pointer-events-none"
-            style={{ 
-              background: 'radial-gradient(circle, rgba(233, 168, 255, 0.5) 0%, rgba(192, 132, 252, 0) 65%)',
-              left: `${Math.min(100, Math.max(0, percentage))}%`, // Constrain to valid range
-              top: `calc(50% - 16px)`, // 16px is half the glow height to center on track
-              transform: 'translateX(-50%)' // Center the glow on the percentage point
-            }}
-            animate={{ 
-              scale: 1 + (percentage / 100) * 0.5 // Glow gets bigger at higher values
-            }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          />
+          {/*<motion.div*/}
+          {/*  className="absolute w-8 h-8 rounded-full pointer-events-none"*/}
+          {/*  style={{ */}
+          {/*    background: 'radial-gradient(circle, rgba(233, 168, 255, 0.5) 0%, rgba(192, 132, 252, 0) 65%)',*/}
+          {/*    left: `${Math.min(100, Math.max(0, percentage))}%`, // Constrain to valid range*/}
+          {/*    top: `calc(50% - 16px)`, // 16px is half the glow height to center on track*/}
+          {/*    transform: 'translateX(-50%)' // Center the glow on the percentage point*/}
+          {/*  }}*/}
+          {/*  animate={{ */}
+          {/*    scale: 1 + (percentage / 100) * 0.5 // Glow gets bigger at higher values*/}
+          {/*  }}*/}
+          {/*  transition={{ type: 'spring', stiffness: 300, damping: 20 }}*/}
+          {/*/>*/}
 
           {/* Dash marks */}
           {dashPositions.map((position, index) => (
@@ -151,82 +151,82 @@ export function ModernSlider({
         </motion.div>
 
         {/* Thumb with dynamic glow */}
-        <motion.div
-          className="absolute w-6 h-6 bg-white rounded-full shadow-lg cursor-grab"
-          style={{ 
-            left: `${Math.min(100, Math.max(0, percentage))}%`, // Constrain to valid range
-            top: `calc(50% - 12px)`, // 12px is half the thumb height to center on track
-            transform: 'translateX(-50%)' // Center the thumb on the percentage point
-          }}
-          drag="x"
-          dragConstraints={trackRef}
-          dragElastic={0}
-          onDragStart={() => {
-            setIsDragging(true);
-            triggerHaptic('selection');
-          }}
-          onDragEnd={() => setIsDragging(false)}
-          onDrag={(_, info) => {
-            if (!trackRef.current) return;
-            
-            const rect = trackRef.current.getBoundingClientRect();
-            // More stable drag calculation with damping for fast movements
-            const sensitivity = Math.min(1, 50 / Math.abs(info.velocity.x || 1)); // Reduce sensitivity for fast drags
-            const dampedDelta = info.delta.x * sensitivity;
-            
-            const currentOffset = (percentage / 100) * rect.width;
-            const newOffset = Math.max(0, Math.min(rect.width, currentOffset + dampedDelta));
-            const newPercentage = (newOffset / rect.width) * 100;
-            const newValue = Math.round((newPercentage / 100) * (max - min) + min);
-            
-            // Always clamp to valid range
-            const finalValue = Math.max(min, Math.min(max, newValue));
-            if (finalValue !== value) {
-              onChange(finalValue);
-            }
-          }}
-          whileHover={{ 
-            scale: 1.2,
-            boxShadow: "0 0 20px rgba(147, 51, 234, 0.5)"
-          }}
-          whileDrag={{ 
-            scale: 1.3,
-            boxShadow: "0 0 30px rgba(147, 51, 234, 0.8)"
-          }}
-          animate={{
-            boxShadow: isDragging 
-              ? `0px 0px 15px 5px rgba(192, 132, 252, ${0.5 + ((progressPercent || percentage/100)*0.5)})` 
-              : `0px 0px 8px 2px rgba(192, 132, 252, ${0.2 + ((progressPercent || percentage/100)*0.3)})`
-          }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        >
-          {/* Dynamic intensity thumb glow */}
-          <motion.div
-            className="absolute inset-0 bg-purple-400/30 rounded-full blur-md"
-            animate={{ 
-              scale: isDragging ? 2 : 1 + ((progressPercent || percentage/100) * 0.5),
-              opacity: isDragging ? 1 : 0.3 + ((progressPercent || percentage/100) * 0.4)
-            }}
-            transition={{ duration: 0.2 }}
-          />
-        </motion.div>
+        {/*<motion.div*/}
+        {/*  className="absolute w-6 h-6 bg-white rounded-full shadow-lg cursor-grab"*/}
+        {/*  style={{ */}
+        {/*    left: `${Math.min(100, Math.max(0, percentage))}%`, // Constrain to valid range*/}
+        {/*    top: `calc(50% - 12px)`, // 12px is half the thumb height to center on track*/}
+        {/*    transform: 'translateX(-50%)' // Center the thumb on the percentage point*/}
+        {/*  }}*/}
+        {/*  drag="x"*/}
+        {/*  dragConstraints={trackRef}*/}
+        {/*  dragElastic={0}*/}
+        {/*  onDragStart={() => {*/}
+        {/*    setIsDragging(true);*/}
+        {/*    triggerHaptic('selection');*/}
+        {/*  }}*/}
+        {/*  onDragEnd={() => setIsDragging(false)}*/}
+        {/*  onDrag={(_, info) => {*/}
+        {/*    if (!trackRef.current) return;*/}
+        {/*    */}
+        {/*    const rect = trackRef.current.getBoundingClientRect();*/}
+        {/*    // More stable drag calculation with damping for fast movements*/}
+        {/*    const sensitivity = Math.min(1, 50 / Math.abs(info.velocity.x || 1)); // Reduce sensitivity for fast drags*/}
+        {/*    const dampedDelta = info.delta.x * sensitivity;*/}
+        {/*    */}
+        {/*    const currentOffset = (percentage / 100) * rect.width;*/}
+        {/*    const newOffset = Math.max(0, Math.min(rect.width, currentOffset + dampedDelta));*/}
+        {/*    const newPercentage = (newOffset / rect.width) * 100;*/}
+        {/*    const newValue = Math.round((newPercentage / 100) * (max - min) + min);*/}
+        {/*    */}
+        {/*    // Always clamp to valid range*/}
+        {/*    const finalValue = Math.max(min, Math.min(max, newValue));*/}
+        {/*    if (finalValue !== value) {*/}
+        {/*      onChange(finalValue);*/}
+        {/*    }*/}
+        {/*  }}*/}
+        {/*  whileHover={{ */}
+        {/*    scale: 1.2,*/}
+        {/*    boxShadow: "0 0 20px rgba(147, 51, 234, 0.5)"*/}
+        {/*  }}*/}
+        {/*  whileDrag={{ */}
+        {/*    scale: 1.3,*/}
+        {/*    boxShadow: "0 0 30px rgba(147, 51, 234, 0.8)"*/}
+        {/*  }}*/}
+        {/*  animate={{*/}
+        {/*    boxShadow: isDragging */}
+        {/*      ? `0px 0px 15px 5px rgba(192, 132, 252, ${0.5 + ((progressPercent || percentage/100)*0.5)})` */}
+        {/*      : `0px 0px 8px 2px rgba(192, 132, 252, ${0.2 + ((progressPercent || percentage/100)*0.3)})`*/}
+        {/*  }}*/}
+        {/*  transition={{ type: "spring", stiffness: 300, damping: 30 }}*/}
+        {/*>*/}
+        {/*  /!* Dynamic intensity thumb glow *!/*/}
+        {/*  <motion.div*/}
+        {/*    className="absolute inset-0 bg-purple-400/30 rounded-full blur-md"*/}
+        {/*    animate={{ */}
+        {/*      scale: isDragging ? 2 : 1 + ((progressPercent || percentage/100) * 0.5),*/}
+        {/*      opacity: isDragging ? 1 : 0.3 + ((progressPercent || percentage/100) * 0.4)*/}
+        {/*    }}*/}
+        {/*    transition={{ duration: 0.2 }}*/}
+        {/*  />*/}
+        {/*</motion.div>*/}
 
-        {/* Value display */}
-        <AnimatePresence>
-          {isDragging && (
-            <motion.div
-              className="absolute -top-12 left-1/2 -translate-x-1/2 bg-black/80 text-white px-3 py-1 rounded-lg text-sm font-medium backdrop-blur-sm"
-              style={{ left: `${Math.min(100, Math.max(0, percentage))}%` }}
-              initial={{ opacity: 0, y: 10, scale: 0.8 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.8 }}
-              transition={{ duration: 0.2 }}
-            >
-              {clampedValue}
-              <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black/80" />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/*/!* Value display *!/*/}
+        {/*<AnimatePresence>*/}
+        {/*  {isDragging && (*/}
+        {/*    <motion.div*/}
+        {/*      className="absolute -top-12 left-1/2 -translate-x-1/2 bg-black/80 text-white px-3 py-1 rounded-lg text-sm font-medium backdrop-blur-sm"*/}
+        {/*      style={{ left: `${Math.min(100, Math.max(0, percentage))}%` }}*/}
+        {/*      initial={{ opacity: 0, y: 10, scale: 0.8 }}*/}
+        {/*      animate={{ opacity: 1, y: 0, scale: 1 }}*/}
+        {/*      exit={{ opacity: 0, y: 10, scale: 0.8 }}*/}
+        {/*      transition={{ duration: 0.2 }}*/}
+        {/*    >*/}
+        {/*      {clampedValue}*/}
+        {/*      <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black/80" />*/}
+        {/*    </motion.div>*/}
+        {/*  )}*/}
+        {/*</AnimatePresence>*/}
       </div>
 
     </div>
