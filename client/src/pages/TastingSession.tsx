@@ -2531,7 +2531,7 @@ export default function TastingSession() {
                   <Users className="w-8 h-8 text-white animate-pulse" />
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">
-                  Preparing Group Results 📊
+                  Please chat amongst yourselves about the group results!
                 </h2>
                 <p className="text-white/80 text-lg">
                   {currentWine?.wineName || 'Wine'}
@@ -2611,7 +2611,7 @@ export default function TastingSession() {
                   <Users className="w-8 h-8 text-white" />
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-2">
-                  Group Results 📊
+                  Please chat amongst yourselves about the group results!
                 </h2>
                 <p className="text-white/80 text-lg">
                   {currentWine?.wineName || 'Wine'} - Average Scores
@@ -2792,16 +2792,16 @@ export default function TastingSession() {
                               )}
                             </div>
                             
-                            {typeof average === 'number' && average > 0 && questionType !== 'multiple_choice' && (
-                              <div className="text-white/60 font-medium">
-                                {average >= 8 ? '🌟 Excellent' :
-                                 average >= 7 ? '😊 Great' :
-                                 average >= 6 ? '👍 Good' :
-                                 average >= 5 ? '😐 Average' :
-                                 average >= 4 ? '👎 Below Average' :
-                                 '😞 Poor'}
-                              </div>
-                            )}
+                            {/*{typeof average === 'number' && average > 0 && questionType !== 'multiple_choice' && (*/}
+                            {/*  <div className="text-white/60 font-medium">*/}
+                            {/*    {average >= 8 ? '🌟 Excellent' :*/}
+                            {/*     average >= 7 ? '😊 Great' :*/}
+                            {/*     average >= 6 ? '👍 Good' :*/}
+                            {/*     average >= 5 ? '😐 Average' :*/}
+                            {/*     average >= 4 ? '👎 Below Average' :*/}
+                            {/*     '😞 Poor'}*/}
+                            {/*  </div>*/}
+                            {/*)}*/}
                           </div>
                           
                           {/* Enhanced Response distribution for multiple choice */}
