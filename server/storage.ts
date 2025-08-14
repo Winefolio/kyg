@@ -4445,7 +4445,6 @@ export class DatabaseStorage implements IStorage {
 
   async getUserDashboardData(email: string): Promise<any> {
     // Get all participants with this email
-    // const userParticipants = await this.getAllParticipantsByEmail(email);
     const userParticipants = await db.select().from(participants).where(eq(participants.email, email));
 
     if (userParticipants.length === 0) {
@@ -4479,43 +4478,60 @@ export class DatabaseStorage implements IStorage {
     }
 
     const userSessions = await db
-      .select()
-      .from(sessions)
-      .where(inArray(sessions.id, sessionIds));
+        .select()
+        .from(sessions)
+        .where(inArray(sessions.id, sessionIds))
+        .orderBy(desc(sessions.startedAt));
 
     // Get all responses for these participants
     const participantIds = userParticipants.map(p => p.id);
     const userResponses = await db
-      .select()
-      .from(responses)
-      .where(inArray(responses.participantId, participantIds));
+        .select()
+        .from(responses)
+        .where(inArray(responses.participantId, participantIds));
+
+    // --- OPTIMIZATION START ---
+
+    // 1. Get all unique slide IDs from responses
+    const slideIds = [...new Set(userResponses.map(r => r.slideId).filter(Boolean) as string[])];
+
+    // 2. Fetch all slides in one query
+    const allSlides = slideIds.length > 0 ? await db.select().from(slides).where(inArray(slides.id, slideIds)) : [];
+    const slidesMap = new Map(allSlides.map(s => [s.id, s]));
+
+    // 3. Get all unique wine IDs from the fetched slides
+    const wineIds = [...new Set(allSlides.map(s => s.packageWineId).filter(Boolean) as string[])];
+
+    // 4. Fetch all wines in one query
+    const allWines = wineIds.length > 0 ? await db.select().from(packageWines).where(inArray(packageWines.id, wineIds)) : [];
+    const winesMap = new Map(allWines.map(w => [w.id, w]));
+
+    // --- OPTIMIZATION END ---
 
     // Calculate statistics
     const totalSessions = userSessions.length;
     const totalResponses = userResponses.length;
     const completedSessions = userSessions.filter((s: any) => s.status === 'completed').length;
-    
-    // Get unique wines tasted with full details
+
+    // Get unique wines tasted with full details using the pre-fetched maps
     const wineDetails = new Map();
     const regionCounts = new Map();
     const grapeCounts = new Map();
-    
+
     for (const response of userResponses) {
       if (response.slideId) {
-        const slide = await this.getSlideById(response.slideId);
+        const slide = slidesMap.get(response.slideId);
         if (slide?.packageWineId) {
-          const wine = await db.query.packageWines.findFirst({
-            where: eq(packageWines.id, slide.packageWineId)
-          });
-          
+          const wine = winesMap.get(slide.packageWineId);
+
           if (wine) {
             wineDetails.set(wine.id, wine);
-            
+
             // Count regions
             if (wine.region) {
               regionCounts.set(wine.region, (regionCounts.get(wine.region) || 0) + 1);
             }
-            
+
             // Count grape varieties
             if (wine.grapeVarietals && Array.isArray(wine.grapeVarietals)) {
               wine.grapeVarietals.forEach((grape: string) => {
@@ -4566,54 +4582,49 @@ export class DatabaseStorage implements IStorage {
 
   async getUserWineScores(email: string): Promise<any> {
     const userParticipants = await this.getAllParticipantsByEmail(email);
-    
+
     if (userParticipants.length === 0) {
       return { scores: [] };
     }
 
     const participantIds = userParticipants.map(p => p.id);
-    const userResponses = await db
-      .select()
-      .from(responses)
-      .where(inArray(responses.participantId, participantIds));
 
-    // Group responses by wine and calculate scores
+    // Optimized: Fetch all responses with related wine data in a single query
+    const responsesWithDetails = await db
+        .select({
+          response: responses,
+          wine: packageWines
+        })
+        .from(responses)
+        .innerJoin(slides, eq(responses.slideId, slides.id))
+        .innerJoin(packageWines, eq(slides.packageWineId, packageWines.id))
+        .where(inArray(responses.participantId, participantIds));
+
+    // Group responses by wine and calculate scores in memory
     const wineScores: Record<string, any> = {};
-    
-    for (const response of userResponses) {
-      if (response.slideId) {
-        const slide = await this.getSlideById(response.slideId);
-        if (slide?.packageWineId) {
-          const wine = await db.query.packageWines.findFirst({
-            where: eq(packageWines.id, slide.packageWineId)
-          });
-          
-          if (wine) {
-            if (!wineScores[wine.id]) {
-              wineScores[wine.id] = {
-                wineId: wine.id,
-                wineName: wine.wineName,
-                wineDescription: wine.wineDescription,
-                wineImageUrl: wine.wineImageUrl,
-                producer: wine.producer,
-                region: wine.region,
-                vintage: wine.vintage,
-                wineType: wine.wineType,
-                grapeVarietals: wine.grapeVarietals,
-                alcoholContent: wine.alcoholContent,
-                scores: [],
-                averageScore: 0,
-                totalRatings: 0
-              };
-            }
-            
-            // Extract numerical scores from response
-            const score = this.extractScoreFromResponse(response);
-            if (score !== null) {
-              wineScores[wine.id].scores.push(score);
-            }
-          }
-        }
+
+    for (const { response, wine } of responsesWithDetails) {
+      if (!wineScores[wine.id]) {
+        wineScores[wine.id] = {
+          wineId: wine.id,
+          wineName: wine.wineName,
+          wineDescription: wine.wineDescription,
+          wineImageUrl: wine.wineImageUrl,
+          producer: wine.producer,
+          region: wine.region,
+          vintage: wine.vintage,
+          wineType: wine.wineType,
+          grapeVarietals: wine.grapeVarietals,
+          alcoholContent: wine.alcoholContent,
+          scores: [],
+          averageScore: 0,
+          totalRatings: 0
+        };
+      }
+
+      const score = this.extractScoreFromResponse(response);
+      if (score !== null) {
+        wineScores[wine.id].scores.push(score);
       }
     }
 
@@ -4623,16 +4634,87 @@ export class DatabaseStorage implements IStorage {
         wineScore.averageScore = wineScore.scores.reduce((a: number, b: number) => a + b, 0) / wineScore.scores.length;
         wineScore.totalRatings = wineScore.scores.length;
       }
-      
-      // Add placeholder price (in real app, this would come from a pricing table)
+
       wineScore.price = this.generatePlaceholderPrice(wineScore.averageScore, wineScore.region);
-      
-      // Add favorite status (placeholder - in real app this would be user-specific)
-      wineScore.isFavorite = Math.random() > 0.7; // 30% chance of being favorite
+      wineScore.isFavorite = Math.random() > 0.7;
     });
 
     return {
       scores: Object.values(wineScores).sort((a: any, b: any) => b.averageScore - a.averageScore)
+    };
+  }
+
+  async getUserTasteProfileData(email: string): Promise<{ scores: any[]; dashboardData: any } | null> {
+    // 1. Get all participants for the user's email
+    const userParticipants = await this.getAllParticipantsByEmail(email);
+    if (userParticipants.length === 0) {
+      return null;
+    }
+
+    const participantIds = userParticipants.map(p => p.id);
+
+    // 2. Fetch all responses and related slide/wine data in a single, efficient query
+    const responsesWithDetails = await db
+        .select({
+          response: responses,
+          slide: {
+            packageWineId: slides.packageWineId
+          },
+          wine: packageWines
+        })
+        .from(responses)
+        .leftJoin(slides, eq(responses.slideId, slides.id))
+        .leftJoin(packageWines, eq(slides.packageWineId, packageWines.id))
+        .where(inArray(responses.participantId, participantIds));
+
+    // 3. Process the fetched data in memory
+    const dashboardData = await this.getUserDashboardData(email); // This can be further optimized if needed
+    if (!dashboardData) {
+      return null;
+    }
+
+    const wineScores: Record<string, any> = {};
+    for (const { response, wine } of responsesWithDetails) {
+      if (wine) {
+        if (!wineScores[wine.id]) {
+          wineScores[wine.id] = {
+            wineId: wine.id,
+            wineName: wine.wineName,
+            wineDescription: wine.wineDescription,
+            wineImageUrl: wine.wineImageUrl,
+            producer: wine.producer,
+            region: wine.region,
+            vintage: wine.vintage,
+            wineType: wine.wineType,
+            grapeVarietals: wine.grapeVarietals,
+            alcoholContent: wine.alcoholContent,
+            scores: [],
+            averageScore: 0,
+            totalRatings: 0
+          };
+        }
+        const score = this.extractScoreFromResponse(response);
+        if (score !== null) {
+          wineScores[wine.id].scores.push(score);
+        }
+      }
+    }
+
+    // 4. Calculate averages and finalize the scores object
+    Object.values(wineScores).forEach((wineScore: any) => {
+      if (wineScore.scores.length > 0) {
+        wineScore.averageScore = wineScore.scores.reduce((a: number, b: number) => a + b, 0) / wineScore.scores.length;
+        wineScore.totalRatings = wineScore.scores.length;
+      }
+      wineScore.price = this.generatePlaceholderPrice(wineScore.averageScore, wineScore.region);
+      wineScore.isFavorite = Math.random() > 0.7;
+    });
+
+    const sortedScores = Object.values(wineScores).sort((a: any, b: any) => b.averageScore - a.averageScore);
+
+    return {
+      scores: sortedScores,
+      dashboardData
     };
   }
 
