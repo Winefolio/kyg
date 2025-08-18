@@ -2879,6 +2879,40 @@ export default function TastingSession() {
                                       </div>
                                     </div>
                                   )}
+
+                                    {/* Min/Max users display for scale questions */}
+                                    {questionType === 'scale' && responseDistribution && responseDistribution.minUsers && responseDistribution.maxUsers && (
+                                        <div className="mt-4 pt-4 border-t border-white/10">
+                                            <div className="text-sm text-white/70 mb-3 font-medium">Score Range:</div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {/* Minimum Score */}
+                                                <div className="bg-blue-500/10 rounded-lg p-3 border border-blue-400/20">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-blue-300 text-sm font-medium">Lowest Score</span>
+                                                        <span className="text-blue-200 text-lg font-bold">
+                                              {responseDistribution.minScore}
+                                            </span>
+                                                    </div>
+                                                    <div className="text-xs text-blue-200/80">
+                                                        <span className="font-medium">Scored by:</span> {responseDistribution.minUsers.join(', ')}
+                                                    </div>
+                                                </div>
+
+                                                {/* Maximum Score */}
+                                                <div className="bg-emerald-500/10 rounded-lg p-3 border border-emerald-400/20">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-emerald-300 text-sm font-medium">Highest Score</span>
+                                                        <span className="text-emerald-200 text-lg font-bold">
+                                              {responseDistribution.maxScore}
+                                            </span>
+                                                    </div>
+                                                    <div className="text-xs text-emerald-200/80">
+                                                        <span className="font-medium">Scored by:</span> {responseDistribution.maxUsers.join(', ')}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                   
                                                                     {/* Simple progress bar for multiple choice showing highest percentage */}
                                   {questionType === 'multiple_choice' && responseDistribution && Array.isArray(responseDistribution) && responseDistribution.length > 0 && (
