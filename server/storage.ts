@@ -2824,8 +2824,18 @@ export class DatabaseStorage implements IStorage {
     return Math.round((sum / validScores.length) * 100) / 100; // Round to 2 decimal places
   }
 
-  private getScaleDistribution(responses: any[]): any {
+  private getScaleDistribution(responses: any[]): {
+    distribution: { [score: string]: number };
+    minScore: number;
+    minUsers: string[];
+    maxScore: number;
+    maxUsers: string[];
+  } {
     const distribution: { [key: string]: number } = {};
+    let minScore = 10;
+    let maxScore = 1;
+    const minUsers: string[] = [];
+    const maxUsers: string[] = [];
 
     responses.forEach(r => {
       let score: number;
@@ -2838,13 +2848,41 @@ export class DatabaseStorage implements IStorage {
         score = 0;
       }
 
-      // Clamp to reasonable range
+      // Clamp to reasonable range (1–10)
       score = Math.max(1, Math.min(10, score));
       const scoreKey = score.toString();
+
+      // Build distribution
       distribution[scoreKey] = (distribution[scoreKey] || 0) + 1;
+
+      const user = r.participantName || 'Unknown User';
+
+      // Track min users
+      if (score < minScore) {
+        minScore = score;
+        minUsers.length = 0;
+        minUsers.push(user);
+      } else if (score === minScore) {
+        minUsers.push(user);
+      }
+
+      // Track max users
+      if (score > maxScore) {
+        maxScore = score;
+        maxUsers.length = 0;
+        maxUsers.push(user);
+      } else if (score === maxScore) {
+        maxUsers.push(user);
+      }
     });
 
-    return distribution;
+    return {
+      distribution,
+      minScore,
+      minUsers,
+      maxScore,
+      maxUsers
+    };
   }
 
   private getMultipleChoiceDistribution(responses: any[], slide: any): any {
