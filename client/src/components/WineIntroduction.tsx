@@ -88,7 +88,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
           </motion.div>
 
           {/* Scrollable Content Area */}
-          <div className="flex-grow overflow-y-auto">
+          <div className="flex-grow overflow-y-auto pt-6">
             {/* Wine Showcase */}
             <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 items-center mb-4 sm:mb-6">
             {/* Wine Image */}
@@ -107,7 +107,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <div className="absolute -inset-8 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-3xl blur-2xl -z-10" />
+                  <div className="absolute -inset-8 rounded-3xl blur-2xl -z-10" />
                   
                   {/* Floating elements around wine */}
                   {wine.position > 0 && (

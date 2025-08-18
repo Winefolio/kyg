@@ -2803,8 +2803,8 @@ export default function TastingSession() {
                                 displayUnit = 'consensus';
                               }
                             } else if (questionType === 'boolean') {
-                              formattedAverage = `${(average * 100).toFixed(0)}%`;
-                              displayUnit = 'agreement';
+                              formattedAverage = `${participantCount}`;
+                              displayUnit = 'answers';
                             } else if (questionType === 'text' && hasSentimentAnalysis) {
                               // Sentiment analysis scores (1-10 scale)
                               formattedAverage = average % 1 === 0 ? average.toString() : average.toFixed(1);
