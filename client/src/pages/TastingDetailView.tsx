@@ -449,7 +449,7 @@ export default function TastingDetailView() {
           <CardContent>
             <div className="flex items-center space-x-4">
               <div className="flex space-x-1">
-                {[1, 2, 3, 4, 5].map((star) => (
+                {[1].map((star) => (
                   <button
                     key={star}
                     className={`text-2xl cursor-default ${
@@ -461,7 +461,7 @@ export default function TastingDetailView() {
                 ))}
               </div>
               <span className="text-purple-200">
-                {overallRating > 0 ? `${overallRating}/5 stars` : 'Rate your experience'}
+                {overallRating > 0 ? `${overallRating} Stars` : 'Rate your experience'}
               </span>
             </div>
           </CardContent>

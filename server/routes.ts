@@ -948,8 +948,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Resolve to actual session UUID if a short code is provided
+      const session = await storage.getSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      const resolvedSessionId = session.id;
+
       // Calculate averages for all questions in this wine
-      const questionAverages = await storage.calculateWineQuestionAverages(sessionId, wineId);
+      const questionAverages = await storage.calculateWineQuestionAverages(resolvedSessionId, wineId);
       
       if (questionAverages.length === 0) {
         return res.json({
@@ -967,8 +974,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       questionAverages.forEach((question, index) => {
         const questionId = question.slideId || `question-${index}`;
         
-        // Include scale, multiple_choice, and boolean questions with valid scores in the averages display
-        if ((question.questionType === 'scale' || question.questionType === 'multiple_choice' || question.questionType === 'boolean') && 
+        // Include scale and multiple_choice when average is available
+        if ((question.questionType === 'scale' || question.questionType === 'multiple_choice') && 
             question.averageScore !== null && question.averageScore !== undefined) {
           questionsMap[questionId] = {
             id: questionId,
@@ -986,6 +993,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             responseCount: question.totalResponses,
             scaleMax: question.questionType === 'scale' ? 10 : (question.questionType === 'multiple_choice' ? 10 : 1), // Adjust max based on type
             scale_max: question.questionType === 'scale' ? 10 : (question.questionType === 'multiple_choice' ? 10 : 1),
+            questionType: question.questionType,
+            responseDistribution: question.responseDistribution,
+            timestamp: question.timestamp
+          };
+        } else if (question.questionType === 'boolean') {
+          // Always include boolean questions even if averageScore is null
+          questionsMap[questionId] = {
+            id: questionId,
+            questionId: questionId,
+            slideId: question.slideId,
+            questionTitle: question.questionTitle,
+            title: question.questionTitle,
+            question: question.questionTitle,
+            average: null,
+            avg: null,
+            value: null,
+            participantCount: question.totalResponses,
+            participants: question.totalResponses,
+            count: question.totalResponses,
+            responseCount: question.totalResponses,
+            scaleMax: 1,
+            scale_max: 1,
             questionType: question.questionType,
             responseDistribution: question.responseDistribution,
             timestamp: question.timestamp
@@ -1022,8 +1051,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
       
+      // Enrich boolean questions with user names and accurate counts from session responses
+      try {
+        const sessionParticipants = await storage.getParticipantsBySessionId(resolvedSessionId);
+        const participantIdToName = new Map<string, string>();
+        const validParticipantIds = new Set<string>();
+        for (const p of sessionParticipants) {
+          if (p?.id) {
+            validParticipantIds.add(p.id);
+            participantIdToName.set(p.id, p.displayName || p.email || 'Participant');
+          }
+        }
+
+        // Iterate only boolean questions
+        const booleanEntries = Object.entries(questionsMap).filter(([, q]) => q.questionType === 'boolean');
+        for (const [, q] of booleanEntries) {
+          const slideId = q.slideId;
+          if (!slideId) continue;
+          try {
+            const slideResponses = await storage.getResponsesBySlideId(slideId);
+            // Filter to current session participants
+            const filtered = slideResponses.filter((r: any) => r?.participantId && validParticipantIds.has(r.participantId));
+
+            let yesUsers: string[] = [];
+            let noUsers: string[] = [];
+
+            for (const r of filtered) {
+              const ans = r?.answerJson;
+              let val: boolean | null = null;
+              if (typeof ans === 'boolean') {
+                val = ans;
+              } else if (typeof ans === 'string') {
+                if (ans.toLowerCase() === 'true' || ans.toLowerCase() === 'yes' || ans === '1') val = true;
+                else if (ans.toLowerCase() === 'false' || ans.toLowerCase() === 'no' || ans === '0') val = false;
+              } else if (ans && typeof ans === 'object' && 'value' in ans) {
+                if (typeof (ans as any).value === 'boolean') val = (ans as any).value;
+              }
+
+              const name = participantIdToName.get(r.participantId) || 'Participant';
+              if (val === true) yesUsers.push(name);
+              else if (val === false) noUsers.push(name);
+            }
+
+            const totalCount = yesUsers.length + noUsers.length;
+            // Build enriched distribution even if zeros, so frontend can still render labels
+            const enrichedDistribution = [
+              {
+                option: 'true',
+                optionText: 'Yes',
+                count: yesUsers.length,
+                percentage: totalCount > 0 ? Math.round((yesUsers.length / totalCount) * 100) : 0,
+                users: yesUsers
+              },
+              {
+                option: 'false',
+                optionText: 'No',
+                count: noUsers.length,
+                percentage: totalCount > 0 ? Math.round((noUsers.length / totalCount) * 100) : 0,
+                users: noUsers
+              }
+            ];
+
+            q.responseDistribution = enrichedDistribution;
+            // Keep participantCount as-is from averages; do not override average
+          } catch (enrichErr) {
+            console.warn('Warning: failed to enrich boolean distribution for slide', slideId, enrichErr);
+          }
+        }
+      } catch (enrichOuterErr) {
+        console.warn('Warning: boolean distribution enrichment skipped:', enrichOuterErr);
+      }
+
       res.json({
-        sessionId,
+        sessionId: resolvedSessionId,
         wineId,
         totalQuestions: questionAverages.length,
         scaleQuestions: Object.keys(questionsMap).length,

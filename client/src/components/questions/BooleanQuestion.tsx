@@ -39,6 +39,12 @@ export function BooleanQuestion({ question, value, onChange, setDisableNext }: B
     }else if (setDisableNext){
       setDisableNext(true);
     }
+
+    return () => {
+      if (setDisableNext) {
+        setDisableNext(false)
+      }
+    }
   }, []);
 
   useEffect(() => {
