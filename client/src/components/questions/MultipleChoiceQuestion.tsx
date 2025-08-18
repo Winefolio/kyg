@@ -51,6 +51,11 @@ export function MultipleChoiceQuestion({ question, value, onChange, disableNext,
         setDisableNext(true);
       }
     }
+
+    return () => {
+      if (setDisableNext) {
+        setDisableNext(false);
+      } };
   }, []);
 
   // Extract all relevant glossary terms from the current slide content

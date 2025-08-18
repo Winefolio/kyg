@@ -3089,43 +3089,71 @@ export class DatabaseStorage implements IStorage {
   private getBooleanDistributionWithUsers(responses: any[]): any {
     const distribution: { [key: string]: { count: number, users: string[] } } = { true: { count: 0, users: [] }, false: { count: 0, users: [] } };
 
-    responses.forEach(r => {
-      if (r.answerJson && typeof r.answerJson === 'object') {
-        const answerObj = r.answerJson as any;
-        const value = answerObj.value || answerObj.answer;
-        const participantName = r.participantName || 'Unknown User';
-
-        if (typeof value === 'boolean') {
-          distribution[value.toString()].count += 1;
-          distribution[value.toString()].users.push(participantName);
-        } else if (typeof value === 'string') {
-          const lowerValue = value.toLowerCase();
-          if (lowerValue === 'yes' || lowerValue === 'true') {
-            distribution.true.count += 1;
-            distribution.true.users.push(participantName);
-          } else if (lowerValue === 'no' || lowerValue === 'false') {
-            distribution.false.count += 1;
-            distribution.false.users.push(participantName);
-          }
-        }
+    // Helper to coerce various shapes into a boolean
+    const coerceBool = (input: any): boolean | null => {
+      if (typeof input === 'boolean') return input;
+      if (typeof input === 'number') return input > 0;
+      if (typeof input === 'string') {
+        const s = input.trim().toLowerCase();
+        if (['true', 'yes', 'y', '1', 'on'].includes(s)) return true;
+        if (['false', 'no', 'n', '0', 'off'].includes(s)) return false;
+        return null;
       }
+      if (input && typeof input === 'object') {
+        // Common fields
+        const candidates = [
+          (input as any).value,
+          (input as any).answer,
+          (input as any).selected,
+          (input as any).checked,
+          (input as any).option,
+          (input as any).choice,
+          (input as any).selectedOption,
+          (input as any).optionValue,
+        ];
+        for (const c of candidates) {
+          const v = coerceBool(c);
+          if (v !== null) return v;
+        }
+        // Nested patterns e.g., { selected: { value: true } }
+        if ((input as any).selected && typeof (input as any).selected === 'object') {
+          const v = coerceBool((input as any).selected.value ?? (input as any).selected.option);
+          if (v !== null) return v;
+        }
+        // Option text fallbacks
+        const t = (input as any).optionText;
+        const v2 = coerceBool(t);
+        if (v2 !== null) return v2;
+      }
+      return null;
+    };
+
+    let recognized = 0;
+    responses.forEach(r => {
+      const participantName = r.participantName || 'Unknown User';
+      const ans = r.answerJson;
+      const val = coerceBool(ans);
+      if (val === null) return;
+      recognized += 1;
+      distribution[val.toString()].count += 1;
+      distribution[val.toString()].users.push(participantName);
     });
 
     // Convert to array format with count, percentage, and users
-    const totalResponses = responses.length;
+    const totalForPct = recognized > 0 ? recognized : responses.length;
     return [
       {
         option: 'true',
         optionText: 'Yes',
         count: distribution.true.count,
-        percentage: totalResponses > 0 ? Math.round((distribution.true.count / totalResponses) * 100 * 100) / 100 : 0,
+        percentage: totalForPct > 0 ? Math.round((distribution.true.count / totalForPct) * 100) : 0,
         users: distribution.true.users
       },
       {
         option: 'false',
         optionText: 'No',
         count: distribution.false.count,
-        percentage: totalResponses > 0 ? Math.round((distribution.false.count / totalResponses) * 100 * 100) / 100 : 0,
+        percentage: totalForPct > 0 ? Math.round((distribution.false.count / totalForPct) * 100) : 0,
         users: distribution.false.users
       }
     ];
@@ -4662,7 +4690,7 @@ export class DatabaseStorage implements IStorage {
 
             // Count regions
             if (wine.region) {
-              regionCounts.set(wine.region, (regionCounts.get(wine.region) || 0) + 1);
+              regionCounts.set(wine.region, 1);
             }
 
             // Count grape varieties

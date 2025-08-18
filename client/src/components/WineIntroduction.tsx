@@ -60,7 +60,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
       </div>
 
       {/* Main Content - Flex Layout */}
-      <div className="relative z-10 flex-1 flex flex-col p-4 sm:p-6 overflow-y-auto">
+      <div className="relative z-10 flex-1 flex flex-col p-4 sm:p-6 overflow-y-auto bg-gradient-primary">
         <motion.div
           className="flex-1 flex flex-col max-w-4xl w-full mx-auto"
           initial={{ opacity: 0, scale: 0.9 }}

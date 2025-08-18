@@ -102,6 +102,7 @@ export default function TastingSession() {
         isFirstWine: boolean;
     } | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [showFinalCongratulations, setShowFinalCongratulations] = useState(false);
 
     // Timer state for blocking wine completion screen
     const [blockingTimer, setBlockingTimer] = useState(120); // 2 minutes in seconds
@@ -1597,8 +1598,10 @@ export default function TastingSession() {
                 setCompletedSlides(prev => [...prev, currentSlideIndex]);
             }
         } else {
-            // End of session
-            handleComplete();
+            // End of session — show final congratulations screen instead of immediate navigation
+            setShowFinalCongratulations(true);
+            // End the session locally
+            endSession();
         }
     };
 
@@ -2726,6 +2729,59 @@ export default function TastingSession() {
                           const questionType = questionData.questionType || 'scale';
                           const hasTextResponses = questionData.hasTextResponses;
                           const hasSentimentAnalysis = questionData.hasSentimentAnalysis;
+                          // Normalize boolean distributions when provided as an object map
+                          let booleanDistributionArray: Array<{ option: string; optionText: string; count: number; percentage: number; users?: string[] }> | null = null;
+                          if (questionType === 'boolean' && responseDistribution) {
+                            if (Array.isArray(responseDistribution)) {
+                              booleanDistributionArray = responseDistribution.map((opt: any) => ({
+                                option: String(opt.option ?? (opt.optionText?.toLowerCase() === 'yes' ? 'true' : 'false')),
+                                optionText: opt.optionText ?? (String(opt.option) === 'true' ? 'Yes' : 'No'),
+                                count: Number(opt.count ?? 0),
+                                percentage: Number(opt.percentage ?? 0),
+                                users: opt.users || []
+                              }));
+                            } else if (typeof responseDistribution === 'object') {
+                              const entries = Object.entries(responseDistribution as Record<string, any>);
+                              const counts = entries.map(([key, value]) => typeof value === 'object' && value !== null ? Number(value.count ?? 0) : Number(value ?? 0));
+                              const total = counts.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0) || 0;
+                              booleanDistributionArray = entries.map(([key, value], idx) => {
+                                const isTrue = key === 'true' || key === '1' || key === 'yes' || key === 'Yes';
+                                const count = typeof value === 'object' && value !== null ? Number(value.count ?? 0) : Number(value ?? 0);
+                                const users = (typeof value === 'object' && value !== null && Array.isArray((value as any).users)) ? (value as any).users : [];
+                                const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
+                                return {
+                                  option: key,
+                                  optionText: isTrue ? 'Yes' : 'No',
+                                  count: Number.isFinite(count) ? count : 0,
+                                  percentage,
+                                  users
+                                };
+                              });
+                            }
+                          }
+                          const booleanTotalCount = (questionType === 'boolean' && booleanDistributionArray)
+                            ? booleanDistributionArray.reduce((sum, opt) => sum + (opt.count || 0), 0)
+                            : 0;
+                          const booleanMaxPercent = (questionType === 'boolean' && booleanDistributionArray && booleanDistributionArray.length > 0)
+                            ? Math.max(...booleanDistributionArray.map((opt) => opt.percentage || 0))
+                            : 0;
+                          // Compute observed min/max for scale questions from object-form responseDistribution
+                          let observedMin: number | null = null;
+                          let observedMax: number | null = null;
+                          if (
+                            questionType === 'scale' &&
+                            responseDistribution &&
+                            typeof responseDistribution === 'object' &&
+                            !Array.isArray(responseDistribution)
+                          ) {
+                            const numericKeys = Object.keys(responseDistribution)
+                              .map((k) => Number(k))
+                              .filter((v) => !Number.isNaN(v) && (responseDistribution as any)[v] > 0);
+                            if (numericKeys.length > 0) {
+                              observedMin = Math.min(...numericKeys);
+                              observedMax = Math.max(...numericKeys);
+                            }
+                          }
                           
                           // Format average to show meaningful precision and handle different types
                           let formattedAverage = '';
@@ -2782,6 +2838,11 @@ export default function TastingSession() {
                                               {displayUnit}
                                             </span>
                                           )}
+                                        </div>
+                                      )}
+                                      {questionType === 'scale' && observedMin !== null && observedMax !== null && (
+                                        <div className="text-white/60 text-sm">
+                                          Min-Max: {observedMin} – {observedMax}
                                         </div>
                                       )}
                                       <div className="text-white/50 text-sm">
@@ -2896,11 +2957,11 @@ export default function TastingSession() {
                                   )}
                                   
                                   {/* Boolean question distribution with users */}
-                                  {questionType === 'boolean' && responseDistribution && Array.isArray(responseDistribution) && responseDistribution.length > 0 && (
+                                  {questionType === 'boolean' && booleanDistributionArray && booleanDistributionArray.some((o: any) => (o.count || 0) > 0) && (
                                     <div className="mt-4 pt-4 border-t border-white/10">
                                       <div className="text-sm text-white/70 mb-3 font-medium">Answer Distribution:</div>
                                       <div className="space-y-3">
-                                        {responseDistribution.map((option: any, index: number) => {
+                                        {booleanDistributionArray.map((option: any, index: number) => {
                                           const percentage = option.percentage || 0;
                                           const count = option.count || 0;
                                           const optionText = option.optionText || (option.option === 'true' ? 'Yes' : 'No');
@@ -3009,6 +3070,57 @@ export default function TastingSession() {
               >
                 Continue to Next Wine
                 <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+            </motion.div>
+          </div>
+        </div>
+      )}
+
+      {/* Final Congratulations Overlay */}
+      {showFinalCongratulations && (
+        <div 
+          className="fixed inset-0 z-[10000] bg-gradient-primary/95 backdrop-blur-lg"
+          style={{ 
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 10000
+          }}
+        >
+          <div className="h-full w-full flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-gradient-card backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl max-w-md w-full text-center"
+            >
+              <div className="mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-emerald-400 to-green-500 rounded-full flex items-center justify-center">
+                  <Award className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  Congratulations!
+                </h2>
+                <p className="text-white/80 text-lg">
+                  You've completed your tasting experience.
+                </p>
+              </div>
+
+              <Button 
+                onClick={() => {
+                  const email = participant?.email as string | undefined;
+                  if (email) {
+                    setLocation(`/dashboard/${encodeURIComponent(email)}`);
+                  } else {
+                    setLocation('/login');
+                  }
+                }}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium py-3"
+                size="lg"
+              >
+                Go to Your Dashboard
+                <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </motion.div>
           </div>
