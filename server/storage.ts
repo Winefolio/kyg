@@ -4734,7 +4734,10 @@ export class DatabaseStorage implements IStorage {
             // Count grape varieties
             if (wine.grapeVarietals && Array.isArray(wine.grapeVarietals)) {
               wine.grapeVarietals.forEach((grape: string) => {
-                grapeCounts.set(grape, (grapeCounts.get(grape) || 0) + 1);
+                if (!grapeCounts.has(grape)) {
+                  grapeCounts.set(grape, 1);
+                }
+              
               });
             }
           }

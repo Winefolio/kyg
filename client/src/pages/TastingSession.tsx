@@ -3094,7 +3094,7 @@ export default function TastingSession() {
               </div>
 
               <div className="text-white/60 text-sm mb-4">
-                🍷 Ready to continue to the next wine when you are!
+                 Ready to continue to the next wine when you are!
               </div>
               
               <Button 

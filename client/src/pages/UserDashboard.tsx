@@ -1072,12 +1072,10 @@ export default function UserDashboard() {
                         <p className="text-sm text-purple-200 mb-2">{wine.grapeVarietals.join(', ')}</p>
                       )}
                       <div className="flex items-center space-x-1 mb-2">
-                        {[...Array(5)].map((_, i) => (
-                          <Star 
-                            key={i} 
-                            className={`w-4 h-4 ${i < Math.floor(wine.averageScore) ? 'text-yellow-400 fill-current' : 'text-gray-400'}`} 
-                          />
-                        ))}
+                      <Star
+                        className={`w-4 h-4 ${wine.averageScore >= 1 ? 'text-yellow-400 fill-current' : 'text-gray-400'}`}
+                      />
+
                         <span className="text-white ml-1">{wine.averageScore.toFixed(1)}</span>
                       </div>
                       <p className="text-sm text-purple-200 mb-4 line-clamp-2">{wine.wineDescription}</p>
@@ -1126,12 +1124,10 @@ export default function UserDashboard() {
                         </div>
                         {/* Desktop Rating - hidden on mobile */}
                         <div className="hidden sm:flex items-center space-x-1 mb-2">
-                          {[...Array(5)].map((_, i) => (
-                            <Star 
-                              key={i} 
-                              className={`w-4 h-4 ${i < Math.floor(wine.averageScore) ? 'text-yellow-400 fill-current' : 'text-gray-400'}`} 
-                            />
-                          ))}
+                        <Star
+                          className={`w-4 h-4 ${wine.averageScore >= 1 ? 'text-yellow-400 fill-current' : 'text-gray-400'}`}
+                        />
+
                           <span className="text-white ml-1">{wine.averageScore.toFixed(1)}</span>
                         </div>
                         {/* <div className="flex items-center space-x-2">
@@ -1146,12 +1142,9 @@ export default function UserDashboard() {
                       </div>
                       {/* Mobile Rating - shown only on mobile at bottom */}
                       <div className="sm:hidden flex items-center justify-center space-x-1 mt-3 pt-3 border-t border-white/10">
-                        {[...Array(5)].map((_, i) => (
-                          <Star 
-                            key={i} 
-                            className={`w-4 h-4 ${i < Math.floor(wine.averageScore) ? 'text-yellow-400 fill-current' : 'text-gray-400'}`} 
-                          />
-                        ))}
+                      <Star
+                        className={`w-4 h-4 ${wine.averageScore >= 1 ? 'text-yellow-400 fill-current' : 'text-gray-400'}`}
+                      />
                         <span className="text-white ml-1">{wine.averageScore.toFixed(1)}</span>
                       </div>
                     </CardContent>
@@ -1216,7 +1209,7 @@ export default function UserDashboard() {
             {finalTastingHistory && finalTastingHistory.history && finalTastingHistory.history.length > 0 ? (
               <>
                 {/* Tastings Summary Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
               <Card className="bg-white/10 backdrop-blur-xl border-white/20">
                 <CardContent className="p-6">
                   <div className="flex items-center space-x-4">
@@ -1226,20 +1219,6 @@ export default function UserDashboard() {
                     <div>
                       <p className="text-sm text-purple-200">Total Tastings</p>
                       <p className="text-2xl font-bold text-white">{finalTastingHistory?.total || 0}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white/10 backdrop-blur-xl border-white/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-green-500/20 rounded-full">
-                      <Trophy className="w-6 h-6 text-green-300" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-purple-200">Completed</p>
-                      <p className="text-2xl font-bold text-white">{finalTastingHistory?.history.filter(h => h.status === 'completed').length || 0}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -1309,12 +1288,7 @@ export default function UserDashboard() {
                               An intimate journey through exceptional wines. Taste {session.winesTasted} carefully selected wines with expert guidance.
                             </p>
                           </div>
-                          <Badge 
-                            variant={session.status === 'completed' ? 'default' : 'secondary'}
-                            className={session.status === 'completed' ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}
-                          >
-                            {session.status}
-                          </Badge>
+                          
                         </div>
                         
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
