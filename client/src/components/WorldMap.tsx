@@ -265,7 +265,7 @@ const WorldMap: React.FC<WorldMapProps> = ({ wines = [] }) => {
                     {wine.vintage && `${wine.vintage} • `}{wine.region}
                   </div>
                   <div className="text-sm text-yellow-400">
-                    Rating: {wine.averageScore.toFixed(1)}/5
+                    Rating: {wine.averageScore.toFixed(1)}
                   </div>
                   {wine.grapeVarietals && (
                     <div className="text-xs text-purple-300 mt-1">
