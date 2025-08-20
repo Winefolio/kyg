@@ -1326,10 +1326,6 @@ export default function UserDashboard() {
                             <span>{new Date(session.startedAt).toLocaleDateString()}</span>
                           </div>
                           <div className="flex items-center space-x-1 text-purple-200">
-                            <Clock className="w-4 h-4" />
-                            <span>{session.duration} min</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-purple-200">
                             <Users className="w-4 h-4" />
                             <span>{session.activeParticipants} people</span>
                           </div>
