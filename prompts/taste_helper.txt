@@ -1,19 +1,18 @@
-You are an expert sommelier helping a wine enthusiast improve their wine knowledge and purchasing decisions. Based on their tasting history, create personalized sommelier tips.
+You are an expert sommelier helping a wine enthusiast improve their wine knowledge and purchasing decisions. Based on the below data points, please prepare a brief output.
 
 User's Wine Profile:
 - Total wines tasted: {totalWines}
 - Average rating: {avgRating}/5
 - Top region: {topRegion}
 - Favorite grape variety: {topGrape}
-- Wine type preference: {winePreference}
-- Top-rated wines: {topRatedWines}
+- Top-rated White Wine & Its Traits: {topWhite}
+- Top-rated Red Wine & Its Traits: {topRed}
+- Sommelier Feedback: {sommelierFeedback}
 
 Please provide personalized advice in the following format:
 
-1. A brief preference profile paragraph (2-3 sentences) that they can share with a sommelier
-2. Red wine description (if they've tasted reds): What they enjoy about red wines
-3. White wine description (if they've tasted whites): What they enjoy about white wines  
-4. 4 specific questions they should ask a sommelier based on their profile
-5. Price guidance based on their rating patterns
+1. Red wine preference description (if they've tasted reds): What they enjoy about red wines? Maybe allude to region, qualities like acidity, body, etc.
+2. White wine description (if they've tasted whites): What they enjoy about white wines. Maybe allude to region, qualities like acidity, body, etc.
+3. A few questions they should ask to a Sommelier in a wine shop or restaurant to keep exploring wines they like based on their existing preferences as well as recent sommelier feedback that they have received. The questions should be related to finding new wines in regions or flavors that they have previously been interested in. Please ground them in simple language around characteristics or regions, don't be pretentious.
 
-Keep the tone conversational, knowledgeable but not pretentious, and focus on actionable advice they can use when talking to wine professionals.
+Don't be pretentious - keep the questions and observations short and relatively simple

@@ -191,7 +191,8 @@ export interface IStorage {
   getUserDashboardData(email: string): Promise<any>;
   getUserWineScores(email: string): Promise<any>;
   getUserTastingHistory(email: string, options: { limit: number; offset: number }): Promise<any>;
-  
+  getUserSommelierFeedback(email: string): Promise<string[]>;
+
   // LLM Integration
   generateSommelierTips(email: string): Promise<SommelierTips>;
 }
@@ -5112,6 +5113,28 @@ export class DatabaseStorage implements IStorage {
     return locations[Math.floor(Math.random() * locations.length)];
   }
 
+  async getUserSommelierFeedback(email: string): Promise<string[]> {
+    try {
+      const result = await db
+        .select({
+          sommelier_feedback: participants.sommelier_feedback
+        })
+        .from(participants)
+        .where(and(
+          eq(participants.email, email),
+          isNotNull(participants.sommelier_feedback)
+        ))
+        .orderBy(desc(participants.createdAt));
+
+      return result
+        .map((row: any) => row.sommelier_feedback)
+        .filter((feedback: any) => feedback && feedback.trim().length > 0);
+    } catch (error) {
+      console.error("Error fetching sommelier feedback:", error);
+      return [];
+    }
+  }
+
   async generateSommelierTips(email: string): Promise<SommelierTips> {
     return generateSommelierTips(email);
   }
@@ -5130,6 +5153,9 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
     // 1. Get user's wine preferences from their responses
     const userDashboardData = await storage.getUserDashboardData(email);
     const userWineScores = await storage.getUserWineScores(email);
+    
+    // 2. Get sommelier feedback from previous tasting sessions
+    const sommelierFeedback = await storage.getUserSommelierFeedback(email);
     
     if (!userDashboardData || !userWineScores.scores || userWineScores.scores.length === 0) {
       console.log(`📝 No tasting history found for ${email}, returning default tips`);
@@ -5157,31 +5183,28 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
     const redWines = userWineScores.scores.filter((wine: any) => wine.wineType === 'red');
     const whiteWines = userWineScores.scores.filter((wine: any) => wine.wineType === 'white');
     const totalWines = userWineScores.scores.length;
-    const redPercentage = (redWines.length / totalWines) * 100;
-    const whitePercentage = (whiteWines.length / totalWines) * 100;
-    
-    // Determine wine preference description
-    let winePreference: string;
-    if (redPercentage > 70) {
-      winePreference = "Strong red wine preference";
-    } else if (whitePercentage > 70) {
-      winePreference = "Strong white wine preference";
-    } else if (redPercentage > 60) {
-      winePreference = "Prefers red wines";
-    } else if (whitePercentage > 60) {
-      winePreference = "Prefers white wines";
-    } else {
-      winePreference = "Balanced red/white preference";
-    }
-    
-    // Get top-rated wines for context
-    const topRatedWines = userWineScores.scores
-      .filter((wine: any) => wine.averageScore >= 4.0)
-      .slice(0, 3)
-      .map((wine: any) => `${wine.wineName} (${wine.averageScore}/5)`)
-      .join(', ') || 'Still exploring preferences';
+
+    // Get top-rated white and red wines with traits
+    const topWhiteWine = whiteWines
+      .sort((a: any, b: any) => b.averageScore - a.averageScore)[0];
+    const topRedWine = redWines
+      .sort((a: any, b: any) => b.averageScore - a.averageScore)[0];
+
+    const topWhite = topWhiteWine
+      ? `${topWhiteWine.wineName} from ${topWhiteWine.region || 'unknown region'} (${topWhiteWine.averageScore}/5) - ${topWhiteWine.grapeVarietals?.join(', ') || 'grape variety unknown'}`
+      : 'No white wines rated yet';
+
+    const topRed = topRedWine
+      ? `${topRedWine.wineName} from ${topRedWine.region || 'unknown region'} (${topRedWine.averageScore}/5) - ${topRedWine.grapeVarietals?.join(', ') || 'grape variety unknown'}`
+      : 'No red wines rated yet';
+
+    // Format sommelier feedback for the prompt
+    const formattedSommelierFeedback = sommelierFeedback.length > 0
+      ? sommelierFeedback.slice(0, 3).map((feedback, index) => `\n  ${index + 1}. ${feedback}`).join('')
+      : 'No feedback available';
 
     console.log(`📊 User profile: ${totalWines} wines, ${avgRating.toFixed(1)}/5 avg, ${topRegion}, ${topGrape}`);
+    console.log(`🍷 Sommelier feedback entries: ${sommelierFeedback.length}`);
 
     // Step 1: Load the prompt template
     try {
@@ -5194,8 +5217,9 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
         .replace('{avgRating}', avgRating.toFixed(1))
         .replace('{topRegion}', topRegion)
         .replace('{topGrape}', topGrape)
-        .replace('{winePreference}', winePreference)
-        .replace('{topRatedWines}', topRatedWines);
+        .replace('{topWhite}', topWhite)
+        .replace('{topRed}', topRed)
+        .replace('{sommelierFeedback}', formattedSommelierFeedback);
 
       console.log(`📋 Template loaded and populated successfully`);
 
@@ -5314,7 +5338,6 @@ function parseStructuredResponse(response: string, context: any): SommelierTips 
     // Split response into sections
     const lines = response.split('\n').filter(line => line.trim());
     
-    let preferenceProfile = "";
     let redDescription = "";
     let whiteDescription = "";
     const questions: string[] = [];
@@ -5331,66 +5354,67 @@ function parseStructuredResponse(response: string, context: any): SommelierTips 
       }
       
       // Detect sections based on the template format
-      if (trimmed.match(/^1\.|preference profile/i)) {
-        currentSection = "preference";
-        continue;
-      } else if (trimmed.match(/^2\.|red wine description/i)) {
+      if (trimmed.match(/^1\.|red wine preference/i)) {
         currentSection = "red";
         continue;
-      } else if (trimmed.match(/^3\.|white wine description/i)) {
+      } else if (trimmed.match(/^2\.|white wine description/i)) {
         currentSection = "white";
         continue;
-      } else if (trimmed.match(/^4\.|questions/i) || trimmed.toLowerCase().includes('ask a sommelier')) {
+      } else if (trimmed.match(/^3\.|questions/i) || trimmed.toLowerCase().includes('ask') || trimmed.toLowerCase().includes('sommelier')) {
         currentSection = "questions";
-        continue;
-      } else if (trimmed.match(/^5\.|price guidance/i)) {
-        currentSection = "price";
         continue;
       }
       
       // Extract content based on current section
-      if (currentSection === "preference" && !preferenceProfile && trimmed.length > 20) {
-        // Remove any leading markers and get the preference summary
-        preferenceProfile = trimmed.replace(/^[-*•]\s*/, '').replace(/^\d+\.\s*/, '');
-      } else if (currentSection === "red" && !redDescription && trimmed.length > 20 && !trimmed.includes('?')) {
+      if (currentSection === "red" && !redDescription && trimmed.length > 20 && !trimmed.includes('?')) {
         redDescription = trimmed.replace(/^[-*•]\s*/, '').replace(/^\d+\.\s*/, '');
       } else if (currentSection === "white" && !whiteDescription && trimmed.length > 20 && !trimmed.includes('?')) {
         whiteDescription = trimmed.replace(/^[-*•]\s*/, '').replace(/^\d+\.\s*/, '');
-      } else if (currentSection === "questions" && trimmed.includes('?') && questions.length < 4) {
+      } else if (currentSection === "questions" && trimmed.includes('?')) {
         // Clean up question formatting and extract questions
         const cleanQuestion = trimmed
           .replace(/^[-*•]\s*/, '')
           .replace(/^\d+\.\s*/, '')
           .replace(/^[a-z]\.\s*/i, '') // Remove a. b. c. d. formatting
           .replace(/^\[.*?\]\s*/, ''); // Remove bracketed prefixes
-        
+
         if (cleanQuestion.length > 10) {
           questions.push(cleanQuestion);
         }
-      } else if (currentSection === "price" && !priceGuidance && trimmed.length > 20) {
-        priceGuidance = trimmed.replace(/^[-*•]\s*/, '').replace(/^\d+\.\s*/, '');
       }
     }
     
     // Fallback if parsing didn't work perfectly
-    if (!preferenceProfile) {
-      preferenceProfile = `I enjoy wines from ${context.topRegion}, particularly ${context.topGrape}. My average rating is ${context.avgRating.toFixed(1)}/5, and I've tasted ${context.totalWines} wines so far.`;
-    }
-    
     if (!redDescription && context.redWines && context.redWines.length > 0) {
       const redStyle = analyzeWineStyle(context.redWines);
       redDescription = `For reds, ${redStyle.toLowerCase()}`;
     } else if (!redDescription) {
       redDescription = "I'm interested in exploring red wines and understanding their characteristics.";
     }
-    
+
     if (!whiteDescription && context.whiteWines && context.whiteWines.length > 0) {
       const whiteStyle = analyzeWineStyle(context.whiteWines);
       whiteDescription = `For whites, ${whiteStyle.toLowerCase()}`;
     } else if (!whiteDescription) {
       whiteDescription = "I'd like to explore white wines and discover my preferences.";
     }
-    
+
+    // Generate preference profile from red and white descriptions
+    let preferenceProfile = "";
+    const profileParts = [];
+    if (redDescription && redDescription !== "I'm interested in exploring red wines and understanding their characteristics.") {
+      profileParts.push(redDescription);
+    }
+    if (whiteDescription && whiteDescription !== "I'd like to explore white wines and discover my preferences.") {
+      profileParts.push(whiteDescription);
+    }
+
+    if (profileParts.length > 0) {
+      preferenceProfile = profileParts.join(' ');
+    } else {
+      preferenceProfile = `I enjoy wines from ${context.topRegion}, particularly ${context.topGrape}. My average rating is ${context.avgRating.toFixed(1)}/5, and I've tasted ${context.totalWines} wines so far.`;
+    }
+
     if (questions.length === 0) {
       questions.push(
         `Do you have any wines similar to ${context.topGrape} from ${context.topRegion}?`,
