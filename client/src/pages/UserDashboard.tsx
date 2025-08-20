@@ -64,6 +64,7 @@ interface WineScore {
   averageScore: number;
   totalRatings: number;
   isFavorite: boolean;
+  expectedCharacteristics?: Record<string, any>;
 }
 
 interface TastingHistory {
@@ -1080,6 +1081,20 @@ export default function UserDashboard() {
                       </div>
                       <p className="text-sm text-purple-200 mb-4 line-clamp-2">{wine.wineDescription}</p>
 
+                      {/* Expected Characteristics Chips */}
+                      {wine.expectedCharacteristics && Object.keys(wine.expectedCharacteristics).length > 0 && (
+                        <div className="mt-2">
+                          <h4 className="text-white font-medium mb-2">Wine Characteristics</h4>
+                          <div className="flex flex-wrap gap-1">
+                            {Object.entries(wine.expectedCharacteristics).map(([category, value], index) => (
+                              <Badge key={index} variant="outline" className="text-purple-200 border-purple-300">
+                                {category}: {value}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {/* <div className="flex items-center justify-between">
                         <Button
                           size="sm"
@@ -1121,6 +1136,20 @@ export default function UserDashboard() {
                             <p className="text-sm text-purple-200 mb-2">{wine.grapeVarietals.join(', ')}</p>
                           )}
                           <p className="text-sm text-purple-200 line-clamp-2">{wine.wineDescription}</p>
+
+                          {/* Expected Characteristics Chips */}
+                          {wine.expectedCharacteristics && Object.keys(wine.expectedCharacteristics).length > 0 && (
+                            <div className="mt-2">
+                              <h4 className="text-white font-medium mb-2">Wine Characteristics</h4>
+                              <div className="flex flex-wrap gap-1">
+                                {Object.entries(wine.expectedCharacteristics).map(([category, value], index) => (
+                                  <Badge key={index} variant="outline" className="text-purple-200 border-purple-300">
+                                    {category}: {value}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                         {/* Desktop Rating - hidden on mobile */}
                         <div className="hidden sm:flex items-center space-x-1 mb-2">
