@@ -5198,11 +5198,6 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
       ? `${topRedWine.wineName} from ${topRedWine.region || 'unknown region'} (${topRedWine.averageScore}/5) - ${topRedWine.grapeVarietals?.join(', ') || 'grape variety unknown'}`
       : 'No red wines rated yet';
 
-    // Format sommelier feedback for the prompt
-    const formattedSommelierFeedback = sommelierFeedback.length > 0
-      ? sommelierFeedback.slice(0, 3).map((feedback, index) => `\n  ${index + 1}. ${feedback}`).join('')
-      : 'No feedback available';
-
     console.log(`📊 User profile: ${totalWines} wines, ${avgRating.toFixed(1)}/5 avg, ${topRegion}, ${topGrape}`);
     console.log(`🍷 Sommelier feedback entries: ${sommelierFeedback.length}`);
 
@@ -5212,14 +5207,25 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
       const templateContent = await fs.readFile(templatePath, 'utf-8');
 
       // Step 2: Replace placeholders with user data
-      const prompt = templateContent
+      const MAX_TOKENS = 128000; // gpt-4o → 128k tokens max
+      let prompt = templateContent
         .replace('{totalWines}', totalWines.toString())
         .replace('{avgRating}', avgRating.toFixed(1))
         .replace('{topRegion}', topRegion)
         .replace('{topGrape}', topGrape)
         .replace('{topWhite}', topWhite)
         .replace('{topRed}', topRed)
-        .replace('{sommelierFeedback}', formattedSommelierFeedback);
+
+        let feedback = [...sommelierFeedback];
+        let feedbackText = feedback.map((f, i) => `\n  ${i + 1}. ${f}`).join('');
+
+        while (feedback.length && (prompt.length + feedbackText.length) / 4 >= MAX_TOKENS) {
+          feedback.shift();
+          feedbackText = feedback.map((f, i) => `\n  ${i + 1}. ${f}`).join('');
+        }
+
+        prompt = prompt.replace('{sommelierFeedback}', feedback.length ? feedbackText : 'No feedback available');
+        console.log(`🔍 ≈${(prompt.length / 4).toFixed(0)} tokens, ${feedback.length}/${sommelierFeedback.length} feedback`);
 
       console.log(`📋 Template loaded and populated successfully`);
 
