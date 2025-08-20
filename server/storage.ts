@@ -5239,12 +5239,27 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
         model: "gpt-4o",
         messages: [
           {
+            role: "system",
+            content: `
+              You are an expert wine sommelier. Do not include any text outside the JSON response.
+              Write in second person (you/your) addressing the user directly.
+              {
+                "preferenceProfile": "overall summary",
+                "redDescription": "red wine preferences",
+                "whiteDescription": "white wine preferences",
+                "questions": ["question1", "question2", "question3", "question4"],
+                "priceGuidance": "price guidance"
+              }
+              `
+          },
+          {
             role: "user",
             content: prompt
           }
         ],
         temperature: 0.7,
-        max_tokens: 600
+        max_tokens: 600,
+        response_format: { type: "json_object" }
       });
 
       const response = completion.choices[0]?.message?.content;
@@ -5255,8 +5270,9 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
 
       console.log(`✅ OpenAI response received (${response.length} chars)`);
 
-      // Step 4: Parse the response into preference summary and questions array
-      const parsedTips = parseStructuredResponse(response, {
+      // Step 4: Parse the JSON response directly
+      const jsonResponse = JSON.parse(response);
+      const parsedTips = validateAndSanitizeSommelierTips(jsonResponse, {
         topRegion,
         topGrape,
         avgRating,
@@ -5297,156 +5313,22 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
   }
 }
 
-// Helper function to analyze wine style preferences
-function analyzeWineStyle(wines: any[]): string {
-  if (wines.length === 0) {
-    return "No preference data yet";
-  }
 
-  // Analyze average ratings and characteristics
-  const avgScore = wines.reduce((sum, wine) => sum + (wine.averageScore || 0), 0) / wines.length;
-  
-  // Get regions and grape varieties
-  const regions = wines.map(w => w.region).filter(Boolean);
-  const grapes = wines.flatMap(w => w.grapeVarietals || []).filter(Boolean);
-  
-  // Find most common region and grape
-  const topRegion = getMostCommon(regions);
-  const topGrape = getMostCommon(grapes);
-  
-  if (avgScore >= 4.5) {
-    return `Prefers premium ${topGrape ? topGrape + ' ' : ''}wines${topRegion ? ' from ' + topRegion : ''}, typically rating them highly (${avgScore.toFixed(1)}/5)`;
-  } else if (avgScore >= 4.0) {
-    return `Enjoys well-made ${topGrape ? topGrape + ' ' : ''}wines${topRegion ? ' from ' + topRegion : ''} with good balance and complexity`;
-  } else if (avgScore >= 3.5) {
-    return `Appreciates approachable ${topGrape ? topGrape + ' ' : ''}wines${topRegion ? ' from ' + topRegion : ''}, still developing preferences`;
-  } else {
-    return `Exploring different styles, still discovering preferences in ${topGrape ? topGrape + ' ' : ''}wines`;
-  }
-}
 
-// Helper function to find most common element in array
-function getMostCommon(arr: string[]): string | null {
-  if (arr.length === 0) return null;
-  
-  const counts = arr.reduce((acc, item) => {
-    acc[item] = (acc[item] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  
-  return Object.entries(counts)
-    .sort(([,a], [,b]) => b - a)[0]?.[0] || null;
-}
-
-// Step 4: Parse the structured response into preference summary and questions array
-function parseStructuredResponse(response: string, context: any): SommelierTips {
-  try {
-    // Split response into sections
-    const lines = response.split('\n').filter(line => line.trim());
-    
-    let redDescription = "";
-    let whiteDescription = "";
-    const questions: string[] = [];
-    let priceGuidance = "";
-    
-    let currentSection = "";
-    
-    for (const line of lines) {
-      const trimmed = line.trim();
-      
-      // Skip empty lines and formatting
-      if (!trimmed || trimmed.startsWith('**') || trimmed.startsWith('---')) {
-        continue;
-      }
-      
-      // Detect sections based on the template format
-      if (trimmed.match(/^1\.|red wine preference/i)) {
-        currentSection = "red";
-        continue;
-      } else if (trimmed.match(/^2\.|white wine description/i)) {
-        currentSection = "white";
-        continue;
-      } else if (trimmed.match(/^3\.|questions/i) || trimmed.toLowerCase().includes('ask') || trimmed.toLowerCase().includes('sommelier')) {
-        currentSection = "questions";
-        continue;
-      }
-      
-      // Extract content based on current section
-      if (currentSection === "red" && !redDescription && trimmed.length > 20 && !trimmed.includes('?')) {
-        redDescription = trimmed.replace(/^[-*•]\s*/, '').replace(/^\d+\.\s*/, '');
-      } else if (currentSection === "white" && !whiteDescription && trimmed.length > 20 && !trimmed.includes('?')) {
-        whiteDescription = trimmed.replace(/^[-*•]\s*/, '').replace(/^\d+\.\s*/, '');
-      } else if (currentSection === "questions" && trimmed.includes('?')) {
-        // Clean up question formatting and extract questions
-        const cleanQuestion = trimmed
-          .replace(/^[-*•]\s*/, '')
-          .replace(/^\d+\.\s*/, '')
-          .replace(/^[a-z]\.\s*/i, '') // Remove a. b. c. d. formatting
-          .replace(/^\[.*?\]\s*/, ''); // Remove bracketed prefixes
-
-        if (cleanQuestion.length > 10) {
-          questions.push(cleanQuestion);
-        }
-      }
-    }
-    
-    // Fallback if parsing didn't work perfectly
-    if (!redDescription && context.redWines && context.redWines.length > 0) {
-      const redStyle = analyzeWineStyle(context.redWines);
-      redDescription = `For reds, ${redStyle.toLowerCase()}`;
-    } else if (!redDescription) {
-      redDescription = "I'm interested in exploring red wines and understanding their characteristics.";
-    }
-
-    if (!whiteDescription && context.whiteWines && context.whiteWines.length > 0) {
-      const whiteStyle = analyzeWineStyle(context.whiteWines);
-      whiteDescription = `For whites, ${whiteStyle.toLowerCase()}`;
-    } else if (!whiteDescription) {
-      whiteDescription = "I'd like to explore white wines and discover my preferences.";
-    }
-
-    // Generate preference profile from red and white descriptions
-    let preferenceProfile = "";
-    const profileParts = [];
-    if (redDescription && redDescription !== "I'm interested in exploring red wines and understanding their characteristics.") {
-      profileParts.push(redDescription);
-    }
-    if (whiteDescription && whiteDescription !== "I'd like to explore white wines and discover my preferences.") {
-      profileParts.push(whiteDescription);
-    }
-
-    if (profileParts.length > 0) {
-      preferenceProfile = profileParts.join(' ');
-    } else {
-      preferenceProfile = `I enjoy wines from ${context.topRegion}, particularly ${context.topGrape}. My average rating is ${context.avgRating.toFixed(1)}/5, and I've tasted ${context.totalWines} wines so far.`;
-    }
-
-    if (questions.length === 0) {
-      questions.push(
-        `Do you have any wines similar to ${context.topGrape} from ${context.topRegion}?`,
-        "What would you recommend that pairs well with my meal and matches my taste preferences?",
-        "Can you suggest something from a region I haven't explored that might fit my palate?",
-        "What's a good value wine that represents the style I enjoy?"
-      );
-    }
-    
-    if (!priceGuidance) {
-      const suggestedPrice = Math.round(context.avgRating * 25);
-      priceGuidance = `Based on my taste preferences, I typically enjoy wines in the $${suggestedPrice-10}-${suggestedPrice+15} range. I'm open to trying something special if you think it really fits my palate.`;
-    }
-    
-    return {
-      preferenceProfile,
-      redDescription,
-      whiteDescription,
-      questions: questions.slice(0, 4), // Ensure exactly 4 questions
-      priceGuidance
-    };
-    
-  } catch (error) {
-    console.error("Error parsing structured response:", error);
-    throw error;
-  }
+// Validate and sanitize JSON response from OpenAI
+function validateAndSanitizeSommelierTips(jsonResponse: any, context: any): SommelierTips {
+  return {
+    preferenceProfile: jsonResponse.preferenceProfile || `I enjoy wines from ${context.topRegion}, particularly ${context.topGrape}. My average rating is ${context.avgRating.toFixed(1)}/5.`,
+    redDescription: jsonResponse.redDescription || "I'm interested in exploring red wines and understanding their characteristics.",
+    whiteDescription: jsonResponse.whiteDescription || "I'd like to explore white wines and discover my preferences.",
+    questions: Array.isArray(jsonResponse.questions) ? jsonResponse.questions.slice(0, 4) : [
+      `Do you have any wines similar to ${context.topGrape} from ${context.topRegion}?`,
+      "What would you recommend that pairs well with my meal?",
+      "Can you suggest something from a region I haven't explored?",
+      "What's a good value wine that represents the style I enjoy?"
+    ],
+    priceGuidance: jsonResponse.priceGuidance || `I typically enjoy wines in the $${Math.round(context.avgRating * 20)}-${Math.round(context.avgRating * 30)} range.`
+  };
 }
 
 // Fallback function if OpenAI is unavailable
