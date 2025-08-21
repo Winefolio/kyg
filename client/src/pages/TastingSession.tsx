@@ -2391,7 +2391,7 @@ export default function TastingSession() {
           </div>
 
           {/* Main slide content */}
-          <div className="flex-grow overflow-y-auto p-3">
+          <div className="flex-grow overflow-y-auto p-3" style={{ height: "100vh" }}>
             <div key={`slide-wrapper-${currentSlideIndex}`} className="min-h-full flex flex-col justify-center max-w-2xl mx-auto w-full">
               <DebugErrorBoundary name="SlideContent">
                 {renderSlideContent()}
@@ -2651,6 +2651,7 @@ export default function TastingSession() {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               className="bg-gradient-card backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl max-w-4xl w-full text-center my-8"
+              style={{ maxHeight: "90vh" }}
             >
               <div className="mb-6">
                 <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full flex items-center justify-center">
@@ -2664,7 +2665,7 @@ export default function TastingSession() {
                 </p>
               </div>
 
-              <div className="mb-6 max-h-96 overflow-y-auto custom-scrollbar overflow-y-scroll">
+              <div className="mb-6  pr-2 overflow-y-auto custom-scrollbar overflow-y-scroll" style={{ maxHeight: "30vh" }}>
                 {/* Always try to show averages data, even if there's a message */}
                 {currentWineCompletionStatus.averagesData.questions || currentWineCompletionStatus.averagesData.data || currentWineCompletionStatus.averagesData.averages ? (
                   (() => {
@@ -2828,7 +2829,15 @@ export default function TastingSession() {
                                       {questionTitle}
                                     </h3>
                                     <div className="flex items-center gap-4 mt-2">
-                                      {(questionType !== 'text' || hasSentimentAnalysis) && (
+                                      {questionType === 'multiple_choice' && responseDistribution && Array.isArray(responseDistribution) && responseDistribution.length > 0 ? (
+                                        <div className="flex gap-1">
+                                          <span className="text-sm text-white/60 font-medium">Top Answer:</span>
+                                          <span className="text-sm font-bold text-purple-300">
+                                            {responseDistribution.reduce((top: any, current: any) => 
+                                              (current.count > (top?.count || 0) ? current : top), null)?.optionText || 'No responses'}
+                                          </span>
+                                        </div>
+                                      ) : (questionType !== 'text' || hasSentimentAnalysis) && (
                                         <div className="flex items-baseline gap-1">
                                           <span className="text-2xl font-bold text-purple-300">
                                             {formattedAverage}
@@ -2914,8 +2923,8 @@ export default function TastingSession() {
                                         </div>
                                     )}
                                   
-                                                                    {/* Simple progress bar for multiple choice showing highest percentage */}
-                                  {questionType === 'multiple_choice' && responseDistribution && Array.isArray(responseDistribution) && responseDistribution.length > 0 && (
+                                  {/* Simple progress bar for multiple choice showing highest percentage */}
+                                  {/* {questionType === 'multiple_choice' && responseDistribution && Array.isArray(responseDistribution) && responseDistribution.length > 0 && (
                                     <div className="w-full bg-white/20 rounded-full h-4 mb-3 overflow-hidden">
                                       <div 
                                         className="bg-gradient-to-r from-emerald-400 via-blue-400 to-indigo-500 h-4 rounded-full transition-all duration-1500 ease-out shadow-sm"
@@ -2926,7 +2935,7 @@ export default function TastingSession() {
                                         <div className="w-full h-full bg-white/10 animate-pulse"></div>
                                       </div>
                                     </div>
-                                  )}
+                                  )} */}
 
                                   {/* Simple progress bar for boolean questions showing highest percentage */}
                                   {questionType === 'boolean' && responseDistribution && Array.isArray(responseDistribution) && responseDistribution.length > 0 && (
