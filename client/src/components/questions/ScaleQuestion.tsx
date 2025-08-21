@@ -135,7 +135,7 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
 
       <div className="space-y-6">
         {/* Dynamic Feedback Text */}
-        <div className="h-8 text-center">
+        <div className="h-8 text-center flex flex-col items-center justify-center space-y-1">
           <AnimatePresence mode="wait">
             <motion.p
               key={feedbackText}
@@ -145,9 +145,18 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
               exit={{ opacity: 0, y: -5 }}
               transition={{ duration: 0.2 }}
             >
-              {/*{feedbackText}*/}
+              {feedbackText}
             </motion.p>
           </AnimatePresence>
+          <motion.span
+            key={localValue}
+            className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+          >
+            {localValue}
+          </motion.span>
         </div>
 
         <ModernSlider
