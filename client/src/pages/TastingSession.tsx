@@ -2125,8 +2125,8 @@ export default function TastingSession() {
   }
 
   return (
-    <>
-      <div className="h-dynamic-screen bg-gradient-primary flex relative overflow-hidden">
+    <div style={{minHeight: "100vh"}}>
+      <div className="h-screen bg-gradient-primary flex relative overflow-hidden">
         {/* Sidebar */}
         <AnimatePresence>
           {sidebarOpen && (
@@ -2400,8 +2400,8 @@ export default function TastingSession() {
           </div>
 
           {/* Navigation footer */}
-          <div className="flex-shrink-0 p-4 border-t border-white/10 bg-gradient-to-t from-purple-950/20 to-transparent safe-area-bottom">
-            <div className="flex justify-between items-center max-w-2xl mx-auto">
+          <div className="flex-shrink-0 border-t border-white/10 bg-gradient-to-t from-purple-950/20 to-transparent safe-area-bottom">
+            <div className="flex p-4 justify-between items-center max-w-2xl mx-auto">
               <Button
                 variant="ghost"
                 onClick={goToPreviousSlide}
@@ -3185,6 +3185,6 @@ export default function TastingSession() {
           onTimerExpired={handleWineCompletionTimerExpired}
         />
       )}
-    </>
+    </div>
   );
 }
