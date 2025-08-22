@@ -98,7 +98,7 @@ interface WineForm {
   grapeVarietals: string[];
   alcoholContent: string;
   expectedCharacteristics: Record<string, any>;
-  discussion_questions: string[];
+  discussionQuestions: string[];
   packageId?: string;
 }
 
