@@ -28,7 +28,7 @@ interface WineForm {
   grapeVarietals: string[];
   alcoholContent: string;
   expectedCharacteristics: Record<string, any>;
-  discussion_questions: string[];
+  discussionQuestions: string[];
 }
 
 // PROPS INTERFACE
@@ -74,7 +74,7 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
     grapeVarietals: wine?.grapeVarietals || [],
     alcoholContent: wine?.alcoholContent || '13.5%',
     expectedCharacteristics: wine?.expectedCharacteristics || {},
-    discussion_questions: wine?.discussion_questions || []
+    discussionQuestions: wine?.discussionQuestions || []
   });
 
   const [activeTab, setActiveTab] = useState<'details' | 'characteristics' | 'discussion'>('details');
@@ -288,7 +288,7 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
               <div className="mb-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-white font-semibold mb-2">Discussion Questions</h3>
-                  {!isReadOnly && !isAddingQuestion && (
+                  {!isReadOnly && !isAddingQuestion && wineForm.discussionQuestions.length !== 0 && (
                     <Button
                       onClick={() => setIsAddingQuestion(true)}
                       className="bg-purple-600 hover:bg-purple-700 text-white"
@@ -318,7 +318,7 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
                             if (newQuestion.trim()) {
                               setWineForm(prev => ({
                                 ...prev,
-                                discussion_questions: [...prev.discussion_questions, newQuestion.trim()]
+                                discussionQuestions: [...prev.discussionQuestions, newQuestion.trim()]
                               }));
                               setNewQuestion('');
                               setIsAddingQuestion(false);
@@ -346,7 +346,7 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
                 )}
 
                 {/* Existing Questions List */}
-                {wineForm.discussion_questions.map((question, index) => (
+                {wineForm.discussionQuestions.map((question, index) => (
                   <Card key={index} className="bg-white/5 border-white/10 p-4">
                     {editingQuestionIndex === index ? (
                       <div className="flex items-start gap-3">
@@ -361,7 +361,7 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
                               if (newQuestion.trim()) {
                                 setWineForm(prev => ({
                                   ...prev,
-                                  discussion_questions: prev.discussion_questions.map((q, i) =>
+                                  discussionQuestions: prev.discussionQuestions.map((q, i) =>
                                     i === index ? newQuestion.trim() : q
                                   )
                                 }));
@@ -407,7 +407,7 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
                               onClick={() => {
                                 setWineForm(prev => ({
                                   ...prev,
-                                  discussion_questions: prev.discussion_questions.filter((_, i) => i !== index)
+                                  discussionQuestions: prev.discussionQuestions.filter((_, i) => i !== index)
                                 }));
                               }}
                               variant="ghost"
@@ -424,7 +424,7 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
                 ))}
 
                 {/* Empty State */}
-                {wineForm.discussion_questions.length === 0 && !isAddingQuestion && (
+                {wineForm.discussionQuestions.length === 0 && !isAddingQuestion && (
                   <div className="text-center py-8">
                     <p className="text-white/50 mb-4">No discussion questions added yet.</p>
                     {!isReadOnly && (
