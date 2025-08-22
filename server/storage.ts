@@ -3539,7 +3539,8 @@ export class DatabaseStorage implements IStorage {
         taste: ['Bold', 'Full-bodied', 'Smooth tannins'],
         color: 'Deep ruby red',
         finish: 'Long and elegant'
-      }
+      },
+      discussionQuestions: wine.discussionQuestions || []
     };
 
     const [newWine] = await db.insert(packageWines).values(wineData).returning();
@@ -3704,6 +3705,7 @@ export class DatabaseStorage implements IStorage {
           alcoholContent: packageWines.alcoholContent,
           position: packageWines.position,
           expectedCharacteristics: packageWines.expectedCharacteristics,
+          discussionQuestions: packageWines.discussionQuestions,
           createdAt: packageWines.createdAt
         }
       })
@@ -4820,6 +4822,7 @@ export class DatabaseStorage implements IStorage {
           grapeVarietals: wine.grapeVarietals,
           alcoholContent: wine.alcoholContent,
           expectedCharacteristics: wine.expectedCharacteristics,
+          discussionQuestions: wine.discussionQuestions,
           scores: [],
           averageScore: 0,
           totalRatings: 0

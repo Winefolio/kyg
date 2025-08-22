@@ -2665,7 +2665,7 @@ export default function TastingSession() {
                 </p>
               </div>
 
-              <div className="mb-6  pr-2 overflow-y-auto custom-scrollbar overflow-y-scroll" style={{ maxHeight: "30vh" }}>
+              <div className="mb-6 pb-1 pr-2 overflow-y-auto custom-scrollbar overflow-y-scroll" style={{ maxHeight: "30vh" }}>
                 {/* Always try to show averages data, even if there's a message */}
                 {currentWineCompletionStatus.averagesData.questions || currentWineCompletionStatus.averagesData.data || currentWineCompletionStatus.averagesData.averages ? (
                   (() => {
@@ -3079,6 +3079,33 @@ export default function TastingSession() {
                             </AccordionItem>
                           );
                         })}
+                        {currentWine?.discussionQuestions && currentWine.discussionQuestions.length > 0 && (
+                          <AccordionItem value="discussion-questions" className="border border-white/10 rounded-2xl overflow-hidden bg-white/5 hover:bg-white/10 transition-colors">
+                            <AccordionTrigger className="px-6 py-4 hover:no-underline text-white hover:text-purple-200 transition-colors">
+                              <div className="flex items-center gap-3">
+                                {/* <MessageCircle className="w-5 h-5 text-purple-400" /> */}
+                                <div className="text-left">
+                                  <h3 className="font-semibold text-lg">Discussion Questions</h3>
+                                  <p className="text-sm text-white/60">{currentWine.discussionQuestions.length} questions to discuss</p>
+                                </div>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="px-6 pb-6">
+                              <div className="space-y-4">
+                                {currentWine.discussionQuestions.map((question: string, index: number) => (
+                                  <div key={index} className="bg-white/5 rounded-xl p-4 border border-white/10">
+                                    <div className="flex items-start gap-3">
+                                      <div className="w-6 h-6 rounded-full bg-purple-500/20 border border-purple-400/30 flex items-center justify-center flex-shrink-0">
+                                        <span className="text-sm font-medium text-purple-300">{index + 1}</span>
+                                      </div>
+                                      <p className="text-white/90">{question}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        )}
                       </Accordion>
                     );
                   })()

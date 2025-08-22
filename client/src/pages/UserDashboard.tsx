@@ -300,10 +300,16 @@ export default function UserDashboard() {
   // Use taste profile directly
   const finalTasteProfile = tasteProfile;
 
-  // Fetch sommelier tips
+  // Fetch sommelier feedback first
+  const { data: sommelierFeedback } = useQuery<string[]>({
+    queryKey: [`/api/dashboard/${email}/sommelier-feedback`],
+    enabled: !!email,
+  });
+
+  // Only fetch sommelier tips if we don't have feedback
   const { data: sommelierTips, isLoading: tipsLoading, error: tipsError, refetch: refetchTips } = useQuery<SommelierTips>({
     queryKey: [`/api/dashboard/${email}/sommelier-tips`],
-    enabled: !!email,
+    enabled: !!email && !!sommelierFeedback && sommelierFeedback.length > 0,
     retry: false, // Don't retry 404 errors
   });
 
@@ -884,7 +890,12 @@ export default function UserDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {tipsLoading ? (
+                {sommelierFeedback?.length === 0 ? (
+                  <div className="text-center py-8 text-purple-200">
+                    <p className="text-lg font-medium mb-2">Awaiting feedback from Sommelier...</p>
+                    <p className="text-sm text-purple-200/70">Your personalized tips will appear here after receiving your first sommelier feedback.</p>
+                  </div>
+                ) : tipsLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="text-center">
                       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-300 mx-auto mb-4"></div>

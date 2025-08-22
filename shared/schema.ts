@@ -81,6 +81,8 @@ export const packageWines = pgTable("package_wines", {
   alcoholContent: text("alcohol_content"), // e.g., "13.5%"
   // Expected characteristics for analytics comparison
   expectedCharacteristics: jsonb("expected_characteristics"), // Sommelier's expected ratings
+  // Discussion questions for wine tasting
+  discussionQuestions: jsonb("discussion_questions").default([]), // Array of discussion questions
   // Metadata
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
