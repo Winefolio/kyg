@@ -154,6 +154,7 @@ export const packageWines = pgTable("package_wines", {
 	grapeVarietals: jsonb("grape_varietals"),
 	alcoholContent: text("alcohol_content"),
 	expectedCharacteristics: jsonb("expected_characteristics"),
+	discussionQuestions: jsonb("discussion_questions").default([]),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
 	index("idx_package_wines_type").using("btree", table.wineType.asc().nullsLast().op("text_ops")),

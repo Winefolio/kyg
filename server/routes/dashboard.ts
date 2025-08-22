@@ -124,6 +124,28 @@ export function registerDashboardRoutes(app: Express) {
     }
   });
 
+  // Get user's sommelier feedback
+  app.get("/api/dashboard/:email/sommelier-feedback", async (req, res) => {
+    try {
+      const { email } = req.params;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email parameter is required" });
+      }
+
+      const feedback = await storage.getUserSommelierFeedback(email);
+      
+      if (!feedback) {
+        return res.status(404).json({ message: "No sommelier feedback found for this user" });
+      }
+
+      res.json(feedback);
+    } catch (error) {
+      console.error("Error fetching sommelier feedback:", error);
+      res.status(500).json({ message: "Internal server error", error: String(error) });
+    }
+  });
+
   // Get wine collection with detailed filtering
   app.get("/api/dashboard/:email/collection", async (req, res) => {
     try {
