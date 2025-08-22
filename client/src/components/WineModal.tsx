@@ -347,7 +347,7 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
 
                 {/* Existing Questions List */}
                 {wineForm.discussionQuestions.map((question, index) => (
-                  <Card key={index} className="bg-white/5 border-white/10 p-4">
+                  <Card key={question + Math.random()} className="bg-white/5 border-white/10 p-4">
                     {editingQuestionIndex === index ? (
                       <div className="flex items-start gap-3">
                         <Textarea
