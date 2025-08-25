@@ -38,6 +38,7 @@ interface WineModalProps {
   packageId: string;
   onClose: () => void;
   onSave: (data: Partial<WineForm>) => void;
+  isLoading: boolean;
 }
 
 // CONSTANTS
@@ -56,7 +57,7 @@ const commonGrapes = [
   'Chardonnay', 'Sauvignon Blanc', 'Riesling', 'Pinot Grigio/Pinot Gris', 'Gewürztraminer'
 ];
 
-export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalProps) {
+export function WineModal({ mode, wine, packageId, onClose, onSave, isLoading }: WineModalProps) {
   // Fetch wine characteristics from API
   const { data: wineCharacteristics, isLoading: characteristicsLoading } = useQuery<any[]>({
     queryKey: ["/api/wine-characteristics"],
@@ -443,11 +444,11 @@ export function WineModal({ mode, wine, packageId, onClose, onSave }: WineModalP
 
           {!isReadOnly && (
             <div className="flex space-x-3 mt-8 pt-6 border-t border-white/20">
-              <Button onClick={handleSubmit} className="flex-1 bg-white text-purple-900 hover:bg-white/90">
+              <Button onClick={handleSubmit} disabled={isLoading} className="flex-1 bg-white text-purple-900 hover:bg-white/90">
                 <Save className="w-4 h-4 mr-2" />
-                {mode === 'create' ? 'Add Wine' : 'Save Changes'}
+                {isLoading ? 'Saving...' : (mode === 'create' ? 'Add Wine' : 'Save Changes')}
               </Button>
-              <Button variant="ghost" onClick={onClose} className="flex-1 text-white hover:bg-white/10">Cancel</Button>
+              <Button variant="ghost" onClick={onClose} disabled={isLoading} className="flex-1 text-white hover:bg-white/10">Cancel</Button>
             </div>
           )}
         </div>
