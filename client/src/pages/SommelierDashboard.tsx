@@ -1110,7 +1110,8 @@ export default function SommelierDashboard() {
           wine={selectedWine}
           packageId={selectedPackage.id}
           onClose={() => setWineModalOpen(false)}
-          onSave={(data) => {
+          isLoading={createWineMutation.isPending || updateWineMutation.isPending}
+          onSave={async (data) => {
             console.log("Wine save triggered:", { data, mode: wineModalMode, packageId: selectedPackage.id });
             if (wineModalMode === "create") {
               const wineData = {
@@ -1118,9 +1119,9 @@ export default function SommelierDashboard() {
                 packageId: selectedPackage.id,
               };
               console.log("Creating wine with data:", wineData);
-              createWineMutation.mutate(wineData);
+              await createWineMutation.mutateAsync(wineData);
             } else if (wineModalMode === "edit" && selectedWine) {
-              updateWineMutation.mutate({ id: selectedWine.id, data: data as WineForm });
+              await updateWineMutation.mutateAsync({ id: selectedWine.id, data: data as WineForm });
             }
           }}
         />

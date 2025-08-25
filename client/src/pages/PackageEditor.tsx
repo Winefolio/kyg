@@ -317,7 +317,7 @@ export default function PackageEditor() {
         return newSet;
       });
       
-      queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
       setIsWineModalOpen(false);
     },
     onError: (error: any) => toast({ title: "Error creating wine", description: error.message, variant: "destructive" }),
@@ -325,8 +325,8 @@ export default function PackageEditor() {
 
   const updateWineMutation = useMutation({
     mutationFn: ({ wineId, data }: { wineId: string; data: any }) => apiRequest('PATCH', `/api/wines/${wineId}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
       toast({ title: "Wine updated successfully" });
       setIsWineModalOpen(false);
     },
@@ -1927,8 +1927,12 @@ export default function PackageEditor() {
           mode={editingWine ? 'edit' : 'create'}
           wine={editingWine}
           packageId={editorData.id}
-          onClose={() => { setIsWineModalOpen(false); setEditingWine(null); }}
+          onClose={() => { 
+            if (createWineMutation.isPending || updateWineMutation.isPending) return;
+            setIsWineModalOpen(false); setEditingWine(null); 
+          }}
           onSave={handleWineSave}
+          isLoading={createWineMutation.isPending || updateWineMutation.isPending}
         />
       )}
 
