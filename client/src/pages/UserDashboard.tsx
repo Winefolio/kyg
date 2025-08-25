@@ -93,12 +93,26 @@ interface TasteProfile {
     preferredVarieties: Array<{ grape: string; averageScore: number; count: number }>;
     favoriteRegions: Array<{ region: string; count: number }>;
     commonFlavorNotes: string[];
+    traits?: {
+      body: string[];
+      acidity: number[];
+      sweetness: string[];
+      fruits: string[];
+    };
+    regionsTop3: string[];
   };
   whiteWineProfile: {
     stylePreference: string;
     preferredVarieties: Array<{ grape: string; averageScore: number; count: number }>;
     favoriteRegions: Array<{ region: string; count: number }>;
     commonFlavorNotes: string[];
+    traits?: {
+      body: string[];
+      acidity: number[];
+      sweetness: string[];
+      fruits: string[];
+    };
+    regionsTop3: string[];
   };
   overallStats: {
     totalWines: number;
@@ -508,6 +522,25 @@ export default function UserDashboard() {
     setSortBy('rating');
   };
 
+
+  const wineProfiles = [
+    {
+      wineType: 'red',
+      traits: tasteProfile?.redWineProfile?.traits || {},
+      regionsTop3: tasteProfile?.redWineProfile?.regionsTop3 || [],
+      color: "purple",
+      // tasteProfile: finalTasteProfile?.redWineProfile
+    },
+    {
+      wineType: 'white',
+      traits: tasteProfile?.whiteWineProfile?.traits || {},
+      regionsTop3: tasteProfile?.whiteWineProfile?.regionsTop3 || [],
+      color: "yellow",
+      // tasteProfile: finalTasteProfile?.whiteWineProfile
+    }
+  ];
+
+
   return (
     <div className="min-h-screen bg-gradient-primary">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
@@ -756,127 +789,63 @@ export default function UserDashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Red Wine Profile */}
-              <Card className="bg-white/10 backdrop-blur-xl border-white/20">
-                <CardHeader>
-                  <CardTitle className="text-white">Red Wine Profile</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-purple-200">Body Preference</span>
-                    <Badge variant="secondary" className="bg-purple-500/20 text-purple-200">
-                      {finalTasteProfile?.redWineProfile?.stylePreference || "Medium-bodied"}
-                    </Badge>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <h4 className="text-white font-medium">Preferred Varieties</h4>
-                    {finalTasteProfile?.redWineProfile?.preferredVarieties && finalTasteProfile.redWineProfile.preferredVarieties.length > 0 ? (
-                      finalTasteProfile.redWineProfile.preferredVarieties.map((variety, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <span className="text-purple-200">{variety.grape}</span>
-                          <div className="flex items-center space-x-2">
-                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                            <span className="text-white">{variety.averageScore.toFixed(1)} ({variety.count})</span>
+              {wineProfiles.map(({ wineType, traits, regionsTop3, color }) => (
+                <Card className="bg-white/10 backdrop-blur-xl border-white/20">
+                  <CardHeader>
+                    <CardTitle className="text-white">{wineType.charAt(0).toUpperCase() + wineType.slice(1)} Wine Profile</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-3">
+                      <h4 className="text-white font-medium">Based on your highest rated {wineType}s:</h4>
+                      <div className={`text-${color}-200`}>
+                        {Object.entries(traits).map(([traitName, trait], index) => (
+                          <div key={index} className="flex justify-between items-start">
+                            <span className={`text-white w-[30%]`}>{traitName.charAt(0).toUpperCase() + traitName.slice(1)}</span>
+                            <div className="w-[70%]">
+                              <div className="flex flex-wrap gap-1 justify-end">
+                                {trait && Array.isArray(trait) && trait.length > 0 ? trait.map((value, i) => (
+                                  <Badge key={i} variant="secondary" className={`bg-${color}-500/20 text-${color}-200`}>
+                                    {value}
+                                  </Badge>
+                                )) : <p className={`text-white text-sm`}>No data</p>}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-purple-300 text-sm">No data</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <h4 className="text-white font-medium">Favorite Red Regions</h4>
-                    {finalTasteProfile?.redWineProfile?.favoriteRegions && finalTasteProfile.redWineProfile.favoriteRegions.length > 0 ? (
-                      finalTasteProfile.redWineProfile.favoriteRegions.map((region, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <span className="text-purple-200">{region.region}</span>
-                          <span className="text-white">{region.count} wines</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-purple-300 text-sm">No data</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <h4 className="text-white font-medium">Common Flavor Notes</h4>
-                    {finalTasteProfile?.redWineProfile?.commonFlavorNotes && finalTasteProfile.redWineProfile.commonFlavorNotes.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {finalTasteProfile.redWineProfile.commonFlavorNotes.map((note, index) => (
-                          <Badge key={index} variant="outline" className="text-purple-200 border-purple-300">
-                            {note}
-                          </Badge>
                         ))}
                       </div>
-                    ) : (
-                      <p className="text-purple-300 text-sm">No data</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                    </div>
 
-              {/* White Wine Profile */}
-              <Card className="bg-white/10 backdrop-blur-xl border-white/20">
-                <CardHeader>
-                  <CardTitle className="text-white">White Wine Profile</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-purple-200">Style Preference</span>
-                    <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-200">
-                      {finalTasteProfile?.whiteWineProfile?.stylePreference || "Rich & Full"}
-                    </Badge>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <h4 className="text-white font-medium">Preferred Varieties</h4>
-                    {finalTasteProfile?.whiteWineProfile?.preferredVarieties && finalTasteProfile.whiteWineProfile.preferredVarieties.length > 0 ? (
-                      finalTasteProfile.whiteWineProfile.preferredVarieties.map((variety, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <span className="text-purple-200">{variety.grape}</span>
-                          <div className="flex items-center space-x-2">
-                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                            <span className="text-white">{variety.averageScore.toFixed(1)} ({variety.count})</span>
-                          </div>
+                    <div className="space-y-2">
+                      <h4 className="text-white font-medium">Some regions you’ve liked</h4>
+                      {regionsTop3.length ? (
+                        <div className="flex flex-wrap gap-2">
+                          {regionsTop3.map((region, i) => (
+                            <Badge key={i} variant="outline" className={`text-${color}-200 border-${color}-300`}>{region}</Badge>
+                          ))}
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-purple-300 text-sm">No data</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <h4 className="text-white font-medium">Favorite White Regions</h4>
-                    {finalTasteProfile?.whiteWineProfile?.favoriteRegions && finalTasteProfile.whiteWineProfile.favoriteRegions.length > 0 ? (
-                      finalTasteProfile.whiteWineProfile.favoriteRegions.map((region, index) => (
-                        <div key={index} className="flex items-center justify-between">
-                          <span className="text-purple-200">{region.region}</span>
-                          <span className="text-white">{region.count} wines</span>
+                      ) : (
+                        <p className="text-white text-sm">No regions yet</p>
+                      )}
+                    </div>
+
+                    {/* <div className="space-y-3">
+                      <h4 className="text-white font-medium">Common Flavor Notes</h4>
+                      {tasteProfile?.commonFlavorNotes && tasteProfile.commonFlavorNotes.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {tasteProfile.commonFlavorNotes.map((note, index) => (
+                            <Badge key={index} variant="outline" className="text-purple-200 border-purple-300">
+                              {note}
+                            </Badge>
+                          ))}
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-purple-300 text-sm">No data</p>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <h4 className="text-white font-medium">Common Flavor Notes</h4>
-                    {finalTasteProfile?.whiteWineProfile?.commonFlavorNotes && finalTasteProfile.whiteWineProfile.commonFlavorNotes.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {finalTasteProfile.whiteWineProfile.commonFlavorNotes.map((note, index) => (
-                          <Badge key={index} variant="outline" className="text-yellow-200 border-yellow-300">
-                            {note}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-purple-300 text-sm">No data</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                      ) : (
+                        <p className="text-purple-300 text-sm">No data</p>
+                      )}
+                    </div> */}
+                  </CardContent>
+                </Card>
+                )
+              )}
             </div>
               </>
             )}
