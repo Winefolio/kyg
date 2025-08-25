@@ -1648,7 +1648,7 @@ export default function PackageEditor() {
         )}>
           {/* Editor Panel */}
           <div className={cn(
-            "p-4 sm:p-6 overflow-y-auto",
+            "p-4 sm:p-6 pb-12 overflow-y-auto",
             isMobileView ? "flex-1" : `${isPreviewCollapsed ? 'flex-1' : 'flex-1'}`
           )}>
             {activeSlide ? (() => {
