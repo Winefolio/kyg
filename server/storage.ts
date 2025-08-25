@@ -4895,6 +4895,7 @@ export class DatabaseStorage implements IStorage {
             wineType: wine.wineType,
             grapeVarietals: wine.grapeVarietals,
             alcoholContent: wine.alcoholContent,
+            expectedCharacteristics: wine.expectedCharacteristics,
             scores: [],
             averageScore: 0,
             totalRatings: 0

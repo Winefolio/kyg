@@ -459,6 +459,64 @@ export function registerDashboardRoutes(app: Express) {
   */
 }
 
+  function getTopHalfByType(wines: any[], type: 'red' | 'white') {
+    const typed = (wines || []).filter(w => (w.wineType || '').toLowerCase() === type);
+    const sorted = [...typed].sort((a, b) => (b.averageScore || 0) - (a.averageScore || 0));
+    const half = Math.max(1, Math.ceil(sorted.length / 2));
+    return sorted.slice(0, half);
+  }
+
+  function dedupStrings(values: Array<string | number | null | undefined>) {
+    const out = new Set<string>();
+    for (const v of values) {
+      if (v === null || v === undefined) continue;
+      const s = String(v).trim();
+      if (!s) continue;
+      out.add(s);
+    }
+    return Array.from(out);
+  }
+
+  function dedupNumbers(values: Array<number | string | null | undefined>) {
+    const out = new Set<number>();
+    for (const v of values) {
+      if (typeof v === 'number' && !Number.isNaN(v)) out.add(v);
+    }
+    return Array.from(out);
+  }
+
+  function buildTopTraits(topWines: any[]) {
+    const bodies: Array<string> = [];
+    const acidities: Array<number> = [];
+    const sweetnesses: Array<string> = [];
+    const fruits = new Set<string>();
+
+    for (const w of topWines) {
+      const ec = (w?.expectedCharacteristics || {}) as Record<string, any>;
+      if (ec['Body'] !== undefined) bodies.push(String(ec['Body']));
+      if (typeof ec['Acidity'] === 'number') acidities.push(ec['Acidity']);
+      if (ec['Sweetness'] !== undefined) sweetnesses.push(String(ec['Sweetness']));
+      Object.keys(ec).forEach((key) => {
+        if (key.toLowerCase().includes('fruit') && ec[key]) fruits.add(key);
+      });
+    }
+
+    const regionsTop3 = topWines
+      .slice(0, 3)
+      .map(w => w.region)
+      .filter((r: any) => typeof r === 'string' && r.trim() !== '');
+
+    return {
+      traits: {body: dedupStrings(bodies),
+      acidity: dedupNumbers(acidities),
+      sweetness: dedupStrings(sweetnesses),
+      fruits: Array.from(fruits),
+      },
+      regionsTop3
+    };
+  }
+
+
 // Helper functions for generating enhanced dashboard data
 function generateTasteProfileAnalysis(wines: any[], dashboardData: any) {
   const redWines = wines.filter(w => w.wineType === 'red');
@@ -467,10 +525,15 @@ function generateTasteProfileAnalysis(wines: any[], dashboardData: any) {
   // Analyze red wine preferences
   const redProfile = analyzeWineTypeProfile(redWines, 'red');
   const whiteProfile = analyzeWineTypeProfile(whiteWines, 'white');
+
+  const redTopHalf = getTopHalfByType(wines, 'red');
+  const whiteTopHalf = getTopHalfByType(wines, 'white');
+  const redTraits = buildTopTraits(redTopHalf);
+  const whiteTraits = buildTopTraits(whiteTopHalf);
   
   return {
-    redWineProfile: redProfile,
-    whiteWineProfile: whiteProfile,
+    redWineProfile: { ...redProfile, ...redTraits },
+    whiteWineProfile: { ...whiteProfile, ...whiteTraits },
     overallStats: {
       totalWines: wines.length,
       averageRating: dashboardData.stats.averageScore,
