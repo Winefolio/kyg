@@ -1143,6 +1143,28 @@ export default function PackageEditor() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [pendingContentChanges]);
 
+  useEffect(() => {
+    // Store original body styles to restore them later
+    const originalOverflow = document.body.style.overflow;
+    const originalHeight = document.body.style.height;
+    const originalMinHeight = document.body.style.minHeight;
+    const originalMaxHeight = document.body.style.maxHeight;
+
+    // Apply PackageEditor-specific body styles
+    document.body.style.overflow = 'hidden';
+    document.body.style.height = '100vh';
+    document.body.style.minHeight = '100vh';
+    document.body.style.maxHeight = '100vh';
+
+    // Cleanup function to restore original styles
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.height = originalHeight;
+      document.body.style.minHeight = originalMinHeight;
+      document.body.style.maxHeight = originalMaxHeight;
+    };
+  }, []);
+
   const handleQuickAddQuestion = (wineId: string, sectionType: 'intro' | 'deep_dive' | 'ending') => {
     const wine = wines.find(w => w.id === wineId);
     if (wine) {
