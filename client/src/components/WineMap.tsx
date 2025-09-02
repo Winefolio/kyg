@@ -101,14 +101,14 @@ export default function WineMap({ wines }: WineMapProps) {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-        <div className="text-center p-4 bg-white/5 rounded-lg border border-white/10">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
+        {/* <div className="text-center p-4 bg-white/5 rounded-lg border border-white/10">
           <div className="flex items-center justify-center mb-2">
             <MapPin className="w-5 h-5 text-purple-300" />
           </div>
           <div className="text-2xl font-bold text-white">{uniqueRegions}</div>
           <div className="text-sm text-purple-200">Locations</div>
-        </div>
+        </div> */}
         <div className="text-center p-4 bg-white/5 rounded-lg border border-white/10">
           <div className="flex items-center justify-center mb-2">
             <Globe className="w-5 h-5 text-purple-300" />
