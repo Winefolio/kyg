@@ -100,6 +100,7 @@ interface TasteProfile {
       fruits: string[];
     };
     regionsTop3: string[];
+    summary?: string;
   };
   whiteWineProfile: {
     stylePreference: string;
@@ -113,6 +114,7 @@ interface TasteProfile {
       fruits: string[];
     };
     regionsTop3: string[];
+    summary?: string;
   };
   overallStats: {
     totalWines: number;
@@ -529,6 +531,7 @@ export default function UserDashboard() {
       traits: tasteProfile?.redWineProfile?.traits || {},
       regionsTop3: tasteProfile?.redWineProfile?.regionsTop3 || [],
       color: "purple",
+      summary: tasteProfile?.redWineProfile?.summary,
       // tasteProfile: finalTasteProfile?.redWineProfile
     },
     {
@@ -536,6 +539,7 @@ export default function UserDashboard() {
       traits: tasteProfile?.whiteWineProfile?.traits || {},
       regionsTop3: tasteProfile?.whiteWineProfile?.regionsTop3 || [],
       color: "yellow",
+      summary: tasteProfile?.whiteWineProfile?.summary,
       // tasteProfile: finalTasteProfile?.whiteWineProfile
     }
   ];
@@ -789,63 +793,26 @@ export default function UserDashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {wineProfiles.map(({ wineType, traits, regionsTop3, color }) => (
-                <Card className="bg-white/10 backdrop-blur-xl border-white/20">
-                  <CardHeader>
-                    <CardTitle className="text-white">{wineType.charAt(0).toUpperCase() + wineType.slice(1)} Wine Profile</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-3">
-                      <h4 className="text-white font-medium">Based on your highest rated {wineType}s:</h4>
-                      <div className={`text-${color}-200`}>
-                        {Object.entries(traits).map(([traitName, trait], index) => (
-                          <div key={index} className="flex justify-between items-start">
-                            <span className={`text-white w-[30%]`}>{traitName.charAt(0).toUpperCase() + traitName.slice(1)}</span>
-                            <div className="w-[70%]">
-                              <div className="flex flex-wrap gap-1 justify-end">
-                                {trait && Array.isArray(trait) && trait.length > 0 ? trait.map((value, i) => (
-                                  <Badge key={i} variant="secondary" className={`bg-${color}-500/20 text-${color}-200`}>
-                                    {value}
-                                  </Badge>
-                                )) : <p className={`text-white text-sm`}>No data</p>}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+              {wineProfiles.map(({ wineType, traits, regionsTop3, color, summary }) => {
+                return (
+                  <Card key={wineType} className="bg-white/10 backdrop-blur-xl border-white/20">
+                    <CardHeader>
+                      <CardTitle className="text-white">{wineType.charAt(0).toUpperCase() + wineType.slice(1)} Wine Profile</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-3">
+                        <div className={`text-white-200 leading-relaxed`}>
+                          <p>
+                            {summary || 
+                              `Based on your tasting history, we're still building your ${wineType} wine preference profile. Continue tasting to develop more detailed insights.`
+                            }
+                          </p>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <h4 className="text-white font-medium">Some regions you’ve liked</h4>
-                      {regionsTop3.length ? (
-                        <div className="flex flex-wrap gap-2">
-                          {regionsTop3.map((region, i) => (
-                            <Badge key={i} variant="outline" className={`text-${color}-200 border-${color}-300`}>{region}</Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-white text-sm">No regions yet</p>
-                      )}
-                    </div>
-
-                    {/* <div className="space-y-3">
-                      <h4 className="text-white font-medium">Common Flavor Notes</h4>
-                      {tasteProfile?.commonFlavorNotes && tasteProfile.commonFlavorNotes.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {tasteProfile.commonFlavorNotes.map((note, index) => (
-                            <Badge key={index} variant="outline" className="text-purple-200 border-purple-300">
-                              {note}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-purple-300 text-sm">No data</p>
-                      )}
-                    </div> */}
-                  </CardContent>
-                </Card>
-                )
-              )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
               </>
             )}

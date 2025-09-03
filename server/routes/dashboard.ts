@@ -1,5 +1,11 @@
 import type { Express } from "express";
 import { storage, generateSommelierTips } from "../storage";
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 
 export function registerDashboardRoutes(app: Express) {
   console.log("👤 Registering user dashboard endpoints...");
@@ -115,7 +121,7 @@ export function registerDashboardRoutes(app: Express) {
       const { scores, dashboardData } = profileData;
 
       // Generate taste profile analysis with the efficiently fetched data
-      const tasteProfile = generateTasteProfileAnalysis(scores, dashboardData);
+      const tasteProfile = await generateTasteProfileAnalysis(scores, dashboardData);
 
       res.json(tasteProfile);
     } catch (error) {
@@ -518,7 +524,7 @@ export function registerDashboardRoutes(app: Express) {
 
 
 // Helper functions for generating enhanced dashboard data
-function generateTasteProfileAnalysis(wines: any[], dashboardData: any) {
+async function generateTasteProfileAnalysis(wines: any[], dashboardData: any) {
   const redWines = wines.filter(w => w.wineType === 'red');
   const whiteWines = wines.filter(w => w.wineType === 'white');
   
@@ -530,10 +536,29 @@ function generateTasteProfileAnalysis(wines: any[], dashboardData: any) {
   const whiteTopHalf = getTopHalfByType(wines, 'white');
   const redTraits = buildTopTraits(redTopHalf);
   const whiteTraits = buildTopTraits(whiteTopHalf);
-  
+
+  const redWineData = { ...redProfile, ...redTraits };
+  const whiteWineData = { ...whiteProfile, ...whiteTraits };
+
+  let redSommelierSummary: string | undefined;
+  let whiteSommelierSummary: string | undefined;
+  try {
+    const summaries = await generateWineProfileSummaries(redWineData, whiteWineData);
+    redSommelierSummary = summaries.redSummary;
+    whiteSommelierSummary = summaries.whiteSummary;
+  } catch (error) {
+    console.error('❌ Failed to generate wine profile summaries:', error);
+  }
+
   return {
-    redWineProfile: { ...redProfile, ...redTraits },
-    whiteWineProfile: { ...whiteProfile, ...whiteTraits },
+    redWineProfile: { 
+      ...redWineData, 
+      summary: redSommelierSummary
+    },
+    whiteWineProfile: { 
+      ...whiteWineData, 
+      summary: whiteSommelierSummary 
+    },
     overallStats: {
       totalWines: wines.length,
       averageRating: dashboardData.stats.averageScore,
@@ -670,4 +695,81 @@ function generateLegacySommelierTips(dashboardData: any, wines: any[]) {
     questions,
     priceGuidance
   };
+}
+
+async function generateWineProfileSummaries(
+  redWineTraits: any,
+  whiteWineTraits: any
+): Promise<{ redSummary: string; whiteSummary: string }> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY environment variable is not set");
+  }
+
+  try {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const promptPath = path.join(process.cwd(), 'prompts', 'wine_profile_summary.txt');
+
+    let promptTemplate: string;
+    try {
+      promptTemplate = await fs.readFile(promptPath, 'utf-8');
+    } catch (error) {
+      console.error('Failed to read wine profile summary prompt template:', error);
+      throw new Error('Wine profile summary prompt template not found');
+    }
+
+    const prompt = promptTemplate
+      .replace('{red_preferences}', JSON.stringify(redWineTraits, null, 2))
+      .replace('{white_preferences}', JSON.stringify(whiteWineTraits, null, 2));
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert sommelier creating personalized wine preference summaries. 
+          Respond ONLY in valid JSON format with exactly two fields:
+          {
+            "redSummary": "<string summary of red wine preferences>",
+            "whiteSummary": "<string summary of white wine preferences>"
+          }
+          Do not include any nested objects, arrays, or additional fields.`
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      max_tokens: 500,
+      temperature: 0.3,
+      response_format: { type: "json_object" }
+    });
+
+    const response = completion.choices[0].message.content;
+    if (!response) {
+      throw new Error('No response from OpenAI');
+    }
+    console.log("response", response)
+
+    let result: { redSummary: string; whiteSummary: string };
+    try {
+      result = JSON.parse(response);
+    } catch (parseError) {
+      console.error('Failed to parse OpenAI response as JSON:', response);
+      throw new Error('Invalid JSON response from OpenAI');
+    }
+
+    if (!result.redSummary || !result.whiteSummary) {
+      throw new Error('Invalid response structure from OpenAI');
+    }
+
+    return {
+      redSummary: result.redSummary,
+      whiteSummary: result.whiteSummary
+    };
+
+  } catch (error) {
+    console.error('Error generating wine profile summaries:', error);
+    throw error;
+  }
 }
