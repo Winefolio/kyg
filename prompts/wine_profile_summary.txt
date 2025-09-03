@@ -1,0 +1,7 @@
+Red Wine:
+Based on the user's red wine preferences below, please create a 2-3 sentence summary that gets across a Sommelier style summary of the user's preferences. Please note that the data has scores out of 10 for certain traits or distinctive traits that have been in some of the user's favorite wines to-date. Only make statements that are grounded in the below datapoints, don't try to extrapolate.
+{red_preferences}
+
+White Wine:
+Based on the user's white wine preferences below, please create a 2-3 sentence summary that gets across a Sommelier style summary of the user's preferences. Please note that the data has scores out of 10 for certain traits or distinctive traits that have been in some of the user's favorite wines to-date. Only make statements that are grounded in the below datapoints, don't try to extrapolate.
+{white_preferences}
