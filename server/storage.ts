@@ -195,6 +195,9 @@ export interface IStorage {
 
   // LLM Integration
   generateSommelierTips(email: string): Promise<SommelierTips>;
+
+  // Score calculation
+  calculateAverageScore(userResponses: Response[]): number;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1305,11 +1308,22 @@ export class DatabaseStorage implements IStorage {
 
   async getResponsesByParticipantId(
     participantId: string,
-  ): Promise<Response[]> {
-    return await db
-      .select()
+  ): Promise<(Response & { package_wine_id: string })[]> {
+    const results = await db
+      .select(
+        {
+          response: responses,
+          packageWineId: slides.packageWineId
+        }
+      )
       .from(responses)
+      .leftJoin(slides, eq(responses.slideId, slides.id))
       .where(eq(responses.participantId, participantId));
+
+    return results.map(result => ({
+      ...result.response,
+      package_wine_id: result.packageWineId || ''
+    }));
   }
 
   async getResponsesBySlideId(slideId: string): Promise<Response[]> {
@@ -4951,15 +4965,24 @@ export class DatabaseStorage implements IStorage {
       .limit(options.limit)
       .offset(options.offset);
 
-    const history = sessionsWithPackages.map(({ session, package: pkg }) => {
-      // Generate placeholder sommelier data
+    const history = await Promise.all(
+      sessionsWithPackages.map(async ({ session, package: pkg }) => {
       const sommelier = this.getPlaceholderSommelier(session.id);
-      
-      // Calculate session statistics
       const winesTasted = Math.floor(Math.random() * 8) + 4; // 4-11 wines
-      const userScore = (3.5 + Math.random() * 1.5).toFixed(1); // 3.5-5.0
-      const groupScore = (3.8 + Math.random() * 1.2).toFixed(1); // 3.8-5.0
-      
+      let userScore = 0;
+      let groupScore = 0;
+      const participants = await storage.getParticipantsBySessionId(session.id);
+      const userParticipant = participants.find(p => p.email === email);
+      const userResponses = await storage.getResponsesByParticipantId(userParticipant.id);
+      const allParticipantResponses: any[] = [];
+
+      for (const participant of participants) {
+        const responses = await storage.getResponsesByParticipantId(participant.id);
+        allParticipantResponses.push(...responses);
+      }
+      userScore = storage.calculateAverageScore(userResponses);
+      groupScore = storage.calculateAverageScore(allParticipantResponses);
+
       return {
         sessionId: session.id,
         packageId: session.packageId,
@@ -4970,12 +4993,12 @@ export class DatabaseStorage implements IStorage {
         activeParticipants: session.activeParticipants || 0,
         sommelier,
         winesTasted,
-        userScore: parseFloat(userScore),
-        groupScore: parseFloat(groupScore),
+        userScore: userScore.toFixed(1),
+        groupScore: groupScore.toFixed(1),
         duration: Math.floor(Math.random() * 120) + 90, // 90-210 minutes
         location: this.getPlaceholderLocation()
       };
-    });
+    }));
 
     const total = await db
       .select({ count: sql<number>`count(*)` })
@@ -4988,7 +5011,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  private calculateAverageScore(userResponses: Response[]): number {
+  calculateAverageScore(userResponses: Response[]): number {
     const scores = userResponses
       .map(r => this.extractScoreFromResponse(r))
       .filter(score => score !== null);

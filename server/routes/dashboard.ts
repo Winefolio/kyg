@@ -338,7 +338,15 @@ export function registerDashboardRoutes(app: Express) {
       const userWineScores = await storage.getUserWineScores(userEmail);
       
       console.log(`[DEBUG] User has ${userWineScores.scores.length} total wine scores in their history`);
-      
+
+      const userResponses = await storage.getResponsesByParticipantId(userParticipant.id);
+      const allParticipantResponses: any[] = [];
+
+      for (const participant of participants) {
+        const responses = await storage.getResponsesByParticipantId(participant.id);
+        allParticipantResponses.push(...responses);
+      }
+
       // Generate realistic wine scores based on user's history and session data
       const wineScores = wines.map((wine, index) => {
         // Find if user has tasted this specific wine before
@@ -351,24 +359,9 @@ export function registerDashboardRoutes(app: Express) {
         let groupAverage = 0;
         let individualScores: any[] = [];
         
-        if (existingScore) {
-          // Use actual user score if available
-          userScore = existingScore.averageScore;
-          console.log(`[DEBUG] Found actual score for ${wine.wineName}: ${userScore}`);
-        } else {
-          // Generate realistic score based on user's wine preferences
-          const userAvg = userWineScores.scores.length > 0 
-            ? userWineScores.scores.reduce((sum: number, s: any) => sum + s.averageScore, 0) / userWineScores.scores.length 
-            : 3.5;
-          
-          // Add some variation based on wine characteristics
-          const variation = (Math.random() - 0.5) * 2; // -1 to +1
-          userScore = Math.max(1, Math.min(5, userAvg + variation));
-        }
-        
-        // Generate realistic group average (typically close to user score but with some variation)
-        groupAverage = Math.max(1, Math.min(5, userScore + (Math.random() - 0.5) * 1.5));
-        
+        userScore = storage.calculateAverageScore(userResponses.filter(r => r.package_wine_id === wine.id));
+        groupAverage = storage.calculateAverageScore(allParticipantResponses.filter(r => r.package_wine_id === wine.id));
+
         // Generate individual participant scores around the group average
         for (let i = 0; i < participants.length; i++) {
           const participantScore = Math.max(1, Math.min(5, groupAverage + (Math.random() - 0.5) * 2));
@@ -382,6 +375,7 @@ export function registerDashboardRoutes(app: Express) {
         const grapeVarietalsArray = Array.isArray(wine.grapeVarietals) ? wine.grapeVarietals : [];
         
         return {
+          wineId: wine.id,
           wineName: wine.wineName,
           vintage: wine.vintage?.toString() || "N/A",
           region: wine.region || "Unknown",
