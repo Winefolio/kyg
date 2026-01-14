@@ -2,9 +2,14 @@ import type { Express } from "express";
 import { storage, generateSommelierTips } from "../storage";
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Only create OpenAI client if API key is available
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
+
+if (!openai) {
+  console.warn("⚠️  OPENAI_API_KEY not set - AI features will be disabled");
+}
 
 
 export function registerDashboardRoutes(app: Express) {
@@ -695,8 +700,12 @@ async function generateWineProfileSummaries(
   redWineTraits: any,
   whiteWineTraits: any
 ): Promise<{ redSummary: string; whiteSummary: string }> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY environment variable is not set");
+  if (!openai || !process.env.OPENAI_API_KEY) {
+    console.warn("⚠️  OpenAI not configured for wine profile summaries");
+    return {
+      redSummary: "AI-powered wine profile analysis is not available.",
+      whiteSummary: "AI-powered wine profile analysis is not available."
+    };
   }
 
   try {

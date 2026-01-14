@@ -5167,10 +5167,10 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Initialize OpenAI client (optional)
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 // LLM Integration Function for Sommelier Tips
 export async function generateSommelierTips(email: string): Promise<SommelierTips> {
@@ -5257,8 +5257,15 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
       console.log(`📋 Template loaded and populated successfully`);
 
       // Step 3: Call OpenAI GPT-4o API
-      if (!process.env.OPENAI_API_KEY) {
-        throw new Error("OPENAI_API_KEY environment variable is not set");
+      if (!openai || !process.env.OPENAI_API_KEY) {
+        console.warn("⚠️  OpenAI not configured - returning default tips");
+        return {
+          preferenceProfile: "AI-powered preference analysis is not available. Please configure OPENAI_API_KEY.",
+          redDescription: "Red wine preference analysis unavailable.",
+          whiteDescription: "White wine preference analysis unavailable.",
+          questions: ["What wine would you recommend?", "Can you suggest a food pairing?"],
+          priceGuidance: "Wine recommendations unavailable without AI analysis."
+        };
       }
 
       console.log(`🤖 Calling OpenAI API...`);

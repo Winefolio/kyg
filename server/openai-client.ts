@@ -1,9 +1,13 @@
 import OpenAI from 'openai';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Initialize OpenAI client (optional - only if API key is set)
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
+
+if (!openai) {
+  console.warn("⚠️  OPENAI_API_KEY not set in openai-client.ts - AI features disabled");
+}
 
 export interface TextAnalysisResult {
   sentiment: 'positive' | 'neutral' | 'negative';
@@ -33,6 +37,17 @@ export async function analyzeSingleTextSentiment(
   questionContext: string
 ): Promise<TextAnalysisResult> {
   try {
+    // Return default if OpenAI not configured
+    if (!openai) {
+      return {
+        sentiment: 'neutral',
+        sentimentScore: 5,
+        confidence: 0,
+        keywords: [],
+        summary: 'AI analysis unavailable - OPENAI_API_KEY not configured'
+      };
+    }
+
     // Skip empty or very short text
     if (!textContent || textContent.trim().length < 3) {
       return {
@@ -291,6 +306,17 @@ export async function analyzeWineTextResponsesForSummary(
  * Analyze text content and generate a comprehensive summary instead of numerical scores
  */
 async function analyzeTextForSummary(textContent: string, questionContext: string): Promise<TextAnalysisResult> {
+  // Return default if OpenAI not configured
+  if (!openai) {
+    return {
+      sentiment: 'neutral',
+      sentimentScore: 5,
+      confidence: 0,
+      keywords: [],
+      summary: 'AI analysis unavailable - OPENAI_API_KEY not configured'
+    };
+  }
+
   if (!textContent.trim()) {
     return {
       sentiment: 'neutral',
