@@ -81,6 +81,8 @@ export const packageWines = pgTable("package_wines", {
   alcoholContent: text("alcohol_content"), // e.g., "13.5%"
   // Expected characteristics for analytics comparison
   expectedCharacteristics: jsonb("expected_characteristics"), // Sommelier's expected ratings
+  // Discussion questions for wine tasting
+  discussionQuestions: jsonb("discussion_questions").default([]), // Array of discussion questions
   // Metadata
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow()
@@ -118,7 +120,8 @@ export const slides = pgTable("slides", {
   section_type: varchar("section_type", { length: 20 }),
   payloadJson: jsonb("payload_json").notNull(),
   genericQuestions: jsonb("generic_questions"), // New generic questions format
-  createdAt: timestamp("created_at").defaultNow()
+  createdAt: timestamp("created_at").defaultNow(),
+  comparable: boolean().default(false),
 }, (table) => ({
   packageWinePositionIdx: index("idx_slides_package_wine_position").on(table.packageWineId, table.position),
   globalPositionIdx: index("idx_slides_global_position").on(table.packageWineId, table.globalPosition),
@@ -164,7 +167,8 @@ export const participants = pgTable("participants", {
   isHost: boolean("is_host").default(false),
   progressPtr: integer("progress_ptr").default(0),
   lastActive: timestamp("last_active").defaultNow(),
-  createdAt: timestamp("created_at").defaultNow()
+  createdAt: timestamp("created_at").defaultNow(),
+  sommelier_feedback: text("sommelier_feedback"),
 }, (table) => ({
   sessionIdx: index("idx_participants_session").on(table.sessionId),
   emailSessionIdx: index("idx_participants_email_session").on(table.email, table.sessionId)
@@ -523,4 +527,12 @@ export interface ValidationRules {
     questionId: string;
     condition: string; // JS expression
   }>;
+}
+
+export interface SommelierTips {
+  preferenceProfile: string;
+  redDescription: string;
+  whiteDescription: string;
+  questions: string[];
+  priceGuidance: string;
 }

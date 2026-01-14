@@ -264,6 +264,7 @@ export default function HostDashboard() {
           </div>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="flex flex-col items-center mt-7">
             <Badge 
               className={`px-4 py-2 text-sm font-medium ${
                 sessionStatus === 'active' ? 'bg-green-500/20 text-green-300 border-green-400/50' : 
@@ -274,6 +275,7 @@ export default function HostDashboard() {
             >
               {sessionStatus.charAt(0).toUpperCase() + sessionStatus.slice(1)}
             </Badge>
+            </div>
             
             {/* Session Code with Better Design */}
             {session?.short_code && (
@@ -290,12 +292,12 @@ export default function HostDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-6xl mx-auto">
-          <TabsList className="flex w-full overflow-x-auto md:grid md:grid-cols-5 bg-white/10 backdrop-blur-xl rounded-2xl p-1 mb-8 scrollbar-hide">
-            <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Overview</TabsTrigger>
-            <TabsTrigger value="wines" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Selection</TabsTrigger>
-            <TabsTrigger value="participants" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Participants</TabsTrigger>
-            <TabsTrigger value="analytics" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Analytics</TabsTrigger>
-            <TabsTrigger value="controls" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Controls</TabsTrigger>
+          <TabsList className="flex w-full overflow-x-auto md:grid md:grid-cols-5 bg-white/10 backdrop-blur-xl rounded-2xl p-1 mb-8 scrollbar-hide h-15">
+            <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 sm:px-1 md:px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Overview</TabsTrigger>
+            <TabsTrigger value="wines" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 sm:px-1 md:px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Selection</TabsTrigger>
+            <TabsTrigger value="participants" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 sm:px-1 md:px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Participants</TabsTrigger>
+            <TabsTrigger value="analytics" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 sm:px-1 md:px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Analytics</TabsTrigger>
+            <TabsTrigger value="controls" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 sm:px-1 md:px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Controls</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">

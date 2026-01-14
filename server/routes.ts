@@ -15,6 +15,7 @@ import { z } from "zod";
 // Note: Removed problematic reorderSlidesForWineSimple function
 // Now using proven storage.batchUpdateSlidePositions instead
 import { registerMediaProxyRoutes } from './routes/media-proxy';
+import { registerDashboardRoutes } from './routes/dashboard';
 
 // Configure multer for file uploads with comprehensive image support
 const upload = multer({
@@ -94,26 +95,19 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  console.log("🚀 Starting route registration...");
-  
-  
   // Verify Supabase Storage configuration if configured
   if (isSupabaseConfigured()) {
-    console.log("🔍 Checking Supabase Storage configuration...");
     const storageCheck = await verifyStorageBucket();
     if (!storageCheck.success) {
       console.error("⚠️  Supabase Storage verification failed:", storageCheck.error);
       console.error("⚠️  Media uploads will not work properly until this is fixed.");
     }
-  } else {
-    console.log("ℹ️  Supabase not configured - media uploads will use base64 encoding (development mode)");
   }
   
   // Validate package code
   app.get("/api/packages/:code", async (req, res) => {
     try {
       const { code } = req.params;
-      console.log(`Looking for package with code: ${code}`);
       const pkg = await storage.getPackageByCode(code.toUpperCase());
       
       if (!pkg) {
@@ -341,10 +335,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { sessionIdOrShortCode } = req.params; // This can be either UUID or short_code
       
-      // Enhanced logging for debugging
-      console.log(`[JOIN_ATTEMPT] Starting join process with identifier: ${sessionIdOrShortCode}`);
-      console.log(`[JOIN_ATTEMPT] Request body:`, JSON.stringify(req.body, null, 2));
-      
       // Validate the identifier parameter
       if (!sessionIdOrShortCode || sessionIdOrShortCode === 'undefined' || sessionIdOrShortCode === 'null') {
         console.error(`[JOIN_ERROR] Invalid session identifier provided: ${sessionIdOrShortCode}`);
@@ -353,15 +343,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 1. Fetch the session using the provided identifier
       // storage.getSessionById handles both UUIDs and short_codes
-      console.log(`[JOIN_ATTEMPT] Looking up session with identifier: ${sessionIdOrShortCode}`);
       const session = await storage.getSessionById(sessionIdOrShortCode);
       
       if (!session) {
-        console.log(`[JOIN_ATTEMPT_FAIL] Session not found with identifier: ${sessionIdOrShortCode}`);
         return res.status(404).json({ message: "Session not found. Please check the session code and try again." });
       }
-      
-      console.log(`[JOIN_ATTEMPT] Found session: ${session.id} (short_code: ${session.short_code})`);
       
       // Validate session.id is a proper UUID
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -372,7 +358,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 2. Check session status
       if (session.status !== 'active') {
-        console.log(`[JOIN_ATTEMPT_FAIL] Attempt to join inactive session ${session.id} (status: ${session.status}). Identifier used: ${sessionIdOrShortCode}`);
         return res.status(400).json({ message: "Session is not active. Please check with the host." });
       }
 
@@ -383,7 +368,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         participantInputData = insertParticipantSchema
           .omit({ sessionId: true })
           .parse(req.body);
-        console.log(`[JOIN_ATTEMPT] Parsed participant data:`, JSON.stringify(participantInputData, null, 2));
       } catch (parseError) {
         console.error(`[JOIN_ERROR] Failed to parse participant data:`, parseError);
         if (parseError instanceof z.ZodError) {
@@ -396,12 +380,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 4. Verify active host using the actual session UUID
-      console.log(`[JOIN_ATTEMPT] Checking for active host in session ${session.id}`);
       const currentParticipants = await storage.getParticipantsBySessionId(session.id);
       const hasActiveHost = currentParticipants.some(p => p.isHost);
       
       if (!hasActiveHost) {
-        console.log(`[JOIN_ATTEMPT_FAIL] Session ${session.id} has no active host. Identifier used: ${sessionIdOrShortCode}`);
         return res.status(400).json({ message: "Session does not have an active host. Please contact the session organizer." });
       }
 
@@ -411,8 +393,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         existingParticipant = await storage.getParticipantByEmailInSession(session.id, participantInputData.email);
         
         if (existingParticipant) {
-          console.log(`[JOIN_RESUME] Found existing participant with email ${participantInputData.email} in session ${session.id}`);
-          
           // Update their display name if it changed
           if (existingParticipant.displayName !== participantInputData.displayName) {
             await storage.updateParticipantDisplayName(existingParticipant.id, participantInputData.displayName);
@@ -422,7 +402,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Update their last active time
           await storage.updateParticipantProgress(existingParticipant.id, existingParticipant.progressPtr || 0);
           
-          console.log(`[JOIN_RESUME] Participant ${existingParticipant.displayName} (ID: ${existingParticipant.id}) resuming session ${session.id}`);
           return res.json({
             ...existingParticipant,
             isReturning: true
@@ -435,8 +414,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...participantInputData,
         sessionId: session.id  // CRITICAL FIX: Use actual session UUID, not short code
       };
-      
-      console.log(`[JOIN_ATTEMPT] Creating participant with payload:`, JSON.stringify(participantPayload, null, 2));
       
       let newParticipant;
       try {
@@ -469,7 +446,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedParticipantsList = await storage.getParticipantsBySessionId(session.id);
       await storage.updateSessionParticipantCount(session.id, updatedParticipantsList.length);
 
-      console.log(`[JOIN_SUCCESS] Participant ${newParticipant.displayName} (ID: ${newParticipant.id}) joined session ${session.id} (Short Code: ${session.short_code || 'N/A'})`);
       res.json(newParticipant);
 
     } catch (error) {
@@ -641,12 +617,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertResponseSchema.parse(req.body);
       
-      console.log('[API] POST /api/responses - participantId:', validatedData.participantId);
-      
       // First check if participant exists
       const participant = await storage.getParticipantById(validatedData.participantId!);
       if (!participant) {
-        console.log(`[API] Participant ${validatedData.participantId} not found - likely from stale offline sync`);
         return res.status(404).json({ message: "Participant not found" });
       }
       
@@ -694,14 +667,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   participant.id,
                   slideIndex
                 );
-                console.log(`Updated progress for participant ${participant.id} to slide ${slideIndex} of ${allSlides.length}`);
               } else {
                 // Still update lastActive even if not moving forward
                 await storage.updateParticipantProgress(
                   participant.id,
                   currentProgress
                 );
-                console.log(`Participant ${participant.id} on slide ${slideIndex}. Progress maintained at ${currentProgress}.`);
               }
             }
           }
@@ -842,6 +813,404 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Internal server error" });
     }
   });
+
+  // Get completion status for all participants in a session for a specific wine
+  app.get("/api/sessions/:sessionId/completion-status", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { wineId } = req.query;
+      
+      if (!wineId) {
+        return res.status(400).json({ message: "wineId query parameter is required" });
+      }
+      
+      const completionStatus = await storage.getSessionCompletionStatus(sessionId, wineId as string);
+      
+      res.json(completionStatus);
+    } catch (error) {
+      console.error("Error fetching session completion status:", error);
+      if (error instanceof Error && error.message === 'Session not found') {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get completion status for all participants in a session for a specific wine (RESTful URL format)
+  app.get("/api/sessions/:sessionId/wines/:wineId/completion-status", async (req, res) => {
+    try {
+      const { sessionId, wineId } = req.params;
+      
+      const completionStatus = await storage.getSessionCompletionStatus(sessionId, wineId);
+      
+      res.json(completionStatus);
+    } catch (error) {
+      console.error("Error fetching wine completion status:", error);
+      if (error instanceof Error && error.message === 'Session not found') {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Analyze sentiment for wine text responses
+  app.post("/api/sessions/:sessionId/wines/:wineId/sentiment-analysis", async (req, res) => {
+    try {
+      const { sessionId, wineId } = req.params;
+      
+      // Get all text responses for this wine from all participants
+      const textResponses = await storage.getWineTextResponses(sessionId, wineId);
+      
+      if (textResponses.length === 0) {
+        return res.json({
+          sessionId,
+          wineId,
+          message: "No text responses found for sentiment analysis",
+          results: []
+        });
+      }
+      
+      // Import OpenAI client dynamically to avoid dependency issues if not configured
+      const { analyzeWineTextResponsesForSummary } = await import('./openai-client.js');
+      
+      // Perform summary analysis instead of sentiment scoring - convert format for OpenAI client
+      const formattedResponses = textResponses.map(response => ({
+        slideId: response.slideId,
+        questionTitle: response.questionText,
+        textContent: response.answerText
+      }));
+      
+      const summaryResults = await analyzeWineTextResponsesForSummary(formattedResponses, wineId, sessionId);
+      
+      // Save sentiment results to database - convert WineTextAnalysis to array format for compatibility
+      const resultsArray = [{
+        wineId,
+        participantId: summaryResults.participantId,
+        overallSentiment: summaryResults.overallSentiment,
+        textResponses: summaryResults.textResponses,
+        timestamp: new Date().toISOString()
+      }];
+      
+      await storage.saveSentimentAnalysis(sessionId, wineId, resultsArray);
+      
+      res.json({
+        sessionId,
+        wineId,
+        totalResponses: textResponses.length,
+        results: summaryResults,
+        analysisType: 'summary', // Indicate this is summary-based analysis
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error("❌ Error performing text summary analysis:", error);
+      
+      // Provide fallback analysis if OpenAI fails
+      if (error instanceof Error && (error.message?.includes('OpenAI') || error.message?.includes('API'))) {
+        try {
+          const { getFallbackSentimentAnalysis } = await import('./openai-client.js');
+          const textResponses = await storage.getWineTextResponses(req.params.sessionId, req.params.wineId);
+          
+          // Create fallback analysis for each response with summary focus
+          const fallbackResults = textResponses.map(response => ({
+            ...response,
+            sentiment: getFallbackSentimentAnalysis(response.answerText),
+            summary: `Fallback summary for: ${response.answerText.substring(0, 100)}...`
+          }));
+          
+          res.json({
+            sessionId: req.params.sessionId,
+            wineId: req.params.wineId,
+            totalResponses: textResponses.length,
+            results: fallbackResults,
+            fallback: true,
+            analysisType: 'fallback_summary',
+            timestamp: new Date().toISOString()
+          });
+        } catch (fallbackError) {
+          console.error("❌ Fallback text summary analysis failed:", fallbackError);
+          res.status(500).json({ message: "Text summary analysis unavailable" });
+        }
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  // Step 4: Calculate question averages for a wine
+  app.post('/api/sessions/:sessionId/wines/:wineId/calculate-averages', async (req, res) => {
+    try {
+      const { sessionId, wineId } = req.params;
+      
+      if (!sessionId || !wineId) {
+        return res.status(400).json({ 
+          message: "sessionId and wineId parameters are required" 
+        });
+      }
+
+      // Resolve to actual session UUID if a short code is provided
+      const session = await storage.getSessionById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      const resolvedSessionId = session.id;
+
+      // Calculate averages for all questions in this wine
+      const questionAverages = await storage.calculateWineQuestionAverages(resolvedSessionId, wineId);
+      
+      if (questionAverages.length === 0) {
+        return res.json({
+          sessionId,
+          wineId,
+          message: "No questions found for average calculation",
+          questions: {},
+          results: []
+        });
+      }
+      
+      // Transform data into the format expected by frontend
+      const questionsMap: Record<string, any> = {};
+      
+      questionAverages.forEach((question, index) => {
+        const questionId = question.slideId || `question-${index}`;
+        
+        // Include scale and multiple_choice when average is available
+        if ((question.questionType === 'scale' || question.questionType === 'multiple_choice') && 
+            question.averageScore !== null && question.averageScore !== undefined) {
+          questionsMap[questionId] = {
+            id: questionId,
+            questionId: questionId,
+            slideId: question.slideId,
+            questionTitle: question.questionTitle,
+            title: question.questionTitle,
+            question: question.questionTitle,
+            average: parseFloat(question.averageScore.toFixed(1)),
+            avg: parseFloat(question.averageScore.toFixed(1)),
+            value: parseFloat(question.averageScore.toFixed(1)),
+            participantCount: question.totalResponses,
+            participants: question.totalResponses,
+            count: question.totalResponses,
+            responseCount: question.totalResponses,
+            scaleMax: question.questionType === 'scale' ? 10 : (question.questionType === 'multiple_choice' ? 10 : 1), // Adjust max based on type
+            scale_max: question.questionType === 'scale' ? 10 : (question.questionType === 'multiple_choice' ? 10 : 1),
+            questionType: question.questionType,
+            responseDistribution: question.responseDistribution,
+            timestamp: question.timestamp
+          };
+        } else if (question.questionType === 'boolean') {
+          // Always include boolean questions even if averageScore is null
+          questionsMap[questionId] = {
+            id: questionId,
+            questionId: questionId,
+            slideId: question.slideId,
+            questionTitle: question.questionTitle,
+            title: question.questionTitle,
+            question: question.questionTitle,
+            average: null,
+            avg: null,
+            value: null,
+            participantCount: question.totalResponses,
+            participants: question.totalResponses,
+            count: question.totalResponses,
+            responseCount: question.totalResponses,
+            scaleMax: 1,
+            scale_max: 1,
+            questionType: question.questionType,
+            responseDistribution: question.responseDistribution,
+            timestamp: question.timestamp
+          };
+        }
+        // Handle text questions differently - include summaries instead of scores
+        else if (question.questionType === 'text' && question.totalResponses > 0) {
+          // For text questions, we don't show numerical averages but include the summary
+          questionsMap[questionId] = {
+            id: questionId,
+            questionId: questionId,
+            slideId: question.slideId,
+            questionTitle: question.questionTitle,
+            title: question.questionTitle,
+            question: question.questionTitle,
+            average: null, // No numerical average for text questions
+            avg: null,
+            value: null,
+            participantCount: question.totalResponses,
+            participants: question.totalResponses,
+            count: question.totalResponses,
+            responseCount: question.totalResponses,
+            scaleMax: null, // No scale for text questions
+            scale_max: null,
+            questionType: question.questionType,
+            responseDistribution: question.responseDistribution,
+            textSummary: question.responseDistribution?.summary || 'No summary available',
+            keywords: question.responseDistribution?.keywords || [],
+            sentiment: question.responseDistribution?.sentiment || 'neutral',
+            timestamp: question.timestamp,
+            hasTextResponses: true,
+            isTextQuestion: true // Flag to help frontend handle differently
+          };
+        }
+      });
+      
+      // Enrich boolean questions with user names and accurate counts from session responses
+      try {
+        const sessionParticipants = await storage.getParticipantsBySessionId(resolvedSessionId);
+        const participantIdToName = new Map<string, string>();
+        const validParticipantIds = new Set<string>();
+        for (const p of sessionParticipants) {
+          if (p?.id) {
+            validParticipantIds.add(p.id);
+            participantIdToName.set(p.id, p.displayName || p.email || 'Participant');
+          }
+        }
+
+        // Iterate only boolean questions
+        const booleanEntries = Object.entries(questionsMap).filter(([, q]) => q.questionType === 'boolean');
+        for (const [, q] of booleanEntries) {
+          const slideId = q.slideId;
+          if (!slideId) continue;
+          try {
+            const slideResponses = await storage.getResponsesBySlideId(slideId);
+            // Filter to current session participants
+            const filtered = slideResponses.filter((r: any) => r?.participantId && validParticipantIds.has(r.participantId));
+
+            let yesUsers: string[] = [];
+            let noUsers: string[] = [];
+
+            for (const r of filtered) {
+              const ans = r?.answerJson;
+              let val: boolean | null = null;
+              if (typeof ans === 'boolean') {
+                val = ans;
+              } else if (typeof ans === 'string') {
+                if (ans.toLowerCase() === 'true' || ans.toLowerCase() === 'yes' || ans === '1') val = true;
+                else if (ans.toLowerCase() === 'false' || ans.toLowerCase() === 'no' || ans === '0') val = false;
+              } else if (ans && typeof ans === 'object' && 'value' in ans) {
+                if (typeof (ans as any).value === 'boolean') val = (ans as any).value;
+              }
+
+              const name = participantIdToName.get(r.participantId) || 'Participant';
+              if (val === true) yesUsers.push(name);
+              else if (val === false) noUsers.push(name);
+            }
+
+            const totalCount = yesUsers.length + noUsers.length;
+            // Build enriched distribution even if zeros, so frontend can still render labels
+            const enrichedDistribution = [
+              {
+                option: 'true',
+                optionText: 'Yes',
+                count: yesUsers.length,
+                percentage: totalCount > 0 ? Math.round((yesUsers.length / totalCount) * 100) : 0,
+                users: yesUsers
+              },
+              {
+                option: 'false',
+                optionText: 'No',
+                count: noUsers.length,
+                percentage: totalCount > 0 ? Math.round((noUsers.length / totalCount) * 100) : 0,
+                users: noUsers
+              }
+            ];
+
+            q.responseDistribution = enrichedDistribution;
+            // Keep participantCount as-is from averages; do not override average
+          } catch (enrichErr) {
+            console.warn('Warning: failed to enrich boolean distribution for slide', slideId, enrichErr);
+          }
+        }
+      } catch (enrichOuterErr) {
+        console.warn('Warning: boolean distribution enrichment skipped:', enrichOuterErr);
+      }
+
+      res.json({
+        sessionId: resolvedSessionId,
+        wineId,
+        totalQuestions: questionAverages.length,
+        scaleQuestions: Object.keys(questionsMap).length,
+        questions: questionsMap, // Frontend expects this structure
+        data: questionsMap, // Alternative path for frontend parsing
+        averages: questionsMap, // Another alternative path
+        results: questionAverages, // Keep original for compatibility
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error("Error calculating question averages:", error);
+      res.status(500).json({ 
+        message: "Failed to calculate question averages",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  app.get('/api/sessions/:sessionId/wines/:wineId/comparable-questions', async (req, res) => {
+    try {
+        const { sessionId, wineId } = req.params;
+
+        if (!sessionId || !wineId) {
+            return res.status(400).json({
+            message: "sessionId and wineId parameters are required"
+            });
+        }
+
+        // Fetch comparabel questions for this wine
+        const comparabelQuestions = await storage.getComparabelQuestions(sessionId, wineId);
+
+        if (comparabelQuestions.length === 0) {
+            return res.json({
+            sessionId,
+            wineId,
+            message: "No comparabel questions found for this wine",
+            questions: []
+            });
+        }
+
+        res.json({
+            sessionId,
+            wineId,
+            totalQuestions: comparabelQuestions.length,
+            questions: comparabelQuestions
+        });
+    }
+    catch (error) {
+        console.error("Error fetching comparabel questions:", error);
+        res.status(500).json({
+          message: "Failed to fetch comparabel questions",
+          error: error instanceof Error ? error.message : String(error)
+        });
+    }
+  });
+
+  //endpoint to update comparabel questions for a wine
+  app.put('/api/slides/:slideId/comparable-questions', async (req, res) => {
+    try {
+      const { slideId } = req.params;
+
+      if (!slideId) {
+        return res.status(400).json({ message: "Invalid request data" });
+      }
+
+      // Update the comparable questions for the slide
+      const updatedSlide = await storage.updateSlideComparableQuestions(slideId);
+
+      if (!updatedSlide) {
+        return res.status(404).json({ message: "Slide not found" });
+      }
+
+      res.json(updatedSlide);
+    } catch (error) {
+      console.error("Error updating comparable questions:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  // Step 5: Timer and Skip Option
+  // Note: Step 5 is implemented on the frontend by orchestrating Steps 3 and 4.
+  // When a participant finishes early and the 2-minute timer is running:
+  // - Skip button triggers processTextAnswersAndShowAverages()
+  // - Timer expiry also triggers processTextAnswersAndShowAverages()
+  // - This function calls the Step 3 sentiment-analysis endpoint followed by Step 4 calculate-averages endpoint
+
+  // Data export endpoints
 
   // Export session analytics as CSV
   app.get("/api/sessions/:sessionId/export/csv", async (req, res) => {
@@ -1273,7 +1642,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/slides", async (req, res) => {
     try {
       const validatedData = insertSlideSchema.parse(req.body);
-      console.log(`📝 Creating slide with type: ${validatedData.type}`);
       const slide = await storage.createSlide(validatedData);
       res.json({ slide });
     } catch (error: any) {
@@ -1316,22 +1684,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/slides/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      console.log('🎯 API: PATCH /api/slides/:id received request', {
-        slideId: id,
-        requestBody: req.body,
-        requestBodyKeys: Object.keys(req.body || {}),
-        requestBodySize: JSON.stringify(req.body || {}).length,
-        timestamp: new Date().toISOString()
-      });
       
       const slide = await storage.updateSlide(id, req.body);
-      
-      console.log('✅ API: PATCH /api/slides/:id successful', {
-        slideId: id,
-        updatedSlide: slide,
-        slidePayloadJson: slide?.payloadJson,
-        timestamp: new Date().toISOString()
-      });
       
       res.json({ slide });
     } catch (error) {
@@ -1359,12 +1713,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Update single slide position - using fractional indexing
   app.put("/api/slides/:slideId/position", async (req, res) => {
-    console.log(`🔄 SLIDE POSITION UPDATE:`, {
-      slideId: req.params.slideId,
-      newPosition: req.body.newPosition,
-      timestamp: new Date().toISOString()
-    });
-    
     try {
       const { slideId } = req.params;
       const { newPosition } = req.body;
@@ -1870,6 +2218,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
+
+  // Register dashboard routes
+  registerDashboardRoutes(app);
 
   // Register media proxy routes
   registerMediaProxyRoutes(app);

@@ -25,6 +25,7 @@ import { QuickQuestionBuilder } from '@/components/editor/QuickQuestionBuilder';
 import { SimpleCopyButton } from '@/components/editor/SimpleCopyButton';
 import { PackageIntroCard } from '@/components/editor/PackageIntroCard';
 import { DraggableSlideList } from '@/components/editor/DraggableSlideList';
+import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
@@ -247,6 +248,37 @@ export default function PackageEditor() {
 
   const activeSlide = localSlides.find(s => s.id === activeSlideId);
 
+  const [isComparable, setIsComparable] = useState<boolean>(activeSlide?.comparable ?? false);
+
+  useEffect(() => {
+    setIsComparable(activeSlide?.comparable ?? false);
+
+  }, [activeSlide]);
+
+  const handleComparableToggle = async (checked: boolean) => {
+    setIsComparable(checked);
+    try {
+      await fetch(`/api/slides/${activeSlideId}/comparable-questions`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      //update record in local state
+        setLocalSlides(prevSlides =>
+            prevSlides.map(slide =>
+            slide.id === activeSlideId ? { ...slide, comparable: checked } : slide
+            )
+        );
+    } catch (error) {
+      console.error('Failed to update comparable state:', error);
+        toast({
+            title: "Error updating comparable state",
+            description: error.message,
+            variant: "destructive"
+        });
+    }
+  };
+
   // Navigation functions for preview
   const navigateToSlide = (direction: 'prev' | 'next') => {
     if (!activeSlide) return;
@@ -285,7 +317,7 @@ export default function PackageEditor() {
         return newSet;
       });
       
-      queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
       setIsWineModalOpen(false);
     },
     onError: (error: any) => toast({ title: "Error creating wine", description: error.message, variant: "destructive" }),
@@ -293,8 +325,8 @@ export default function PackageEditor() {
 
   const updateWineMutation = useMutation({
     mutationFn: ({ wineId, data }: { wineId: string; data: any }) => apiRequest('PATCH', `/api/wines/${wineId}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [`/api/packages/${code}/editor`] });
       toast({ title: "Wine updated successfully" });
       setIsWineModalOpen(false);
     },
@@ -1111,6 +1143,28 @@ export default function PackageEditor() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [pendingContentChanges]);
 
+  useEffect(() => {
+    // Store original body styles to restore them later
+    const originalOverflow = document.body.style.overflow;
+    const originalHeight = document.body.style.height;
+    const originalMinHeight = document.body.style.minHeight;
+    const originalMaxHeight = document.body.style.maxHeight;
+
+    // Apply PackageEditor-specific body styles
+    document.body.style.overflow = 'hidden';
+    document.body.style.height = '100vh';
+    document.body.style.minHeight = '100vh';
+    document.body.style.maxHeight = '100vh';
+
+    // Cleanup function to restore original styles
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.height = originalHeight;
+      document.body.style.minHeight = originalMinHeight;
+      document.body.style.maxHeight = originalMaxHeight;
+    };
+  }, []);
+
   const handleQuickAddQuestion = (wineId: string, sectionType: 'intro' | 'deep_dive' | 'ending') => {
     const wine = wines.find(w => w.id === wineId);
     if (wine) {
@@ -1158,7 +1212,6 @@ export default function PackageEditor() {
       // No slides in this section - start at the beginning of the range
       // Special handling for Wine 1 intro to align with backend expectations
       if (winePosition === 1 && currentWineContext.sectionType === 'intro') {
-        // For Wine 1 intro, use a position that aligns with backend calculation
         // Backend calculates: wineBasePosition (1000) + sectionOffset (50) = 1050
         nextPosition = 1050;
       } else {
@@ -1595,7 +1648,7 @@ export default function PackageEditor() {
         )}>
           {/* Editor Panel */}
           <div className={cn(
-            "p-4 sm:p-6 overflow-y-auto",
+            "p-4 sm:p-6 pb-12 overflow-y-auto",
             isMobileView ? "flex-1" : `${isPreviewCollapsed ? 'flex-1' : 'flex-1'}`
           )}>
             {activeSlide ? (() => {
@@ -1604,6 +1657,7 @@ export default function PackageEditor() {
               const slideNumber = wineSlides.findIndex(s => s.id === activeSlide.id) + 1;
               const totalSlidesInWine = wineSlides.length;
               
+              // @ts-ignore
               return (
                 <motion.div key={activeSlide.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                   {/* Enhanced Breadcrumb Navigation */}
@@ -1633,6 +1687,24 @@ export default function PackageEditor() {
                           {activeSlide.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                         </Badge>
                       </div>
+                      {/*let's add a switch here to toggle between the comparable in database current question*/}
+                      {/*TODO: add toggle here*/}
+
+                      {
+                        activeSlide.type !== 'video_message' && activeSlide.type !== 'audio_message' && activeSlide.type !=='interlude' && (
+                            <div className="flex items-center gap-2 my-2">
+                              <label htmlFor="comparable-switch" className="text-white/80 text-sm">
+                                Make answers comparable in Slides
+                              </label>
+                              <Switch
+                                  id="comparable-switch"
+                                  checked={isComparable}
+                                  onCheckedChange={handleComparableToggle}
+                              />
+                            </div>
+                        )
+                      }
+
                     </div>
                   </div>
                   
@@ -1877,8 +1949,12 @@ export default function PackageEditor() {
           mode={editingWine ? 'edit' : 'create'}
           wine={editingWine}
           packageId={editorData.id}
-          onClose={() => { setIsWineModalOpen(false); setEditingWine(null); }}
+          onClose={() => { 
+            if (createWineMutation.isPending || updateWineMutation.isPending) return;
+            setIsWineModalOpen(false); setEditingWine(null); 
+          }}
           onSave={handleWineSave}
+          isLoading={createWineMutation.isPending || updateWineMutation.isPending}
         />
       )}
 

@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+console.log(`supabase service role set for ${supabaseUrl} - ${supabaseUrl && supabaseServiceRole ? 'yes' : 'no'}`);
 // Lazy initialization of Supabase client
 let supabaseStorage: ReturnType<typeof createClient> | null = null;
 

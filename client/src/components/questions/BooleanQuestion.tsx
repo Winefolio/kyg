@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import {useState, useMemo, useEffect} from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,15 +22,36 @@ interface BooleanQuestionProps {
   };
   value: boolean | null;
   onChange: (value: boolean) => void;
+  setDisableNext?: (disabled: boolean) => void;
 }
 
-export function BooleanQuestion({ question, value, onChange }: BooleanQuestionProps) {
+export function BooleanQuestion({ question, value, onChange, setDisableNext }: BooleanQuestionProps) {
   const trueLabel = question.trueLabel || 'Yes';
   const falseLabel = question.falseLabel || 'No';
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
   const glossaryContext = useGlossarySafe();
   const terms = glossaryContext?.terms || [];
   const { triggerHaptic } = useHaptics();
+
+  useEffect(() => {
+    if (value !== null && setDisableNext) {
+      onChange(value);
+    }else if (setDisableNext){
+      setDisableNext(true);
+    }
+
+    return () => {
+      if (setDisableNext) {
+        setDisableNext(false)
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (setDisableNext && value !== null) {
+      setDisableNext(false);
+    }
+  }, [value]);
   
   // Extract all relevant glossary terms from the current slide content
   const relevantTerms = useMemo(() => {

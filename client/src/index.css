@@ -269,3 +269,26 @@ input:focus, textarea:focus, button:focus {
   --button-padding-y: clamp(0.5rem, 2vw, 1rem);
 }
 
+@media (max-width: 400px) {
+  .hide-on-xs {
+    display: none !important;
+  }
+}
+
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #2e5270;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(99, 40, 218, 0.89);
+  border-radius: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

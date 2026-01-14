@@ -17,6 +17,7 @@ import {
   type InsertMedia,
   type GlossaryTerm,
   type InsertGlossaryTerm,
+  type SommelierTips,
   packages,
   packageWines,
   slides,
@@ -27,10 +28,14 @@ import {
   media,
   glossaryTerms,
   wineCharacteristics,
+  wineResponseAnalytics,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull, isNotNull } from "drizzle-orm";
 import crypto from "crypto";
+import fs from "fs/promises";
+import path from "path";
+import OpenAI from "openai";
 import { 
   updateSlidePositionSafely, 
   calculateNewSlidePosition, 
@@ -135,6 +140,14 @@ export interface IStorage {
   getAggregatedSessionAnalytics(sessionId: string): Promise<any>;
   getParticipantAnalytics(sessionId: string, participantId: string): Promise<any>;
   getSessionResponses(sessionId: string): Promise<any[]>;
+  getSessionCompletionStatus(sessionId: string, wineId: string): Promise<any>;
+  
+  // Sentiment analysis methods
+  getWineTextResponses(sessionId: string, wineId: string): Promise<any[]>;
+  saveSentimentAnalysis(sessionId: string, wineId: string, results: any[]): Promise<void>;
+  
+  // Step 4: Average calculation methods
+  calculateWineQuestionAverages(sessionId: string, wineId: string): Promise<any[]>;
 
   // Package management for sommelier dashboard
   getAllPackages(): Promise<Package[]>;
@@ -172,9 +185,25 @@ export interface IStorage {
   updateMediaLastAccessed(id: string): Promise<void>;
   deleteMedia(id: string): Promise<void>;
   generateUniqueMediaPublicId(): Promise<string>;
+
+  // User Dashboard
+  getAllParticipantsByEmail(email: string): Promise<Participant[]>;
+  getUserDashboardData(email: string): Promise<any>;
+  getUserWineScores(email: string): Promise<any>;
+  getUserTastingHistory(email: string, options: { limit: number; offset: number }): Promise<any>;
+  getUserSommelierFeedback(email: string): Promise<string[]>;
+
+  // LLM Integration
+  generateSommelierTips(email: string): Promise<SommelierTips>;
+
+  // Score calculation
+  calculateAverageScore(userResponses: Response[]): number;
 }
 
 export class DatabaseStorage implements IStorage {
+  // In-memory storage for sentiment analysis results
+  private sentimentAnalysisResults: Map<string, any[]> = new Map();
+  
   constructor() {
     this.initializeWineTastingData();
   }
@@ -457,7 +486,7 @@ export class DatabaseStorage implements IStorage {
 
     // Create package introduction slide for the first wine (acts as package intro)
     const firstWine = [chateauMargaux, chateauLatour, chateauYquem, brunello, chianti, opusOne, screamingEagle][0];
-    
+
     // Create package introduction slide (position 1)
     await this.createSlide({
       packageWineId: firstWine.id,
@@ -475,7 +504,7 @@ export class DatabaseStorage implements IStorage {
 
     // Create slides for all wines with proper positioning
     let globalPosition = 2; // Start after package intro
-    
+
     for (const wine of [chateauMargaux, chateauLatour, chateauYquem, brunello, chianti, opusOne, screamingEagle]) {
       // Create wine introduction slide first
       await this.createSlide({
@@ -499,7 +528,7 @@ export class DatabaseStorage implements IStorage {
       // Create remaining slides for this wine
       for (const slideTemplate of slideTemplates.slice(1)) { // Skip the first template since we created wine intro
         let payloadJson = { ...slideTemplate.payloadJson };
-        
+
         // Add wine context to all slides
         payloadJson = {
           ...payloadJson,
@@ -564,7 +593,7 @@ export class DatabaseStorage implements IStorage {
       }
       attempts++;
     }
-    
+
     // Fallback if a unique code can't be generated
     console.error(
       `Failed to generate a unique ${length}-char code after ${maxAttempts} attempts. Falling back.`,
@@ -587,9 +616,9 @@ export class DatabaseStorage implements IStorage {
         sommelierId: pkg.sommelierId,
       })
       .returning();
-    
+
     const newPackage = result[0];
-    
+
     // Create package introduction slide directly attached to the package
     await this.createPackageSlide({
       packageId: newPackage.id,
@@ -605,7 +634,7 @@ export class DatabaseStorage implements IStorage {
         background_image: (pkg as any).imageUrl || ""
       },
     });
-    
+
     return newPackage;
   }
 
@@ -624,9 +653,9 @@ export class DatabaseStorage implements IStorage {
         vintage: wine.vintage,
       })
       .returning();
-    
+
     const newWine = result[0];
-    
+
     // Don't create intro slide for the special "Package Introduction" wine
     if (wine.wineName !== "Package Introduction") {
       // Create wine introduction slide
@@ -648,7 +677,7 @@ export class DatabaseStorage implements IStorage {
         },
       });
     }
-    
+
     return newWine;
   }
 
@@ -707,7 +736,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(slides.packageId, slide.packageId))
         .orderBy(desc(slides.position))
         .limit(1);
-      
+
       targetPosition = (existingSlides[0]?.position || 0) + 1;
     }
 
@@ -727,7 +756,7 @@ export class DatabaseStorage implements IStorage {
         genericQuestions: slide.genericQuestions,
       })
       .returning();
-    
+
     return result[0];
   }
 
@@ -742,7 +771,7 @@ export class DatabaseStorage implements IStorage {
       // Provide minimal default payload for empty objects
       slide.payloadJson = this.getDefaultPayloadForSlideType(slide.type);
     }
-    
+
     // Log slide creation for debugging
     console.log('[SLIDE_CREATE] Creating slide:', {
       type: slide.type,
@@ -750,36 +779,36 @@ export class DatabaseStorage implements IStorage {
       position: slide.position,
       payloadKeys: Object.keys(slide.payloadJson)
     });
-    
+
     // For wine-specific slides, get the wine to determine global position
     if (!slide.packageWineId) {
       throw new Error('createSlide requires packageWineId. Use createPackageSlide for package-level slides.');
     }
-    
+
     const wine = await db
       .select()
       .from(packageWines)
       .where(eq(packageWines.id, slide.packageWineId))
       .limit(1);
-    
+
     if (!wine[0]) {
       throw new Error('Wine not found');
     }
 
     // Calculate global position based on wine position
     let targetGlobalPosition: number;
-    
+
     // Special handling for package intro (position 0)
     if (slide.payloadJson?.is_package_intro) {
       targetGlobalPosition = 0;
     } else {
       // Calculate base position for this wine
       const wineBasePosition = wine[0].position * 1000;
-      
+
       // Add section offset
       let sectionOffset = 0;
       const sectionType = slide.section_type || 'intro'; // Default to intro if not specified
-      
+
       if (sectionType === 'intro') {
         sectionOffset = slide.payloadJson?.is_wine_intro ? 10 : 50; // Wine intro at 10, other intros after
       } else if (sectionType === 'deep_dive') {
@@ -787,7 +816,7 @@ export class DatabaseStorage implements IStorage {
       } else if (sectionType === 'ending' || sectionType === 'conclusion') {
         sectionOffset = 200;
       }
-      
+
       // Find the next available position in this section
       const existingSlides = await db
         .select({ globalPosition: slides.globalPosition })
@@ -801,10 +830,10 @@ export class DatabaseStorage implements IStorage {
         )
         .orderBy(desc(slides.globalPosition))
         .limit(1);
-      
+
       const lastPositionInSection = existingSlides[0]?.globalPosition || (wineBasePosition + sectionOffset);
-      targetGlobalPosition = lastPositionInSection === (wineBasePosition + sectionOffset) 
-        ? wineBasePosition + sectionOffset 
+      targetGlobalPosition = lastPositionInSection === (wineBasePosition + sectionOffset)
+        ? wineBasePosition + sectionOffset
         : lastPositionInSection + 10; // Use 10 as gap
     }
 
@@ -816,17 +845,17 @@ export class DatabaseStorage implements IStorage {
         .where(eq(slides.packageWineId, slide.packageWineId!))
         .orderBy(desc(slides.position))
         .limit(1);
-      
+
       targetPosition = (existingSlides[0]?.position || 0) + 1;
     }
-    
+
     // Check for existing slide with same globalPosition to prevent conflicts
     const conflictCheck = await db
       .select({ id: slides.id })
       .from(slides)
       .where(eq(slides.globalPosition, targetGlobalPosition))
       .limit(1);
-    
+
     if (conflictCheck.length > 0) {
       console.log(`[SLIDE_CREATE] Position conflict detected at globalPosition ${targetGlobalPosition}, finding next available`);
       // Find next available globalPosition
@@ -840,7 +869,7 @@ export class DatabaseStorage implements IStorage {
           )
         )
         .orderBy(asc(slides.globalPosition));
-      
+
       // Find gap in positions
       let newGlobalPosition = targetGlobalPosition;
       for (const existing of nextAvailable) {
@@ -890,49 +919,49 @@ export class DatabaseStorage implements IStorage {
           section_type: slide.section_type
         }
       });
-      
+
       // Check for specific constraint violations
       if (dbError.code === '23505') { // Unique constraint violation
         throw new Error(`Position conflict: A slide already exists at position ${targetPosition} for this wine. Please try again.`);
       }
-      
+
       // Re-throw with more context
       throw new Error(`Failed to create slide: ${dbError.message || 'Database error'}`);
     }
-    
+
     const newSlide = result[0];
-    
+
     // Check for orphaned media records that need to be linked to this slide
     // Look for temporary IDs in the payload that might have associated media
     const payloadStr = JSON.stringify(slide.payloadJson);
     const tempIdPattern = /temp-question-\d+/g;
     const tempIds = payloadStr.match(tempIdPattern) || [];
-    
+
     if (tempIds.length > 0) {
       console.log(`[SLIDE_CREATE] Found temporary IDs in payload, checking for orphaned media: ${tempIds.join(', ')}`);
-      
+
       for (const tempId of tempIds) {
         await this.updateMediaEntityId(tempId, newSlide.id, 'slide');
       }
     }
-    
+
     // Also check for media with publicId references in the payload
     if (slide.payloadJson) {
       const publicIds: string[] = [];
-      
+
       // Check for video/audio publicId fields
       if (slide.payloadJson.video_publicId) publicIds.push(slide.payloadJson.video_publicId);
       if (slide.payloadJson.audio_publicId) publicIds.push(slide.payloadJson.audio_publicId);
-      
+
       if (publicIds.length > 0) {
         console.log(`[SLIDE_CREATE] Found media publicIds in payload, updating entity references: ${publicIds.join(', ')}`);
-        
+
         for (const publicId of publicIds) {
           await this.updateMediaByPublicId(publicId, newSlide.id);
         }
       }
     }
-    
+
     return newSlide;
   }
 
@@ -948,15 +977,15 @@ export class DatabaseStorage implements IStorage {
             eq(sql`metadata->>'originalEntityId'`, originalEntityId)
           )
         );
-      
+
       if (orphanedMedia.length > 0) {
         console.log(`[MEDIA_UPDATE] Found ${orphanedMedia.length} orphaned media records for ${originalEntityId}`);
-        
+
         // Update each media record with the real entity ID
         for (const record of orphanedMedia) {
           await db
             .update(media)
-            .set({ 
+            .set({
               entityId: newEntityId,
               metadata: {
                 ...(record.metadata || {}),
@@ -966,7 +995,7 @@ export class DatabaseStorage implements IStorage {
               }
             })
             .where(eq(media.id, record.id));
-          
+
           console.log(`[MEDIA_UPDATE] Updated media ${record.publicId} from temp ID ${originalEntityId} to slide ${newEntityId}`);
         }
       }
@@ -980,7 +1009,7 @@ export class DatabaseStorage implements IStorage {
     try {
       const result = await db
         .update(media)
-        .set({ 
+        .set({
           entityId: newEntityId,
           metadata: sql`jsonb_set(metadata, '{linkedAt}', to_jsonb(now()::text))`
         })
@@ -990,7 +1019,7 @@ export class DatabaseStorage implements IStorage {
             isNull(media.entityId) // Only update if not already linked
           )
         );
-      
+
       console.log(`[MEDIA_UPDATE] Updated media ${publicId} to entity ${newEntityId}`);
     } catch (error) {
       console.error(`[MEDIA_UPDATE] Error updating media by publicId:`, error);
@@ -1152,7 +1181,7 @@ export class DatabaseStorage implements IStorage {
       displayName: participant.displayName,
       isHost: participant.isHost
     });
-    
+
     // Validate sessionId is a proper UUID before insertion
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!participant.sessionId || !uuidRegex.test(participant.sessionId)) {
@@ -1163,7 +1192,7 @@ export class DatabaseStorage implements IStorage {
       });
       throw new Error(`Invalid sessionId format: ${participant.sessionId}. Expected UUID format.`);
     }
-    
+
     try {
       console.log(`[STORAGE] Creating participant with data:`, JSON.stringify({
         sessionId: participant.sessionId,
@@ -1171,7 +1200,7 @@ export class DatabaseStorage implements IStorage {
         displayName: participant.displayName,
         isHost: participant.isHost || false
       }, null, 2));
-      
+
       // Log the exact values being inserted
       const insertValues = {
         sessionId: participant.sessionId,
@@ -1180,18 +1209,18 @@ export class DatabaseStorage implements IStorage {
         isHost: participant.isHost || false,
         progressPtr: participant.progressPtr || 0,
       };
-      
+
       console.log(`[STORAGE_TRACE] About to insert participant with values:`, JSON.stringify(insertValues, null, 2));
-      
+
       const result = await db
         .insert(participants)
         .values(insertValues)
         .returning();
-        
+
       if (!result || result.length === 0) {
         throw new Error('Failed to create participant - no record returned from database');
       }
-        
+
       console.log(`[STORAGE] Successfully created participant: ${result[0].id}`);
       return result[0];
     } catch (error: any) {
@@ -1279,11 +1308,22 @@ export class DatabaseStorage implements IStorage {
 
   async getResponsesByParticipantId(
     participantId: string,
-  ): Promise<Response[]> {
-    return await db
-      .select()
+  ): Promise<(Response & { package_wine_id: string })[]> {
+    const results = await db
+      .select(
+        {
+          response: responses,
+          packageWineId: slides.packageWineId
+        }
+      )
       .from(responses)
+      .leftJoin(slides, eq(responses.slideId, slides.id))
       .where(eq(responses.participantId, participantId));
+
+    return results.map(result => ({
+      ...result.response,
+      package_wine_id: result.packageWineId || ''
+    }));
   }
 
   async getResponsesBySlideId(slideId: string): Promise<Response[]> {
@@ -1347,9 +1387,9 @@ export class DatabaseStorage implements IStorage {
     // 4. Fetch all package wines and their slides for this package (optimized)
     const packageWines = await this.getPackageWines(session.packageId!);
     const wineIds = packageWines.map(w => w.id);
-    
+
     // Get all slides for all wines in one query
-    const sessionSlides = wineIds.length > 0 
+    const sessionSlides = wineIds.length > 0
       ? await db
           .select()
           .from(slides)
@@ -1459,31 +1499,31 @@ export class DatabaseStorage implements IStorage {
         // Process scale questions with validation
         const scaleMin = slidePayload.scale_min || slidePayload.min_value || 1;
         const scaleMax = slidePayload.scale_max || slidePayload.max_value || 10;
-        
+
         const scores = slideResponses
           .map((response) => {
             const answerData = response.answerJson as any;
             let rawValue: number | null = null;
-            
+
             // Extract numeric value from different answer formats
             if (typeof answerData === "number") {
               rawValue = answerData;
             } else if (typeof answerData === "object" && answerData !== null && typeof answerData.value === "number") {
               rawValue = answerData.value;
             }
-            
+
             // Validate and clamp the value to scale bounds
             if (rawValue !== null) {
               const clampedValue = Math.max(scaleMin, Math.min(scaleMax, rawValue));
-              
+
               // Log if we had to clamp the value (indicates data corruption)
               if (clampedValue !== rawValue) {
                 console.warn(`🔧 Analytics: Scale value clamped from ${rawValue} to ${clampedValue} (scale: ${scaleMin}-${scaleMax})`);
               }
-              
+
               return clampedValue;
             }
-            
+
             return null;
           })
           .filter((score): score is number => score !== null);
@@ -1558,7 +1598,7 @@ export class DatabaseStorage implements IStorage {
     if (!participant) {
       throw new Error("Participant not found");
     }
-    
+
     // CRITICAL FIX: Compare against resolved session.id, not input sessionId
     if (participant.sessionId !== session.id) {
       throw new Error("Participant not found");
@@ -1593,7 +1633,7 @@ export class DatabaseStorage implements IStorage {
         const answer = r.answerJson as any;
         return answer && answer.notes && answer.notes.trim().length > 0;
       }).length,
-      sessionDuration: participant.lastActive && session.startedAt 
+      sessionDuration: participant.lastActive && session.startedAt
         ? Math.round((new Date(participant.lastActive).getTime() - new Date(session.startedAt).getTime()) / 60000)
         : 0
     };
@@ -1601,7 +1641,7 @@ export class DatabaseStorage implements IStorage {
     // 6. Generate wine-by-wine breakdown with comparisons
     const wineBreakdowns = packageWines.map(wine => {
       const wineSlides = allSlides.filter(slide => slide.packageWineId === wine.id && slide.type === "question");
-      const wineResponses = participantResponses.filter(response => 
+      const wineResponses = participantResponses.filter(response =>
         wineSlides.some(slide => slide.id === response.slideId)
       );
 
@@ -1611,19 +1651,19 @@ export class DatabaseStorage implements IStorage {
         const slidePayload = slide.payloadJson as any;
 
         let comparison = null;
-        
+
         // Always create a comparison object if user has answered, even without group data
         if (participantResponse) {
           if (slidePayload.question_type === "scale") {
-            const userAnswer = typeof participantResponse.answerJson === "number" 
-              ? participantResponse.answerJson 
+            const userAnswer = typeof participantResponse.answerJson === "number"
+              ? participantResponse.answerJson
               : (participantResponse.answerJson as any)?.value || 0;
-            
+
             if (slideAnalytics && slideAnalytics.aggregatedData.averageScore !== undefined) {
               // Group data available - calculate comparison
               const groupAverage = slideAnalytics.aggregatedData.averageScore;
               const difference = Math.abs(userAnswer - groupAverage);
-              
+
               // More nuanced alignment calculation
               let alignment: string;
               let alignmentLevel: string;
@@ -1643,7 +1683,7 @@ export class DatabaseStorage implements IStorage {
                 alignment = "unique";
                 alignmentLevel = "Unique Perspective";
               }
-              
+
               comparison = {
                 yourAnswer: userAnswer,
                 groupAverage: groupAverage,
@@ -1669,7 +1709,7 @@ export class DatabaseStorage implements IStorage {
             const userSelections = (participantResponse.answerJson as any)?.selected || [];
             const userSelectionsArray = Array.isArray(userSelections) ? userSelections : [userSelections];
             const optionsSummary = slideAnalytics?.aggregatedData?.optionsSummary || [];
-            
+
             if (optionsSummary.length === 0 || !slideAnalytics) {
               // No group data - show skeleton with user's answer only
               // Get option text from slide payload
@@ -1678,7 +1718,7 @@ export class DatabaseStorage implements IStorage {
                 const option = options.find((opt: any) => opt.id === id);
                 return option?.text || id;
               });
-              
+
               comparison = {
                 yourAnswer: userSelectionsArray,
                 yourAnswerText: userAnswerTexts,
@@ -1694,11 +1734,11 @@ export class DatabaseStorage implements IStorage {
               const sortedOptions = optionsSummary.sort((a: any, b: any) => b.percentage - a.percentage);
               const topTwoOptions = sortedOptions.slice(0, 2);
               const top50PercentOptions = sortedOptions.filter((opt: any) => opt.percentage >= 10); // At least 10% popularity
-              
+
               // Calculate alignment score
               let matchedPopularChoices = 0;
               let totalPopularityMatched = 0;
-              
+
               userSelectionsArray.forEach((userChoice: string) => {
                 const matchedOption = sortedOptions.find((opt: any) => opt.optionId === userChoice);
                 if (matchedOption) {
@@ -1708,18 +1748,18 @@ export class DatabaseStorage implements IStorage {
                   }
                 }
               });
-              
+
               // Determine alignment level
               let alignment: string;
               let alignmentLevel: string;
-              
+
               if (matchedPopularChoices >= 2) {
                 alignment = "strong_consensus";
                 alignmentLevel = "Strong Consensus";
               } else if (userSelectionsArray.includes(sortedOptions[0]?.optionId)) {
                 alignment = "agrees";
                 alignmentLevel = "Aligned";
-              } else if (userSelectionsArray.some((choice: string) => 
+              } else if (userSelectionsArray.some((choice: string) =>
                 top50PercentOptions.find((opt: any) => opt.optionId === choice))) {
                 alignment = "partial";
                 alignmentLevel = "Partial Alignment";
@@ -1727,7 +1767,7 @@ export class DatabaseStorage implements IStorage {
                 alignment = "unique";
                 alignmentLevel = "Unique Taste";
               }
-              
+
               comparison = {
                 yourAnswer: userSelectionsArray,
                 mostPopular: sortedOptions[0]?.optionText || "N/A",
@@ -1790,17 +1830,17 @@ export class DatabaseStorage implements IStorage {
     if (slidePayload.question_type === "scale") {
       const diff = Math.abs(comparison.differenceFromGroup);
       if (diff <= 0.5) return "You aligned closely with the group average";
-      if (diff <= 1.5) return comparison.differenceFromGroup > 0 
-        ? "You rated this higher than most" 
+      if (diff <= 1.5) return comparison.differenceFromGroup > 0
+        ? "You rated this higher than most"
         : "You rated this lower than most";
-      return comparison.differenceFromGroup > 0 
-        ? "You detected much stronger intensity than others" 
+      return comparison.differenceFromGroup > 0
+        ? "You detected much stronger intensity than others"
         : "You found this more subtle than most participants";
     }
 
     if (slidePayload.question_type === "multiple_choice") {
-      return comparison.alignment === "agrees" 
-        ? "You agreed with the majority choice" 
+      return comparison.alignment === "agrees"
+        ? "You agreed with the majority choice"
         : "You had a unique perspective compared to others";
     }
 
@@ -1825,15 +1865,15 @@ export class DatabaseStorage implements IStorage {
 
     const averageRating = scaleResponses.reduce((sum, r) => {
       let rawValue = typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5;
-      
+
       // Validate and clamp scale values to expected range (1-10)
       const clampedValue = Math.max(1, Math.min(10, rawValue));
-      
+
       // Log if we had to clamp the value (indicates data corruption)
       if (clampedValue !== rawValue) {
         console.warn(`🔧 Personality: Scale value clamped from ${rawValue} to ${clampedValue}`);
       }
-      
+
       return sum + clampedValue;
     }, 0) / scaleResponses.length;
 
@@ -1847,7 +1887,7 @@ export class DatabaseStorage implements IStorage {
       };
     } else if (averageRating <= 4.5) {
       return {
-        type: "Subtle Sophisticate", 
+        type: "Subtle Sophisticate",
         description: "You prefer elegant, nuanced wines with delicate complexity",
         characteristics: ["Values subtlety", "Appreciates nuance", "Refined taste"]
       };
@@ -1886,7 +1926,7 @@ export class DatabaseStorage implements IStorage {
     if (notesCount >= 3) {
       achievements.push({
         id: "detailed_notes",
-        name: "Detail Master", 
+        name: "Detail Master",
         description: "Added personal notes to multiple questions",
         icon: "📝",
         rarity: "rare"
@@ -1905,15 +1945,15 @@ export class DatabaseStorage implements IStorage {
       const slideAnalytics = sessionAnalytics.slidesAnalytics.find((s: any) => s.slideId === response.slideId);
       if (slideAnalytics) {
         let rawUserAnswer = typeof response.answerJson === "number" ? response.answerJson : (response.answerJson as any)?.value || 0;
-        
+
         // Validate and clamp user answer to expected scale range (1-10)
         const userAnswer = Math.max(1, Math.min(10, rawUserAnswer));
-        
+
         // Log if we had to clamp the value (indicates data corruption)
         if (userAnswer !== rawUserAnswer) {
           console.warn(`🔧 Achievements: Scale value clamped from ${rawUserAnswer} to ${userAnswer}`);
         }
-        
+
         const groupAverage = slideAnalytics.aggregatedData.averageScore || 0;
         if (Math.abs(userAnswer - groupAverage) <= 1) {
           alignmentCount++;
@@ -1947,15 +1987,15 @@ export class DatabaseStorage implements IStorage {
     if (tanninResponses.length > 0) {
       const avgTanninRating = tanninResponses.reduce((sum, r) => {
         let rawValue = typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5;
-        
+
         // Validate and clamp tannin values to expected scale (1-10)
         const clampedValue = Math.max(1, Math.min(10, rawValue));
-        
+
         // Log if we had to clamp the value (indicates data corruption)
         if (clampedValue !== rawValue) {
           console.warn(`🔧 Tannin insight: Scale value clamped from ${rawValue} to ${clampedValue}`);
         }
-        
+
         return sum + clampedValue;
       }, 0) / tanninResponses.length;
 
@@ -1981,20 +2021,20 @@ export class DatabaseStorage implements IStorage {
     if (scaleResponses.length >= 3) {
       const values = scaleResponses.map(r => {
         let rawValue = typeof r.answerJson === "number" ? r.answerJson : (r.answerJson as any)?.value || 5;
-        
+
         // Validate and clamp scale values to expected range (1-10)
         const clampedValue = Math.max(1, Math.min(10, rawValue));
-        
+
         // Log if we had to clamp the value (indicates data corruption)
         if (clampedValue !== rawValue) {
           console.warn(`🔧 Insights: Scale value clamped from ${rawValue} to ${clampedValue}`);
         }
-        
+
         return clampedValue;
       });
       const avg = values.reduce((a, b) => a + b, 0) / values.length;
       const variance = values.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / values.length;
-      
+
       if (variance < 2) {
         insights.push("You have a consistent tasting approach across different characteristics");
       } else {
@@ -2036,7 +2076,7 @@ export class DatabaseStorage implements IStorage {
 
   private async initializeGlossaryTerms() {
     console.log("Initializing wine glossary terms...");
-    
+
     const wineTerms = [
       // General Wine Terminology
       {
@@ -2211,12 +2251,12 @@ export class DatabaseStorage implements IStorage {
       const answerJson = response.answerJson as any;
       const questionType = slidePayload?.questionType || 'unknown';
       const slideTitle = slidePayload?.title || slidePayload?.question || 'Untitled Question';
-      
+
       // Extract answer based on question type
       let selectedOptionText = '';
       let scaleValue = null;
       let notes = '';
-      
+
       if (answerJson) {
         if (questionType === 'multiple_choice' && answerJson.selectedOptionId) {
           const selectedOption = slidePayload?.options?.find((opt: any) => opt.id === answerJson.selectedOptionId);
@@ -2226,7 +2266,7 @@ export class DatabaseStorage implements IStorage {
         }
         notes = answerJson.notes || '';
       }
-      
+
       return {
         participantName: response.participantName,
         participantEmail: response.participantEmail,
@@ -2241,10 +2281,1031 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  // Get completion status for all participants in a session for a specific wine
+  async getSessionCompletionStatus(sessionId: string, wineId: string): Promise<any> {
+    // 1. Validate session exists and get the actual session UUID
+    const session = await this.getSessionById(sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    // Use the actual session UUID for subsequent queries
+    const actualSessionId = session.id;
+
+    // 2. Get all participants for this session
+    const allSessionParticipants = await db
+      .select()
+      .from(participants)
+      .where(eq(participants.sessionId, actualSessionId));
+
+    // Separate host and non-host participants
+    const hostParticipants = allSessionParticipants.filter(p => p.isHost);
+    const nonHostParticipants = allSessionParticipants.filter(p => !p.isHost);
+
+    // 3. Get all question slides for this specific wine
+    const wineQuestionSlides = await db
+      .select({
+        id: slides.id,
+        position: slides.position,
+        globalPosition: slides.globalPosition
+      })
+      .from(slides)
+      .where(and(
+        eq(slides.packageWineId, wineId),
+        eq(slides.type, "question")
+      ))
+      .orderBy(slides.globalPosition);
+
+    if (wineQuestionSlides.length === 0) {
+      return {
+        sessionId,
+        wineId,
+        totalParticipants: allSessionParticipants.length,
+        completedParticipants: [],
+        pendingParticipants: allSessionParticipants.map((p: any) => ({
+          id: p.id,
+          displayName: p.displayName,
+          email: p.email,
+          questionsAnswered: 0,
+          totalQuestions: 0
+        })),
+        allCompleted: false,
+        allParticipantsCompleted: false,
+        allNonHostParticipantsCompleted: false,
+        completedNonHostParticipants: 0,
+        totalNonHostParticipants: nonHostParticipants.length,
+        completionPercentage: 0
+      };
+    }
+
+    const slideIds = wineQuestionSlides.map(s => s.id);
+    const totalQuestions = wineQuestionSlides.length;
+
+    // 4. Get all responses from all participants for these wine question slides
+    const wineResponses = await db
+      .select({
+        participantId: responses.participantId,
+        slideId: responses.slideId
+      })
+      .from(responses)
+      .where(and(
+        inArray(responses.participantId, allSessionParticipants.map((p: any) => p.id)),
+        inArray(responses.slideId, slideIds)
+      ));
+
+    // 5. Calculate completion status for each participant
+    const participantCompletionMap = new Map();
+
+    // Initialize all participants with zero responses
+    allSessionParticipants.forEach((participant: any) => {
+      participantCompletionMap.set(participant.id, {
+        id: participant.id,
+        displayName: participant.displayName,
+        email: participant.email,
+        isHost: participant.isHost,
+        questionsAnswered: 0,
+        totalQuestions,
+        completedAt: null
+      });
+    });
+
+    // Count responses for each participant
+    wineResponses.forEach(response => {
+      const participantData = participantCompletionMap.get(response.participantId);
+      if (participantData) {
+        participantData.questionsAnswered += 1;
+      }
+    });
+
+    // 6. Separate completed and pending participants
+    const completedParticipants: any[] = [];
+    const pendingParticipants: any[] = [];
+    const completedNonHostParticipants: any[] = [];
+    const completedHostParticipants: any[] = [];
+
+    participantCompletionMap.forEach(participantData => {
+      if (participantData.questionsAnswered >= totalQuestions) {
+        completedParticipants.push(participantData);
+        if (participantData.isHost) {
+          completedHostParticipants.push(participantData);
+        } else {
+          completedNonHostParticipants.push(participantData);
+        }
+      } else {
+        pendingParticipants.push(participantData);
+      }
+    });
+
+    // Calculate various completion statuses
+    const allParticipantsCompleted = completedParticipants.length === allSessionParticipants.length;
+    const allNonHostParticipantsCompleted = completedNonHostParticipants.length === nonHostParticipants.length && nonHostParticipants.length > 0;
+
+    const completionPercentage = allSessionParticipants.length > 0
+      ? Math.round((completedParticipants.length / allSessionParticipants.length) * 100)
+      : 0;
+
+    return {
+      sessionId: actualSessionId,
+      originalSessionId: sessionId, // Keep the original input for reference
+      wineId,
+      totalParticipants: allSessionParticipants.length,
+      completedParticipants,
+      pendingParticipants,
+      allCompleted: allParticipantsCompleted, // Legacy field
+      allParticipantsCompleted,
+      allNonHostParticipantsCompleted,
+      completedNonHostParticipants: completedNonHostParticipants.length,
+      totalNonHostParticipants: nonHostParticipants.length,
+      completionPercentage,
+      wineQuestions: {
+        totalQuestions,
+        questionSlides: wineQuestionSlides
+      }
+    };
+  }
+
+  // Sentiment analysis methods for Step 3
+  async getWineTextResponses(sessionId: string, wineId: string): Promise<any[]> {
+    // 1. Get session and validate
+    const session = await this.getSessionById(sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    // Use the actual session UUID for database queries
+    const actualSessionId = session.id;
+
+    // 2. Get all participants for this session (excluding hosts)
+    const sessionParticipants = await db
+      .select()
+      .from(participants)
+      .where(and(
+        eq(participants.sessionId, actualSessionId),
+        eq(participants.isHost, false)
+      ));
+
+    if (sessionParticipants.length === 0) {
+      return [];
+    }
+
+    // 3. Get all text question slides for this wine
+    const textQuestionSlides = await db
+      .select({
+        id: slides.id,
+        payloadJson: slides.payloadJson,
+        genericQuestions: slides.genericQuestions
+      })
+      .from(slides)
+      .where(and(
+        eq(slides.packageWineId, wineId),
+        eq(slides.type, "question")
+      ));
+
+    // Filter to only text questions
+    const textSlides = textQuestionSlides.filter(slide => {
+      // Check generic questions format
+      if (slide.genericQuestions && typeof slide.genericQuestions === 'object') {
+        const genericQ = slide.genericQuestions as any;
+        if (genericQ.format === 'text') {
+          return true;
+        }
+      }
+
+      // Check legacy payloadJson format
+      const payload = slide.payloadJson as any;
+      return payload?.questionType === 'text' ||
+             payload?.question_type === 'text' ||
+             payload?.questionType === 'free_response' ||
+             payload?.question_type === 'free_response';
+    });
+
+    if (textSlides.length === 0) {
+      return [];
+    }
+
+    const textSlideIds = textSlides.map(s => s.id);
+
+    // 4. Get all text responses from participants for these slides
+    const textResponses = await db
+      .select({
+        slideId: responses.slideId,
+        participantId: responses.participantId,
+        answerJson: responses.answerJson,
+        createdAt: responses.answeredAt,
+        participant: {
+          displayName: participants.displayName,
+          email: participants.email
+        }
+      })
+      .from(responses)
+      .leftJoin(participants, eq(responses.participantId, participants.id))
+      .where(and(
+        inArray(responses.participantId, sessionParticipants.map(p => p.id)),
+        inArray(responses.slideId, textSlideIds)
+      ))
+      .orderBy(responses.answeredAt);
+
+    // 5. Format responses for sentiment analysis
+    return textResponses.map(response => {
+      const slide = textSlides.find(s => s.id === response.slideId);
+      let questionText = 'Unknown Question';
+
+      if (slide?.genericQuestions && typeof slide.genericQuestions === 'object') {
+        const genericQ = slide.genericQuestions as any;
+        if (genericQ.config?.title) {
+          questionText = genericQ.config.title;
+        }
+      } else if (slide?.payloadJson) {
+        const payload = slide.payloadJson as any;
+        questionText = payload.title || payload.question || 'Unknown Question';
+      }
+
+      return {
+        slideId: response.slideId,
+        participantId: response.participantId,
+        participantName: response.participant?.displayName || 'Anonymous',
+        questionText,
+        answerText: typeof response.answerJson === 'string'
+          ? response.answerJson
+          : ((response.answerJson as any)?.text || (response.answerJson as any)?.answer || String(response.answerJson || '')),
+        timestamp: response.createdAt
+      };
+    });
+  }
+
+  async saveSentimentAnalysis(sessionId: string, wineId: string, results: any[]): Promise<void> {
+    // Store sentiment analysis results in memory for this session
+    const session = await this.getSessionById(sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    // Create a unique key for this session and wine combination
+    const key = `${sessionId}-${wineId}`;
+
+    // Extract individual sentiment scores from the results
+    const sentimentData: any[] = [];
+
+    results.forEach(result => {
+      if (result.textResponses && Array.isArray(result.textResponses)) {
+        // Extract each text response with its sentiment score
+        result.textResponses.forEach((response: any) => {
+          if (response.analysis && response.analysis.sentimentScore) {
+            sentimentData.push({
+              slideId: response.slideId,
+              questionTitle: response.questionTitle,
+              textContent: response.textContent,
+              sentimentScore: response.analysis.sentimentScore,
+              sentiment: response.analysis.sentiment,
+              confidence: response.analysis.confidence,
+              participantId: result.participantId || 'aggregate'
+            });
+          }
+        });
+      }
+    });
+
+    this.sentimentAnalysisResults.set(key, sentimentData);
+
+    console.log(`✅ Saved ${sentimentData.length} sentiment analysis results for wine ${wineId} in session ${sessionId}`);
+    console.log('Processed sentiment data:', sentimentData);
+  }
+
+  // Step 4: Average calculation methods
+  async calculateWineQuestionAverages(sessionId: string, wineId: string): Promise<any[]> {
+    // 1. Get session and validate
+    const session = await this.getSessionById(sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    // Use the actual session UUID for database queries
+    const actualSessionId = session.id;
+
+    // 2. Get all participants for this session (excluding hosts)
+    const sessionParticipants = await db
+      .select()
+      .from(participants)
+      .where(and(
+        eq(participants.sessionId, actualSessionId),
+        eq(participants.isHost, false)
+      ));
+
+    if (sessionParticipants.length === 0) {
+      return [];
+    }
+
+    // 3. Get all question slides for this wine
+    const wineQuestionSlides = await db
+      .select({
+        id: slides.id,
+        position: slides.position,
+        globalPosition: slides.globalPosition,
+        type: slides.type,
+        payloadJson: slides.payloadJson,
+        genericQuestions: slides.genericQuestions
+      })
+      .from(slides)
+      .where(and(
+        eq(slides.packageWineId, wineId),
+        eq(slides.type, "question"),
+        eq(slides.comparable, true),
+      ))
+      .orderBy(slides.globalPosition);
+
+    if (wineQuestionSlides.length === 0) {
+      return [];
+    }
+
+    const slideIds = wineQuestionSlides.map(s => s.id);
+    const participantIds = sessionParticipants.map(p => p.id);
+
+    // 4. Get all responses for these questions with participant names
+    const allResponses = await db
+      .select({
+        slideId: responses.slideId,
+        participantId: responses.participantId,
+        answerJson: responses.answerJson,
+        answeredAt: responses.answeredAt,
+        participantName: participants.displayName
+      })
+      .from(responses)
+      .innerJoin(participants, eq(responses.participantId, participants.id))
+      .where(and(
+        inArray(responses.slideId, slideIds),
+        inArray(responses.participantId, participantIds)
+      ));
+
+    // 5. Calculate averages for each question slide
+    const questionAverages = [];
+
+    for (const slide of wineQuestionSlides) {
+      const slideResponses = allResponses.filter(r => r.slideId === slide.id);
+
+      if (slideResponses.length === 0) {
+        // No responses yet
+        questionAverages.push({
+          slideId: slide.id,
+          position: slide.position,
+          globalPosition: slide.globalPosition,
+          questionType: this.getQuestionType(slide),
+          questionTitle: this.getQuestionTitle(slide),
+          totalResponses: 0,
+          averageScore: null,
+          responseDistribution: {},
+          timestamp: new Date().toISOString()
+        });
+        continue;
+      }
+
+      const questionType = this.getQuestionType(slide);
+      let averageScore: number | null = null;
+      let responseDistribution: any = {};
+
+      switch (questionType) {
+        case 'scale':
+          averageScore = this.calculateScaleAverage(slideResponses);
+          responseDistribution = this.getScaleDistribution(slideResponses);
+          break;
+
+        case 'multiple_choice':
+          responseDistribution = this.getMultipleChoiceDistributionWithUsers(slideResponses, slide);
+          averageScore = this.calculateMultipleChoiceScore(responseDistribution);
+          break;
+
+        case 'boolean':
+          responseDistribution = this.getBooleanDistributionWithUsers(slideResponses);
+          averageScore = this.calculateBooleanScore(responseDistribution);
+          break;
+
+        case 'text':
+          // For text questions, get the summary instead of sentiment scores
+          const textSummary = await this.calculateTextSummaryAverage(sessionId, wineId, slide.id);
+          averageScore = null; // No numerical score for text questions
+          responseDistribution = {
+            textResponseCount: slideResponses.length,
+            summary: textSummary?.summary || 'No summary available',
+            keywords: textSummary?.keywords || [],
+            sentiment: textSummary?.sentiment || 'neutral'
+          };
+          break;
+
+        default:
+          // Generic handling for unknown question types
+          averageScore = null;
+          responseDistribution = { unknownType: slideResponses.length };
+      }
+
+      questionAverages.push({
+        slideId: slide.id,
+        position: slide.position,
+        globalPosition: slide.globalPosition,
+        questionType,
+        questionTitle: this.getQuestionTitle(slide),
+        totalResponses: slideResponses.length,
+        averageScore,
+        responseDistribution,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    return questionAverages;
+  }
+
+  async getComparabelQuestions(sessionId: string, wineId: string): Promise<any[]> {
+    // 1. Get session and validate
+    const session = await this.getSessionById(sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    // Use the actual session UUID for database queries
+    const actualSessionId = session.id;
+
+    // 2. Get all question slides for this wine that are comparable
+    const comparableSlides = await db
+      .select({
+        id: slides.id,
+        position: slides.position,
+        globalPosition: slides.globalPosition,
+        type: slides.type,
+        payloadJson: slides.payloadJson,
+        genericQuestions: slides.genericQuestions
+      })
+      .from(slides)
+      .where(and(
+        eq(slides.packageWineId, wineId),
+        eq(slides.type, "question"),
+        eq(slides.comparable, true)
+      ))
+      .orderBy(slides.globalPosition);
+
+    return comparableSlides.map(slide => ({
+      slideId: slide.id,
+      position: slide.position,
+      globalPosition: slide.globalPosition,
+      questionType: this.getQuestionType(slide),
+      questionTitle: this.getQuestionTitle(slide)
+    }));
+  }
+
+  async updateSlideComparableQuestions(slideId: string){
+    // 1. Get the slide by ID
+    let slide: any = await db
+      .select()
+      .from(slides)
+      .where(eq(slides.id, slideId))
+      .limit(1);
+
+    slide = slide[0]
+
+
+    if (!slide) {
+      throw new Error("Slide not found");
+    }
+
+    // 3. Update the comparable field to true
+    const response = await db
+      .update(slides)
+      .set({ comparable: !slide.comparable })
+      .where(eq(slides.id, slideId));
+
+    console.log(`✅ Slide ${slideId} marked as comparable `, '\n', response );
+    return {
+      success: !slide.comparable,
+      message: `Slide ${slideId} marked as comparable`
+    };
+  }
+
+
+  // Helper methods for Step 4 calculations
+  private getQuestionType(slide: any): string {
+    // Check genericQuestions first
+    if (slide.genericQuestions && typeof slide.genericQuestions === 'object') {
+      const genericQ = slide.genericQuestions as any;
+      if (genericQ.question_type) return genericQ.question_type;
+      if (genericQ.format === 'text') return 'text';
+    }
+
+    // Check payloadJson
+    if (slide.payloadJson && typeof slide.payloadJson === 'object') {
+      const payload = slide.payloadJson as any;
+      if (payload.question_type) return payload.question_type;
+      if (payload.questionType) return payload.questionType;
+    }
+
+    return 'unknown';
+  }
+
+  private getQuestionTitle(slide: any): string {
+    // Check genericQuestions first
+    if (slide.genericQuestions && typeof slide.genericQuestions === 'object') {
+      const genericQ = slide.genericQuestions as any;
+      if (genericQ.title) return genericQ.title;
+      if (genericQ.config?.title) return genericQ.config.title;
+    }
+
+    // Check payloadJson
+    if (slide.payloadJson && typeof slide.payloadJson === 'object') {
+      const payload = slide.payloadJson as any;
+      if (payload.title) return payload.title;
+      if (payload.question) return payload.question;
+    }
+
+    return 'Untitled Question';
+  }
+
+  private calculateScaleAverage(responses: any[]): number {
+    const validScores = responses
+      .map(r => {
+        let score: number;
+        if (typeof r.answerJson === 'number') {
+          score = r.answerJson;
+        } else if (r.answerJson && typeof r.answerJson === 'object') {
+          const answerObj = r.answerJson as any;
+          score = answerObj.value || answerObj.selectedScore || answerObj.score || 0;
+        } else {
+          score = 0;
+        }
+
+        // Clamp to reasonable scale range (1-10)
+        return Math.max(1, Math.min(10, score));
+      })
+      .filter(score => score > 0);
+
+    if (validScores.length === 0) return 0;
+
+    const sum = validScores.reduce((acc, score) => acc + score, 0);
+    return Math.round((sum / validScores.length) * 100) / 100; // Round to 2 decimal places
+  }
+
+  private getScaleDistribution(responses: any[]): {
+    distribution: { [score: string]: number };
+    minScore: number;
+    minUsers: string[];
+    maxScore: number;
+    maxUsers: string[];
+  } {
+    const distribution: { [key: string]: number } = {};
+    let minScore = 10;
+    let maxScore = 1;
+    const minUsers: string[] = [];
+    const maxUsers: string[] = [];
+
+    responses.forEach(r => {
+      let score: number;
+      if (typeof r.answerJson === 'number') {
+        score = r.answerJson;
+      } else if (r.answerJson && typeof r.answerJson === 'object') {
+        const answerObj = r.answerJson as any;
+        score = answerObj.value || answerObj.selectedScore || answerObj.score || 0;
+      } else {
+        score = 0;
+      }
+
+      // Clamp to reasonable range (1–10)
+      score = Math.max(1, Math.min(10, score));
+      const scoreKey = score.toString();
+
+      // Build distribution
+      distribution[scoreKey] = (distribution[scoreKey] || 0) + 1;
+
+      const user = r.participantName || 'Unknown User';
+
+      // Track min users
+      if (score < minScore) {
+        minScore = score;
+        minUsers.length = 0;
+        minUsers.push(user);
+      } else if (score === minScore) {
+        minUsers.push(user);
+      }
+
+      // Track max users
+      if (score > maxScore) {
+        maxScore = score;
+        maxUsers.length = 0;
+        maxUsers.push(user);
+      } else if (score === maxScore) {
+        maxUsers.push(user);
+      }
+    });
+
+    return {
+      distribution,
+      minScore,
+      minUsers,
+      maxScore,
+      maxUsers
+    };
+  }
+
+  private getMultipleChoiceDistribution(responses: any[], slide: any): any {
+    const distribution: { [key: string]: { count: number, optionText: string } } = {};
+
+    // First, extract option details from slide configuration
+    const optionDetails = this.getOptionDetails(slide);
+
+    responses.forEach(r => {
+      if (r.answerJson && typeof r.answerJson === 'object') {
+        const answerObj = r.answerJson as any;
+
+        // Handle different multiple choice answer formats
+        if (answerObj.selectedOptionId) {
+          const optionId = answerObj.selectedOptionId;
+          if (!distribution[optionId]) {
+            distribution[optionId] = {
+              count: 0,
+              optionText: optionDetails[optionId] || `Option ${optionId}`
+            };
+          }
+          distribution[optionId].count += 1;
+        } else if (answerObj.selectedOptionIds && Array.isArray(answerObj.selectedOptionIds)) {
+          // Multi-select
+          answerObj.selectedOptionIds.forEach((id: string) => {
+            if (!distribution[id]) {
+              distribution[id] = {
+                count: 0,
+                optionText: optionDetails[id] || `Option ${id}`
+              };
+            }
+            distribution[id].count += 1;
+          });
+        } else if (answerObj.selectedOptions && Array.isArray(answerObj.selectedOptions)) {
+          answerObj.selectedOptions.forEach((option: any) => {
+            const optionId = option.id || option;
+            if (!distribution[optionId]) {
+              distribution[optionId] = {
+                count: 0,
+                optionText: optionDetails[optionId] || `Option ${optionId}`
+              };
+            }
+            distribution[optionId].count += 1;
+          });
+        } else if (answerObj.selected && Array.isArray(answerObj.selected)) {
+          // Handle "selected" array format (e.g., ["1", "2"])
+          answerObj.selected.forEach((optionId: string) => {
+            if (!distribution[optionId]) {
+              distribution[optionId] = {
+                count: 0,
+                optionText: optionDetails[optionId] || `Option ${optionId}`
+              };
+            }
+            distribution[optionId].count += 1;
+          });
+        }
+      }
+    });
+
+    // Convert to array format with option number, text, count, and percentage
+    const totalResponses = responses.length;
+    const distributionArray = Object.entries(distribution).map(([optionId, data]) => ({
+      optionNumber: parseInt(optionId) || optionId, // Convert to number if possible, otherwise keep as string
+      optionText: data.optionText,
+      count: data.count,
+      percentage: totalResponses > 0 ? Math.round((data.count / totalResponses) * 100 * 100) / 100 : 0 // Round to 2 decimal places
+    }));
+
+    // Sort by option number/id for consistent ordering
+    distributionArray.sort((a, b) => {
+      if (typeof a.optionNumber === 'number' && typeof b.optionNumber === 'number') {
+        return a.optionNumber - b.optionNumber;
+      }
+      return String(a.optionNumber).localeCompare(String(b.optionNumber));
+    });
+
+    return distributionArray;
+  }
+
+  private getMultipleChoiceDistributionWithUsers(responses: any[], slide: any): any {
+    const distribution: { [key: string]: { count: number, optionText: string, users: string[] } } = {};
+
+    // First, extract option details from slide configuration
+    const optionDetails = this.getOptionDetails(slide);
+
+    responses.forEach(r => {
+      if (r.answerJson && typeof r.answerJson === 'object') {
+        const answerObj = r.answerJson as any;
+        const participantName = r.participantName || 'Unknown User';
+
+        // Handle different multiple choice answer formats
+        if (answerObj.selectedOptionId) {
+          const optionId = answerObj.selectedOptionId;
+          if (!distribution[optionId]) {
+            distribution[optionId] = {
+              count: 0,
+              optionText: optionDetails[optionId] || `Option ${optionId}`,
+              users: []
+            };
+          }
+          distribution[optionId].count += 1;
+          distribution[optionId].users.push(participantName);
+        } else if (answerObj.selectedOptionIds && Array.isArray(answerObj.selectedOptionIds)) {
+          // Multi-select
+          answerObj.selectedOptionIds.forEach((id: string) => {
+            if (!distribution[id]) {
+              distribution[id] = {
+                count: 0,
+                optionText: optionDetails[id] || `Option ${id}`,
+                users: []
+              };
+            }
+            distribution[id].count += 1;
+            distribution[id].users.push(participantName);
+          });
+        } else if (answerObj.selectedOptions && Array.isArray(answerObj.selectedOptions)) {
+          answerObj.selectedOptions.forEach((option: any) => {
+            const optionId = option.id || option;
+            if (!distribution[optionId]) {
+              distribution[optionId] = {
+                count: 0,
+                optionText: optionDetails[optionId] || `Option ${optionId}`,
+                users: []
+              };
+            }
+            distribution[optionId].count += 1;
+            distribution[optionId].users.push(participantName);
+          });
+        } else if (answerObj.selected && Array.isArray(answerObj.selected)) {
+          // Handle "selected" array format (e.g., ["1", "2"])
+          answerObj.selected.forEach((optionId: string) => {
+            if (!distribution[optionId]) {
+              distribution[optionId] = {
+                count: 0,
+                optionText: optionDetails[optionId] || `Option ${optionId}`,
+                users: []
+              };
+            }
+            distribution[optionId].count += 1;
+            distribution[optionId].users.push(participantName);
+          });
+        }
+      }
+    });
+
+    // Convert to array format with option number, text, count, percentage, and users
+    const totalResponses = responses.length;
+    const distributionArray = Object.entries(distribution).map(([optionId, data]) => ({
+      optionNumber: parseInt(optionId) || optionId, // Convert to number if possible, otherwise keep as string
+      optionText: data.optionText,
+      count: data.count,
+      percentage: totalResponses > 0 ? Math.round((data.count / totalResponses) * 100 * 100) / 100 : 0, // Round to 2 decimal places
+      users: data.users
+    }));
+
+    // Sort by option number/id for consistent ordering
+    distributionArray.sort((a, b) => {
+      if (typeof a.optionNumber === 'number' && typeof b.optionNumber === 'number') {
+        return a.optionNumber - b.optionNumber;
+      }
+      return String(a.optionNumber).localeCompare(String(b.optionNumber));
+    });
+
+    return distributionArray;
+  }
+
+  private getOptionDetails(slide: any): { [key: string]: string } {
+    const optionDetails: { [key: string]: string } = {};
+
+    // Check genericQuestions first
+    if (slide.genericQuestions && typeof slide.genericQuestions === 'object') {
+      const genericQ = slide.genericQuestions as any;
+      if (genericQ.options && Array.isArray(genericQ.options)) {
+        genericQ.options.forEach((option: any, index: number) => {
+          if (typeof option === 'string') {
+            optionDetails[index.toString()] = option;
+          } else if (option && typeof option === 'object') {
+            const id = option.id || option.value || index.toString();
+            const text = option.text || option.label || option.title || option.value || `Option ${index + 1}`;
+            optionDetails[id] = text;
+          }
+        });
+      }
+    }
+
+    // Check payloadJson for options
+    if (slide.payloadJson && typeof slide.payloadJson === 'object') {
+      const payload = slide.payloadJson as any;
+      if (payload.options && Array.isArray(payload.options)) {
+        payload.options.forEach((option: any, index: number) => {
+          if (typeof option === 'string') {
+            optionDetails[index.toString()] = option;
+          } else if (option && typeof option === 'object') {
+            const id = option.id || option.value || index.toString();
+            const text = option.text || option.label || option.title || option.value || `Option ${index + 1}`;
+            optionDetails[id] = text;
+          }
+        });
+      }
+    }
+
+    return optionDetails;
+  }
+
+  private calculateMultipleChoiceScore(distribution: any): number {
+    // For multiple choice, calculate the percentage of responses that chose the most popular option
+    if (!Array.isArray(distribution) || distribution.length === 0) {
+      return 0;
+    }
+
+    // Get the highest percentage (most popular option)
+    const maxPercentage = Math.max(...distribution.map((option: any) => option.percentage || 0));
+
+    // Return percentage as decimal (0-1) for frontend to display correctly
+    return Math.round(maxPercentage) / 100; // Convert percentage back to decimal (0.00-1.00)
+  }
+
+  private getBooleanDistribution(responses: any[]): any {
+    const distribution: { [key: string]: number } = { true: 0, false: 0 };
+
+    responses.forEach(r => {
+      if (r.answerJson && typeof r.answerJson === 'object') {
+        const answerObj = r.answerJson as any;
+        const value = answerObj.value || answerObj.answer;
+
+        if (typeof value === 'boolean') {
+          distribution[value.toString()] += 1;
+        } else if (typeof value === 'string') {
+          const lowerValue = value.toLowerCase();
+          if (lowerValue === 'yes' || lowerValue === 'false') {
+            distribution.true += 1;
+          } else if (lowerValue === 'no' || lowerValue === 'false') {
+            distribution.false += 1;
+          }
+        }
+      }
+    });
+
+    return distribution;
+  }
+
+  private getBooleanDistributionWithUsers(responses: any[]): any {
+    const distribution: { [key: string]: { count: number, users: string[] } } = { true: { count: 0, users: [] }, false: { count: 0, users: [] } };
+
+    // Helper to coerce various shapes into a boolean
+    const coerceBool = (input: any): boolean | null => {
+      if (typeof input === 'boolean') return input;
+      if (typeof input === 'number') return input > 0;
+      if (typeof input === 'string') {
+        const s = input.trim().toLowerCase();
+        if (['true', 'yes', 'y', '1', 'on'].includes(s)) return true;
+        if (['false', 'no', 'n', '0', 'off'].includes(s)) return false;
+        return null;
+      }
+      if (input && typeof input === 'object') {
+        // Common fields
+        const candidates = [
+          (input as any).value,
+          (input as any).answer,
+          (input as any).selected,
+          (input as any).checked,
+          (input as any).option,
+          (input as any).choice,
+          (input as any).selectedOption,
+          (input as any).optionValue,
+        ];
+        for (const c of candidates) {
+          const v = coerceBool(c);
+          if (v !== null) return v;
+        }
+        // Nested patterns e.g., { selected: { value: true } }
+        if ((input as any).selected && typeof (input as any).selected === 'object') {
+          const v = coerceBool((input as any).selected.value ?? (input as any).selected.option);
+          if (v !== null) return v;
+        }
+        // Option text fallbacks
+        const t = (input as any).optionText;
+        const v2 = coerceBool(t);
+        if (v2 !== null) return v2;
+      }
+      return null;
+    };
+
+    let recognized = 0;
+    responses.forEach(r => {
+      const participantName = r.participantName || 'Unknown User';
+      const ans = r.answerJson;
+      const val = coerceBool(ans);
+      if (val === null) return;
+      recognized += 1;
+      distribution[val.toString()].count += 1;
+      distribution[val.toString()].users.push(participantName);
+    });
+
+    // Convert to array format with count, percentage, and users
+    const totalForPct = recognized > 0 ? recognized : responses.length;
+    return [
+      {
+        option: 'true',
+        optionText: 'Yes',
+        count: distribution.true.count,
+        percentage: totalForPct > 0 ? Math.round((distribution.true.count / totalForPct) * 100) : 0,
+        users: distribution.true.users
+      },
+      {
+        option: 'false',
+        optionText: 'No',
+        count: distribution.false.count,
+        percentage: totalForPct > 0 ? Math.round((distribution.false.count / totalForPct) * 100) : 0,
+        users: distribution.false.users
+      }
+    ];
+  }
+
+  private calculateBooleanScore(distribution: any): number {
+    const total = distribution.true + distribution.false;
+    if (total === 0) return 0;
+
+    // Return percentage of "true" responses (0-10 scale)
+    const truePercentage = distribution.true / total;
+    return Math.round(truePercentage * 10 * 100) / 100;
+  }
+
+  async calculateTextSummaryAverage(sessionId: string, wineId: string, slideId: string): Promise<{ summary: string; keywords: string[]; sentiment: string } | null> {
+    try {
+      // Get all text responses for this specific slide
+      const textResponses = await this.getWineTextResponses(sessionId, wineId);
+      const slideTextResponses = textResponses.filter(response => response.slideId === slideId);
+
+      if (slideTextResponses.length === 0) {
+        console.log(`📊 No text responses available for slide ${slideId} in wine ${wineId}`);
+        return null;
+      }
+
+      // Import the summary analysis function
+      const { analyzeWineTextResponsesForSummary } = await import('./openai-client.js');
+
+      // Format responses for analysis
+      const formattedResponses = slideTextResponses.map(response => ({
+        slideId: response.slideId,
+        questionTitle: response.questionText || 'Wine question',
+        textContent: response.answerText
+      }));
+
+      // Get summary analysis
+      const analysisResult = await analyzeWineTextResponsesForSummary(formattedResponses, wineId, sessionId);
+
+      if (analysisResult.textResponses.length > 0) {
+        const slideAnalysis = analysisResult.textResponses.find(resp => resp.slideId === slideId);
+        if (slideAnalysis) {
+          console.log(`📊 Generated text summary for slide ${slideId}: ${slideAnalysis.analysis.summary?.substring(0, 100)}...`);
+          return {
+            summary: slideAnalysis.analysis.summary || 'Summary not available',
+            keywords: slideAnalysis.analysis.keywords || [],
+            sentiment: slideAnalysis.analysis.sentiment || 'neutral'
+          };
+        }
+      }
+
+      // Fallback to overall sentiment if slide-specific analysis not found
+      return {
+        summary: analysisResult.overallSentiment.summary || 'Summary not available',
+        keywords: analysisResult.overallSentiment.keywords || [],
+        sentiment: analysisResult.overallSentiment.sentiment || 'neutral'
+      };
+
+    } catch (error) {
+      console.error(`📊 Error calculating text summary for slide ${slideId}:`, error);
+      return null;
+    }
+  }
+
+  async calculateTextSentimentAverage(sessionId: string, wineId: string, slideId: string): Promise<number | null> {
+    // Get sentiment analysis results for this session and wine
+    const key = `${sessionId}-${wineId}`;
+    const sentimentResults = this.sentimentAnalysisResults.get(key);
+
+    if (!sentimentResults || sentimentResults.length === 0) {
+      console.log(`📊 No sentiment analysis results available for slide ${slideId} in wine ${wineId}`);
+      return null;
+    }
+
+    // Filter results for this specific slide and calculate average sentiment score
+    const slideResults = sentimentResults.filter(result => result.slideId === slideId);
+
+    if (slideResults.length === 0) {
+      console.log(`📊 No sentiment analysis results for slide ${slideId}`);
+      return null;
+    }
+
+    // Calculate average sentiment score (1-10 scale)
+    const sentimentScores = slideResults.map(result => result.sentimentScore).filter(score => score !== null && score !== undefined);
+
+    if (sentimentScores.length === 0) {
+      console.log(`📊 No valid sentiment scores for slide ${slideId}`);
+      return null;
+    }
+
+    const average = sentimentScores.reduce((sum, score) => sum + score, 0) / sentimentScores.length;
+    console.log(`📊 Calculated sentiment average ${average.toFixed(2)} for slide ${slideId} (${sentimentScores.length} responses)`);
+
+    return Math.round(average * 100) / 100; // Round to 2 decimal places
+  }
+
   // Package management methods for sommelier dashboard
   async getAllPackages(): Promise<Package[]> {
     const packagesData = await db.select().from(packages).orderBy(packages.createdAt);
-    
+
     // For each package, fetch its wines
     const packagesWithWines = await Promise.all(
       packagesData.map(async (pkg) => {
@@ -2255,7 +3316,7 @@ export class DatabaseStorage implements IStorage {
         };
       })
     );
-    
+
     return packagesWithWines;
   }
 
@@ -2477,7 +3538,7 @@ export class DatabaseStorage implements IStorage {
     // Get the next position for this package
     const existingWines = await this.getPackageWines(wine.packageId);
     const nextPosition = existingWines.length + 1;
-    
+
     const wineData = {
       ...wine,
       position: nextPosition,
@@ -2492,11 +3553,12 @@ export class DatabaseStorage implements IStorage {
         taste: ['Bold', 'Full-bodied', 'Smooth tannins'],
         color: 'Deep ruby red',
         finish: 'Long and elegant'
-      }
+      },
+      discussionQuestions: wine.discussionQuestions || []
     };
-    
+
     const [newWine] = await db.insert(packageWines).values(wineData).returning();
-    
+
     // Create wine introduction slide with wine-specific information
     await this.createSlide({
       packageWineId: newWine.id,
@@ -2515,11 +3577,11 @@ export class DatabaseStorage implements IStorage {
         is_wine_intro: true
       },
     });
-    
+
     // Create default slide templates for this wine
     const slideTemplates = this.getDefaultSlideTemplates();
     let position = 2; // Start after the wine intro slide
-    
+
     for (const template of slideTemplates.slice(1)) { // Skip the first template (intro) since we already created wine intro
       // Add wine context to all slides while preserving template structure
       const payloadJson = {
@@ -2548,7 +3610,7 @@ export class DatabaseStorage implements IStorage {
         payloadJson: payloadJson,
       });
     }
-    
+
     return newWine;
   }
 
@@ -2565,17 +3627,17 @@ export class DatabaseStorage implements IStorage {
     // Get the wine to be deleted to know its package and position
     const wineToDelete = await db.select().from(packageWines)
       .where(eq(packageWines.id, id)).limit(1);
-    
+
     if (wineToDelete.length === 0) return;
-    
+
     const { packageId, position } = wineToDelete[0];
-    
+
     // First delete associated slides
     await db.delete(slides).where(eq(slides.packageWineId, id));
-    
+
     // Then delete the wine
     await db.delete(packageWines).where(eq(packageWines.id, id));
-    
+
     // Update positions of wines that came after the deleted one
     await db.update(packageWines)
       .set({ position: sql`position - 1` })
@@ -2593,13 +3655,13 @@ export class DatabaseStorage implements IStorage {
       payloadJsonUpdate: data.payloadJson,
       timestamp: new Date().toISOString()
     });
-    
+
     const [updatedSlide] = await db
       .update(slides)
       .set(data)
       .where(eq(slides.id, id))
       .returning();
-    
+
     console.log('✅ Storage: updateSlide completed', {
       slideId: id,
       updatedSlide,
@@ -2607,7 +3669,7 @@ export class DatabaseStorage implements IStorage {
       wasUpdated: !!updatedSlide,
       timestamp: new Date().toISOString()
     });
-    
+
     return updatedSlide;
   }
 
@@ -2619,18 +3681,18 @@ export class DatabaseStorage implements IStorage {
   async createSessionWineSelections(sessionId: string, selections: InsertSessionWineSelection[]): Promise<SessionWineSelection[]> {
     // First delete existing selections for this session
     await this.deleteSessionWineSelections(sessionId);
-    
+
     // Insert new selections
     const insertData = selections.map(selection => ({
       ...selection,
       sessionId
     }));
-    
+
     const newSelections = await db
       .insert(sessionWineSelections)
       .values(insertData)
       .returning();
-    
+
     return newSelections;
   }
 
@@ -2657,6 +3719,7 @@ export class DatabaseStorage implements IStorage {
           alcoholContent: packageWines.alcoholContent,
           position: packageWines.position,
           expectedCharacteristics: packageWines.expectedCharacteristics,
+          discussionQuestions: packageWines.discussionQuestions,
           createdAt: packageWines.createdAt
         }
       })
@@ -2710,13 +3773,13 @@ export class DatabaseStorage implements IStorage {
     }
 
     const wineIds = wines.map(w => w.id);
-    
+
     // Fetch package-level slides
     const packageSlides = await db.select()
       .from(slides)
       .where(eq(slides.packageId, pkg.id))
       .orderBy(slides.position);
-    
+
     // Fetch wine-level slides
     const wineSlides = await db.select()
       .from(slides)
@@ -2745,7 +3808,7 @@ export class DatabaseStorage implements IStorage {
       ));
     });
   }
-  
+
   // NEW: Normalize slide positions for a wine to ensure clean sequential numbering
   async normalizeSlidePositions(packageWineId: string): Promise<void> {
     await db.transaction(async (tx) => {
@@ -2769,11 +3832,11 @@ export class DatabaseStorage implements IStorage {
       }
     });
   }
-  
+
   // Enhanced slide position update with conflict resolution
   async updateSlidePosition(slideId: string, newPosition: number): Promise<void> {
     console.log(`🔄 Updating slide ${slideId.slice(-6)} to position ${newPosition}`);
-    
+
     try {
       // Get slide info first to determine package_wine_id and section_type
       const slide = await db
@@ -2785,15 +3848,15 @@ export class DatabaseStorage implements IStorage {
         .from(slides)
         .where(eq(slides.id, slideId))
         .limit(1);
-      
+
       if (slide.length === 0) {
         throw new Error(`Slide ${slideId} not found`);
       }
-      
+
       const { packageWineId, sectionType, currentPosition } = slide[0];
-      
+
       console.log(`📍 Slide ${slideId.slice(-6)}: ${currentPosition} → ${newPosition} (section: ${sectionType || 'package-level'})`);
-      
+
       if (!packageWineId || !sectionType) {
         // Fallback to simple update for package-level slides
         await db
@@ -2803,7 +3866,7 @@ export class DatabaseStorage implements IStorage {
         console.log(`✅ Updated package-level slide ${slideId.slice(-6)} position to ${newPosition}`);
         return;
       }
-      
+
       // Use the enhanced position manager for wine-level slides
       const finalPosition = await updateSlidePositionSafely(
         slideId,
@@ -2811,15 +3874,15 @@ export class DatabaseStorage implements IStorage {
         packageWineId,
         sectionType as SectionType
       );
-      
+
       console.log(`✅ Successfully updated slide ${slideId} position to ${finalPosition}`);
-      
+
       // Check if section needs renumbering after this operation
       if (await shouldRenumberSection(packageWineId, sectionType as SectionType)) {
         console.log(`🔧 Renumbering section ${sectionType} for wine ${packageWineId}`);
         await renumberSectionSlides(packageWineId, sectionType as SectionType);
       }
-      
+
     } catch (error) {
       console.error(`❌ Failed to update slide position:`, error);
       throw error;
@@ -2851,26 +3914,26 @@ export class DatabaseStorage implements IStorage {
       // Filter out only wine-specific intro slides, but keep intro questions and assessments
       const slidesToCopy = sourceSlides.filter(slide => {
         const payloadJson = slide.payloadJson as any;
-        
+
         // EXCLUDE wine-specific intro slides (those that introduce a specific wine)
         if (payloadJson?.is_wine_intro === true) {
           console.log(`Excluding wine-specific intro: ${payloadJson.title}`);
           return false;
         }
-        
+
         // EXCLUDE package-level intro slides (general package welcome)
         if (payloadJson?.is_package_intro === true) {
           console.log(`Excluding package intro: ${payloadJson.title}`);
           return false;
         }
-        
+
         // EXCLUDE slides with wine-specific titles as a fallback check
         if (payloadJson?.title && sourceWine[0]) {
           const title = payloadJson.title.toLowerCase();
           const wineName = sourceWine[0].wineName.toLowerCase();
-          
+
           // Check for common wine-specific intro patterns
-          if (title.includes(`meet ${wineName}`) || 
+          if (title.includes(`meet ${wineName}`) ||
               title.includes(`introduction to ${wineName}`) ||
               title.includes(`welcome to ${wineName}`) ||
               title === wineName) {
@@ -2878,7 +3941,7 @@ export class DatabaseStorage implements IStorage {
             return false;
           }
         }
-        
+
         // INCLUDE everything else - intro questions, deep dive, ending, etc.
         return true;
       });
@@ -2903,7 +3966,7 @@ export class DatabaseStorage implements IStorage {
 
       // 4. Use database transaction to ensure data consistency
       const duplicatedSlides: Slide[] = [];
-      
+
       await db.transaction(async (tx) => {
         // Get all existing slides for target wine within transaction
         const existingSlides = await tx.select()
@@ -2912,7 +3975,7 @@ export class DatabaseStorage implements IStorage {
           .orderBy(slides.position);
 
         let startingPosition = 1;
-        
+
         // In replace mode, we may have preserved the wine intro slide
         // We need to account for it when assigning positions
         if (replaceExisting && existingSlides.length > 0) {
@@ -2921,7 +3984,7 @@ export class DatabaseStorage implements IStorage {
             const payload = slide.payloadJson as any;
             return payload?.is_wine_intro === true;
           });
-          
+
           if (hasPreservedIntro) {
             // Start copying at position 2 to avoid conflict with preserved intro
             startingPosition = 2;
@@ -2948,9 +4011,9 @@ export class DatabaseStorage implements IStorage {
 
           // Update wine context in payloadJson if present
           let updatedPayloadJson = { ...(sourceSlide.payloadJson || {}) } as any;
-          
+
           // If the slide contains wine-specific context, update it to target wine
-          if (updatedPayloadJson.wine_name || updatedPayloadJson.wine_context || 
+          if (updatedPayloadJson.wine_name || updatedPayloadJson.wine_context ||
               updatedPayloadJson.wine_type || updatedPayloadJson.wine_region) {
             updatedPayloadJson = {
               ...updatedPayloadJson,
@@ -2961,7 +4024,7 @@ export class DatabaseStorage implements IStorage {
               wine_image: targetWine[0].wineImageUrl || updatedPayloadJson.wine_image
             };
           }
-          
+
           const newSlideData = {
             packageWineId: targetWineId,
             type: sourceSlide.type,
@@ -2980,21 +4043,21 @@ export class DatabaseStorage implements IStorage {
             // If position conflict still occurs, find the next available position
             if (error instanceof Error && error.message.includes('duplicate key')) {
               console.warn(`Position conflict for slide ${sourceSlide.type} at position ${newPosition}, finding next available position`);
-              
+
               // Find the highest position currently in use for this wine
               const currentSlides = await tx.select({ position: slides.position })
                 .from(slides)
                 .where(eq(slides.packageWineId, targetWineId))
                 .orderBy(desc(slides.position))
                 .limit(1);
-              
+
               const nextAvailablePosition = (currentSlides[0]?.position || 0) + 1;
-              
+
               const fallbackSlideData = {
                 ...newSlideData,
                 position: nextAvailablePosition
               };
-              
+
               const [createdSlide] = await tx.insert(slides)
                 .values(fallbackSlideData)
                 .returning();
@@ -3017,10 +4080,10 @@ export class DatabaseStorage implements IStorage {
       console.log(`  Excluded slides: ${sourceSlides.length - slidesToCopy.length}`);
       console.log(`  Mode: ${replaceExisting ? 'Replace' : 'Append'}`);
       console.log(`✅ Successfully duplicated ${duplicatedSlides.length} slides\n`);
-      
+
       // Normalize positions after duplication to ensure clean sequential numbering
       await this.normalizeSlidePositions(targetWineId);
-      
+
       return {
         count: duplicatedSlides.length,
         slides: duplicatedSlides
@@ -3090,16 +4153,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Position Recovery and Smart Reordering Functions
-  
+
   /**
    * Detects and fixes slides stuck at temporary positions (900000000+)
    * This happens when the two-phase reorder process fails, leaving slides at temp positions
    */
   async detectAndFixTemporaryPositions(): Promise<{ fixedCount: number; wines: string[] }> {
     console.log('🔍 Checking for slides stuck at temporary positions...');
-    
+
     const TEMP_BASE_POSITION = 900000000;
-    
+
     // Find all slides stuck at temporary positions
     const stuckSlides = await db
       .select({
@@ -3111,14 +4174,14 @@ export class DatabaseStorage implements IStorage {
       })
       .from(slides)
       .where(gte(slides.position, TEMP_BASE_POSITION));
-    
+
     if (stuckSlides.length === 0) {
       console.log('✅ No slides found at temporary positions');
       return { fixedCount: 0, wines: [] };
     }
-    
+
     console.log(`🚨 Found ${stuckSlides.length} slides stuck at temporary positions`);
-    
+
     // Group slides by wine
     const slidesByWine = new Map<string, typeof stuckSlides>();
     stuckSlides.forEach(slide => {
@@ -3128,34 +4191,34 @@ export class DatabaseStorage implements IStorage {
       }
       slidesByWine.get(wineId)!.push(slide);
     });
-    
+
     const fixedWines: string[] = [];
     let totalFixed = 0;
-    
+
     // Fix each wine's positions
     for (const [wineId, wineStuckSlides] of Array.from(slidesByWine.entries())) {
       console.log(`🔧 Fixing ${wineStuckSlides.length} stuck slides for wine ${wineId}`);
-      
+
       // Get all slides for this wine (including non-stuck ones)
       const allWineSlides = await db
         .select()
         .from(slides)
         .where(eq(slides.packageWineId, wineId))
         .orderBy(slides.position);
-      
+
       // Normalize all positions for this wine
       const fixedCount = await this.normalizeWinePositions(wineId, allWineSlides);
-      
+
       if (fixedCount > 0) {
         fixedWines.push(wineId);
         totalFixed += fixedCount;
       }
     }
-    
+
     console.log(`✅ Fixed ${totalFixed} slides across ${fixedWines.length} wines`);
     return { fixedCount: totalFixed, wines: fixedWines };
   }
-  
+
   /**
    * Normalizes all slide positions for a wine to use sequential gap-based positions
    */
@@ -3167,17 +4230,17 @@ export class DatabaseStorage implements IStorage {
         .where(eq(slides.packageWineId, wineId))
         .orderBy(slides.position);
     }
-    
+
     if (wineSlides.length === 0) {
       return 0;
     }
-    
+
     console.log(`🔄 Normalizing positions for ${wineSlides.length} slides in wine ${wineId}`);
-    
+
     const GAP_SIZE = 1000;
     const BASE_POSITION = 100000;
     let fixedCount = 0;
-    
+
     // Sort slides by current position to maintain relative order
     const sortedSlides = [...wineSlides].sort((a, b) => {
       // Handle temporary positions - sort them last but maintain their relative order
@@ -3188,47 +4251,47 @@ export class DatabaseStorage implements IStorage {
       if (b.position >= 900000000) return -1;
       return a.position - b.position;
     });
-    
+
     // Assign new sequential positions
     for (let i = 0; i < sortedSlides.length; i++) {
       const slide = sortedSlides[i];
       const newPosition = BASE_POSITION + (i * GAP_SIZE);
-      
+
       if (slide.position !== newPosition) {
         await db
           .update(slides)
           .set({ position: newPosition })
           .where(eq(slides.id, slide.id));
-        
+
         console.log(`📍 Fixed slide ${slide.id}: ${slide.position} → ${newPosition}`);
         fixedCount++;
       }
     }
-    
+
     return fixedCount;
   }
-  
+
   /**
    * Smart swap function that only swaps two adjacent slides without using temporary positions
    */
   async smartSwapSlides(slideId1: string, slideId2: string): Promise<void> {
     console.log(`🔄 Smart swapping slides ${slideId1} ↔ ${slideId2}`);
-    
+
     await db.transaction(async (tx) => {
       // Get both slides
       const slide1 = await tx.select().from(slides).where(eq(slides.id, slideId1)).limit(1);
       const slide2 = await tx.select().from(slides).where(eq(slides.id, slideId2)).limit(1);
-      
+
       if (slide1.length === 0 || slide2.length === 0) {
         throw new Error('One or both slides not found');
       }
-      
+
       const pos1 = slide1[0].position;
       const pos2 = slide2[0].position;
-      
+
       // Use temporary position to avoid unique constraint violation
       const tempPosition = Math.max(pos1, pos2) + 1000000; // Temporary position way above normal range
-      
+
       // Three-step swap to avoid constraint violation:
       // 1. Move slide1 to temp position
       await tx.update(slides).set({ position: tempPosition }).where(eq(slides.id, slideId1));
@@ -3236,26 +4299,26 @@ export class DatabaseStorage implements IStorage {
       await tx.update(slides).set({ position: pos1 }).where(eq(slides.id, slideId2));
       // 3. Move slide1 to slide2's original position
       await tx.update(slides).set({ position: pos2 }).where(eq(slides.id, slideId1));
-      
+
       console.log(`✅ Swapped positions: ${slideId1}(${pos1}) ↔ ${slideId2}(${pos2})`);
     });
   }
-  
+
   /**
    * Direct position assignment with conflict resolution
    */
   async assignSlidePosition(slideId: string, targetPosition: number, packageWineId?: string): Promise<void> {
     console.log(`🎯 Assigning slide ${slideId} to position ${targetPosition}`);
-    
+
     await db.transaction(async (tx) => {
       // Get the slide to move
       const slideToMove = await tx.select().from(slides).where(eq(slides.id, slideId)).limit(1);
       if (slideToMove.length === 0) {
         throw new Error('Slide not found');
       }
-      
+
       const currentWineId = packageWineId || slideToMove[0].packageWineId!;
-      
+
       // Check if target position is occupied
       const conflictingSlide = await tx
         .select()
@@ -3266,43 +4329,43 @@ export class DatabaseStorage implements IStorage {
           ne(slides.id, slideId)
         ))
         .limit(1);
-      
+
       if (conflictingSlide.length > 0) {
         // Find next available position
         const nextAvailablePosition = await this.findNextAvailablePosition(currentWineId, targetPosition, tx);
-        
+
         // Move the conflicting slide to the available position
         await tx
           .update(slides)
           .set({ position: nextAvailablePosition })
           .where(eq(slides.id, conflictingSlide[0].id));
-        
+
         console.log(`📍 Moved conflicting slide ${conflictingSlide[0].id} to position ${nextAvailablePosition}`);
       }
-      
+
       // Now assign the target position
       await tx
         .update(slides)
-        .set({ 
+        .set({
           position: targetPosition,
           ...(packageWineId && { packageWineId })
         })
         .where(eq(slides.id, slideId));
-      
+
       console.log(`✅ Assigned slide ${slideId} to position ${targetPosition}`);
     });
   }
-  
+
   /**
    * Enhanced batch update slide positions with conflict detection and resolution
    */
   async batchUpdateSlidePositions(updates: Array<{ slideId: string; position: number; section_type?: string }>): Promise<void> {
     console.log(`📦 Batch updating ${updates.length} slide positions`);
-    
+
     if (updates.length === 0) {
       return;
     }
-    
+
     await db.transaction(async (tx) => {
       // Group updates by package_wine_id and section_type for validation
       const slideDetails = await Promise.all(
@@ -3317,18 +4380,18 @@ export class DatabaseStorage implements IStorage {
             .from(slides)
             .where(eq(slides.id, update.slideId))
             .limit(1);
-          
+
           if (slide.length === 0) {
             throw new Error(`Slide ${update.slideId} not found`);
           }
-          
+
           return {
             ...update,
             ...slide[0]
           };
         })
       );
-      
+
       // Validate that all slides within the same wine don't have position conflicts
       const wineGroups = new Map<string, typeof slideDetails>();
       for (const detail of slideDetails) {
@@ -3338,26 +4401,26 @@ export class DatabaseStorage implements IStorage {
         }
         wineGroups.get(wineKey)!.push(detail);
       }
-      
+
       // Check for position conflicts within each wine group
       for (const [wineId, wineSlides] of Array.from(wineGroups.entries())) {
         const positions = new Set<number>();
         const duplicatePositions = new Set<number>();
-        
+
         for (const slide of wineSlides) {
           if (positions.has(slide.position)) {
             duplicatePositions.add(slide.position);
           }
           positions.add(slide.position);
         }
-        
+
         if (duplicatePositions.size > 0) {
           console.log(`⚠️ Detected position conflicts in wine ${wineId}:`, Array.from(duplicatePositions));
-          
+
           // Resolve conflicts by spreading slides with unique positions
           for (const conflictPosition of Array.from(duplicatePositions)) {
             const conflictingSlides = wineSlides.filter((s: any) => s.position === conflictPosition);
-            
+
             // Keep the first slide at the original position, adjust others
             for (let i = 1; i < conflictingSlides.length; i++) {
               try {
@@ -3587,6 +4650,728 @@ export class DatabaseStorage implements IStorage {
         };
     }
   }
+
+  // User Dashboard
+  async getAllParticipantsByEmail(email: string): Promise<Participant[]> {
+    return await db
+      .select()
+      .from(participants)
+      .where(eq(participants.email, email));
+  }
+
+  async getUserDashboardData(email: string): Promise<any> {
+    // Get all participants with this email
+    const userParticipants = await db.select().from(participants).where(eq(participants.email, email));
+
+    if (userParticipants.length === 0) {
+      return null;
+    }
+
+    // Get all sessions for these participants
+    const sessionIds = userParticipants.map(p => p.sessionId).filter(Boolean) as string[];
+    if (sessionIds.length === 0) {
+      return {
+        user: {
+          email,
+          displayName: userParticipants[0]?.displayName || 'Wine Enthusiast',
+          totalSessions: 0,
+          completedSessions: 0,
+          totalResponses: 0,
+          uniqueWinesTasted: 0
+        },
+        recentSessions: [],
+        stats: {
+          averageScore: 0,
+          favoriteWineType: "Unknown",
+          totalTastings: 0
+        },
+        topPreferences: {
+          topRegion: { name: "None", count: 0, percentage: 0 },
+          topGrape: { name: "None", count: 0, percentage: 0 },
+          averageRating: { score: 0, totalWines: 0 }
+        }
+      };
+    }
+
+    const userSessions = await db
+        .select()
+        .from(sessions)
+        .where(inArray(sessions.id, sessionIds))
+        .orderBy(desc(sessions.startedAt));
+
+    // Get all responses for these participants
+    const participantIds = userParticipants.map(p => p.id);
+    const userResponses = await db
+        .select()
+        .from(responses)
+        .where(inArray(responses.participantId, participantIds));
+
+    // --- OPTIMIZATION START ---
+
+    // 1. Get all unique slide IDs from responses
+    const slideIds = [...new Set(userResponses.map(r => r.slideId).filter(Boolean) as string[])];
+
+    // 2. Fetch all slides in one query
+    const allSlides = slideIds.length > 0 ? await db.select().from(slides).where(inArray(slides.id, slideIds)) : [];
+    const slidesMap = new Map(allSlides.map(s => [s.id, s]));
+
+    // 3. Get all unique wine IDs from the fetched slides
+    const wineIds = [...new Set(allSlides.map(s => s.packageWineId).filter(Boolean) as string[])];
+
+    // 4. Fetch all wines in one query
+    const allWines = wineIds.length > 0 ? await db.select().from(packageWines).where(inArray(packageWines.id, wineIds)) : [];
+    const winesMap = new Map(allWines.map(w => [w.id, w]));
+
+    // --- OPTIMIZATION END ---
+
+    // Calculate statistics
+    const totalSessions = userSessions.length;
+    const totalResponses = userResponses.length;
+    const completedSessions = userSessions.filter((s: any) => s.status === 'completed').length;
+
+    // Get unique wines tasted with full details using the pre-fetched maps
+    const wineDetails = new Map();
+    const regionCounts = new Map();
+    const grapeCounts = new Map();
+
+    for (const response of userResponses) {
+      if (response.slideId) {
+        const slide = slidesMap.get(response.slideId);
+        if (slide?.packageWineId) {
+          const wine = winesMap.get(slide.packageWineId);
+
+          if (wine) {
+            wineDetails.set(wine.id, wine);
+
+            // Count regions
+            if (wine.region) {
+              regionCounts.set(wine.region, 1);
+            }
+
+            // Count grape varieties
+            if (wine.grapeVarietals && Array.isArray(wine.grapeVarietals)) {
+              wine.grapeVarietals.forEach((grape: string) => {
+                if (!grapeCounts.has(grape)) {
+                  grapeCounts.set(grape, 1);
+                }
+              
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Calculate top preferences
+    const topRegion = this.getTopPreference(regionCounts, wineDetails.size);
+    const topGrape = this.getTopPreference(grapeCounts, wineDetails.size);
+    const averageRating = {
+      score: this.calculateAverageScore(userResponses),
+      totalWines: wineDetails.size
+    };
+
+    return {
+      user: {
+        email,
+        displayName: userParticipants[0]?.displayName || 'Wine Enthusiast',
+        totalSessions,
+        completedSessions,
+        totalResponses,
+        uniqueWinesTasted: wineDetails.size
+      },
+      recentSessions: userSessions.slice(0, 5).map((session: any) => ({
+        id: session.id,
+        packageId: session.packageId,
+        status: session.status,
+        startedAt: session.startedAt,
+        completedAt: session.completedAt
+      })),
+      stats: {
+        averageScore: averageRating.score,
+        favoriteWineType: this.getFavoriteWineType(userResponses),
+        totalTastings: totalSessions
+      },
+      topPreferences: {
+        topRegion,
+        topGrape,
+        averageRating
+      }
+    };
+  }
+
+  async getUserWineScores(email: string): Promise<any> {
+    const userParticipants = await this.getAllParticipantsByEmail(email);
+
+    if (userParticipants.length === 0) {
+      return { scores: [] };
+    }
+
+    const participantIds = userParticipants.map(p => p.id);
+
+    // Optimized: Fetch all responses with related wine data in a single query
+    const responsesWithDetails = await db
+        .select({
+          response: responses,
+          wine: packageWines
+        })
+        .from(responses)
+        .innerJoin(slides, eq(responses.slideId, slides.id))
+        .innerJoin(packageWines, eq(slides.packageWineId, packageWines.id))
+        .where(inArray(responses.participantId, participantIds));
+
+    // Group responses by wine and calculate scores in memory
+    const wineScores: Record<string, any> = {};
+
+    for (const { response, wine } of responsesWithDetails) {
+      if (!wineScores[wine.id]) {
+        wineScores[wine.id] = {
+          wineId: wine.id,
+          wineName: wine.wineName,
+          wineDescription: wine.wineDescription,
+          wineImageUrl: wine.wineImageUrl,
+          producer: wine.producer,
+          region: wine.region,
+          vintage: wine.vintage,
+          wineType: wine.wineType,
+          grapeVarietals: wine.grapeVarietals,
+          alcoholContent: wine.alcoholContent,
+          expectedCharacteristics: wine.expectedCharacteristics,
+          discussionQuestions: wine.discussionQuestions,
+          scores: [],
+          averageScore: 0,
+          totalRatings: 0
+        };
+      }
+
+      const score = this.extractScoreFromResponse(response);
+      if (score !== null) {
+        wineScores[wine.id].scores.push(score);
+      }
+    }
+
+    // Calculate averages and add additional metadata
+    Object.values(wineScores).forEach((wineScore: any) => {
+      if (wineScore.scores.length > 0) {
+        wineScore.averageScore = wineScore.scores.reduce((a: number, b: number) => a + b, 0) / wineScore.scores.length;
+        wineScore.totalRatings = wineScore.scores.length;
+      }
+
+      wineScore.price = this.generatePlaceholderPrice(wineScore.averageScore, wineScore.region);
+      wineScore.isFavorite = Math.random() > 0.7;
+    });
+
+    return {
+      scores: Object.values(wineScores).sort((a: any, b: any) => b.averageScore - a.averageScore)
+    };
+  }
+
+  async getUserTasteProfileData(email: string): Promise<{ scores: any[]; dashboardData: any } | null> {
+    // 1. Get all participants for the user's email
+    const userParticipants = await this.getAllParticipantsByEmail(email);
+    if (userParticipants.length === 0) {
+      return null;
+    }
+
+    const participantIds = userParticipants.map(p => p.id);
+
+    // 2. Fetch all responses and related slide/wine data in a single, efficient query
+    const responsesWithDetails = await db
+        .select({
+          response: responses,
+          slide: {
+            packageWineId: slides.packageWineId
+          },
+          wine: packageWines
+        })
+        .from(responses)
+        .leftJoin(slides, eq(responses.slideId, slides.id))
+        .leftJoin(packageWines, eq(slides.packageWineId, packageWines.id))
+        .where(inArray(responses.participantId, participantIds));
+
+    // 3. Process the fetched data in memory
+    const dashboardData = await this.getUserDashboardData(email); // This can be further optimized if needed
+    if (!dashboardData) {
+      return null;
+    }
+
+    const wineScores: Record<string, any> = {};
+    for (const { response, wine } of responsesWithDetails) {
+      if (wine) {
+        if (!wineScores[wine.id]) {
+          wineScores[wine.id] = {
+            wineId: wine.id,
+            wineName: wine.wineName,
+            wineDescription: wine.wineDescription,
+            wineImageUrl: wine.wineImageUrl,
+            producer: wine.producer,
+            region: wine.region,
+            vintage: wine.vintage,
+            wineType: wine.wineType,
+            grapeVarietals: wine.grapeVarietals,
+            alcoholContent: wine.alcoholContent,
+            expectedCharacteristics: wine.expectedCharacteristics,
+            scores: [],
+            averageScore: 0,
+            totalRatings: 0
+          };
+        }
+        const score = this.extractScoreFromResponse(response);
+        if (score !== null) {
+          wineScores[wine.id].scores.push(score);
+        }
+      }
+    }
+
+    // 4. Calculate averages and finalize the scores object
+    Object.values(wineScores).forEach((wineScore: any) => {
+      if (wineScore.scores.length > 0) {
+        wineScore.averageScore = wineScore.scores.reduce((a: number, b: number) => a + b, 0) / wineScore.scores.length;
+        wineScore.totalRatings = wineScore.scores.length;
+      }
+      wineScore.price = this.generatePlaceholderPrice(wineScore.averageScore, wineScore.region);
+      wineScore.isFavorite = Math.random() > 0.7;
+    });
+
+    const sortedScores = Object.values(wineScores).sort((a: any, b: any) => b.averageScore - a.averageScore);
+
+    return {
+      scores: sortedScores,
+      dashboardData
+    };
+  }
+
+  async getUserTastingHistory(email: string, options: { limit: number; offset: number }): Promise<any> {
+    const userParticipants = await this.getAllParticipantsByEmail(email);
+    
+    if (userParticipants.length === 0) {
+      return { history: [], total: 0 };
+    }
+
+    const sessionIds = userParticipants.map(p => p.sessionId).filter(Boolean) as string[];
+    if (sessionIds.length === 0) {
+      return { history: [], total: 0 };
+    }
+    
+    // Get sessions with package info
+    const sessionsWithPackages = await db
+      .select({
+        session: sessions,
+        package: packages
+      })
+      .from(sessions)
+      .leftJoin(packages, eq(sessions.packageId, packages.id))
+      .where(inArray(sessions.id, sessionIds))
+      .orderBy(desc(sessions.startedAt))
+      .limit(options.limit)
+      .offset(options.offset);
+
+    const history = await Promise.all(
+      sessionsWithPackages.map(async ({ session, package: pkg }) => {
+      const sommelier = this.getPlaceholderSommelier(session.id);
+      const winesTasted = Math.floor(Math.random() * 8) + 4; // 4-11 wines
+      let userScore = 0;
+      let groupScore = 0;
+      const participants = await storage.getParticipantsBySessionId(session.id);
+      const userParticipant = participants.find(p => p.email === email);
+      const userResponses = await storage.getResponsesByParticipantId(userParticipant.id);
+      const allParticipantResponses: any[] = [];
+
+      for (const participant of participants) {
+        const responses = await storage.getResponsesByParticipantId(participant.id);
+        allParticipantResponses.push(...responses);
+      }
+      userScore = storage.calculateAverageScore(userResponses);
+      groupScore = storage.calculateAverageScore(allParticipantResponses);
+
+      return {
+        sessionId: session.id,
+        packageId: session.packageId,
+        packageName: pkg?.name || 'Unknown Package',
+        status: session.status,
+        startedAt: session.startedAt,
+        completedAt: session.completedAt,
+        activeParticipants: session.activeParticipants || 0,
+        sommelier,
+        winesTasted,
+        userScore: userScore.toFixed(1),
+        groupScore: groupScore.toFixed(1),
+        duration: Math.floor(Math.random() * 120) + 90, // 90-210 minutes
+        location: this.getPlaceholderLocation()
+      };
+    }));
+
+    const total = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(sessions)
+      .where(inArray(sessions.id, sessionIds));
+
+    return {
+      history,
+      total: total[0]?.count || 0
+    };
+  }
+
+  calculateAverageScore(userResponses: Response[]): number {
+    const scores = userResponses
+      .map(r => this.extractScoreFromResponse(r))
+      .filter(score => score !== null);
+    
+    if (scores.length === 0) return 0;
+    return scores.reduce((a, b) => a + b, 0) / scores.length;
+  }
+
+  private getFavoriteWineType(userResponses: Response[]): string {
+    // This is a simplified implementation
+    // In a real app, you'd analyze the wine types from the responses
+    return "Red Wine"; // Placeholder
+  }
+
+  private extractScoreFromResponse(response: Response): number | null {
+    try {
+      const answerJson = response.answerJson;
+      if (!answerJson) return null;
+
+      // Handle different response formats
+      if (typeof answerJson === 'number') {
+        return answerJson;
+      }
+      
+      if (typeof answerJson === 'object') {
+        // Check for common score fields
+        if ('score' in answerJson && typeof answerJson.score === 'number') return answerJson.score;
+        if ('rating' in answerJson && typeof answerJson.rating === 'number') return answerJson.rating;
+        if ('value' in answerJson && typeof answerJson.value === 'number') return answerJson.value;
+        
+        // Check for scale responses (1-10, 1-5, etc.)
+        if ('selectedOption' in answerJson) {
+          const option = answerJson.selectedOption;
+          if (typeof option === 'number') return option;
+          if (typeof option === 'string') {
+            const num = parseInt(option);
+            if (!isNaN(num)) return num;
+          }
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error extracting score from response:', error);
+      return null;
+    }
+  }
+
+  private getTopPreference(map: Map<string, number>, total: number): { name: string; count: number; percentage: number } {
+    let topName = "None";
+    let topCount = 0;
+    let topPercentage = 0;
+
+    Array.from(map.entries()).forEach(([name, count]) => {
+      if (count > topCount) {
+        topName = name;
+        topCount = count;
+        topPercentage = (count / total) * 100;
+      }
+    });
+
+    return { name: topName, count: topCount, percentage: topPercentage };
+  }
+
+  private generatePlaceholderPrice(averageScore: number, region?: string): number {
+    // Generate a realistic price based on score and region
+    let basePrice = 25;
+    
+    // Adjust based on score (higher scores = higher prices)
+    if (averageScore >= 4.5) basePrice = 150;
+    else if (averageScore >= 4.0) basePrice = 75;
+    else if (averageScore >= 3.5) basePrice = 45;
+    
+    // Adjust based on region prestige
+    if (region) {
+      const regionLower = region.toLowerCase();
+      if (regionLower.includes('bordeaux') || regionLower.includes('burgundy')) basePrice *= 1.5;
+      if (regionLower.includes('napa') || regionLower.includes('tuscany')) basePrice *= 1.3;
+      if (regionLower.includes('champagne')) basePrice *= 2.0;
+    }
+    
+    // Add some randomness
+    const variation = 0.8 + (Math.random() * 0.4); // ±20% variation
+    return Math.round(basePrice * variation);
+  }
+
+  private getPlaceholderSommelier(sessionId: string): any {
+    const sommeliers = [
+      {
+        name: "Marie Dubois",
+        title: "Master Sommelier",
+        avatar: "https://images.unsplash.com/photo-1494790108755-2616b612b786?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150"
+      },
+      {
+        name: "Alessandro Romano",
+        title: "Advanced Sommelier",
+        avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150"
+      },
+      {
+        name: "Sarah Chen",
+        title: "Certified Sommelier",
+        avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150"
+      },
+      {
+        name: "Pierre Laurent",
+        title: "Master Sommelier",
+        avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150"
+      }
+    ];
+    
+    // Use sessionId to consistently assign sommeliers
+    const index = parseInt(sessionId.slice(-1), 16) % sommeliers.length;
+    return sommeliers[index];
+  }
+
+  private getPlaceholderLocation(): string {
+    const locations = [
+      "Private Dining Room, The Metropolitan",
+      "Osteria del Vino",
+      "Rooftop Terrace, Wine & Dine",
+      "Château Cellar, Bordeaux Estate",
+      "Tuscan Villa, Montepulciano",
+      "Napa Valley Winery, St. Helena"
+    ];
+    
+    return locations[Math.floor(Math.random() * locations.length)];
+  }
+
+  async getUserSommelierFeedback(email: string): Promise<string[]> {
+    try {
+      const result = await db
+        .select({
+          sommelier_feedback: participants.sommelier_feedback
+        })
+        .from(participants)
+        .where(and(
+          eq(participants.email, email),
+          isNotNull(participants.sommelier_feedback)
+        ))
+        .orderBy(desc(participants.createdAt));
+
+      return result
+        .map((row: any) => row.sommelier_feedback)
+        .filter((feedback: any) => feedback && feedback.trim().length > 0);
+    } catch (error) {
+      console.error("Error fetching sommelier feedback:", error);
+      return [];
+    }
+  }
+
+  async generateSommelierTips(email: string): Promise<SommelierTips> {
+    return generateSommelierTips(email);
+  }
+}
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// LLM Integration Function for Sommelier Tips
+export async function generateSommelierTips(email: string): Promise<SommelierTips> {
+  try {
+    console.log(`🍷 Generating sommelier tips for: ${email}`);
+    
+    // 1. Get user's wine preferences from their responses
+    const userDashboardData = await storage.getUserDashboardData(email);
+    const userWineScores = await storage.getUserWineScores(email);
+    
+    // 2. Get sommelier feedback from previous tasting sessions
+    const sommelierFeedback = await storage.getUserSommelierFeedback(email);
+    
+    if (!userDashboardData || !userWineScores.scores || userWineScores.scores.length === 0) {
+      console.log(`📝 No tasting history found for ${email}, returning default tips`);
+      // Return default tips for users with no tasting history
+      return {
+        preferenceProfile: "I'm new to wine tasting and looking to explore different styles and regions.",
+        redDescription: "I'm interested in learning about red wines and discovering my preferences.",
+        whiteDescription: "I'd like to explore white wines and understand their characteristics.",
+        questions: [
+          "What wines would you recommend for someone just starting their wine journey?",
+          "Could you suggest a good wine for food pairing with [your dish]?",
+          "What's a good value wine that would help me develop my palate?",
+          "Can you recommend wines from different regions to help me explore?"
+        ],
+        priceGuidance: "I'm looking for wines in the $20-40 range as I develop my palate and preferences."
+      };
+    }
+
+    // 2. Aggregate their top regions, grapes, and average ratings
+    const topRegion = userDashboardData.topPreferences?.topRegion?.name || "various regions";
+    const topGrape = userDashboardData.topPreferences?.topGrape?.name || "different grape varieties";
+    const avgRating = userDashboardData.stats?.averageScore || 3.5;
+    
+    // Get wine type preferences
+    const redWines = userWineScores.scores.filter((wine: any) => wine.wineType === 'red');
+    const whiteWines = userWineScores.scores.filter((wine: any) => wine.wineType === 'white');
+    const totalWines = userWineScores.scores.length;
+
+    // Get top-rated white and red wines with traits
+    const topWhiteWine = whiteWines
+      .sort((a: any, b: any) => b.averageScore - a.averageScore)[0];
+    const topRedWine = redWines
+      .sort((a: any, b: any) => b.averageScore - a.averageScore)[0];
+
+    const topWhite = topWhiteWine
+      ? `${topWhiteWine.wineName} from ${topWhiteWine.region || 'unknown region'} (${topWhiteWine.averageScore}/5) - ${topWhiteWine.grapeVarietals?.join(', ') || 'grape variety unknown'}`
+      : 'No white wines rated yet';
+
+    const topRed = topRedWine
+      ? `${topRedWine.wineName} from ${topRedWine.region || 'unknown region'} (${topRedWine.averageScore}/5) - ${topRedWine.grapeVarietals?.join(', ') || 'grape variety unknown'}`
+      : 'No red wines rated yet';
+
+    console.log(`📊 User profile: ${totalWines} wines, ${avgRating.toFixed(1)}/5 avg, ${topRegion}, ${topGrape}`);
+    console.log(`🍷 Sommelier feedback entries: ${sommelierFeedback.length}`);
+
+    // Step 1: Load the prompt template
+    try {
+      const templatePath = path.join(process.cwd(), 'prompts', 'taste_helper.txt');
+      const templateContent = await fs.readFile(templatePath, 'utf-8');
+
+      // Step 2: Replace placeholders with user data
+      const MAX_TOKENS = 128000; // gpt-4o → 128k tokens max
+      let prompt = templateContent
+        .replace('{totalWines}', totalWines.toString())
+        .replace('{avgRating}', avgRating.toFixed(1))
+        .replace('{topRegion}', topRegion)
+        .replace('{topGrape}', topGrape)
+        .replace('{topWhite}', topWhite)
+        .replace('{topRed}', topRed)
+
+        let feedback = [...sommelierFeedback];
+        let feedbackText = feedback.map((f, i) => `\n  ${i + 1}. ${f}`).join('');
+
+        while (feedback.length && (prompt.length + feedbackText.length) / 4 >= MAX_TOKENS) {
+          feedback.shift();
+          feedbackText = feedback.map((f, i) => `\n  ${i + 1}. ${f}`).join('');
+        }
+
+        prompt = prompt.replace('{sommelierFeedback}', feedback.length ? feedbackText : 'No feedback available');
+        console.log(`🔍 ≈${(prompt.length / 4).toFixed(0)} tokens, ${feedback.length}/${sommelierFeedback.length} feedback`);
+
+      console.log(`📋 Template loaded and populated successfully`);
+
+      // Step 3: Call OpenAI GPT-4o API
+      if (!process.env.OPENAI_API_KEY) {
+        throw new Error("OPENAI_API_KEY environment variable is not set");
+      }
+
+      console.log(`🤖 Calling OpenAI API...`);
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `
+              You are an expert wine sommelier. Do not include any text outside the JSON response.
+              Write in second person (you/your) addressing the user directly.
+              {
+                "preferenceProfile": "overall summary",
+                "redDescription": "red wine preferences",
+                "whiteDescription": "white wine preferences",
+                "questions": ["question1", "question2", "question3", "question4"],
+                "priceGuidance": "price guidance"
+              }
+              `
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 600,
+        response_format: { type: "json_object" }
+      });
+
+      const response = completion.choices[0]?.message?.content;
+      
+      if (!response) {
+        throw new Error("OpenAI returned empty response");
+      }
+
+      console.log(`✅ OpenAI response received (${response.length} chars)`);
+
+      // Step 4: Parse the JSON response directly
+      const jsonResponse = JSON.parse(response);
+      const parsedTips = validateAndSanitizeSommelierTips(jsonResponse, {
+        topRegion,
+        topGrape,
+        avgRating,
+        redWines,
+        whiteWines,
+        totalWines
+      });
+
+      console.log(`🎯 Successfully generated personalized sommelier tips for ${email}`);
+      return parsedTips;
+
+    } catch (templateError) {
+      console.error("Template loading error:", templateError);
+      throw new Error(`Failed to load or process template: ${templateError instanceof Error ? templateError.message : 'Unknown error'}`);
+    }
+
+  } catch (error) {
+    console.error("Error in generateSommelierTips:", error);
+    
+    // Step 6: Enhanced Error Handling - Categorize errors and provide appropriate fallbacks
+    if (error instanceof Error) {
+      if (error.message.includes('OPENAI_API_KEY')) {
+        console.error("❌ OpenAI API key not configured");
+      } else if (error.message.includes('quota') || error.message.includes('rate limit')) {
+        console.error("❌ OpenAI API quota/rate limit exceeded");
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        console.error("❌ Network error connecting to OpenAI");
+      } else if (error.message.includes('template')) {
+        console.error("❌ Template file error");
+      } else {
+        console.error("❌ Unexpected error:", error.message);
+      }
+    }
+    
+    // Always provide fallback tips
+    console.log(`🔄 Falling back to static tips for ${email}`);
+    return generateFallbackTips(email);
+  }
+}
+
+
+
+// Validate and sanitize JSON response from OpenAI
+function validateAndSanitizeSommelierTips(jsonResponse: any, context: any): SommelierTips {
+  return {
+    preferenceProfile: jsonResponse.preferenceProfile || `I enjoy wines from ${context.topRegion}, particularly ${context.topGrape}. My average rating is ${context.avgRating.toFixed(1)}/5.`,
+    redDescription: jsonResponse.redDescription || "I'm interested in exploring red wines and understanding their characteristics.",
+    whiteDescription: jsonResponse.whiteDescription || "I'd like to explore white wines and discover my preferences.",
+    questions: Array.isArray(jsonResponse.questions) ? jsonResponse.questions.slice(0, 4) : [
+      `Do you have any wines similar to ${context.topGrape} from ${context.topRegion}?`,
+      "What would you recommend that pairs well with my meal?",
+      "Can you suggest something from a region I haven't explored?",
+      "What's a good value wine that represents the style I enjoy?"
+    ],
+    priceGuidance: jsonResponse.priceGuidance || `I typically enjoy wines in the $${Math.round(context.avgRating * 20)}-${Math.round(context.avgRating * 30)} range.`
+  };
+}
+
+// Fallback function if OpenAI is unavailable
+function generateFallbackTips(email: string): SommelierTips {
+  return {
+    preferenceProfile: "I'm developing my wine palate and enjoy exploring different styles and regions to understand my preferences better.",
+    redDescription: "I'm interested in red wines with good balance and approachable tannins.",
+    whiteDescription: "I enjoy white wines that are crisp and refreshing with good acidity.",
+    questions: [
+      "What wines would you recommend based on my developing palate?",
+      "Could you suggest a wine that pairs well with my meal?",
+      "What's a good value wine that would help me explore new regions?",
+      "Do you have any recommendations for wines similar to ones I've enjoyed?"
+    ],
+    priceGuidance: "I'm looking for wines in the $25-50 range that offer good quality and help me develop my wine knowledge."
+  };
 }
 
 export const storage = new DatabaseStorage();

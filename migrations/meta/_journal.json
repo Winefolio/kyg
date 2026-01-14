@@ -15,6 +15,13 @@
       "when": 1749155443185,
       "tag": "0001_worried_kate_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1754403760865,
+      "tag": "0002_reflective_old_lace",
+      "breakpoints": true
     }
   ]
 }

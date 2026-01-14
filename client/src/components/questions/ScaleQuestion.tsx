@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import {useState, useMemo, useEffect, useRef} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ModernSlider } from "@/components/ui/modern-slider";
 import { Label } from "@/components/ui/label";
@@ -28,8 +28,34 @@ interface ScaleQuestionProps {
 export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps) {
   const { triggerHaptic } = useHaptics();
   const glossaryContext = useGlossarySafe();
+  const [localValue, setLocalValue] = useState(value);
   const terms = glossaryContext?.terms || [];
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
+  useEffect(() => {
+    onChange(value);
+  }, []);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  function useDebouncedChange(onChange: (value: number) => void, delay = 300) {
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    return (value: number) => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        onChange(value);
+      }, delay);
+    };
+  }
+
+  const debouncedHandleChange = useDebouncedChange(onChange, 300);
+
+  const handleSliderChange = (newValue: number) => {
+    setLocalValue(newValue); // Update UI instantly
+    debouncedHandleChange(newValue); // Debounced backend/state update
+  };
 
   // Extract all relevant glossary terms from the current slide content
   const relevantTerms = useMemo(() => {
@@ -43,7 +69,7 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
   }, [question, terms]);
 
   // Calculate dynamic label styling based on slider position
-  const progressPercent = (value - question.scale_min) / (question.scale_max - question.scale_min);
+  const progressPercent = (localValue - question.scale_min) / (question.scale_max - question.scale_min);
   
   // Opacity: Make labels fade but never disappear completely (min opacity of 0.5)
   const rightLabelOpacity = 0.5 + (progressPercent * 0.5);
@@ -109,27 +135,26 @@ export function ScaleQuestion({ question, value, onChange }: ScaleQuestionProps)
 
       <div className="space-y-6">
         {/* Dynamic Feedback Text */}
-        <div className="h-8 text-center">
+        <div className="h-8 text-center flex flex-col items-center justify-center space-y-1">
           <AnimatePresence mode="wait">
-            <motion.p
-              key={feedbackText}
-              className="text-lg font-semibold text-purple-300"
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              transition={{ duration: 0.2 }}
+            <motion.span
+              key={localValue}
+              className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 15 }}
             >
-              {feedbackText}
-            </motion.p>
+              {localValue}
+            </motion.span>
           </AnimatePresence>
         </div>
 
         <ModernSlider
-          value={value}
+          value={localValue}
           min={question.scale_min}
           max={question.scale_max}
           step={1}
-          onChange={onChange}
+          onChange={handleSliderChange}
           progressPercent={progressPercent}
         />
         
