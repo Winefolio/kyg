@@ -37,6 +37,12 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
   
   // Debounce the value to reduce the number of onChange calls
   const debouncedValue = useDebounce(localValue, 300);
+
+  useEffect(() => {
+    if (value === '') {
+    onChange(' ');
+    }
+  }, []);
   
   // Extract all relevant glossary terms from the current slide content
   const relevantTerms = useMemo(() => {

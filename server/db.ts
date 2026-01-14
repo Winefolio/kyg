@@ -13,12 +13,12 @@ if (!connectionString) {
 console.log("Connecting to PostgreSQL database...");
 console.log("Connection string (masked):", connectionString?.replace(/:([^:@]+)@/, ':***@'));
 
-// Create the database connection with explicit SSL requirement and connection pooling
+// Create the database connection with SSL configuration for local development
 const sql = postgres(connectionString as string, {
-  ssl: 'require',
+  ssl: process.env.NODE_ENV === 'production' ? 'require' : false, // Only require SSL in production
   max: 20,              // Maximum number of connections in pool
   idle_timeout: 30,     // Close idle connections after 30 seconds
-  connect_timeout: 10,  // Connection timeout in seconds
+  connect_timeout: 30,  // Connection timeout in seconds (increased from 10)
   max_lifetime: 60 * 30 // Max connection lifetime: 30 minutes
 });
 export const db = drizzle(sql, { schema });

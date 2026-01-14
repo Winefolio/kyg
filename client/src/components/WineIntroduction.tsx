@@ -15,7 +15,7 @@ interface WineIntroductionProps {
 
 export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroductionProps) {
   return (
-    <div className="h-dynamic-screen relative overflow-hidden flex flex-col">
+    <div className="relative overflow-hidden flex flex-col" style={{ height: '100vh' }}>
       {/* Animated Background */}
       <div className="fixed inset-0 bg-gradient-to-br from-amber-900 via-orange-900 to-red-900">
         {/* Orange overlay removed for better mobile visibility */}
@@ -60,7 +60,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
       </div>
 
       {/* Main Content - Flex Layout */}
-      <div className="relative z-10 flex-1 flex flex-col p-4 sm:p-6">
+      <div className="relative z-10 flex-1 flex flex-col p-4 sm:p-6 overflow-y-auto bg-gradient-primary">
         <motion.div
           className="flex-1 flex flex-col max-w-4xl w-full mx-auto"
           initial={{ opacity: 0, scale: 0.9 }}
@@ -88,7 +88,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
           </motion.div>
 
           {/* Scrollable Content Area */}
-          <div className="flex-grow overflow-y-auto">
+          <div className="overflow-y-auto pt-6" style={{ flexGrow: 0.5 }}>
             {/* Wine Showcase */}
             <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 items-center mb-4 sm:mb-6">
             {/* Wine Image */}
@@ -107,7 +107,7 @@ export function WineIntroduction({ wine, isFirstWine, onContinue }: WineIntroduc
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <div className="absolute -inset-8 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-3xl blur-2xl -z-10" />
+                  <div className="absolute -inset-8 rounded-3xl blur-2xl -z-10" />
                   
                   {/* Floating elements around wine */}
                   {wine.position > 0 && (

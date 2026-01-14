@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import {useState, useMemo, useEffect} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,14 +34,29 @@ interface MultipleChoiceQuestionProps {
     notes?: string;
   };
   onChange: (value: { selected: string[]; notes?: string }) => void;
+  disableNext?: boolean;
+  setDisableNext?: (disable: boolean) => void;
 }
 
-export function MultipleChoiceQuestion({ question, value, onChange }: MultipleChoiceQuestionProps) {
+export function MultipleChoiceQuestion({ question, value, onChange, disableNext, setDisableNext }: MultipleChoiceQuestionProps) {
   const { triggerHaptic } = useHaptics();
   const glossaryContext = useGlossarySafe();
   const terms = glossaryContext?.terms || [];
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
+
+  useEffect(() => {
+    if (value.selected.length <= 0 ){
+      if (setDisableNext) {
+        setDisableNext(true);
+      }
+    }
+
+    return () => {
+      if (setDisableNext) {
+        setDisableNext(false);
+      } };
+  }, []);
 
   // Extract all relevant glossary terms from the current slide content
   const relevantTerms = useMemo(() => {
@@ -70,6 +85,9 @@ export function MultipleChoiceQuestion({ question, value, onChange }: MultipleCh
     }
     
     onChange({ ...value, selected: newSelected });
+    if (setDisableNext) {
+      setDisableNext(false);
+    }
   };
 
   const handleNotesChange = (notes: string) => {

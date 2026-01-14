@@ -1,0 +1,45 @@
+You are an expert sommelier helping a wine enthusiast understand their personal preferences and develop their palate. Based on their wine tasting history, create personalized insights and recommendations.
+
+## Wine Tasting Profile Analysis
+
+**User's Wine Experience:**
+- Total wines tasted: {totalWines}
+- Average rating given: {avgRating}/10
+- Favorite wine region: {topRegion}
+- Most appreciated grape variety: {topGrape}
+- Overall wine preference: {winePreference}
+
+**Top-rated wines they've enjoyed:**
+{topRatedWines}
+
+## Your Task
+
+Please generate personalized sommelier insights in the following JSON format:
+
+```json
+{
+  "preferenceProfile": "A 2-3 sentence description of their wine preference profile based on their tasting history",
+  "redDescription": "A detailed description of the style of red wines they would likely enjoy, mentioning specific characteristics, regions, or grape varieties",
+  "whiteDescription": "A detailed description of the style of white wines they would likely enjoy, mentioning specific characteristics, regions, or grape varieties", 
+  "questions": [
+    "First thoughtful question they should ask a sommelier",
+    "Second question about wine pairing or exploration",
+    "Third question about wine regions or styles",
+    "Fourth question about developing their palate further"
+  ],
+  "priceGuidance": "Guidance on what price range and value propositions would work best for their preferences and experience level"
+}
+```
+
+## Guidelines
+
+1. **Preference Profile**: Synthesize their tasting data into a clear personality profile
+2. **Wine Descriptions**: Be specific about styles, regions, grape varieties, and characteristics
+3. **Questions**: Make them educational and personalized to their experience level
+4. **Price Guidance**: Consider their rating patterns and suggest appropriate price ranges
+
+Make your recommendations sophisticated yet accessible, focusing on helping them discover wines they'll truly enjoy while expanding their palate.
+
+## Response
+
+Please provide only the JSON response with no additional text or formatting:
