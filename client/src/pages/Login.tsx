@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,16 +8,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { ArrowLeft, Mail, Wine, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  // Get redirect URL from query params
+  const redirectTo = new URLSearchParams(search).get("redirect");
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email.trim()) {
       toast({
         title: "Email Required",
@@ -32,21 +38,42 @@ export default function Login() {
     try {
       // Check if user exists by trying to fetch their dashboard data
       const response = await fetch(`/api/dashboard/${encodeURIComponent(email.trim())}?login=true`);
-      
+
       if (response.ok) {
-        // User exists, redirect to dashboard
-        setLocation(`/dashboard/${encodeURIComponent(email.trim())}`);
+        // Authenticate with server to establish session
+        const authResult = await login(email.trim());
+        if (!authResult.success) {
+          throw new Error(authResult.error || "Authentication failed");
+        }
+
+        // Redirect to original page or dashboard
+        const destination = redirectTo || `/dashboard/${encodeURIComponent(email.trim())}`;
+        setLocation(destination);
         toast({
           title: "Welcome Back!",
-          description: "Redirecting to your dashboard...",
+          description: redirectTo ? "Continuing where you left off..." : "Redirecting to your dashboard...",
         });
       } else if (response.status === 404) {
-        // User doesn't exist
-        toast({
-          title: "No Account Found",
-          description: "We couldn't find any tasting data for this email. Please join a tasting session first.",
-          variant: "destructive",
-        });
+        // User doesn't exist - authenticate to create account
+        const authResult = await login(email.trim());
+        if (!authResult.success) {
+          throw new Error(authResult.error || "Authentication failed");
+        }
+
+        // If they came from a journey, redirect back there
+        if (redirectTo?.startsWith('/journeys')) {
+          setLocation(redirectTo);
+          toast({
+            title: "Welcome!",
+            description: "You can start exploring wine journeys.",
+          });
+        } else {
+          toast({
+            title: "No Tasting History",
+            description: "You can start with solo tastings or learning journeys to build your profile.",
+          });
+          setLocation('/journeys');
+        }
       } else {
         throw new Error("Failed to check account");
       }

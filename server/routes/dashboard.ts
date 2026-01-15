@@ -726,7 +726,7 @@ async function generateWineProfileSummaries(
       .replace('{white_preferences}', JSON.stringify(whiteWineTraits, null, 2));
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-5.2", // Using GPT-5.2 for complex wine profile analysis - needs strong reasoning
       messages: [
         {
           role: "system",

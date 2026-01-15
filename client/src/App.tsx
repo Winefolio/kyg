@@ -18,7 +18,10 @@ import TastingDetailView from "@/pages/TastingDetailView";
 import Login from "@/pages/Login";
 import SoloDashboard from "@/pages/SoloDashboard";
 import SoloTastingDetail from "@/pages/SoloTastingDetail";
+import SoloTastingNew from "@/pages/SoloTastingNew";
 import SoloProfile from "@/pages/SoloProfile";
+import JourneyBrowser from "@/pages/JourneyBrowser";
+import JourneyDetail from "@/pages/JourneyDetail";
 
 import Profile from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
@@ -39,8 +42,11 @@ function Router() {
       <Route path="/host/:sessionId/:participantId" component={HostDashboard} />
       <Route path="/login" component={Login} />
       <Route path="/solo" component={SoloDashboard} />
+      <Route path="/solo/new" component={SoloTastingNew} />
       <Route path="/solo/tasting/:id" component={SoloTastingDetail} />
       <Route path="/solo/profile" component={SoloProfile} />
+      <Route path="/journeys" component={JourneyBrowser} />
+      <Route path="/journeys/:id" component={JourneyDetail} />
       <Route component={NotFound} />
     </Switch>
   );

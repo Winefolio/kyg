@@ -675,3 +675,194 @@ export interface WineCharacteristicsData {
 }
 
 export type WineCharacteristicsCacheEntry = typeof wineCharacteristicsCache.$inferSelect;
+
+// ============================================
+// LEARNING JOURNEYS (Product Pivot - Sprint 3)
+// ============================================
+
+// Journeys table - learning paths created by liaisons
+export const journeys = pgTable("journeys", {
+  id: serial("id").primaryKey(),
+  liaisonId: integer("liaison_id").references(() => users.id), // null = system journey
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  difficultyLevel: varchar("difficulty_level", { length: 20 }).notNull().default('beginner'), // 'beginner', 'intermediate', 'advanced'
+  estimatedDuration: varchar("estimated_duration", { length: 50 }), // e.g., "4 weeks", "8 wines"
+  wineType: varchar("wine_type", { length: 50 }), // 'red', 'white', 'mixed', etc.
+  coverImageUrl: text("cover_image_url"),
+  isPublished: boolean("is_published").default(false).notNull(),
+  totalChapters: integer("total_chapters").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => ({
+  liaisonIdx: index("idx_journeys_liaison").on(table.liaisonId),
+  publishedIdx: index("idx_journeys_published").on(table.isPublished),
+  difficultyIdx: index("idx_journeys_difficulty").on(table.difficultyLevel)
+}));
+
+// Chapters table - individual steps in a journey
+export const chapters = pgTable("chapters", {
+  id: serial("id").primaryKey(),
+  journeyId: integer("journey_id").notNull().references(() => journeys.id, { onDelete: "cascade" }),
+  chapterNumber: integer("chapter_number").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  wineRequirements: jsonb("wine_requirements"), // Criteria for valid wines
+  learningObjectives: jsonb("learning_objectives"), // What user will learn
+  tastingPrompts: jsonb("tasting_prompts"), // Guided questions during tasting
+  completionCriteria: jsonb("completion_criteria"), // What counts as "complete"
+  // Shopping guide fields - help users find wines at their local shop
+  shoppingTips: text("shopping_tips"), // Natural language guidance for finding wine
+  priceRange: jsonb("price_range"), // { min: number, max: number, currency: string }
+  alternatives: jsonb("alternatives"), // Array of acceptable substitute wines/criteria
+  askFor: text("ask_for"), // What to tell the wine shop staff
+  createdAt: timestamp("created_at").defaultNow().notNull()
+}, (table) => ({
+  journeyChapterIdx: unique().on(table.journeyId, table.chapterNumber),
+  journeyIdx: index("idx_chapters_journey").on(table.journeyId)
+}));
+
+// User journey progress tracking
+export const userJourneys = pgTable("user_journeys", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  journeyId: integer("journey_id").notNull().references(() => journeys.id, { onDelete: "cascade" }),
+  currentChapter: integer("current_chapter").default(1).notNull(),
+  completedChapters: jsonb("completed_chapters").default([]).notNull(), // Array of {chapterId, completedAt, tastingId}
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  lastActivityAt: timestamp("last_activity_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at") // null until all chapters done
+}, (table) => ({
+  userJourneyUnique: unique().on(table.userId, table.journeyId),
+  userIdx: index("idx_user_journeys_user").on(table.userId),
+  journeyIdx: index("idx_user_journeys_journey").on(table.journeyId)
+}));
+
+// Insert schemas for journeys
+export const insertJourneySchema = createInsertSchema(journeys, {
+  title: z.string().min(1, "Title is required").max(200),
+  description: z.string().nullable().optional(),
+  difficultyLevel: z.enum(['beginner', 'intermediate', 'advanced']).default('beginner'),
+  estimatedDuration: z.string().nullable().optional(),
+  wineType: z.enum(['red', 'white', 'rosé', 'sparkling', 'mixed']).nullable().optional(),
+  coverImageUrl: z.string().url().nullable().optional(),
+  isPublished: z.boolean().default(false)
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  totalChapters: true
+});
+
+export const insertChapterSchema = createInsertSchema(chapters, {
+  journeyId: z.number().int().positive(),
+  chapterNumber: z.number().int().positive(),
+  title: z.string().min(1, "Title is required").max(200),
+  description: z.string().nullable().optional(),
+  wineRequirements: z.object({
+    wineType: z.string().optional(),
+    region: z.string().optional(),
+    grapeVariety: z.string().optional(),
+    minVintage: z.number().optional(),
+    maxVintage: z.number().optional(),
+    priceRange: z.object({ min: z.number(), max: z.number() }).optional(),
+    specificWine: z.string().optional(), // Exact wine match
+    anyWine: z.boolean().optional() // Accept any wine
+  }).nullable().optional(),
+  learningObjectives: z.array(z.string()).nullable().optional(),
+  tastingPrompts: z.array(z.object({
+    question: z.string(),
+    category: z.enum(['appearance', 'aroma', 'taste', 'structure', 'overall']).optional()
+  })).nullable().optional(),
+  completionCriteria: z.object({
+    requirePhoto: z.boolean().default(true),
+    requireAllPrompts: z.boolean().default(false),
+    minRating: z.number().optional()
+  }).nullable().optional(),
+  // Shopping guide fields
+  shoppingTips: z.string().nullable().optional(),
+  priceRange: z.object({
+    min: z.number(),
+    max: z.number(),
+    currency: z.string().default('USD')
+  }).nullable().optional(),
+  alternatives: z.array(z.object({
+    name: z.string(), // e.g., "Any medium-bodied Italian red"
+    criteria: z.object({
+      wineType: z.string().optional(),
+      region: z.string().optional(),
+      grapeVariety: z.string().optional()
+    }).optional()
+  })).nullable().optional(),
+  askFor: z.string().nullable().optional()
+}).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertUserJourneySchema = createInsertSchema(userJourneys, {
+  userId: z.number().int().positive(),
+  journeyId: z.number().int().positive(),
+  currentChapter: z.number().int().positive().default(1),
+  completedChapters: z.array(z.object({
+    chapterId: z.number(),
+    completedAt: z.string(),
+    tastingId: z.number()
+  })).default([])
+}).omit({
+  id: true,
+  startedAt: true,
+  lastActivityAt: true,
+  completedAt: true
+});
+
+// Types for journeys
+export type Journey = typeof journeys.$inferSelect;
+export type InsertJourney = z.infer<typeof insertJourneySchema>;
+export type Chapter = typeof chapters.$inferSelect;
+export type InsertChapter = z.infer<typeof insertChapterSchema>;
+export type UserJourney = typeof userJourneys.$inferSelect;
+export type InsertUserJourney = z.infer<typeof insertUserJourneySchema>;
+
+// Wine requirements structure
+export interface WineRequirements {
+  wineType?: string;
+  region?: string;
+  grapeVariety?: string;
+  minVintage?: number;
+  maxVintage?: number;
+  priceRange?: { min: number; max: number };
+  specificWine?: string;
+  anyWine?: boolean;
+}
+
+// Completed chapter record
+export interface CompletedChapter {
+  chapterId: number;
+  completedAt: string;
+  tastingId: number;
+}
+
+// Shopping guide types
+export interface PriceRange {
+  min: number;
+  max: number;
+  currency: string;
+}
+
+export interface WineAlternative {
+  name: string; // e.g., "Any medium-bodied Italian red"
+  criteria?: {
+    wineType?: string;
+    region?: string;
+    grapeVariety?: string;
+  };
+}
+
+// Full chapter shopping guide
+export interface ChapterShoppingGuide {
+  shoppingTips?: string;
+  priceRange?: PriceRange;
+  alternatives?: WineAlternative[];
+  askFor?: string;
+}
