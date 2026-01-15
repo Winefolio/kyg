@@ -8,6 +8,12 @@ import { db } from "./db";
 import { sql } from "drizzle-orm";
 
 const app = express();
+
+// Trust proxy for Railway/Heroku/etc (required for secure cookies behind proxy)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
