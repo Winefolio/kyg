@@ -98,7 +98,7 @@ Respond in JSON format only:
           content: prompt
         }
       ],
-      max_tokens: 350,
+      max_completion_tokens: 350,
       temperature: 0.2, // Very low temperature for consistent analysis
       response_format: { type: "json_object" } // Ensure JSON response
     });
@@ -372,7 +372,7 @@ Respond in JSON format only:
           content: prompt
         }
       ],
-      max_tokens: 600, // Increased for comprehensive summaries
+      max_completion_tokens: 600, // Increased for comprehensive summaries
       temperature: 0.3, // Balanced for creative yet consistent summaries
       response_format: { type: "json_object" }
     });

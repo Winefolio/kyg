@@ -5821,7 +5821,7 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
           }
         ],
         temperature: 0.7,
-        max_tokens: 600,
+        max_completion_tokens: 600,
         response_format: { type: "json_object" }
       });
 
