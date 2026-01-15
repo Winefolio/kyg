@@ -1,0 +1,35 @@
+1. What type of fruit do you smell and taste most in this wine? (Please select one answer that describes it
+best, even if the fruit you get isn’t there it should fall into one of these categories!)
+◦ A Fruit (i.e,[])
+◦ B Fruit (i.e, [])
+◦ C Fruit (i.e, [])
+⁃ On the scale below, how much do you enjoy the flavor/smell you identified in the wine? (your thoughts on
+the sensation through the lens of the wine, not your general hated towards plums...duh) 1 = get it away
+from me, 5 = I’m indifferent, but still thirsty, 10 = give me more of this!
+2. What condition is the fruit you picked up on in? (Please select the answer that best describes!)
+◦ Underripe/Green (in flavor not color)
+◦ Ripe/Fresh-Picked
+◦ Overripe/Jammy
+◦ Baked/Cooked
+⁃ On the scale below, how much do you enjoy the flavor/smell you identified in the wine? (your thoughts on
+the sensation through the lens of the wine) 1 = get it away from me, 5 = I’m indifferent, but still thirsty, 10 =
+give me more!
+3. Do you smell/taste any of the following secondary or tertiary notes? Iif so which stands out the most?
+◦ Earth/Minerality (i.e, forest floor, leaves, graphite, flint)
+◦ Vessel/Oak barrels (i.e, toast, vanilla, cinnamon, clove, dill)
+◦ Herbal/Floral (i.e, eucalyptus, mint, black pepper, violet)
+◦ Fermentation/aging (i.e, leather, tobacco, soy sauce, jerky)
+⁃ On the scale below, how much do you enjoy the secondary and tertiary notes that you identified in the wine?
+(your thoughts on the sensation through the lens of the wine) 1 = get it away from me, 5 = I’m indifferent,
+but still thirsty, 10 = give me more!
+4. 4. One the scale below, mark how much you enjoyed the acidity of the wine (was it mouth-watering like you
+just tasted something delicious, or puckering like it was something overly sour - think about the
+pleasantness of this sensation to you). You can refer to the terminology for more info. 1 = Way too acidic
+and puckering, 5 = I’m indifferent, but still thirsty, 10 = Mouthwatering and absolutely delicious!
+5. On the scale below, mark how much you enjoyed the body of the wine ( think drinking a glass of water vs a
+glass of whole milk, the body is how heavy the wine feels in your mouth). 1 = get it away from me, 5 = I’m
+indifferent, but still thirsty, 10 = give me more!
+7. Would you drink another glass and/or finish a bottle of a wine like this? Would you bring this bottle to a
+dinner party? Be honest here, proverbial water gun to your head.1 = I wouldn’t drink this and would be
+embarrassed to bring it to dinner party , 5 = I’m indifferent, but still thirsty, 10 = I love it and would
+confidently recommend it to a wine snob

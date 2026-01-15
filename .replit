@@ -8,7 +8,7 @@ packages = ["imagemagick"]
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
+build = ["sh", "-c", "npm install && npm run db:push && npm run build"]
 run = ["npm", "run", "start"]
 
 [workflows]
@@ -35,3 +35,77 @@ waitForPort = 5000
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3000
+
+[[ports]]
+localPort = 14022
+externalPort = 5000
+exposeLocalhost = true
+
+[[ports]]
+localPort = 16672
+externalPort = 3003
+exposeLocalhost = true
+
+[[ports]]
+localPort = 26690
+externalPort = 5173
+exposeLocalhost = true
+
+[[ports]]
+localPort = 28706
+externalPort = 8080
+exposeLocalhost = true
+
+[[ports]]
+localPort = 34057
+externalPort = 8099
+exposeLocalhost = true
+
+[[ports]]
+localPort = 39151
+externalPort = 8000
+exposeLocalhost = true
+
+[[ports]]
+localPort = 46198
+externalPort = 4200
+exposeLocalhost = true
+
+[[ports]]
+localPort = 52622
+externalPort = 6800
+exposeLocalhost = true
+
+[[ports]]
+localPort = 55887
+externalPort = 9000
+exposeLocalhost = true
+
+[[ports]]
+localPort = 57594
+externalPort = 3001
+exposeLocalhost = true
+
+[[ports]]
+localPort = 57853
+externalPort = 6000
+exposeLocalhost = true
+
+[[ports]]
+localPort = 60993
+externalPort = 8008
+exposeLocalhost = true
+
+[[ports]]
+localPort = 61566
+externalPort = 8081
+exposeLocalhost = true
+
+[[ports]]
+localPort = 62213
+externalPort = 3002
+exposeLocalhost = true

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { SessionWineSelector } from "@/components/SessionWineSelector";
 import type { Session, Participant, Slide, Response } from "@shared/schema";
 
 // Analytics data types
@@ -243,40 +244,60 @@ export default function HostDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-primary">
-      <div className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Host Dashboard</h1>
-          <p className="text-purple-200">
-            {analyticsData?.packageName || session?.packageCode || 'Wine Collection'} • {participants.length} participants
-          </p>
-          <Badge 
-            className={`mt-2 ${
-              sessionStatus === 'active' ? 'bg-green-500' : 
-              sessionStatus === 'paused' ? 'bg-yellow-500' : 
-              sessionStatus === 'completed' ? 'bg-blue-500' : 'bg-gray-500'
-            }`}
-          >
-            {sessionStatus.charAt(0).toUpperCase() + sessionStatus.slice(1)}
-          </Badge>
-          
-          {/* Display Short Session Code */}
-          {session?.short_code && (
-            <div className="mt-4">
-              <p className="text-purple-200 mb-2">Share this code with participants:</p>
-              <Badge className="text-2xl font-bold tracking-wider bg-white/20 text-white px-6 py-3 border border-white/30">
-                {session.short_code}
-              </Badge>
+      <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-6 lg:px-6 lg:py-8 max-w-7xl">
+        {/* Improved Header with Better Spacing */}
+        <div className="text-center mb-10 space-y-6">
+          <div className="space-y-3">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white tracking-tight">
+              Host Dashboard
+            </h1>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-lg">
+              <span className="text-purple-200 font-medium">
+                {analyticsData?.packageName || session?.packageCode || 'Wine Collection'}
+              </span>
+              <span className="hidden sm:block text-purple-300">•</span>
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-purple-300" />
+                <span className="text-purple-200">{participants.length} participants</span>
+              </div>
             </div>
-          )}
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="flex flex-col items-center mt-7">
+            <Badge 
+              className={`px-4 py-2 text-sm font-medium ${
+                sessionStatus === 'active' ? 'bg-green-500/20 text-green-300 border-green-400/50' : 
+                sessionStatus === 'paused' ? 'bg-yellow-500/20 text-yellow-300 border-yellow-400/50' : 
+                sessionStatus === 'completed' ? 'bg-blue-500/20 text-blue-300 border-blue-400/50' : 
+                'bg-gray-500/20 text-gray-300 border-gray-400/50'
+              } border`}
+            >
+              {sessionStatus.charAt(0).toUpperCase() + sessionStatus.slice(1)}
+            </Badge>
+            </div>
+            
+            {/* Session Code with Better Design */}
+            {session?.short_code && (
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-purple-300 text-sm font-medium">Session Code</span>
+                <div className="bg-white/15 backdrop-blur-md border border-white/30 rounded-2xl px-6 py-3">
+                  <span className="text-white text-2xl font-bold tracking-[0.2em] font-mono">
+                    {session.short_code}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-6xl mx-auto">
-          <TabsList className="grid w-full grid-cols-4 bg-white/10 backdrop-blur-xl">
-            <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20">Overview</TabsTrigger>
-            <TabsTrigger value="participants" className="text-white data-[state=active]:bg-white/20">Participants</TabsTrigger>
-            <TabsTrigger value="analytics" className="text-white data-[state=active]:bg-white/20">Analytics</TabsTrigger>
-            <TabsTrigger value="controls" className="text-white data-[state=active]:bg-white/20">Controls</TabsTrigger>
+          <TabsList className="flex w-full overflow-x-auto md:grid md:grid-cols-5 bg-white/10 backdrop-blur-xl rounded-2xl p-1 mb-8 scrollbar-hide h-15">
+            <TabsTrigger value="overview" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 sm:px-1 md:px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Overview</TabsTrigger>
+            <TabsTrigger value="wines" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 sm:px-1 md:px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Selection</TabsTrigger>
+            <TabsTrigger value="participants" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 sm:px-1 md:px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Participants</TabsTrigger>
+            <TabsTrigger value="analytics" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 sm:px-1 md:px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Analytics</TabsTrigger>
+            <TabsTrigger value="controls" className="text-white data-[state=active]:bg-white/20 data-[state=active]:text-white rounded-xl py-3 sm:px-1 md:px-4 text-sm font-medium transition-all whitespace-nowrap flex-shrink-0">Controls</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -396,6 +417,29 @@ export default function HostDashboard() {
             </div>
           </TabsContent>
 
+          <TabsContent value="wines" className="space-y-6">
+            {session?.packageId && (
+              <SessionWineSelector 
+                sessionId={session.id}
+                packageId={session.packageId}
+                onSelectionChange={(selectedCount) => {
+                  console.log(`Host selected ${selectedCount} wines for session`);
+                }}
+              />
+            )}
+            {!session?.packageId && (
+              <Card className="bg-gradient-card backdrop-blur-xl border border-white/20">
+                <CardContent className="p-8 text-center">
+                  <Wine className="w-12 h-12 text-white/40 mx-auto mb-4" />
+                  <h3 className="text-white text-lg font-medium mb-2">No Package Selected</h3>
+                  <p className="text-white/60">
+                    This session doesn't have a wine package assigned. Contact your administrator.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
           <TabsContent value="participants" className="space-y-6">
             <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
               <CardHeader>
@@ -442,9 +486,16 @@ export default function HostDashboard() {
                               </div>
                             </div>
                             <Progress value={progress} className="h-2" />
-                            <p className="text-purple-200 text-xs mt-1">
-                              Step {participant.progressPtr || 0} of {totalSlidesForThisParticipant}
-                            </p>
+                            <div className="flex justify-between items-center">
+                              <p className="text-purple-200 text-xs mt-1">
+                                Step {participant.progressPtr || 0} of {totalSlidesForThisParticipant}
+                              </p>
+                              {participant.progressPtr && participant.progressPtr > 0 && slides[participant.progressPtr - 1] && (
+                                <p className="text-purple-300 text-xs mt-1">
+                                  {(slides[participant.progressPtr - 1] as any).wineInfo?.wineName || 'Introduction'}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -672,6 +723,20 @@ export default function HostDashboard() {
                     <h3 className="text-white font-medium">Data Export</h3>
                     <div className="space-y-2">
                       <Button
+                        onClick={() => {
+                          // Download CSV export
+                          const link = document.createElement('a');
+                          link.href = `/api/sessions/${sessionId}/export/csv`;
+                          link.download = `wine-tasting-session-${sessionId}-analytics.csv`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          
+                          toast({
+                            title: "Export Started",
+                            description: "Your CSV file will download shortly"
+                          });
+                        }}
                         variant="outline"
                         className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20"
                       >

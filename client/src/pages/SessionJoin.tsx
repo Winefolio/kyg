@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,12 +15,12 @@ import { UserProfileModal } from "@/components/UserProfileModal";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { apiRequest } from "@/lib/queryClient";
-import { Wine, Users, User } from "lucide-react";
+import { Wine, Users, User, Clock, Loader2 } from "lucide-react";
 import type { Package, Participant, Session } from "@shared/schema";
 
 const joinFormSchema = z.object({
   displayName: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  email: z.string().min(1, "Email is required").email("Invalid email"),
   isHost: z.boolean().default(false)
 });
 
@@ -62,6 +62,24 @@ export default function SessionJoin() {
     enabled: !!effectivePackageCode
   });
 
+  // Get package slides to determine wine count and total slides
+  const { data: slidesData, isLoading: slidesLoading } = useQuery<{
+    package: Package;
+    slides: any[];
+    totalCount: number;
+    wines: any[];
+  }>({
+    queryKey: [`/api/packages/${effectivePackageCode}/slides`],
+    enabled: !!effectivePackageCode
+  });
+
+  // Get participants count when joining existing session
+  const { data: participants, isLoading: participantsLoading } = useQuery<Participant[]>({
+    queryKey: [`/api/sessions/${sessionIdFromUrl}/participants`],
+    enabled: !!sessionIdFromUrl,
+    refetchInterval: 5000 // Refresh every 5 seconds to get updated count
+  });
+
   // Create session mutation
   const createSessionMutation = useMutation({
     mutationFn: async (packageCode: string) => {
@@ -84,24 +102,53 @@ export default function SessionJoin() {
 
     try {
       if (sessionIdFromUrl) {
+        // Enhanced logging for debugging
+        console.log('[CLIENT_JOIN] Attempting to join session with:', {
+          sessionIdFromUrl,
+          sessionIdType: typeof sessionIdFromUrl,
+          sessionIdLength: sessionIdFromUrl?.length,
+          isUUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionIdFromUrl),
+          isShortCode: sessionIdFromUrl?.length === 6 && /^[A-Z0-9]{6}$/.test(sessionIdFromUrl),
+          existingSession: existingSession
+        });
+        
         // Joining an existing session via sessionId
         if (!existingSession) {
           throw new Error('Session not found');
         }
 
         // Add participant to existing session
+        const participantData = {
+          ...data,
+          isHost: false // Participants joining via link are not hosts
+        };
+        
+        console.log('[CLIENT_JOIN] Sending participant data:', participantData);
+        
         const participant = await joinSessionMutation.mutateAsync({
           sessionId: sessionIdFromUrl,
-          participant: {
-            ...data,
-            isHost: false // Participants joining via link are not hosts
-          }
+          participant: participantData
         });
 
         triggerHaptic('success');
         
-        // Navigate to tasting session
-        setLocation(`/tasting/${sessionIdFromUrl}/${participant.id}`);
+        // Handle returning participants
+        if (participant.isReturning) {
+          console.log('[SESSION_JOIN] Returning participant detected:', {
+            participantId: participant.id,
+            progressPtr: participant.progressPtr,
+            email: participant.email
+          });
+          
+          // Show welcome back message
+          alert(`Welcome back, ${participant.displayName}! We'll resume where you left off.`);
+        }
+        
+        // Navigate to tasting session with resume parameter
+        const resumeParam = participant.isReturning && participant.progressPtr > 0 
+          ? `?resume=${participant.progressPtr}` 
+          : '';
+        setLocation(`/tasting/${sessionIdFromUrl}/${participant.id}${resumeParam}`);
         
       } else {
         // Creating a new session (original flow for hosts or package code entry)
@@ -130,13 +177,77 @@ export default function SessionJoin() {
     } catch (error) {
       console.error('Error joining session:', error);
       triggerHaptic('error');
+      
+      // Display user-friendly error messages based on the error
+      let errorMessage = 'Failed to join session. Please try again.';
+      
+      if (error instanceof Error) {
+        // Parse error message from API response
+        if (error.message.includes('500:')) {
+          try {
+            const errorData = JSON.parse(error.message.substring(error.message.indexOf('{'), error.message.lastIndexOf('}') + 1));
+            errorMessage = errorData.message || errorMessage;
+            
+            // Log additional error details for debugging
+            console.error('Error details:', {
+              errorCode: errorData.errorCode,
+              timestamp: errorData.timestamp,
+              fullError: error.message
+            });
+          } catch (parseError) {
+            // If parsing fails, use a generic message
+            console.error('Failed to parse error response:', parseError);
+          }
+        } else if (error.message.includes('404:')) {
+          errorMessage = 'Session not found. Please check the session code and try again.';
+        } else if (error.message.includes('400:')) {
+          errorMessage = 'Invalid session or participant data. Please check your information and try again.';
+        } else if (error.message.includes('409:')) {
+          errorMessage = 'You may have already joined this session. Please refresh and try again.';
+        }
+      }
+      
+      // Show error to user (you might want to add a toast notification here)
+      alert(errorMessage);
     } finally {
       setIsJoining(false);
     }
   };
 
-  if (packageLoading || sessionLoading) {
+  // Check if we're trying to join a session that doesn't exist
+  useEffect(() => {
+    if (sessionIdFromUrl && !sessionLoading && !existingSession) {
+      // Session not found - redirect back to gateway with error
+      setTimeout(() => {
+        triggerHaptic('error');
+        setLocation('/');
+      }, 2000);
+    }
+  }, [sessionIdFromUrl, sessionLoading, existingSession, triggerHaptic, setLocation]);
+
+  if (packageLoading || sessionLoading || slidesLoading) {
     return <LoadingOverlay isVisible={true} message="Loading session details..." />;
+  }
+
+  // Show error state if session not found
+  if (sessionIdFromUrl && !existingSession) {
+    return (
+      <div className="min-h-screen bg-gradient-primary p-6 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-red-500/20 backdrop-blur-xl rounded-3xl p-8 border border-red-500/30 shadow-2xl max-w-md w-full text-center"
+        >
+          <h2 className="text-2xl font-bold text-white mb-4">Session Not Found</h2>
+          <p className="text-white/80 mb-6">
+            The session code "{sessionIdFromUrl}" does not exist or has expired.
+          </p>
+          <p className="text-white/60 text-sm">
+            Redirecting you back to the homepage...
+          </p>
+        </motion.div>
+      </div>
+    );
   }
 
   return (
@@ -163,16 +274,43 @@ export default function SessionJoin() {
           {/* Session Stats */}
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-white">6</div>
-              <div className="text-white/60 text-sm">Wines</div>
+              <div className="text-2xl font-bold text-white h-8 flex items-center justify-center">
+                {slidesLoading ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  slidesData?.wines ? slidesData.wines.filter(w => w.position > 0).length : 0
+                )}
+              </div>
+              <div className="text-white/60 text-sm flex items-center justify-center gap-1">
+                <Wine className="w-3 h-3" />
+                Wines
+              </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-white">45</div>
-              <div className="text-white/60 text-sm">Minutes</div>
+              <div className="text-2xl font-bold text-white h-8 flex items-center justify-center">
+                {slidesLoading ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  slidesData?.totalCount ? Math.round(slidesData.totalCount * 1) : 0
+                )}
+              </div>
+              <div className="text-white/60 text-sm flex items-center justify-center gap-1">
+                <Clock className="w-3 h-3" />
+                Minutes
+              </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-white">0</div>
-              <div className="text-white/60 text-sm">Participants</div>
+              <div className="text-2xl font-bold text-white h-8 flex items-center justify-center">
+                {participantsLoading && sessionIdFromUrl ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  sessionIdFromUrl && participants ? participants.length : 0
+                )}
+              </div>
+              <div className="text-white/60 text-sm flex items-center justify-center gap-1">
+                <Users className="w-3 h-3" />
+                Participants
+              </div>
             </div>
           </div>
         </motion.div>
@@ -213,7 +351,7 @@ export default function SessionJoin() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-white/80">Email (Optional)</FormLabel>
+                    <FormLabel className="text-white/80">Email (Required)</FormLabel>
                     <FormControl>
                       <Input
                         {...field}

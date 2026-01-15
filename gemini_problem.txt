@@ -1,0 +1,90 @@
+Know Your Grape: AI Project Brief & Technical Deep-Dive
+This document provides the context for the "Know Your Grape" project. Please use this as your primary source of truth for understanding our goals, conventions, and immediate tasks.
+1. Project Overview & Goals
+Know Your Grape is a real-time, interactive wine-tasting platform. It enables sommeliers (Hosts) to create tasting "packages," each containing multiple wines and a corresponding set of presentation slides (interludes, questions, etc.). Participants join a live session and are guided through the tasting.
+Our current focus is a major overhaul to enhance the user experience and, most importantly, to build a robust and intuitive content management system (the "Package Editor") for sommeliers.
+Primary Goals:
+Seamless Multi-Wine Experience: Ensure the tasting session flows perfectly from one wine to the next, with a clear, replicable structure for each wine.
+Dynamic Content Creation: Empower sommeliers to easily create, edit, and arrange slides for any wine in their packages using a flexible, template-based system.
+UI/UX Polish and Consistency: Refine the user interface, remove redundant components, and create a polished, predictable experience for all users.
+2. Technical Stack & Conventions
+Backend: Node.js, Express, PostgreSQL, Drizzle ORM.
+Frontend: React, Vite, TypeScript, wouter (routing).
+Data & State: @tanstack/react-query for server state, React Context for global UI state.
+UI & Styling: tailwindcss, shadcn/ui, framer-motion.
+Key Files:
+Shared Schema: shared/schema.ts (Single Source of Truth for data structures).
+Data Layer: server/storage.ts (All database logic).
+API: server/routes.ts (All API endpoints).
+Participant UI: client/src/pages/TastingSession.tsx (The live tasting screen).
+Admin UI: client/src/pages/PackageEditor.tsx (The main content editor).
+3. Detailed Task Breakdown & Implementation Paths
+This section outlines our immediate objectives. For each task, we describe the problem qualitatively, analyze its root cause in the code, and suggest a potential implementation path for you to use as a reference.
+Group 1: Session Flow & Content Architecture
+Task 1.1: Implement a Continuous, Replicable Multi-Wine Flow
+Problem: When a package contains multiple wines, the tasting experience breaks after the first wine. The session flow (Intro -> Deep Dive -> Ending sections) is not replicated for the second, third, and subsequent wines. We need a continuous experience where each wine gets the same structured tasting flow.
+Analysis (The "Why"): The root cause is not a runtime issue in the frontend but a data seeding issue in the backend. The initializeWineTastingData function in server/storage.ts successfully creates multiple PackageWine records. However, it only generates and assigns the full set of tasting slides to the first wine. The subsequent wines have no associated slides in the database, causing the session to have no content to display after the first wine's slides are exhausted.
+Suggested Implementation Path (A Potential "How"):
+Fix the Data Seeding Logic: The immediate fix is within server/storage.ts. Modify the initializeWineTastingData function. Instead of creating slides once, create a loop that iterates over every wine that was just created (e.g., for (const wine of [chateauMargaux, chateauLatour, ...])).
+Generate Slides for Each Wine: Inside this loop, run the existing slide creation logic. For each wine, create a full set of slides from the slideTemplates array, ensuring each new slide is linked with the correct packageWineId of the current wine in the loop.
+The True Fix: The long-term solution, addressed in a later task, is to make this process dynamic within the PackageEditor, so a sommelier can build these flows without any hardcoded logic.
+Key Files to Investigate:
+server/storage.ts: The initializeWineTastingData function is the primary location for the fix.
+Task 1.2: Implement a Dynamic Slide Template System for the Editor
+Problem: We need a flexible way for sommeliers to build out the tasting experience in the PackageEditor. Instead of hardcoding every slide, they should be able to select from a list of pre-defined templates (like the ones in the provided image) to add new, editable slides to any wine.
+Analysis (The "Why"): The file client/src/lib/wineTemplates.ts and the hardcoded SLIDE_TEMPLATES in SlideEditor.tsx are a great starting point, but there's no clear UI or logic that allows a user to select one and create a new database record from it.
+Suggested Implementation Path (A Potential "How"):
+Centralize & Enhance Templates: Consolidate all slide templates into one definitive source, likely client/src/lib/wineTemplates.ts. Add the new questions from the provided image to this file as new templates, ensuring each has a unique ID, name, icon, default sectionType, and a complete payloadTemplate.
+Create the "Add Slide" UI: In PackageEditor.tsx, within the sidebar UI for each wine, add a prominent (+) Add Slide button. This button should trigger a <Popover> or <DropdownMenu> component.
+Populate the Template Menu: The content of this popover should be a list of the templates from your centralized file, grouped by section (Intro, Deep Dive, Ending).
+Implement the Creation Logic: When a user clicks a template (e.g., "Body Assessment"), the onClick handler should call the createSlideMutation. The payload for this mutation must include:
+The packageWineId of the wine it's being added to.
+The type, section_type, and payloadJson from the selected template.
+A calculated position (e.g., one greater than the last slide for that wine).
+This will call POST /api/slides, create the new slide in the database, and it will appear in the editor after the react-query data re-fetches.
+Key Files to Investigate:
+client/src/pages/PackageEditor.tsx: To add the UI and trigger the mutation.
+client/src/lib/wineTemplates.ts: To define the source templates.
+server/storage.ts: To ensure the createSlide logic is correct.
+Task 1.3: Consolidate Tooltip UI
+Problem: We have two conflicting tooltip mechanisms. We want to standardize on a single, consistent approach: an info icon in the top-right of a component that opens a panel with relevant terms. The pop-up that appears at the bottom of the screen should be removed.
+Analysis (The "Why"):
+The "Keep" System: MultipleChoiceQuestion.tsx has the desired behavior. An <Info> icon in the header toggles a panel (isInfoPanelOpen) that lists all relevant glossary terms for that slide.
+The "Remove" System: The DynamicTextRenderer.tsx component is currently configured to automatically find terms and make them clickable, triggering a definition pop-up. This is the functionality we want to disable to achieve a consistent UI.
+Suggested Implementation Path (A Potential "How"):
+Modify DynamicTextRenderer: Open client/src/components/ui/DynamicTextRenderer.tsx. Change its behavior so that it still finds and wraps glossary terms, but instead of a <button> that triggers a pop-up, it should wrap them in a non-interactive, styled <span> (e.g., <span className="font-bold text-purple-300">{term}</span>). This preserves the visual highlighting without the unwanted pop-up behavior.
+Create a Reusable Help Panel: Extract the info panel logic from MultipleChoiceQuestion.tsx into a new component: client/src/components/ui/HelpfulTermsPanel.tsx. This component should take the slide's content as props, use the extractRelevantTerms helper function to find applicable terms, and render the icon and panel.
+Deploy the Panel: Add the new <HelpfulTermsPanel /> component to the header of all question components (MultipleChoiceQuestion.tsx, ScaleQuestion.tsx, etc.) to provide a consistent help mechanism.
+Key Files to Investigate:
+client/src/components/ui/DynamicTextRenderer.tsx: To remove the pop-up onClick logic.
+client/src/components/questions/MultipleChoiceQuestion.tsx: To use as the source for the new HelpfulTermsPanel component.
+client/src/components/questions/ScaleQuestion.tsx (and others): To add the new, standardized help panel.
+Group 2: Host & Editor Experience
+Task 2.1: Implement Host Wine Selection & Ordering
+Problem: A host currently has no control over the wines used in a session. When they start a session with a package, all wines are included in their default order. We need to give the host the ability to select a subset of wines and define a custom order for them for that specific session.
+Analysis (The "Why"): The HostDashboard.tsx page lacks this UI. The database schema, however, is prepared for this with the sessionWineSelections table. The backend API and the frontend runtime logic just need to be built to utilize it.
+Suggested Implementation Path (A Potential "How"):
+Build the SessionWineSelector UI: The file client/src/components/SessionWineSelector.tsx already exists and is a fantastic start. Ensure it's integrated into HostDashboard.tsx. This component should:
+Fetch all wines for the session's package.
+Render each wine with a toggle switch (isIncluded) and a drag handle.
+Use @dnd-kit/sortable to allow the host to re-order the wines.
+Implement Save Logic: Add a "Save Selection" button. On click, it should call a new mutation that sends the custom list of wines (their IDs, isIncluded status, and new position) to a new endpoint: POST /api/sessions/:sessionId/wine-selections.
+Update Backend: The backend logic for this endpoint in server/storage.ts should populate the sessionWineSelections table for that session.
+Update Session Runtime: Critically, the data-fetching logic in TastingSession.tsx (GET /api/packages/:code/slides) must be updated. The backend for this route must first check if the session has entries in sessionWineSelections. If it does, it should build the slide deck based on that custom order and selection. If not, it should fall back to the default package order.
+Key Files to Investigate:
+client/src/pages/HostDashboard.tsx: To integrate the selection UI.
+client/src/components/SessionWineSelector.tsx: The UI component for this feature.
+server/routes.ts & server/storage.ts: To implement the API for saving and retrieving session-specific wine selections.
+Task 2.2: Implement a True Live Preview in the Editor
+Problem: The slide preview in PackageEditor.tsx is a static mock-up. It does not update in real-time as the sommelier makes edits, and it doesn't accurately represent the final look and feel of the slide.
+Analysis (The "Why"): SlidePreviewPanel.tsx uses its own simplified rendering logic instead of the real, interactive components. The state from the editor form (SlideConfigPanel) is not shared with the preview panel.
+Suggested Implementation Path (A Potential "How"):
+Lift Editing State: The state for the slide currently being edited must be managed by the parent PackageEditor.tsx component, not within the form component itself.
+Share Live State: Pass this "live" slide data state down as props to both the SlideConfigPanel (the form) and the SlidePreviewPanel (the preview). The form will now update the parent's state onChange.
+Refactor the Preview Panel: Rewrite SlidePreviewPanel.tsx to be a "dumb" presenter. It should contain a switch statement based on the type of the live slide data it receives.
+Render Real Components: Inside the switch, render the actual participant-facing components (e.g., <MultipleChoiceQuestion question={liveSlideData.payloadJson} ... />). This is the key to achieving 100% preview fidelity.
+Debounce for Performance: To prevent UI lag, the function that updates the live state from the form should be debounced, so the preview only re-renders after a brief pause in typing (e.g., 250ms).
+Key Files to Investigate:
+client/src/pages/PackageEditor.tsx: To manage the live editing state.
+client/src/components/editor/SlideConfigPanel.tsx: The form component.
+client/src/components/editor/SlidePreviewPanel.tsx: The preview component to be refactored.

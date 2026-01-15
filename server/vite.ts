@@ -28,7 +28,7 @@ export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
-    allowedHosts: true,
+    allowedHosts: true as const, // Fix type issue
   };
 
   const vite = await createViteServer({
@@ -47,7 +47,8 @@ export async function setupVite(app: Express, server: Server) {
   });
 
   app.use(vite.middlewares);
-  app.use("*", async (req, res, next) => {
+  // Serve React app for all non-API routes to support client-side routing
+  app.use(/^(?!\/api\/).*/, async (req, res, next) => {
     const url = req.originalUrl;
 
     try {
