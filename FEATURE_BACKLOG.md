@@ -33,15 +33,31 @@ This file tracks features that have been deprioritized, cut from reviews, or are
 ---
 
 ### User Dashboard Redesign - Rich Wine Discovery Experience
-**Status**: Backlog
+**Status**: In Progress (Sprint 4.1)
 **Priority**: High
 **Source**: User request (2026-01-15)
 
-**Description**: Complete redesign of the user dashboard to create a compelling, feature-rich experience that helps users discover and buy wines based on their taste profile.
+**Update (2026-01-15)**: Phase 1 of this feature is now in progress as "Unified User Dashboard" in Sprint 4.1.
+See `plans/feat-unified-dashboard.md` for detailed implementation plan.
 
-**Problem**: Current dashboard is basic and doesn't provide actionable value that would drive wine purchases.
+**Phase 1 (Sprint 4.1 - In Progress)**: Unified Dashboard
+- Merge solo + group tastings into single view at `/dashboard/:email`
+- Add preference bars (sweetness, acidity, tannins, body)
+- Source badges showing Solo vs Group for each tasting
+- Email-only access (no auth required for now)
 
-**Proposed Features**:
+**Phase 2 (Future)**: Rich Discovery
+- Personalized wine recommendations
+- Taste profile visualization with radar chart
+- Wine discovery feed
+- Purchase integration
+- Social features
+
+---
+
+**Original Description**: Complete redesign of the user dashboard to create a compelling, feature-rich experience that helps users discover and buy wines based on their taste profile.
+
+**Proposed Features (deferred to Phase 2)**:
 1. **Personalized Wine Recommendations**
    - AI-powered suggestions based on tasting history
    - "Wines You'll Love" section with match percentages
