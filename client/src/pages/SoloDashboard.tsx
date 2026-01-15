@@ -246,10 +246,10 @@ export default function SoloDashboard() {
             </span>
             <button
               onClick={() => logoutMutation.mutate()}
-              className="text-white/60 hover:text-white p-2 rounded-full hover:bg-white/10"
+              className="text-white/60 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-white/10"
               title="Logout"
             >
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-6 h-6" />
             </button>
           </div>
         </div>

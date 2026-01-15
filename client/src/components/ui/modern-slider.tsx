@@ -35,17 +35,47 @@ export function ModernSlider({
   const clampedValue = Math.max(min, Math.min(max, value));
   const percentage = Math.max(0, Math.min(100, ((clampedValue - min) / (max - min)) * 100));
 
-  const handleClick = (e: React.MouseEvent) => {
-    if (!trackRef.current) return;
-    
+  const calculateValueFromPosition = (clientX: number) => {
+    if (!trackRef.current) return null;
+
     const rect = trackRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickPercentage = (clickX / rect.width) * 100;
-    const newValue = Math.round((clickPercentage / 100) * (max - min) + min);
-    const clampedValue = Math.max(min, Math.min(max, newValue));
-    
+    const posX = clientX - rect.left;
+    const posPercentage = (posX / rect.width) * 100;
+    const newValue = Math.round((posPercentage / 100) * (max - min) + min);
+    return Math.max(min, Math.min(max, newValue));
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    const newValue = calculateValueFromPosition(e.clientX);
+    if (newValue !== null) {
+      triggerHaptic('selection');
+      onChange(newValue);
+    }
+  };
+
+  // Touch event handlers for mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setIsDragging(true);
+    const touch = e.touches[0];
+    const newValue = calculateValueFromPosition(touch.clientX);
+    if (newValue !== null && newValue !== value) {
+      triggerHaptic('selection');
+      onChange(newValue);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const touch = e.touches[0];
+    const newValue = calculateValueFromPosition(touch.clientX);
+    if (newValue !== null && newValue !== value) {
+      onChange(newValue);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
     triggerHaptic('selection');
-    onChange(clampedValue);
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -61,16 +91,19 @@ export function ModernSlider({
   const dashPositions = Array.from({ length: dashCount }, (_, i) => (i / (dashCount - 1)) * 100);
 
   return (
-    <div className={cn("relative overflow-hidden", className)}>
-      {/* Slider Track */}
+    <div className={cn("relative overflow-hidden py-4", className)}>
+      {/* Slider Track - extra padding for better touch target */}
       <div className="relative">
         <motion.div
           ref={trackRef}
-          className="relative h-3 bg-white/20 rounded-full cursor-pointer overflow-hidden backdrop-blur-sm"
+          className="relative h-4 bg-white/20 rounded-full cursor-pointer overflow-hidden backdrop-blur-sm touch-none"
           style={{ maxWidth: '100%' }} // Safety net to prevent overflow
           onClick={handleClick}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setHoverPosition(null)}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           whileHover={{ scaleY: 1.2 }}
           transition={{ duration: 0.2 }}
         >

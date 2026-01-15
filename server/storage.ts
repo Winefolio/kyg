@@ -1796,6 +1796,10 @@ export class DatabaseStorage implements IStorage {
         wineName: wine.wineName,
         wineDescription: wine.wineDescription,
         wineImageUrl: wine.wineImageUrl,
+        wineType: wine.wineType,
+        region: wine.region,
+        grapeVarietals: wine.grapeVarietals,
+        expectedCharacteristics: wine.expectedCharacteristics,
         questionsAnswered: wineResponses.length,
         totalQuestions: wineSlides.length,
         questionAnalysis

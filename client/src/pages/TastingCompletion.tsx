@@ -11,20 +11,23 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { useSessionPersistence } from "@/hooks/useSessionPersistence";
 import { ComingSoonOverlay } from "@/components/ui/coming-soon-overlay";
-import { 
-  CheckCircle, 
-  Trophy, 
-  Wine, 
-  Home, 
+import { WineInsights } from "@/components/WineInsights";
+import { apiRequest } from "@/lib/queryClient";
+import {
+  CheckCircle,
+  Trophy,
+  Wine,
+  Home,
   TrendingUp,
   Users,
   Target,
   PieChart,
   Zap,
   Download,
-  Edit
+  Edit,
+  Lightbulb
 } from "lucide-react";
-import type { Participant, Response, Session } from "@shared/schema";
+import type { Participant, Response, Session, WineCharacteristicsData } from "@shared/schema";
 
 interface ParticipantAnalytics {
   participantId: string;
@@ -41,6 +44,21 @@ interface ParticipantAnalytics {
     wineName: string;
     wineDescription: string;
     wineImageUrl: string;
+    wineType?: string;
+    region?: string;
+    grapeVarietals?: string[];
+    expectedCharacteristics?: {
+      sweetness?: number;
+      acidity?: number;
+      tannins?: number;
+      body?: number;
+      style?: string;
+      regionCharacter?: string;
+      aroma?: string[];
+      taste?: string[];
+      color?: string;
+      finish?: string;
+    };
     questionsAnswered: number;
     totalQuestions: number;
     questionAnalysis: Array<{
@@ -58,6 +76,125 @@ interface ParticipantAnalytics {
   };
   insights: string[];
   recommendations: string[];
+}
+
+// Component to display wine insights for group tastings
+// Uses pre-uploaded characteristics when available, falls back to LLM only for user-uploaded wines
+function WineInsightsLoader({
+  wineName,
+  wineDescription,
+  expectedCharacteristics,
+  questionAnalysis
+}: {
+  wineName: string;
+  wineDescription: string;
+  expectedCharacteristics?: {
+    sweetness?: number;
+    acidity?: number;
+    tannins?: number;
+    body?: number;
+    style?: string;
+    regionCharacter?: string;
+  };
+  questionAnalysis: Array<{
+    question: string;
+    questionType: string;
+    answered: boolean;
+    comparison: any;
+  }>;
+}) {
+  // Check if we have pre-uploaded characteristics with the required taste attributes
+  const hasPreUploadedCharacteristics = expectedCharacteristics &&
+    (typeof expectedCharacteristics.sweetness === 'number' ||
+     typeof expectedCharacteristics.acidity === 'number' ||
+     typeof expectedCharacteristics.tannins === 'number' ||
+     typeof expectedCharacteristics.body === 'number');
+
+  // Only fetch from LLM if no pre-uploaded characteristics exist
+  const { data: fetchedCharacteristics, isLoading } = useQuery<{
+    found: boolean;
+    characteristics?: WineCharacteristicsData;
+  }>({
+    queryKey: ['wine-characteristics', wineName],
+    queryFn: async () => {
+      const response = await apiRequest('POST', '/api/solo/wines/characteristics', {
+        wineName,
+        wineRegion: wineDescription
+      });
+      return response.json();
+    },
+    staleTime: 1000 * 60 * 30,
+    retry: 1,
+    enabled: !hasPreUploadedCharacteristics // Only fetch if no pre-uploaded data
+  });
+
+  // Use pre-uploaded characteristics or fetched ones
+  const characteristics: WineCharacteristicsData | undefined = hasPreUploadedCharacteristics
+    ? {
+        sweetness: expectedCharacteristics.sweetness ?? 3,
+        acidity: expectedCharacteristics.acidity ?? 3,
+        tannins: expectedCharacteristics.tannins ?? 3,
+        body: expectedCharacteristics.body ?? 3,
+        style: expectedCharacteristics.style,
+        regionCharacter: expectedCharacteristics.regionCharacter,
+        source: 'cache' as const
+      }
+    : fetchedCharacteristics?.characteristics;
+
+  // Extract user ratings from question analysis
+  const extractUserRatings = () => {
+    const ratings: { sweetness?: number; acidity?: number; tannins?: number; body?: number } = {};
+
+    const attributePatterns: Record<string, RegExp> = {
+      sweetness: /sweet/i,
+      acidity: /acid|crisp|tart/i,
+      tannins: /tannin|grip|dry/i,
+      body: /body|weight|full|light/i
+    };
+
+    for (const q of questionAnalysis) {
+      if (q.questionType === 'scale' && q.comparison?.yourAnswer) {
+        const answer = q.comparison.yourAnswer;
+        // Convert 10-point scale to 5-point scale
+        const normalizedAnswer = typeof answer === 'number' ? Math.round(answer / 2) : undefined;
+
+        for (const [attr, pattern] of Object.entries(attributePatterns)) {
+          if (pattern.test(q.question) && normalizedAnswer) {
+            ratings[attr as keyof typeof ratings] = normalizedAnswer;
+          }
+        }
+      }
+    }
+
+    return ratings;
+  };
+
+  const userRatings = extractUserRatings();
+  const hasRatings = Object.keys(userRatings).length > 0;
+
+  // Show loading only if we're fetching (i.e., no pre-uploaded data)
+  if (!hasPreUploadedCharacteristics && isLoading) {
+    return (
+      <div className="bg-amber-500/10 rounded-lg p-3 border border-amber-500/20 animate-pulse">
+        <div className="flex items-center gap-2">
+          <Lightbulb className="w-4 h-4 text-amber-400" />
+          <span className="text-white/60 text-sm">Loading wine intelligence...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!characteristics || !hasRatings) {
+    return null;
+  }
+
+  return (
+    <WineInsights
+      characteristics={characteristics}
+      userRatings={userRatings}
+      compact={true}
+    />
+  );
 }
 
 export default function TastingCompletion() {
@@ -316,6 +453,15 @@ export default function TastingCompletion() {
                       </div>
                     </CardHeader>
                     <CardContent>
+                      {/* Wine Intelligence - uses pre-uploaded characteristics when available */}
+                      <div className="mb-4">
+                        <WineInsightsLoader
+                          wineName={wine.wineName}
+                          wineDescription={wine.wineDescription}
+                          expectedCharacteristics={wine.expectedCharacteristics}
+                          questionAnalysis={wine.questionAnalysis}
+                        />
+                      </div>
                       <Accordion type="single" collapsible className="w-full">
                         <AccordionItem value="questions" className="border-white/20">
                           <AccordionTrigger className="text-white hover:text-purple-200">

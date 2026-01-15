@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Wine, ArrowRight, X } from "lucide-react";
+import { Wine, ArrowRight, X, Camera, Loader2, CheckCircle } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import PhotoCapture from "./PhotoCapture";
 
 interface WineInfo {
   wineName: string;
@@ -74,6 +76,10 @@ const COMMON_GRAPES = [
 ];
 
 export default function WineEntryForm({ onSubmit, onCancel, initialData }: WineEntryFormProps) {
+  const [showPhotoCapture, setShowPhotoCapture] = useState(false);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+  const [recognitionMessage, setRecognitionMessage] = useState<string | null>(null);
+
   const [wineName, setWineName] = useState(initialData?.wineName || '');
   const [wineRegion, setWineRegion] = useState(initialData?.wineRegion || '');
   const [wineVintage, setWineVintage] = useState<string>(
@@ -85,6 +91,47 @@ export default function WineEntryForm({ onSubmit, onCancel, initialData }: WineE
   const currentYear = new Date().getFullYear();
   const vintageYears = Array.from({ length: 50 }, (_, i) => currentYear - i);
 
+  const handlePhotoCapture = async (file: File) => {
+    setIsProcessingPhoto(true);
+    setRecognitionMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch('/api/solo/wines/recognize', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      if (data.recognized && data.wine) {
+        // Pre-fill form with recognized data
+        if (data.wine.wineName) setWineName(data.wine.wineName);
+        if (data.wine.wineRegion) setWineRegion(data.wine.wineRegion);
+        if (data.wine.wineVintage) setWineVintage(data.wine.wineVintage.toString());
+        if (data.wine.grapeVariety) setGrapeVariety(data.wine.grapeVariety);
+        if (data.wine.wineType) setWineType(data.wine.wineType);
+
+        setRecognitionMessage(
+          data.wine.confidence > 0.7
+            ? '✓ Wine recognized! Please verify the details.'
+            : '✓ Wine recognized with low confidence. Please verify the details.'
+        );
+      } else {
+        setRecognitionMessage('Could not recognize wine. Please enter details manually.');
+      }
+    } catch (error) {
+      console.error('Photo recognition error:', error);
+      setRecognitionMessage('Recognition failed. Please enter details manually.');
+    } finally {
+      setIsProcessingPhoto(false);
+      setShowPhotoCapture(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -95,11 +142,22 @@ export default function WineEntryForm({ onSubmit, onCancel, initialData }: WineE
     onSubmit({
       wineName: wineName.trim(),
       wineRegion: wineRegion.trim() || undefined,
-      wineVintage: wineVintage ? parseInt(wineVintage) : undefined,
+      wineVintage: wineVintage && wineVintage !== 'nv' ? parseInt(wineVintage) : undefined,
       grapeVariety: grapeVariety.trim() || undefined,
       wineType: wineType as WineInfo['wineType'] || undefined
     });
   };
+
+  // Show photo capture view
+  if (showPhotoCapture) {
+    return (
+      <PhotoCapture
+        onCapture={handlePhotoCapture}
+        onCancel={() => setShowPhotoCapture(false)}
+        isProcessing={isProcessingPhoto}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
@@ -122,10 +180,55 @@ export default function WineEntryForm({ onSubmit, onCancel, initialData }: WineE
             </div>
             <button
               onClick={onCancel}
-              className="text-white/60 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+              className="text-white/60 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6" />
             </button>
+          </div>
+
+          {/* Scan Label Button */}
+          <button
+            onClick={() => setShowPhotoCapture(true)}
+            className="w-full mb-4 flex items-center justify-center gap-3 p-4 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 hover:from-blue-500/30 hover:to-cyan-500/30 rounded-xl border border-blue-500/30 transition-colors"
+          >
+            <Camera className="w-5 h-5 text-blue-400" />
+            <span className="text-white font-medium">Scan Wine Label</span>
+          </button>
+
+          {/* Recognition Message */}
+          <AnimatePresence>
+            {recognitionMessage && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className={`mb-4 p-3 rounded-lg flex items-center gap-2 ${
+                  recognitionMessage.startsWith('✓')
+                    ? 'bg-emerald-500/20 border border-emerald-500/30'
+                    : 'bg-amber-500/20 border border-amber-500/30'
+                }`}
+              >
+                <CheckCircle className={`w-4 h-4 ${
+                  recognitionMessage.startsWith('✓') ? 'text-emerald-400' : 'text-amber-400'
+                }`} />
+                <span className={`text-sm ${
+                  recognitionMessage.startsWith('✓') ? 'text-emerald-200' : 'text-amber-200'
+                }`}>
+                  {recognitionMessage}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="relative mb-4">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-white/10" />
+            </div>
+            <div className="relative flex justify-center text-xs">
+              <span className="bg-gradient-to-br from-white/10 to-white/5 px-2 text-white/40">
+                or enter manually
+              </span>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
