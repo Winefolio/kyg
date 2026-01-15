@@ -110,7 +110,7 @@ If you cannot read the label clearly or it's not a wine label, return:
             ]
           }
         ],
-        max_tokens: 500,
+        max_completion_tokens: 500,
         response_format: { type: 'json_object' }
       });
 
