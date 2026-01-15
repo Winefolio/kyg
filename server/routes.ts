@@ -16,6 +16,8 @@ import { z } from "zod";
 // Now using proven storage.batchUpdateSlidePositions instead
 import { registerMediaProxyRoutes } from './routes/media-proxy';
 import { registerDashboardRoutes } from './routes/dashboard';
+import { registerAuthRoutes } from './routes/auth';
+import { registerTastingsRoutes } from './routes/tastings';
 
 // Configure multer for file uploads with comprehensive image support
 const upload = multer({
@@ -2219,12 +2221,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Register auth routes (solo tasting)
+  registerAuthRoutes(app);
+
+  // Register solo tasting routes
+  registerTastingsRoutes(app);
+
   // Register dashboard routes
   registerDashboardRoutes(app);
 
   // Register media proxy routes
   registerMediaProxyRoutes(app);
-  
+
   console.log("✅ All routes registered successfully!");
   const httpServer = createServer(app);
   return httpServer;
