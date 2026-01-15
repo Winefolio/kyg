@@ -135,6 +135,71 @@ export function registerDashboardRoutes(app: Express) {
     }
   });
 
+  // Get unified preferences (combined from solo + group tastings)
+  app.get("/api/dashboard/:email/preferences", async (req, res) => {
+    try {
+      const { email } = req.params;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email parameter is required" });
+      }
+
+      // Get preferences from solo tastings
+      const user = await storage.getUserByEmail(email);
+      let soloPrefs: { sweetness: number | null; acidity: number | null; tannins: number | null; body: number | null; count: number } = {
+        sweetness: null, acidity: null, tannins: null, body: null, count: 0
+      };
+
+      if (user) {
+        soloPrefs = await storage.getSoloTastingPreferences(user.id);
+      }
+
+      // Get preferences from group tastings
+      const groupPrefs = await storage.getGroupTastingPreferences(email);
+
+      // Combine both sources with weighted average
+      const totalCount = soloPrefs.count + groupPrefs.count;
+
+      if (totalCount === 0) {
+        return res.json({
+          sweetness: null,
+          acidity: null,
+          tannins: null,
+          body: null,
+          totalTastings: 0,
+          soloTastings: 0,
+          groupTastings: 0
+        });
+      }
+
+      // Weighted average of preferences
+      const combine = (solo: number | null, soloCount: number, group: number | null, groupCount: number) => {
+        const validSolo = solo !== null ? { value: solo, count: soloCount } : null;
+        const validGroup = group !== null ? { value: group, count: groupCount } : null;
+
+        if (!validSolo && !validGroup) return null;
+        if (!validSolo) return validGroup!.value;
+        if (!validGroup) return validSolo.value;
+
+        const totalWeight = validSolo.count + validGroup.count;
+        return (validSolo.value * validSolo.count + validGroup.value * validGroup.count) / totalWeight;
+      };
+
+      res.json({
+        sweetness: combine(soloPrefs.sweetness, soloPrefs.count, groupPrefs.sweetness, groupPrefs.count),
+        acidity: combine(soloPrefs.acidity, soloPrefs.count, groupPrefs.acidity, groupPrefs.count),
+        tannins: combine(soloPrefs.tannins, soloPrefs.count, groupPrefs.tannins, groupPrefs.count),
+        body: combine(soloPrefs.body, soloPrefs.count, groupPrefs.body, groupPrefs.count),
+        totalTastings: totalCount,
+        soloTastings: soloPrefs.count,
+        groupTastings: groupPrefs.count
+      });
+    } catch (error) {
+      console.error("Error fetching unified preferences:", error);
+      res.status(500).json({ message: "Internal server error", error: String(error) });
+    }
+  });
+
   // Get user's sommelier feedback
   app.get("/api/dashboard/:email/sommelier-feedback", async (req, res) => {
     try {

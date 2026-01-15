@@ -83,6 +83,17 @@ interface WineScore {
   };
 }
 
+// Sprint 4.1: Unified preferences from both solo + group tastings
+interface UnifiedPreferences {
+  sweetness: number | null;
+  acidity: number | null;
+  tannins: number | null;
+  body: number | null;
+  totalTastings: number;
+  soloTastings: number;
+  groupTastings: number;
+}
+
 interface TastingHistory {
   sessionId: string;
   packageId: string;
@@ -339,6 +350,12 @@ export default function UserDashboard() {
 
   // Use taste profile directly
   const finalTasteProfile = tasteProfile;
+
+  // Sprint 4.1: Fetch unified preferences (solo + group combined)
+  const { data: unifiedPreferences } = useQuery<UnifiedPreferences>({
+    queryKey: [`/api/dashboard/${email}/preferences`],
+    enabled: !!email,
+  });
 
   // Fetch sommelier feedback first
   const { data: sommelierFeedback } = useQuery<string[]>({
@@ -722,6 +739,49 @@ export default function UserDashboard() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Sprint 4.1: Unified Preference Bars */}
+        {unifiedPreferences && unifiedPreferences.totalTastings > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="mb-6 p-5 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/10"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="w-5 h-5 text-green-400" />
+              <h2 className="text-lg font-semibold text-white">Taste Profile</h2>
+              <span className="text-white/40 text-sm ml-auto">
+                Based on {unifiedPreferences.totalTastings} tastings
+              </span>
+            </div>
+
+            {/* Preference Bars */}
+            <div className="space-y-3">
+              {[
+                { label: 'Sweetness', value: unifiedPreferences.sweetness, color: 'from-pink-500 to-rose-500' },
+                { label: 'Acidity', value: unifiedPreferences.acidity, color: 'from-yellow-500 to-orange-500' },
+                { label: 'Tannins', value: unifiedPreferences.tannins, color: 'from-red-500 to-red-700' },
+                { label: 'Body', value: unifiedPreferences.body, color: 'from-purple-500 to-indigo-500' },
+              ].map((pref) => (
+                <div key={pref.label}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-white/70">{pref.label}</span>
+                    <span className="text-white/50">{pref.value !== null ? `${Number(pref.value).toFixed(1)}/5` : '-'}</span>
+                  </div>
+                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: pref.value !== null ? `${(Number(pref.value) / 5) * 100}%` : '0%' }}
+                      transition={{ duration: 0.5, delay: 0.2 }}
+                      className={`h-full bg-gradient-to-r ${pref.color} rounded-full`}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
         )}
 
         {/* Main Content Tabs */}

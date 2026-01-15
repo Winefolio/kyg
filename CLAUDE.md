@@ -91,6 +91,22 @@ Optional:
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE` - For media uploads
 - `SESSION_SECRET` - For production session encryption
 
+## Product Roadmap
+
+**Current Sprint:** Sprint 4 - Rich Dashboard & Insights Evolution
+
+**Active Work (Sprint 4.1):** Unified User Dashboard
+- Merging solo + group dashboards into single view at `/dashboard/:email`
+- See `plans/feat-unified-dashboard.md` for detailed implementation plan
+- Key design decisions: email-only access (no auth), duplicate wines shown separately
+
+See `/Users/andreszubillaga/plans/kyg-product-pivot.md` for:
+- Sprint status table (what's complete, what's current)
+- Detailed specs for each sprint
+- Technical implementation notes
+
+**Important:** KYG has TWO coexisting experiences (group + solo). We are NOT pivoting away from group tastings.
+
 ## Feature Backlog
 
 See `FEATURE_BACKLOG.md` for deprioritized features and future ideas.

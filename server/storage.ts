@@ -4732,6 +4732,90 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  // Sprint 4.1: Get solo tasting preferences for unified dashboard
+  async getSoloTastingPreferences(userId: number): Promise<{
+    sweetness: number | null;
+    acidity: number | null;
+    tannins: number | null;
+    body: number | null;
+    count: number;
+  }> {
+    const result = await db.execute(sql`
+      SELECT
+        AVG((responses->'taste'->>'sweetness')::numeric) as sweetness,
+        AVG((responses->'taste'->>'acidity')::numeric) as acidity,
+        AVG((responses->'taste'->>'tannins')::numeric) as tannins,
+        AVG((responses->'taste'->>'body')::numeric) as body,
+        COUNT(*) as count
+      FROM tastings
+      WHERE user_id = ${userId}
+    `);
+
+    const row = Array.isArray(result) ? result[0] : (result as any).rows?.[0];
+    return {
+      sweetness: row?.sweetness ? Number(row.sweetness) : null,
+      acidity: row?.acidity ? Number(row.acidity) : null,
+      tannins: row?.tannins ? Number(row.tannins) : null,
+      body: row?.body ? Number(row.body) : null,
+      count: row?.count ? Number(row.count) : 0
+    };
+  }
+
+  // Sprint 4.1: Get group tasting preferences for unified dashboard
+  async getGroupTastingPreferences(email: string): Promise<{
+    sweetness: number | null;
+    acidity: number | null;
+    tannins: number | null;
+    body: number | null;
+    count: number;
+  }> {
+    // Get all participant records for this email
+    const userParticipants = await this.getAllParticipantsByEmail(email);
+
+    if (userParticipants.length === 0) {
+      return { sweetness: null, acidity: null, tannins: null, body: null, count: 0 };
+    }
+
+    const participantIds = userParticipants.map(p => p.id);
+
+    // Query responses for these participants and extract preference data
+    // Group responses store data differently - they use responseData JSONB
+    const result = await db.execute(sql`
+      SELECT
+        AVG((response_data->>'taste_sweetness')::numeric) as sweetness,
+        AVG((response_data->>'taste_acidity')::numeric) as acidity,
+        AVG((response_data->>'taste_tannins')::numeric) as tannins,
+        AVG((response_data->>'taste_body')::numeric) as body,
+        COUNT(DISTINCT participant_id) as count
+      FROM responses
+      WHERE participant_id = ANY(${participantIds})
+        AND response_data->>'taste_sweetness' IS NOT NULL
+    `);
+
+    const row = Array.isArray(result) ? result[0] : (result as any).rows?.[0];
+
+    // If no explicit taste data, try alternative field paths
+    if (!row?.sweetness && !row?.acidity && !row?.tannins && !row?.body) {
+      // Fallback: count unique sessions as tastings
+      const uniqueSessions = new Set(userParticipants.map(p => p.sessionId).filter(Boolean));
+      return {
+        sweetness: null,
+        acidity: null,
+        tannins: null,
+        body: null,
+        count: uniqueSessions.size
+      };
+    }
+
+    return {
+      sweetness: row?.sweetness ? Number(row.sweetness) : null,
+      acidity: row?.acidity ? Number(row.acidity) : null,
+      tannins: row?.tannins ? Number(row.tannins) : null,
+      body: row?.body ? Number(row.body) : null,
+      count: row?.count ? Number(row.count) : 0
+    };
+  }
+
   async getUserDashboardData(email: string): Promise<any> {
     // ============================================
     // Sprint 2.5: Unified Dashboard Data (Solo + Group)
