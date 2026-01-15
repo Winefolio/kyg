@@ -11,15 +11,18 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import { 
-  Wine, BarChart3, Clock, Star, MapPin, Filter, 
+import {
+  Wine, BarChart3, Clock, Star, MapPin, Filter,
   ArrowLeft, Search, Calendar, Trophy, TrendingUp,
   Heart, Eye, Share2, Download, MoreHorizontal,
-  Globe, Users, Mic, Map, Menu, AlertCircle, RefreshCcw, Wifi, WifiOff, LogOut
+  Globe, Users, Mic, Map, Menu, AlertCircle, RefreshCcw, Wifi, WifiOff, LogOut,
+  User, Users2
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import WineMap from "@/components/WineMap";
+import { WineInsights } from "@/components/WineInsights";
+import type { WineCharacteristicsData } from "@shared/schema";
 
 interface UserDashboardData {
   user: {
@@ -43,9 +46,14 @@ interface UserDashboardData {
     totalTastings: number;
   };
   topPreferences?: {
-    topRegion: { name: string; count: number; percentage: number };
-    topGrape: { name: string; count: number; percentage: number };
+    topRegion: { name: string; count: number; avgRating: number };
+    topGrape: { name: string; count: number; avgRating: number };
     averageRating: { score: number; totalWines: number };
+  };
+  unifiedTastingStats?: {
+    total: number;
+    solo: number;
+    group: number;
   };
 }
 
@@ -65,6 +73,14 @@ interface WineScore {
   totalRatings: number;
   isFavorite: boolean;
   expectedCharacteristics?: Record<string, any>;
+  source?: 'solo' | 'group';
+  wineCharacteristics?: WineCharacteristicsData;
+  tastingResponses?: {
+    sweetness?: number;
+    acidity?: number;
+    tannins?: number;
+    body?: number;
+  };
 }
 
 interface TastingHistory {
@@ -85,6 +101,14 @@ interface TastingHistory {
   groupScore: number;
   duration: number;
   location: string;
+  source?: 'solo' | 'group';
+  // Solo tasting specific fields
+  wineName?: string;
+  wineRegion?: string;
+  wineVintage?: number;
+  wineType?: string;
+  photoUrl?: string;
+  wineCharacteristics?: WineCharacteristicsData;
 }
 
 interface TasteProfile {
@@ -632,6 +656,35 @@ export default function UserDashboard() {
           </div>
         </div>
 
+        {/* Unified Tasting Stats Banner */}
+        {finalDashboardData.unifiedTastingStats && finalDashboardData.unifiedTastingStats.total > 0 && (
+          <div className="mb-6 p-4 bg-white/5 backdrop-blur-xl rounded-xl border border-white/10">
+            <div className="flex flex-wrap items-center justify-center gap-4 text-center">
+              <div className="flex items-center gap-2">
+                <Wine className="w-5 h-5 text-purple-300" />
+                <span className="text-white font-medium">
+                  {finalDashboardData.unifiedTastingStats.total} Total Tastings
+                </span>
+              </div>
+              <div className="hidden sm:block text-purple-300">•</div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-emerald-400" />
+                  <span className="text-purple-200">
+                    {finalDashboardData.unifiedTastingStats.solo} Solo
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Users2 className="w-4 h-4 text-blue-400" />
+                  <span className="text-purple-200">
+                    {finalDashboardData.unifiedTastingStats.group} Group
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-6">
           <TabsList className="bg-white/10 backdrop-blur-xl border-white/20">
@@ -757,16 +810,19 @@ export default function UserDashboard() {
                   <div className="flex items-center space-x-3 mb-4">
                     <MapPin className="w-5 h-5 text-purple-300" />
                     <div>
-                      <p className="text-sm text-purple-200">Top Region</p>
+                      <p className="text-sm text-purple-200">Favorite Region</p>
                       <p className="text-lg font-semibold text-white">{finalDashboardData.topPreferences?.topRegion?.name || "None"}</p>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-purple-200">Based on {finalDashboardData.topPreferences?.topRegion?.count || 0} wines</span>
-                      <span className="text-white">{finalDashboardData.topPreferences?.topRegion?.percentage?.toFixed(0) || 0}%</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-1">
+                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                      <span className="text-white font-medium">{finalDashboardData.topPreferences?.topRegion?.avgRating || 0}/10</span>
+                      <span className="text-purple-300 text-sm ml-1">avg</span>
                     </div>
-                    <Progress value={finalDashboardData.topPreferences?.topRegion?.percentage || 0} className="h-2" />
+                    <span className="text-purple-200 text-sm">
+                      {finalDashboardData.topPreferences?.topRegion?.count || 0} {(finalDashboardData.topPreferences?.topRegion?.count || 0) === 1 ? 'wine' : 'wines'}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -776,16 +832,19 @@ export default function UserDashboard() {
                   <div className="flex items-center space-x-3 mb-4">
                     <Wine className="w-5 h-5 text-purple-300" />
                     <div>
-                      <p className="text-sm text-purple-200">Top Grape</p>
+                      <p className="text-sm text-purple-200">Favorite Grape</p>
                       <p className="text-lg font-semibold text-white">{finalDashboardData.topPreferences?.topGrape?.name || "None"}</p>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-purple-200">Based on {finalDashboardData.topPreferences?.topGrape?.count || 0} wines</span>
-                      <span className="text-white">{finalDashboardData.topPreferences?.topGrape?.percentage?.toFixed(0) || 0}%</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-1">
+                      <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                      <span className="text-white font-medium">{finalDashboardData.topPreferences?.topGrape?.avgRating || 0}/10</span>
+                      <span className="text-purple-300 text-sm ml-1">avg</span>
                     </div>
-                    <Progress value={finalDashboardData.topPreferences?.topGrape?.percentage || 0} className="h-2" />
+                    <span className="text-purple-200 text-sm">
+                      {finalDashboardData.topPreferences?.topGrape?.count || 0} {(finalDashboardData.topPreferences?.topGrape?.count || 0) === 1 ? 'wine' : 'wines'}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -1028,8 +1087,21 @@ export default function UserDashboard() {
                       </div>
                       <p className="text-sm text-purple-200 mb-4 line-clamp-2">{wine.wineDescription}</p>
 
-                      {/* Expected Characteristics Chips */}
-                      {wine.expectedCharacteristics && Object.keys(wine.expectedCharacteristics).length > 0 && (
+                      {/* Wine Insights - show when we have characteristics and user ratings */}
+                      {wine.wineCharacteristics && wine.tastingResponses && (
+                        <div className="mt-3">
+                          <WineInsights
+                            characteristics={wine.wineCharacteristics}
+                            userRatings={wine.tastingResponses}
+                            overallRating={wine.averageScore}
+                            compact={true}
+                          />
+                        </div>
+                      )}
+
+                      {/* Expected Characteristics Chips - fallback when no WineInsights */}
+                      {(!wine.wineCharacteristics || !wine.tastingResponses) &&
+                        wine.expectedCharacteristics && Object.keys(wine.expectedCharacteristics).length > 0 && (
                         <div className="mt-2">
                           <h4 className="text-white font-medium mb-2">Wine Characteristics</h4>
                           <div className="flex flex-wrap gap-1">
@@ -1042,15 +1114,12 @@ export default function UserDashboard() {
                         </div>
                       )}
 
-                      {/* <div className="flex items-center justify-between">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className={`${wine.isFavorite ? 'text-red-400' : 'text-purple-300'} hover:bg-purple-500/20`}
-                        >
-                          <Heart className={`w-4 h-4 ${wine.isFavorite ? 'fill-current' : ''}`} />
-                        </Button>
-                      </div> */}
+                      {/* Source badge for solo wines */}
+                      {wine.source === 'solo' && (
+                        <Badge variant="outline" className="mt-2 bg-emerald-500/20 text-emerald-300 border-emerald-500/30">
+                          <User className="w-3 h-3 mr-1" />Solo Tasting
+                        </Badge>
+                      )}
                     </CardContent>
                   </Card>
                 ))}
@@ -1084,8 +1153,21 @@ export default function UserDashboard() {
                           )}
                           <p className="text-sm text-purple-200 line-clamp-2">{wine.wineDescription}</p>
 
-                          {/* Expected Characteristics Chips */}
-                          {wine.expectedCharacteristics && Object.keys(wine.expectedCharacteristics).length > 0 && (
+                          {/* Wine Insights - show when we have characteristics and user ratings */}
+                          {wine.wineCharacteristics && wine.tastingResponses && (
+                            <div className="mt-3">
+                              <WineInsights
+                                characteristics={wine.wineCharacteristics}
+                                userRatings={wine.tastingResponses}
+                                overallRating={wine.averageScore}
+                                compact={true}
+                              />
+                            </div>
+                          )}
+
+                          {/* Expected Characteristics Chips - fallback when no WineInsights */}
+                          {(!wine.wineCharacteristics || !wine.tastingResponses) &&
+                            wine.expectedCharacteristics && Object.keys(wine.expectedCharacteristics).length > 0 && (
                             <div className="mt-2">
                               <h4 className="text-white font-medium mb-2">Wine Characteristics</h4>
                               <div className="flex flex-wrap gap-1">
@@ -1097,6 +1179,13 @@ export default function UserDashboard() {
                               </div>
                             </div>
                           )}
+
+                          {/* Source badge for solo wines */}
+                          {wine.source === 'solo' && (
+                            <Badge variant="outline" className="mt-2 bg-emerald-500/20 text-emerald-300 border-emerald-500/30">
+                              <User className="w-3 h-3 mr-1" />Solo Tasting
+                            </Badge>
+                          )}
                         </div>
                         {/* Desktop Rating - hidden on mobile */}
                         <div className="hidden sm:flex items-center space-x-1 mb-2">
@@ -1107,9 +1196,9 @@ export default function UserDashboard() {
                           <span className="text-white ml-1">{wine.averageScore.toFixed(1)}</span>
                         </div>
                         {/* <div className="flex items-center space-x-2">
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
+                          <Button
+                            size="sm"
+                            variant="ghost"
                             className={`${wine.isFavorite ? 'text-red-400' : 'text-purple-300'} hover:bg-purple-500/20`}
                           >
                             <Heart className={`w-4 h-4 ${wine.isFavorite ? 'fill-current' : ''}`} />
@@ -1242,65 +1331,115 @@ export default function UserDashboard() {
 
             {/* Tasting History */}
             <div className="space-y-4">
-              {filteredHistory.map((session) => (
-                <Card 
-                  key={session.sessionId} 
-                  className="bg-white/10 backdrop-blur-xl border-white/20 hover:bg-white/15 transition-colors cursor-pointer"
-                  onClick={() => setLocation(`/dashboard/${email}/tasting/${session.sessionId}`)}
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-start space-x-4">
-                      <Avatar className="h-12 w-12">
-                        <AvatarFallback className="bg-white/20 text-white">
-                          <Wine className="w-6 h-6" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h3 className="text-lg font-semibold text-white mb-1">{session.packageName}</h3>
-                            <p className="text-sm text-purple-200 mb-1">Wine Tasting Experience</p>
-                            <p className="text-sm text-purple-200 line-clamp-2">
-                              An intimate journey through exceptional wines. Taste {session.winesTasted} carefully selected wines with expert guidance.
-                            </p>
+              {filteredHistory.map((session) => {
+                const isSolo = session.source === 'solo';
+
+                return (
+                  <Card
+                    key={session.sessionId}
+                    className="bg-white/10 backdrop-blur-xl border-white/20 hover:bg-white/15 transition-colors cursor-pointer"
+                    onClick={() => !isSolo && setLocation(`/dashboard/${email}/tasting/${session.sessionId}`)}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-start space-x-4">
+                        {/* Avatar/Image */}
+                        {isSolo && session.photoUrl ? (
+                          <div className="h-12 w-12 rounded-full overflow-hidden flex-shrink-0">
+                            <img
+                              src={session.photoUrl}
+                              alt={session.wineName || 'Wine'}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
-                          
-                        </div>
-                        
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                          <div className="flex items-center space-x-1 text-purple-200">
-                            <Calendar className="w-4 h-4" />
-                            <span>{new Date(session.startedAt).toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex items-center space-x-1 text-purple-200">
-                            <Users className="w-4 h-4" />
-                            <span>{session.activeParticipants} people</span>
-                          </div>
-                        </div>
-                        
-                        <div className="flex flex-col md:flex-row items-center justify-between mt-4 pt-4 border-t border-white/10">
-                          <div className="flex items-center space-x-4 text-sm">
-                            {/*<span className="text-purple-200">Wines Tasted: {session.winesTasted}</span>*/}
-                            <div className="flex items-center space-x-1">
-                              <span className="text-purple-200">Your Score:</span>
-                              <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                              <span className="text-white">{session.userScore}</span>
+                        ) : (
+                          <Avatar className="h-12 w-12">
+                            <AvatarFallback className="bg-white/20 text-white">
+                              <Wine className="w-6 h-6" />
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
+
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="text-lg font-semibold text-white">
+                                  {isSolo ? session.wineName : session.packageName}
+                                </h3>
+                                {/* Source Badge */}
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs ${
+                                    isSolo
+                                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                      : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+                                  }`}
+                                >
+                                  {isSolo ? (
+                                    <><User className="w-3 h-3 mr-1" />Solo</>
+                                  ) : (
+                                    <><Users2 className="w-3 h-3 mr-1" />Group</>
+                                  )}
+                                </Badge>
+                              </div>
+
+                              {isSolo ? (
+                                <p className="text-sm text-purple-200 mb-1">
+                                  {session.wineRegion && session.wineVintage
+                                    ? `${session.wineRegion} • ${session.wineVintage}`
+                                    : session.wineRegion || session.wineType || 'Personal Tasting'}
+                                </p>
+                              ) : (
+                                <>
+                                  <p className="text-sm text-purple-200 mb-1">Wine Tasting Experience</p>
+                                  <p className="text-sm text-purple-200 line-clamp-2">
+                                    An intimate journey through exceptional wines. Taste {session.winesTasted} carefully selected wines with expert guidance.
+                                  </p>
+                                </>
+                              )}
                             </div>
-                            <div className="flex items-center space-x-1">
-                              <span className="text-purple-200">Group Avg:</span>
-                              <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                              <span className="text-white">{session.groupScore}</span>
-                            </div>
                           </div>
-                          <div className="text-purple-200 text-sm mt-2 md:mt-0">
-                            Click to view details →
+
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                            <div className="flex items-center space-x-1 text-purple-200">
+                              <Calendar className="w-4 h-4" />
+                              <span>{new Date(session.startedAt).toLocaleDateString()}</span>
+                            </div>
+                            {!isSolo && (
+                              <div className="flex items-center space-x-1 text-purple-200">
+                                <Users className="w-4 h-4" />
+                                <span>{session.activeParticipants} people</span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex flex-col md:flex-row items-center justify-between mt-4 pt-4 border-t border-white/10">
+                            <div className="flex items-center space-x-4 text-sm">
+                              <div className="flex items-center space-x-1">
+                                <span className="text-purple-200">Your Score:</span>
+                                <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                <span className="text-white">{session.userScore}</span>
+                              </div>
+                              {!isSolo && (
+                                <div className="flex items-center space-x-1">
+                                  <span className="text-purple-200">Group Avg:</span>
+                                  <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                                  <span className="text-white">{session.groupScore}</span>
+                                </div>
+                              )}
+                            </div>
+                            {!isSolo && (
+                              <div className="text-purple-200 text-sm mt-2 md:mt-0">
+                                Click to view details →
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
 
             {filteredHistory.length === 0 && (

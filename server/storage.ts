@@ -18,6 +18,8 @@ import {
   type GlossaryTerm,
   type InsertGlossaryTerm,
   type SommelierTips,
+  type User,
+  type Tasting,
   packages,
   packageWines,
   slides,
@@ -29,6 +31,8 @@ import {
   glossaryTerms,
   wineCharacteristics,
   wineResponseAnalytics,
+  users,
+  tastings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull, isNotNull } from "drizzle-orm";
@@ -192,6 +196,11 @@ export interface IStorage {
   getUserWineScores(email: string): Promise<any>;
   getUserTastingHistory(email: string, options: { limit: number; offset: number }): Promise<any>;
   getUserSommelierFeedback(email: string): Promise<string[]>;
+
+  // Unified Tasting Data (Sprint 2.5 - Solo + Group)
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getSoloTastingsByEmail(email: string): Promise<Tasting[]>;
+  getUnifiedTastingStats(email: string): Promise<{ total: number; solo: number; group: number }>;
 
   // LLM Integration
   generateSommelierTips(email: string): Promise<SommelierTips>;
@@ -4663,125 +4672,241 @@ export class DatabaseStorage implements IStorage {
       .where(eq(participants.email, email));
   }
 
-  async getUserDashboardData(email: string): Promise<any> {
-    // Get all participants with this email
-    const userParticipants = await db.select().from(participants).where(eq(participants.email, email));
+  // Sprint 2.5: Unified Tasting Data (Solo + Group)
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await db.query.users.findFirst({
+      where: eq(users.email, email.toLowerCase())
+    });
+    return result;
+  }
 
-    if (userParticipants.length === 0) {
+  async getSoloTastingsByEmail(email: string): Promise<Tasting[]> {
+    const user = await this.getUserByEmail(email);
+    if (!user) {
+      return [];
+    }
+
+    const result = await db
+      .select()
+      .from(tastings)
+      .where(eq(tastings.userId, user.id))
+      .orderBy(desc(tastings.tastedAt));
+
+    return result;
+  }
+
+  async getUnifiedTastingStats(email: string): Promise<{ total: number; solo: number; group: number }> {
+    // Get solo tasting count
+    const user = await this.getUserByEmail(email);
+    let soloCount = 0;
+
+    if (user) {
+      const soloResult = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(tastings)
+        .where(eq(tastings.userId, user.id));
+      soloCount = soloResult[0]?.count || 0;
+    }
+
+    // Get group tasting count (unique sessions)
+    const groupParticipants = await this.getAllParticipantsByEmail(email);
+    const uniqueSessionIds = new Set(
+      groupParticipants.map(p => p.sessionId).filter(Boolean)
+    );
+    const groupCount = uniqueSessionIds.size;
+
+    return {
+      total: soloCount + groupCount,
+      solo: soloCount,
+      group: groupCount
+    };
+  }
+
+  async getUserDashboardData(email: string): Promise<any> {
+    // ============================================
+    // Sprint 2.5: Unified Dashboard Data (Solo + Group)
+    // ============================================
+
+    // Get unified tasting stats first
+    const unifiedStats = await this.getUnifiedTastingStats(email);
+
+    // If no tastings at all (neither group nor solo), return null
+    if (unifiedStats.total === 0) {
       return null;
     }
 
-    // Get all sessions for these participants
-    const sessionIds = userParticipants.map(p => p.sessionId).filter(Boolean) as string[];
-    if (sessionIds.length === 0) {
-      return {
-        user: {
-          email,
-          displayName: userParticipants[0]?.displayName || 'Wine Enthusiast',
-          totalSessions: 0,
-          completedSessions: 0,
-          totalResponses: 0,
-          uniqueWinesTasted: 0
-        },
-        recentSessions: [],
-        stats: {
-          averageScore: 0,
-          favoriteWineType: "Unknown",
-          totalTastings: 0
-        },
-        topPreferences: {
-          topRegion: { name: "None", count: 0, percentage: 0 },
-          topGrape: { name: "None", count: 0, percentage: 0 },
-          averageRating: { score: 0, totalWines: 0 }
-        }
-      };
-    }
+    // Get all participants with this email (for group tastings)
+    const userParticipants = await db.select().from(participants).where(eq(participants.email, email));
 
-    const userSessions = await db
-        .select()
-        .from(sessions)
-        .where(inArray(sessions.id, sessionIds))
-        .orderBy(desc(sessions.startedAt));
+    // Get solo tastings
+    const soloTastings = await this.getSoloTastingsByEmail(email);
 
-    // Get all responses for these participants
-    const participantIds = userParticipants.map(p => p.id);
-    const userResponses = await db
-        .select()
-        .from(responses)
-        .where(inArray(responses.participantId, participantIds));
+    // Determine display name (prefer participant name, fall back to email)
+    const displayName = userParticipants[0]?.displayName || email.split('@')[0] || 'Wine Enthusiast';
 
-    // --- OPTIMIZATION START ---
-
-    // 1. Get all unique slide IDs from responses
-    const slideIds = [...new Set(userResponses.map(r => r.slideId).filter(Boolean) as string[])];
-
-    // 2. Fetch all slides in one query
-    const allSlides = slideIds.length > 0 ? await db.select().from(slides).where(inArray(slides.id, slideIds)) : [];
-    const slidesMap = new Map(allSlides.map(s => [s.id, s]));
-
-    // 3. Get all unique wine IDs from the fetched slides
-    const wineIds = [...new Set(allSlides.map(s => s.packageWineId).filter(Boolean) as string[])];
-
-    // 4. Fetch all wines in one query
-    const allWines = wineIds.length > 0 ? await db.select().from(packageWines).where(inArray(packageWines.id, wineIds)) : [];
-    const winesMap = new Map(allWines.map(w => [w.id, w]));
-
-    // --- OPTIMIZATION END ---
-
-    // Calculate statistics
-    const totalSessions = userSessions.length;
-    const totalResponses = userResponses.length;
-    const completedSessions = userSessions.filter((s: any) => s.status === 'completed').length;
-
-    // Get unique wines tasted with full details using the pre-fetched maps
+    // Initialize counts and collections
+    let totalGroupSessions = 0;
+    let completedGroupSessions = 0;
+    let totalResponses = 0;
+    let userSessions: any[] = [];
     const wineDetails = new Map();
-    const regionCounts = new Map();
-    const grapeCounts = new Map();
+    // Track scores by region and grape for calculating averages
+    const regionScores = new Map<string, number[]>();
+    const grapeScores = new Map<string, number[]>();
+    let allScores: number[] = [];
 
-    for (const response of userResponses) {
-      if (response.slideId) {
-        const slide = slidesMap.get(response.slideId);
-        if (slide?.packageWineId) {
-          const wine = winesMap.get(slide.packageWineId);
+    // ============================================
+    // 1. Process GROUP tasting data
+    // ============================================
+    const sessionIds = userParticipants.map(p => p.sessionId).filter(Boolean) as string[];
 
-          if (wine) {
-            wineDetails.set(wine.id, wine);
+    if (sessionIds.length > 0) {
+      userSessions = await db
+          .select()
+          .from(sessions)
+          .where(inArray(sessions.id, sessionIds))
+          .orderBy(desc(sessions.startedAt));
 
-            // Count regions
-            if (wine.region) {
-              regionCounts.set(wine.region, 1);
-            }
+      totalGroupSessions = userSessions.length;
+      completedGroupSessions = userSessions.filter((s: any) => s.status === 'completed').length;
 
-            // Count grape varieties
-            if (wine.grapeVarietals && Array.isArray(wine.grapeVarietals)) {
-              wine.grapeVarietals.forEach((grape: string) => {
-                if (!grapeCounts.has(grape)) {
-                  grapeCounts.set(grape, 1);
-                }
-              
-              });
+      // Get all responses for these participants
+      const participantIds = userParticipants.map(p => p.id);
+      const userResponses = await db
+          .select()
+          .from(responses)
+          .where(inArray(responses.participantId, participantIds));
+
+      totalResponses = userResponses.length;
+
+      // Fetch slides and wines for group tastings
+      const slideIds = Array.from(new Set(userResponses.map(r => r.slideId).filter(Boolean) as string[]));
+      const allSlides = slideIds.length > 0 ? await db.select().from(slides).where(inArray(slides.id, slideIds)) : [];
+      const slidesMap = new Map(allSlides.map(s => [s.id, s]));
+
+      const wineIds = Array.from(new Set(allSlides.map(s => s.packageWineId).filter(Boolean) as string[]));
+      const allWines = wineIds.length > 0 ? await db.select().from(packageWines).where(inArray(packageWines.id, wineIds)) : [];
+      const winesMap = new Map(allWines.map(w => [w.id, w]));
+
+      // Track scores per wine for calculating averages
+      const wineScoresMap = new Map<string, number[]>();
+
+      // Process group responses
+      for (const response of userResponses) {
+        if (response.slideId) {
+          const slide = slidesMap.get(response.slideId);
+          if (slide?.packageWineId) {
+            const wine = winesMap.get(slide.packageWineId);
+
+            if (wine) {
+              // Initialize wine in details if not exists
+              if (!wineDetails.has(wine.id)) {
+                wineDetails.set(wine.id, { ...wine, scores: [] });
+              }
+
+              // Extract and track score for this wine
+              const score = this.extractScoreFromResponse(response);
+              if (score !== null) {
+                allScores.push(score);
+                const scores = wineScoresMap.get(wine.id) || [];
+                scores.push(score);
+                wineScoresMap.set(wine.id, scores);
+              }
             }
           }
         }
       }
+
+      // Calculate average score for each group wine
+      wineScoresMap.forEach((scores, wineId) => {
+        const wineData = wineDetails.get(wineId);
+        if (wineData && scores.length > 0) {
+          wineData.averageScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+          wineDetails.set(wineId, wineData);
+        }
+      });
     }
 
-    // Calculate top preferences
-    const topRegion = this.getTopPreference(regionCounts, wineDetails.size);
-    const topGrape = this.getTopPreference(grapeCounts, wineDetails.size);
-    const averageRating = {
-      score: this.calculateAverageScore(userResponses),
-      totalWines: wineDetails.size
-    };
+    // ============================================
+    // 2. Process SOLO tasting data
+    // ============================================
+    for (const tasting of soloTastings) {
+      // Extract score from solo tasting
+      const tastingResponses = tasting.responses as any;
+      const overallScore =
+        tastingResponses?.overall?.rating ||
+        tastingResponses?.overall_rating ||
+        0;
+
+      // Add to wine details with score
+      wineDetails.set(`solo-${tasting.id}`, {
+        id: `solo-${tasting.id}`,
+        wineName: tasting.wineName,
+        region: tasting.wineRegion,
+        grapeVarietals: tasting.grapeVariety ? [tasting.grapeVariety] : [],
+        wineType: tasting.wineType,
+        averageScore: overallScore
+      });
+
+      if (overallScore > 0) {
+        allScores.push(overallScore);
+      }
+    }
+
+    // ============================================
+    // 3. Calculate combined statistics
+    // ============================================
+    const totalWines = wineDetails.size;
+    const averageScore = allScores.length > 0
+      ? allScores.reduce((a, b) => a + b, 0) / allScores.length
+      : 0;
+
+    // Collect scores by region and grape from unique wines
+    wineDetails.forEach((wine: any) => {
+      // Get the wine's score (use averageScore if available, otherwise try to extract from allScores context)
+      const wineScore = wine.averageScore || wine.score || 0;
+
+      if (wine.region && wineScore > 0) {
+        const scores = regionScores.get(wine.region) || [];
+        scores.push(wineScore);
+        regionScores.set(wine.region, scores);
+      }
+      if (wine.grapeVarietals && Array.isArray(wine.grapeVarietals) && wineScore > 0) {
+        wine.grapeVarietals.forEach((grape: string) => {
+          const scores = grapeScores.get(grape) || [];
+          scores.push(wineScore);
+          grapeScores.set(grape, scores);
+        });
+      }
+    });
+
+    const topRegion = this.getTopPreferenceByRating(regionScores);
+    const topGrape = this.getTopPreferenceByRating(grapeScores);
+
+    // Determine favorite wine type from all tastings
+    const wineTypes = new Map<string, number>();
+    wineDetails.forEach((wine: any) => {
+      if (wine.wineType) {
+        wineTypes.set(wine.wineType, (wineTypes.get(wine.wineType) || 0) + 1);
+      }
+    });
+    let favoriteWineType = "Unknown";
+    let maxTypeCount = 0;
+    wineTypes.forEach((count, type) => {
+      if (count > maxTypeCount) {
+        maxTypeCount = count;
+        favoriteWineType = type.charAt(0).toUpperCase() + type.slice(1) + " Wine";
+      }
+    });
 
     return {
       user: {
         email,
-        displayName: userParticipants[0]?.displayName || 'Wine Enthusiast',
-        totalSessions,
-        completedSessions,
+        displayName,
+        totalSessions: totalGroupSessions,
+        completedSessions: completedGroupSessions,
         totalResponses,
-        uniqueWinesTasted: wineDetails.size
+        uniqueWinesTasted: totalWines
       },
       recentSessions: userSessions.slice(0, 5).map((session: any) => ({
         id: session.id,
@@ -4791,116 +4916,44 @@ export class DatabaseStorage implements IStorage {
         completedAt: session.completedAt
       })),
       stats: {
-        averageScore: averageRating.score,
-        favoriteWineType: this.getFavoriteWineType(userResponses),
-        totalTastings: totalSessions
+        averageScore,
+        favoriteWineType,
+        totalTastings: unifiedStats.total
       },
       topPreferences: {
         topRegion,
         topGrape,
-        averageRating
-      }
+        averageRating: { score: averageScore, totalWines }
+      },
+      // Sprint 2.5: Unified tasting stats
+      unifiedTastingStats: unifiedStats
     };
   }
 
   async getUserWineScores(email: string): Promise<any> {
-    const userParticipants = await this.getAllParticipantsByEmail(email);
-
-    if (userParticipants.length === 0) {
-      return { scores: [] };
-    }
-
-    const participantIds = userParticipants.map(p => p.id);
-
-    // Optimized: Fetch all responses with related wine data in a single query
-    const responsesWithDetails = await db
-        .select({
-          response: responses,
-          wine: packageWines
-        })
-        .from(responses)
-        .innerJoin(slides, eq(responses.slideId, slides.id))
-        .innerJoin(packageWines, eq(slides.packageWineId, packageWines.id))
-        .where(inArray(responses.participantId, participantIds));
-
-    // Group responses by wine and calculate scores in memory
     const wineScores: Record<string, any> = {};
 
-    for (const { response, wine } of responsesWithDetails) {
-      if (!wineScores[wine.id]) {
-        wineScores[wine.id] = {
-          wineId: wine.id,
-          wineName: wine.wineName,
-          wineDescription: wine.wineDescription,
-          wineImageUrl: wine.wineImageUrl,
-          producer: wine.producer,
-          region: wine.region,
-          vintage: wine.vintage,
-          wineType: wine.wineType,
-          grapeVarietals: wine.grapeVarietals,
-          alcoholContent: wine.alcoholContent,
-          expectedCharacteristics: wine.expectedCharacteristics,
-          discussionQuestions: wine.discussionQuestions,
-          scores: [],
-          averageScore: 0,
-          totalRatings: 0
-        };
-      }
-
-      const score = this.extractScoreFromResponse(response);
-      if (score !== null) {
-        wineScores[wine.id].scores.push(score);
-      }
-    }
-
-    // Calculate averages and add additional metadata
-    Object.values(wineScores).forEach((wineScore: any) => {
-      if (wineScore.scores.length > 0) {
-        wineScore.averageScore = wineScore.scores.reduce((a: number, b: number) => a + b, 0) / wineScore.scores.length;
-        wineScore.totalRatings = wineScore.scores.length;
-      }
-
-      wineScore.price = this.generatePlaceholderPrice(wineScore.averageScore, wineScore.region);
-      wineScore.isFavorite = Math.random() > 0.7;
-    });
-
-    return {
-      scores: Object.values(wineScores).sort((a: any, b: any) => b.averageScore - a.averageScore)
-    };
-  }
-
-  async getUserTasteProfileData(email: string): Promise<{ scores: any[]; dashboardData: any } | null> {
-    // 1. Get all participants for the user's email
+    // ============================================
+    // 1. Get GROUP tasting wines (from participants -> responses)
+    // ============================================
     const userParticipants = await this.getAllParticipantsByEmail(email);
-    if (userParticipants.length === 0) {
-      return null;
-    }
 
-    const participantIds = userParticipants.map(p => p.id);
+    if (userParticipants.length > 0) {
+      const participantIds = userParticipants.map(p => p.id);
 
-    // 2. Fetch all responses and related slide/wine data in a single, efficient query
-    const responsesWithDetails = await db
-        .select({
-          response: responses,
-          slide: {
-            packageWineId: slides.packageWineId
-          },
-          wine: packageWines
-        })
-        .from(responses)
-        .leftJoin(slides, eq(responses.slideId, slides.id))
-        .leftJoin(packageWines, eq(slides.packageWineId, packageWines.id))
-        .where(inArray(responses.participantId, participantIds));
+      // Optimized: Fetch all responses with related wine data in a single query
+      const responsesWithDetails = await db
+          .select({
+            response: responses,
+            wine: packageWines
+          })
+          .from(responses)
+          .innerJoin(slides, eq(responses.slideId, slides.id))
+          .innerJoin(packageWines, eq(slides.packageWineId, packageWines.id))
+          .where(inArray(responses.participantId, participantIds));
 
-    // 3. Process the fetched data in memory
-    const dashboardData = await this.getUserDashboardData(email); // This can be further optimized if needed
-    if (!dashboardData) {
-      return null;
-    }
-
-    const wineScores: Record<string, any> = {};
-    for (const { response, wine } of responsesWithDetails) {
-      if (wine) {
+      // Group responses by wine and calculate scores in memory
+      for (const { response, wine } of responsesWithDetails) {
         if (!wineScores[wine.id]) {
           wineScores[wine.id] = {
             wineId: wine.id,
@@ -4914,11 +4967,14 @@ export class DatabaseStorage implements IStorage {
             grapeVarietals: wine.grapeVarietals,
             alcoholContent: wine.alcoholContent,
             expectedCharacteristics: wine.expectedCharacteristics,
+            discussionQuestions: wine.discussionQuestions,
             scores: [],
             averageScore: 0,
-            totalRatings: 0
+            totalRatings: 0,
+            source: 'group' // Track source for UI
           };
         }
+
         const score = this.extractScoreFromResponse(response);
         if (score !== null) {
           wineScores[wine.id].scores.push(score);
@@ -4926,7 +4982,172 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    // ============================================
+    // 2. Get SOLO tasting wines (from users -> tastings)
+    // ============================================
+    const soloTastings = await this.getSoloTastingsByEmail(email);
+
+    for (const tasting of soloTastings) {
+      const soloId = `solo-${tasting.id}`;
+
+      // Extract overall rating from tasting responses
+      const tastingResponses = tasting.responses as any;
+      let overallScore = 0;
+
+      if (tastingResponses) {
+        // Try different possible locations for overall rating
+        overallScore =
+          tastingResponses?.overall?.rating ||
+          tastingResponses?.overall_rating ||
+          tastingResponses?.overall?.notes?.rating ||
+          0;
+      }
+
+      wineScores[soloId] = {
+        wineId: soloId,
+        wineName: tasting.wineName,
+        wineDescription: '',
+        wineImageUrl: tasting.photoUrl || '',
+        producer: null,
+        region: tasting.wineRegion,
+        vintage: tasting.wineVintage,
+        wineType: tasting.wineType,
+        grapeVarietals: tasting.grapeVariety ? [tasting.grapeVariety] : [],
+        alcoholContent: null,
+        expectedCharacteristics: tasting.wineCharacteristics,
+        discussionQuestions: null,
+        scores: overallScore > 0 ? [overallScore] : [],
+        averageScore: overallScore,
+        totalRatings: overallScore > 0 ? 1 : 0,
+        source: 'solo', // Track source for UI
+        tastedAt: tasting.tastedAt,
+        // Include full tasting responses for WineInsights component
+        tastingResponses: tastingResponses
+      };
+    }
+
+    // ============================================
+    // 3. Calculate averages and add metadata
+    // ============================================
+    Object.values(wineScores).forEach((wineScore: any) => {
+      if (wineScore.scores.length > 0) {
+        wineScore.averageScore = wineScore.scores.reduce((a: number, b: number) => a + b, 0) / wineScore.scores.length;
+        wineScore.totalRatings = wineScore.scores.length;
+      }
+
+      wineScore.price = this.generatePlaceholderPrice(wineScore.averageScore, wineScore.region);
+      wineScore.isFavorite = wineScore.averageScore >= 4;
+    });
+
+    return {
+      scores: Object.values(wineScores).sort((a: any, b: any) => b.averageScore - a.averageScore)
+    };
+  }
+
+  async getUserTasteProfileData(email: string): Promise<{ scores: any[]; dashboardData: any } | null> {
+    const wineScores: Record<string, any> = {};
+
+    // ============================================
+    // 1. Get GROUP tasting wines (from participants -> responses)
+    // ============================================
+    const userParticipants = await this.getAllParticipantsByEmail(email);
+
+    if (userParticipants.length > 0) {
+      const participantIds = userParticipants.map(p => p.id);
+
+      // Fetch all responses and related slide/wine data
+      const responsesWithDetails = await db
+          .select({
+            response: responses,
+            slide: {
+              packageWineId: slides.packageWineId
+            },
+            wine: packageWines
+          })
+          .from(responses)
+          .leftJoin(slides, eq(responses.slideId, slides.id))
+          .leftJoin(packageWines, eq(slides.packageWineId, packageWines.id))
+          .where(inArray(responses.participantId, participantIds));
+
+      for (const { response, wine } of responsesWithDetails) {
+        if (wine) {
+          if (!wineScores[wine.id]) {
+            wineScores[wine.id] = {
+              wineId: wine.id,
+              wineName: wine.wineName,
+              wineDescription: wine.wineDescription,
+              wineImageUrl: wine.wineImageUrl,
+              producer: wine.producer,
+              region: wine.region,
+              vintage: wine.vintage,
+              wineType: wine.wineType,
+              grapeVarietals: wine.grapeVarietals,
+              alcoholContent: wine.alcoholContent,
+              expectedCharacteristics: wine.expectedCharacteristics,
+              scores: [],
+              averageScore: 0,
+              totalRatings: 0,
+              source: 'group'
+            };
+          }
+          const score = this.extractScoreFromResponse(response);
+          if (score !== null) {
+            wineScores[wine.id].scores.push(score);
+          }
+        }
+      }
+    }
+
+    // ============================================
+    // 2. Get SOLO tasting wines (from users -> tastings)
+    // ============================================
+    const soloTastings = await this.getSoloTastingsByEmail(email);
+
+    for (const tasting of soloTastings) {
+      const wineKey = `solo-${tasting.id}`;
+
+      // Extract rating from solo tasting responses
+      const tastingResponses = tasting.responses as any;
+      const overallScore =
+        tastingResponses?.overall?.rating ||
+        tastingResponses?.overall_rating ||
+        0;
+
+      wineScores[wineKey] = {
+        wineId: wineKey,
+        wineName: tasting.wineName,
+        wineDescription: '',
+        wineImageUrl: tasting.photoUrl || '',
+        producer: '',
+        region: tasting.wineRegion,
+        vintage: tasting.wineVintage,
+        wineType: tasting.wineType,
+        grapeVarietals: tasting.grapeVariety ? [tasting.grapeVariety] : [],
+        alcoholContent: '',
+        expectedCharacteristics: tasting.wineCharacteristics,
+        scores: overallScore > 0 ? [overallScore] : [],
+        averageScore: overallScore,
+        totalRatings: overallScore > 0 ? 1 : 0,
+        source: 'solo'
+      };
+    }
+
+    // ============================================
+    // 3. Check if we have any data
+    // ============================================
+    if (Object.keys(wineScores).length === 0) {
+      return null;
+    }
+
+    // Get dashboard data (also unified now)
+    const dashboardData = await this.getUserDashboardData(email);
+    if (!dashboardData) {
+      return null;
+    }
+
+    // ============================================
     // 4. Calculate averages and finalize the scores object
+    // ============================================
     Object.values(wineScores).forEach((wineScore: any) => {
       if (wineScore.scores.length > 0) {
         wineScore.averageScore = wineScore.scores.reduce((a: number, b: number) => a + b, 0) / wineScore.scores.length;
@@ -4945,73 +5166,125 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserTastingHistory(email: string, options: { limit: number; offset: number }): Promise<any> {
+    const allHistory: any[] = [];
+
+    // ============================================
+    // 1. Get GROUP tasting history (from participants -> sessions)
+    // ============================================
     const userParticipants = await this.getAllParticipantsByEmail(email);
-    
-    if (userParticipants.length === 0) {
-      return { history: [], total: 0 };
-    }
-
     const sessionIds = userParticipants.map(p => p.sessionId).filter(Boolean) as string[];
-    if (sessionIds.length === 0) {
-      return { history: [], total: 0 };
+
+    if (sessionIds.length > 0) {
+      // Get sessions with package info
+      const sessionsWithPackages = await db
+        .select({
+          session: sessions,
+          package: packages
+        })
+        .from(sessions)
+        .leftJoin(packages, eq(sessions.packageId, packages.id))
+        .where(inArray(sessions.id, sessionIds))
+        .orderBy(desc(sessions.startedAt));
+
+      const groupHistory = await Promise.all(
+        sessionsWithPackages.map(async ({ session, package: pkg }) => {
+        const sommelier = this.getPlaceholderSommelier(session.id);
+        const winesTasted = Math.floor(Math.random() * 8) + 4; // 4-11 wines
+        let userScore = 0;
+        let groupScore = 0;
+        const participants = await storage.getParticipantsBySessionId(session.id);
+        const userParticipant = participants.find(p => p.email === email);
+        if (userParticipant) {
+          const userResponses = await storage.getResponsesByParticipantId(userParticipant.id);
+          const allParticipantResponses: any[] = [];
+
+          for (const participant of participants) {
+            const responses = await storage.getResponsesByParticipantId(participant.id);
+            allParticipantResponses.push(...responses);
+          }
+          userScore = storage.calculateAverageScore(userResponses);
+          groupScore = storage.calculateAverageScore(allParticipantResponses);
+        }
+
+        return {
+          sessionId: session.id,
+          packageId: session.packageId,
+          packageName: pkg?.name || 'Unknown Package',
+          status: session.status,
+          startedAt: session.startedAt,
+          completedAt: session.completedAt,
+          activeParticipants: session.activeParticipants || 0,
+          sommelier,
+          winesTasted,
+          userScore: userScore.toFixed(1),
+          groupScore: groupScore.toFixed(1),
+          duration: Math.floor(Math.random() * 120) + 90, // 90-210 minutes
+          location: this.getPlaceholderLocation(),
+          source: 'group' // Track source for UI
+        };
+      }));
+
+      allHistory.push(...groupHistory);
     }
-    
-    // Get sessions with package info
-    const sessionsWithPackages = await db
-      .select({
-        session: sessions,
-        package: packages
-      })
-      .from(sessions)
-      .leftJoin(packages, eq(sessions.packageId, packages.id))
-      .where(inArray(sessions.id, sessionIds))
-      .orderBy(desc(sessions.startedAt))
-      .limit(options.limit)
-      .offset(options.offset);
 
-    const history = await Promise.all(
-      sessionsWithPackages.map(async ({ session, package: pkg }) => {
-      const sommelier = this.getPlaceholderSommelier(session.id);
-      const winesTasted = Math.floor(Math.random() * 8) + 4; // 4-11 wines
+    // ============================================
+    // 2. Get SOLO tasting history (from users -> tastings)
+    // ============================================
+    const soloTastings = await this.getSoloTastingsByEmail(email);
+
+    for (const tasting of soloTastings) {
+      // Extract overall rating from tasting responses
+      const tastingResponses = tasting.responses as any;
       let userScore = 0;
-      let groupScore = 0;
-      const participants = await storage.getParticipantsBySessionId(session.id);
-      const userParticipant = participants.find(p => p.email === email);
-      const userResponses = await storage.getResponsesByParticipantId(userParticipant.id);
-      const allParticipantResponses: any[] = [];
 
-      for (const participant of participants) {
-        const responses = await storage.getResponsesByParticipantId(participant.id);
-        allParticipantResponses.push(...responses);
+      if (tastingResponses) {
+        userScore =
+          tastingResponses?.overall?.rating ||
+          tastingResponses?.overall_rating ||
+          0;
       }
-      userScore = storage.calculateAverageScore(userResponses);
-      groupScore = storage.calculateAverageScore(allParticipantResponses);
 
-      return {
-        sessionId: session.id,
-        packageId: session.packageId,
-        packageName: pkg?.name || 'Unknown Package',
-        status: session.status,
-        startedAt: session.startedAt,
-        completedAt: session.completedAt,
-        activeParticipants: session.activeParticipants || 0,
-        sommelier,
-        winesTasted,
+      allHistory.push({
+        sessionId: `solo-${tasting.id}`,
+        packageId: null,
+        packageName: tasting.wineName, // Use wine name as "session" name for solo tastings
+        status: 'completed',
+        startedAt: tasting.tastedAt,
+        completedAt: tasting.tastedAt,
+        activeParticipants: 1,
+        sommelier: null, // No sommelier for solo tastings
+        winesTasted: 1,
         userScore: userScore.toFixed(1),
-        groupScore: groupScore.toFixed(1),
-        duration: Math.floor(Math.random() * 120) + 90, // 90-210 minutes
-        location: this.getPlaceholderLocation()
-      };
-    }));
+        groupScore: null, // No group for solo tastings
+        duration: 5, // Estimated solo tasting duration
+        location: 'Solo Tasting',
+        source: 'solo', // Track source for UI
+        wineRegion: tasting.wineRegion,
+        wineVintage: tasting.wineVintage,
+        wineType: tasting.wineType,
+        photoUrl: tasting.photoUrl,
+        wineCharacteristics: tasting.wineCharacteristics
+      });
+    }
 
-    const total = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(sessions)
-      .where(inArray(sessions.id, sessionIds));
+    // ============================================
+    // 3. Sort combined history by date (newest first)
+    // ============================================
+    allHistory.sort((a, b) => {
+      const dateA = new Date(a.startedAt || a.completedAt).getTime();
+      const dateB = new Date(b.startedAt || b.completedAt).getTime();
+      return dateB - dateA;
+    });
+
+    // Calculate total count
+    const totalCount = allHistory.length;
+
+    // Apply pagination
+    const paginatedHistory = allHistory.slice(options.offset, options.offset + options.limit);
 
     return {
-      history,
-      total: total[0]?.count || 0
+      history: paginatedHistory,
+      total: totalCount
     };
   }
 
@@ -5078,6 +5351,27 @@ export class DatabaseStorage implements IStorage {
     });
 
     return { name: topName, count: topCount, percentage: topPercentage };
+  }
+
+  // Get top preference by highest average rating (not frequency)
+  private getTopPreferenceByRating(scoresMap: Map<string, number[]>): { name: string; count: number; avgRating: number } {
+    let topName = "None";
+    let topCount = 0;
+    let topAvgRating = 0;
+
+    Array.from(scoresMap.entries()).forEach(([name, scores]) => {
+      if (scores.length > 0) {
+        const avgRating = scores.reduce((a, b) => a + b, 0) / scores.length;
+        // Prefer higher average, break ties with more wines
+        if (avgRating > topAvgRating || (avgRating === topAvgRating && scores.length > topCount)) {
+          topName = name;
+          topCount = scores.length;
+          topAvgRating = avgRating;
+        }
+      }
+    });
+
+    return { name: topName, count: topCount, avgRating: Math.round(topAvgRating * 10) / 10 };
   }
 
   private generatePlaceholderPrice(averageScore: number, region?: string): number {
