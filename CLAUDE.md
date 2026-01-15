@@ -93,12 +93,17 @@ Optional:
 
 ## Product Roadmap
 
-**Current Sprint:** Sprint 4 - Rich Dashboard & Insights Evolution
+**Current Sprint:** Sprint 5 - AI Question Generation & Journey Polish
 
-**Active Work (Sprint 4.1):** Unified User Dashboard
-- Merging solo + group dashboards into single view at `/dashboard/:email`
-- See `plans/feat-unified-dashboard.md` for detailed implementation plan
-- Key design decisions: email-only access (no auth), duplicate wines shown separately
+**Completed (Sprint 4.1):** Unified User Dashboard ✅
+- Unified dashboard at `/dashboard/:email` with preference bars
+- BottomNav links directly to unified dashboard
+- See `plans/feat-unified-dashboard.md` for implementation details
+
+**Active Work (Sprint 5):** AI Question Generation
+- AI-generated contextual questions based on wine + chapter context
+- Wine validation for chapter requirements
+- Admin tooling for journey/chapter editors
 
 See `/Users/andreszubillaga/plans/kyg-product-pivot.md` for:
 - Sprint status table (what's complete, what's current)

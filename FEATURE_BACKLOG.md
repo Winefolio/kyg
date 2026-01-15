@@ -46,12 +46,14 @@ See `plans/feat-unified-dashboard.md` for detailed implementation plan.
 - Source badges showing Solo vs Group for each tasting
 - Email-only access (no auth required for now)
 
-**Phase 2 (Future)**: Rich Discovery
+**Phase 2 (Future)**: Dashboard Redesign v2
+See `plans/feat-dashboard-redesign-v2.md` for comprehensive redesign plan including:
+- Wine Personality archetype ("The Explorer", "The Connoisseur", etc.)
+- Gamification system (streaks, badges, levels)
 - Personalized wine recommendations
-- Taste profile visualization with radar chart
-- Wine discovery feed
-- Purchase integration
-- Social features
+- Action-oriented "What to Do Next" cards
+- Visual design overhaul (typography, colors, motion)
+- Deep dive data sections
 
 ---
 
@@ -252,6 +254,92 @@ Right-click existing question, select "Convert to...", intelligent data mapping.
 
 ---
 
+## Future Sprint: Data Collection & Question Improvements
+**Status**: Backlog (captured from expert reviews)
+**Priority**: Medium-High
+**Source**: DHH, Kieran, and Simplicity reviewer feedback (2026-01-15)
+
+### Problem Statement
+Current tasting questions focus on **detection** (what users notice) rather than **preference** (what users like). This makes the data less actionable for building user profiles and generating recommendations.
+
+### Key Insights from Reviews
+
+**1. Detection vs. Preference Questions**
+| Current (Detection) | Better (Preference) |
+|---------------------|---------------------|
+| "Rate the tannin level (1-10)" | "Did you enjoy this wine's tannin level?" |
+| "What aromas do you detect?" | "Which aromas do you find most appealing?" |
+| "How would you describe the body?" | "Do you prefer lighter or fuller wines?" |
+
+**2. Missing Preference Signals**
+- No "Would you buy this wine?" question
+- No price sensitivity data
+- No comparative preferences ("more/less/perfect")
+- No direct enjoyment ratings per detected characteristic
+
+**3. Data Schema Issues**
+- JSONB `responses` field is unvalidated
+- No Zod schema guaranteeing structure
+- Missing GIN index for JSONB queries at scale
+
+### Proposed Question Flow Improvements
+
+```
+Current: Visual → Aroma → Taste → Structure → Overall Rating
+Better:  First Impression → Detection → Preference Signals → Purchase Intent
+```
+
+**Example rewrite:**
+```
+OLD: "Rate aroma intensity (1-10)"
+NEW: "The aromas are [intense/subtle]. Do you prefer:
+     - More intense aromas
+     - More subtle aromas
+     - This level is just right"
+```
+
+### Proposed Preference Schema
+
+```typescript
+interface TastingPreferences {
+  // Detection (what they noticed)
+  detected_aromas: string[];
+  detected_flavors: string[];
+
+  // Preference (what they liked)
+  enjoyed_aromas: string[];  // subset of detected
+  enjoyed_flavors: string[]; // subset of detected
+
+  // Comparative preference
+  sweetness_preference: 'more' | 'less' | 'perfect';
+  body_preference: 'lighter' | 'fuller' | 'perfect';
+  tannin_preference: 'softer' | 'firmer' | 'perfect';
+
+  // Intent signals
+  would_buy: 'yes' | 'maybe' | 'no';
+  price_willing: '$15' | '$30' | '$50' | '$50+';
+
+  // Overall
+  overall_enjoyment: 1 | 2 | 3 | 4 | 5;
+}
+```
+
+### Implementation Notes
+- Requires TastingSession.tsx question flow updates
+- Add Zod validation at API layer
+- Add GIN index on `tastings.responses`
+- Consider A/B testing old vs. new question flow
+- Profile building becomes: derive preference vectors, not just averages
+
+### Why This Matters
+With preference data, we can:
+1. Generate accurate wine recommendations
+2. Build "Wine Personality" profiles
+3. Partner with wine merchants (purchase intent data)
+4. Create meaningful streak/achievement triggers
+
+---
+
 ## How to Use This File
 
 1. **Adding Ideas**: Just append to "Future Ideas" with a brief description
@@ -271,4 +359,4 @@ These planning docs contain more technical detail on backlog items:
 
 ---
 
-*Last updated: 2025-01-15*
+*Last updated: 2026-01-15*
