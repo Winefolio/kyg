@@ -159,6 +159,14 @@ export function registerAuthRoutes(app: Express): void {
       req.session.userId = user.id;
       req.session.userEmail = user.email;
 
+      // Save session explicitly before responding (important for production reliability)
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
       // Return user info (without sensitive data)
       return res.json({
         user: {
@@ -180,7 +188,7 @@ export function registerAuthRoutes(app: Express): void {
         console.error("Logout error:", err);
         return res.status(500).json({ error: "Logout failed" });
       }
-      res.clearCookie("connect.sid");
+      res.clearCookie("kyg.sid");
       return res.json({ success: true });
     });
   });
