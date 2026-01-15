@@ -4732,6 +4732,108 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  // Sprint 4.1: Get solo tasting preferences for unified dashboard
+  async getSoloTastingPreferences(userId: number): Promise<{
+    sweetness: number | null;
+    acidity: number | null;
+    tannins: number | null;
+    body: number | null;
+    count: number;
+  }> {
+    const result = await db.execute(sql`
+      SELECT
+        AVG((responses->'taste'->>'sweetness')::numeric) as sweetness,
+        AVG((responses->'taste'->>'acidity')::numeric) as acidity,
+        AVG((responses->'taste'->>'tannins')::numeric) as tannins,
+        AVG((responses->'taste'->>'body')::numeric) as body,
+        COUNT(*) as count
+      FROM tastings
+      WHERE user_id = ${userId}
+    `);
+
+    const row = Array.isArray(result) ? result[0] : (result as any).rows?.[0];
+    return {
+      sweetness: row?.sweetness ? Number(row.sweetness) : null,
+      acidity: row?.acidity ? Number(row.acidity) : null,
+      tannins: row?.tannins ? Number(row.tannins) : null,
+      body: row?.body ? Number(row.body) : null,
+      count: row?.count ? Number(row.count) : 0
+    };
+  }
+
+  // Sprint 4.1: Get group tasting preferences for unified dashboard
+  async getGroupTastingPreferences(email: string): Promise<{
+    sweetness: number | null;
+    acidity: number | null;
+    tannins: number | null;
+    body: number | null;
+    count: number;
+  }> {
+    // Get all participant records for this email
+    const userParticipants = await this.getAllParticipantsByEmail(email);
+
+    if (userParticipants.length === 0) {
+      return { sweetness: null, acidity: null, tannins: null, body: null, count: 0 };
+    }
+
+    const participantIds = userParticipants.map(p => p.id);
+
+    // Query responses using drizzle's inArray for proper array handling
+    const responseRows = await db
+      .select({
+        sweetness: sql<string>`answer_json->>'sweetness'`,
+        acidity: sql<string>`answer_json->>'acidity'`,
+        tannins: sql<string>`answer_json->>'tannins'`,
+        body: sql<string>`answer_json->>'body'`,
+      })
+      .from(responses)
+      .where(inArray(responses.participantId, participantIds));
+
+    // Calculate averages manually
+    let sweetnessSum = 0, sweetnessCount = 0;
+    let aciditySum = 0, acidityCount = 0;
+    let tanninsSum = 0, tanninsCount = 0;
+    let bodySum = 0, bodyCount = 0;
+
+    for (const row of responseRows) {
+      if (row.sweetness) { sweetnessSum += Number(row.sweetness); sweetnessCount++; }
+      if (row.acidity) { aciditySum += Number(row.acidity); acidityCount++; }
+      if (row.tannins) { tanninsSum += Number(row.tannins); tanninsCount++; }
+      if (row.body) { bodySum += Number(row.body); bodyCount++; }
+    }
+
+    const result = [{
+      sweetness: sweetnessCount > 0 ? sweetnessSum / sweetnessCount : null,
+      acidity: acidityCount > 0 ? aciditySum / acidityCount : null,
+      tannins: tanninsCount > 0 ? tanninsSum / tanninsCount : null,
+      body: bodyCount > 0 ? bodySum / bodyCount : null,
+      count: Math.max(sweetnessCount, acidityCount, tanninsCount, bodyCount)
+    }];
+
+    const row = Array.isArray(result) ? result[0] : (result as any).rows?.[0];
+
+    // If no explicit taste data, try alternative field paths
+    if (!row?.sweetness && !row?.acidity && !row?.tannins && !row?.body) {
+      // Fallback: count unique sessions as tastings
+      const uniqueSessions = new Set(userParticipants.map(p => p.sessionId).filter(Boolean));
+      return {
+        sweetness: null,
+        acidity: null,
+        tannins: null,
+        body: null,
+        count: uniqueSessions.size
+      };
+    }
+
+    return {
+      sweetness: row?.sweetness ? Number(row.sweetness) : null,
+      acidity: row?.acidity ? Number(row.acidity) : null,
+      tannins: row?.tannins ? Number(row.tannins) : null,
+      body: row?.body ? Number(row.body) : null,
+      count: row?.count ? Number(row.count) : 0
+    };
+  }
+
   async getUserDashboardData(email: string): Promise<any> {
     // ============================================
     // Sprint 2.5: Unified Dashboard Data (Solo + Group)
