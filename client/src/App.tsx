@@ -16,12 +16,15 @@ import PackageEditor from "@/pages/PackageEditor";
 import UserDashboard from "@/pages/UserDashboard";
 import TastingDetailView from "@/pages/TastingDetailView";
 import Login from "@/pages/Login";
-import SoloDashboard from "@/pages/SoloDashboard";
+import SoloHome from "@/pages/SoloHome";
+import SoloJournal from "@/pages/SoloJournal";
 import SoloTastingDetail from "@/pages/SoloTastingDetail";
 import SoloTastingNew from "@/pages/SoloTastingNew";
 import SoloProfile from "@/pages/SoloProfile";
+import SoloLogin from "@/pages/SoloLogin";
 import JourneyBrowser from "@/pages/JourneyBrowser";
 import JourneyDetail from "@/pages/JourneyDetail";
+import JourneyAdmin from "@/pages/JourneyAdmin";
 
 import Profile from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
@@ -41,12 +44,15 @@ function Router() {
       <Route path="/completion/:sessionId/:participantId" component={TastingCompletion} />
       <Route path="/host/:sessionId/:participantId" component={HostDashboard} />
       <Route path="/login" component={Login} />
-      <Route path="/solo" component={SoloDashboard} />
+      <Route path="/solo" component={SoloHome} />
+      <Route path="/solo/login" component={SoloLogin} />
+      <Route path="/solo/journal" component={SoloJournal} />
       <Route path="/solo/new" component={SoloTastingNew} />
       <Route path="/solo/tasting/:id" component={SoloTastingDetail} />
       <Route path="/solo/profile" component={SoloProfile} />
       <Route path="/journeys" component={JourneyBrowser} />
       <Route path="/journeys/:id" component={JourneyDetail} />
+      <Route path="/admin/journeys" component={JourneyAdmin} />
       <Route component={NotFound} />
     </Switch>
   );
