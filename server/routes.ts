@@ -18,6 +18,7 @@ import { registerMediaProxyRoutes } from './routes/media-proxy';
 import { registerDashboardRoutes } from './routes/dashboard';
 import { registerAuthRoutes } from './routes/auth';
 import { registerTastingsRoutes } from './routes/tastings';
+import { registerWinesRoutes } from './routes/wines';
 
 // Configure multer for file uploads with comprehensive image support
 const upload = multer({
@@ -2226,6 +2227,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register solo tasting routes
   registerTastingsRoutes(app);
+
+  // Register wine recognition & intelligence routes
+  registerWinesRoutes(app);
 
   // Register dashboard routes
   registerDashboardRoutes(app);

@@ -3,6 +3,7 @@ import { db } from "../db";
 import { tastings, users, insertTastingSchema } from "@shared/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { requireAuth } from "./auth";
+import { attachCharacteristicsToTasting } from "../wine-intelligence";
 
 /**
  * Get user's taste preferences derived from their tastings
@@ -92,6 +93,11 @@ export function registerTastingsRoutes(app: Express): void {
         photoUrl: tastingData.photoUrl || null,
         responses: tastingData.responses
       }).returning();
+
+      // Async: Attach wine characteristics (don't wait for it)
+      attachCharacteristicsToTasting(newTasting.id).catch(err => {
+        console.error("Background wine intel error:", err);
+      });
 
       return res.status(201).json({
         tasting: newTasting,

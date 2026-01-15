@@ -573,7 +573,8 @@ export const tastings = pgTable("tastings", {
   wineType: varchar("wine_type", { length: 50 }), // 'red', 'white', 'rosé', etc.
   photoUrl: text("photo_url"),
   tastedAt: timestamp("tasted_at").defaultNow().notNull(),
-  responses: jsonb("responses").notNull() // Full tasting questionnaire responses
+  responses: jsonb("responses").notNull(), // Full tasting questionnaire responses
+  wineCharacteristics: jsonb("wine_characteristics") // Baseline wine data from GPT-4
 }, (table) => ({
   userIdIdx: index("idx_tastings_user_id").on(table.userId),
   tastedAtIdx: index("idx_tastings_tasted_at").on(table.tastedAt),
@@ -651,3 +652,26 @@ export interface TastingResponses {
     notes?: string;
   };
 }
+
+// Wine characteristics cache (avoid repeat GPT-4 calls)
+export const wineCharacteristicsCache = pgTable("wine_characteristics_cache", {
+  id: serial("id").primaryKey(),
+  wineSignature: varchar("wine_signature", { length: 500 }).notNull().unique(), // normalized: "chateau margaux|bordeaux|cabernet"
+  characteristics: jsonb("characteristics").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+}, (table) => ({
+  signatureIdx: index("idx_wine_cache_signature").on(table.wineSignature)
+}));
+
+// Wine characteristics structure
+export interface WineCharacteristicsData {
+  sweetness: number;    // 1-5 scale
+  acidity: number;
+  tannins: number;
+  body: number;
+  style: string;
+  regionCharacter: string;
+  source: 'cache' | 'gpt4';
+}
+
+export type WineCharacteristicsCacheEntry = typeof wineCharacteristicsCache.$inferSelect;

@@ -98,8 +98,8 @@ const TASTING_QUESTIONS: TastingQuestion[] = [
     section: 'taste',
     type: 'scale',
     config: {
-      title: 'How sweet is this wine?',
-      description: 'From bone dry to sweet.',
+      title: 'How do you like the sweetness?',
+      description: 'Rate where this wine lands for you.',
       scaleMin: 1,
       scaleMax: 5,
       scaleLabels: ['Bone Dry', 'Sweet']
@@ -110,11 +110,11 @@ const TASTING_QUESTIONS: TastingQuestion[] = [
     section: 'taste',
     type: 'scale',
     config: {
-      title: 'How crisp/acidic is it?',
-      description: 'Does it make your mouth water?',
+      title: 'How do you like the acidity?',
+      description: 'That refreshing, mouth-watering quality.',
       scaleMin: 1,
       scaleMax: 5,
-      scaleLabels: ['Soft', 'Crisp/Zippy']
+      scaleLabels: ['Soft', 'Crisp & Zesty']
     }
   },
   {
@@ -122,8 +122,8 @@ const TASTING_QUESTIONS: TastingQuestion[] = [
     section: 'taste',
     type: 'scale',
     config: {
-      title: 'How are the tannins?',
-      description: 'That drying/grippy sensation (mainly for reds).',
+      title: 'How do you like the tannins?',
+      description: 'The drying, grippy sensation (mainly in reds).',
       scaleMin: 1,
       scaleMax: 5,
       scaleLabels: ['Silky Smooth', 'Bold & Grippy']
@@ -134,11 +134,11 @@ const TASTING_QUESTIONS: TastingQuestion[] = [
     section: 'taste',
     type: 'scale',
     config: {
-      title: 'How does it feel in your mouth?',
-      description: 'Light like water or rich like cream?',
+      title: 'How do you like the body?',
+      description: 'The weight and richness in your mouth.',
       scaleMin: 1,
       scaleMax: 5,
-      scaleLabels: ['Light', 'Full-bodied']
+      scaleLabels: ['Light & Delicate', 'Full & Rich']
     }
   },
   {
@@ -399,9 +399,9 @@ export default function SoloTastingSession({ wine, onComplete, onCancel }: SoloT
           <div className="flex items-center justify-between mb-2">
             <button
               onClick={onCancel}
-              className="text-white/70 hover:text-white flex items-center gap-2 text-sm"
+              className="text-white/70 hover:text-white flex items-center gap-2 text-sm min-h-[44px] px-3 rounded-lg hover:bg-white/10 transition-colors"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-5 h-5" />
               Exit
             </button>
             <div className="flex items-center gap-2">

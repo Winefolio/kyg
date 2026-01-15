@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
+import { WineInsights } from "@/components/WineInsights";
 import {
   ArrowLeft,
   Wine,
@@ -17,7 +18,7 @@ import {
   ThumbsUp,
   ThumbsDown
 } from "lucide-react";
-import type { Tasting } from "@shared/schema";
+import type { Tasting, WineCharacteristicsData } from "@shared/schema";
 
 // Section info for display
 const SECTIONS = {
@@ -298,9 +299,9 @@ export default function SoloTastingDetail() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => setLocation('/solo')}
-              className="text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+              className="text-white/70 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-6 h-6" />
             </button>
             <div className="flex-1 min-w-0">
               <h1 className="text-lg font-bold text-white truncate">{tasting.wineName}</h1>
@@ -377,6 +378,20 @@ export default function SoloTastingDetail() {
             </div>
           )}
         </motion.div>
+
+        {/* Wine Intelligence - Compare user perception to typical characteristics */}
+        {tasting.wineCharacteristics && (
+          <WineInsights
+            characteristics={tasting.wineCharacteristics as WineCharacteristicsData}
+            userRatings={{
+              sweetness: responses?.taste?.sweetness,
+              acidity: responses?.taste?.acidity,
+              tannins: responses?.taste?.tannins,
+              body: responses?.taste?.body
+            }}
+            overallRating={responses?.overall?.rating}
+          />
+        )}
 
         {/* Response Sections */}
         {responses?.visual && <ResponseSection section="visual" data={responses.visual} />}
