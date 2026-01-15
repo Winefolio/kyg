@@ -1,0 +1,15 @@
+         wine_name         |                  id                  | position | section_type |   type    |                    slide_title                     
+---------------------------+--------------------------------------+----------+--------------+-----------+----------------------------------------------------
+ Château Margaux 2018      | ab0ccfe3-bd58-44fc-8882-e674abf9319b |        1 |              | interlude | Welcome to Your Wine Tasting
+ Château Margaux 2018      | 89b5db79-c033-4d4f-a389-68ce81c7d273 |        2 |              | question  | What primary flavors do you detect in the bouquet?
+ Château Margaux 2018      | 55afb025-a5ac-4196-ac7f-dadd2d5eec84 |        3 | ending       | question  | Overall Impression
+ Château Margaux 2018      | 996b2cf2-d73c-47cf-8c5e-40a7a99e3a9f |        4 | deep_dive    | question  | How would you describe the body?
+ Château Margaux 2018      | fe7e0449-f4af-448d-8a3d-49bfda14d1f9 |        5 | ending       | question  | How long is the finish?
+ Château Margaux 2018      | b2cca120-a735-4d58-a9b2-e0f277177196 |        6 | deep_dive    | question  | How would you describe the body?
+ Château Margaux 2018      | 42dbea96-eca1-4edd-b4a5-a912b5061afc |        7 | intro        | question  | Visual Assessment
+ Château Margaux 2018      | 9d489d8b-5b82-4f8d-80df-1f75893eb849 |        8 | intro        | question  | Visual Assessment
+ Château Pichon Baron 2019 | 03b98341-f0be-4576-a21c-c74a07269b37 |        1 | intro        | question  | How would you describe the body?
+ Château Pichon Baron 2019 | 046091d4-d548-4390-877e-dd2e5cbf7032 |        2 | intro        | question  | How long is the finish?
+ Château Pichon Baron 2019 | f502a813-9119-4365-8701-b07c92cee5f6 |        3 | deep_dive    | question  | Overall wine rating
+(11 rows)
+

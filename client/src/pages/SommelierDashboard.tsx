@@ -1,400 +1,1284 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { QrCode, Users, Wine, Plus, Copy, Download } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Link } from "wouter";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { WineModal } from "@/components/WineModal";
+import { SlideEditor } from "@/components/SlideEditor";
+import { QRCodeModal } from "@/components/QRCodeModal";
+import { SessionCreationModal } from "@/components/SessionCreationModal";
+import { ImageUpload } from "@/components/ui/image-upload";
+import {
+  WINE_TEMPLATES,
+  getWineImage,
+  getGrapeVarietals,
+  getWineTypes,
+  getWineRegions,
+} from "@/lib/wineTemplates";
+import {
+  Plus,
+  Edit3,
+  Trash2,
+  Wine,
+  Users,
+  BarChart3,
+  Settings,
+  Copy,
+  Eye,
+  PlayCircle,
+  PauseCircle,
+  ArrowLeft,
+  Save,
+  X,
+  Upload,
+  Image as ImageIcon,
+  Video,
+  Volume2,
+  MessageSquare,
+  Star,
+  Clock,
+  Download,
+  QrCode,
+  Link,
+  Send,
+  Mail,
+  ExternalLink,
+  ChevronDown,
+  ChevronRight,
+  Move,
+  GripVertical,
+  TrendingUp,
+  Activity,
+  MoreVertical,
+  Monitor,
+  ChevronUp,
+} from "lucide-react";
+
+interface Package {
+  id: string;
+  name: string;
+  code: string;
+  description: string;
+  imageUrl?: string;
+  isActive: boolean;
+  createdAt: string;
+  wines: PackageWine[];
+}
+
+interface PackageWine {
+  id: string;
+  packageId: string;
+  wineName: string;
+  wineDescription: string;
+  wineImageUrl: string;
+  position: number;
+  slides: Slide[];
+}
+
+interface WineForm {
+  wineName: string;
+  wineDescription: string;
+  wineImageUrl: string;
+  position: number;
+  wineType: string;
+  vintage: number | null;
+  region: string;
+  producer: string;
+  grapeVarietals: string[];
+  alcoholContent: string;
+  expectedCharacteristics: Record<string, any>;
+  discussionQuestions: string[];
+  packageId?: string;
+}
+
+interface SlideOrderItem {
+  id: string;
+  position: number;
+  type: string;
+  sectionType: string;
+  title: string;
+  description: string;
+}
+
+interface SlideTemplate {
+  id: string;
+  name: string;
+  type: string;
+  sectionType: string;
+  payloadTemplate: any;
+  isPublic: boolean;
+}
+
+interface Slide {
+  id: string;
+  packageWineId: string;
+  position: number;
+  type: "interlude" | "question" | "video_message" | "audio_message" | "media";
+  sectionType: "intro" | "deep_dive" | "ending";
+  title: string;
+  description: string;
+  payloadJson: any;
+}
+
+interface Session {
+  id: string;
+  packageId: string;
+  packageCode: string;
+  packageName: string;
+  short_code: string;
+  status: string;
+  participantCount: number;
+  startedAt: string;
+  completedAt: string | null;
+  updatedAt: string;
+}
+
+type TabType = "packages" | "sessions" | "analytics";
+type PackageModalMode = "create" | "edit" | "view";
+type WineModalMode = "create" | "edit" | "view";
 
 export default function SommelierDashboard() {
-  const [newSessionName, setNewSessionName] = useState("");
-  const [selectedPackage, setSelectedPackage] = useState("WINE01");
-  const [customCode, setCustomCode] = useState("");
-  const [packageName, setPackageName] = useState("");
-  const [packageDescription, setPackageDescription] = useState("");
-  const [isCreatingCustom, setIsCreatingCustom] = useState(false);
+  const [, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState<TabType>("packages");
+  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [packageModalOpen, setPackageModalOpen] = useState(false);
+  const [packageModalMode, setPackageModalMode] =
+    useState<PackageModalMode>("view");
+  const [wineModalOpen, setWineModalOpen] = useState(false);
+  const [wineModalMode, setWineModalMode] = useState<WineModalMode>("create");
+  const [selectedWine, setSelectedWine] = useState<PackageWine | null>(null);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedSessionForQR, setSelectedSessionForQR] =
+    useState<Session | null>(null);
+  const [showSessionCreationModal, setShowSessionCreationModal] = useState(false);
+  const [selectedPackageForSession, setSelectedPackageForSession] = useState<Package | null>(null);
+  const [expandedPackages, setExpandedPackages] = useState<Set<string>>(
+    new Set(),
+  );
+  const [slideEditorOpen, setSlideEditorOpen] = useState(false);
+  const [selectedWineForSlides, setSelectedWineForSlides] =
+    useState<PackageWine | null>(null);
+  const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
+  const [sessionParticipants, setSessionParticipants] = useState<Record<string, any[]>>({});
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Generate random wine codes
-  const generateRandomCode = () => {
-    const wineWords = ['VINE', 'GRAPE', 'CORK', 'VINO', 'CELLAR', 'BARREL', 'TANNIN'];
-    const randomWord = wineWords[Math.floor(Math.random() * wineWords.length)];
-    const randomNum = Math.floor(Math.random() * 999) + 1;
-    return `${randomWord}${randomNum.toString().padStart(3, '0')}`;
+  // Function to toggle participant dropdown and fetch participants
+  const toggleParticipants = async (sessionId: string) => {
+    if (expandedParticipants.has(sessionId)) {
+      // Collapse the dropdown
+      setExpandedParticipants(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(sessionId);
+        return newSet;
+      });
+    } else {
+      // Expand and fetch participants
+      setExpandedParticipants(prev => new Set(prev).add(sessionId));
+      
+      // Fetch participants if not already cached
+      if (!sessionParticipants[sessionId]) {
+        try {
+          const response = await apiRequest('GET', `/api/sessions/${sessionId}/participants`, null);
+          const participants = await response.json();
+          setSessionParticipants(prev => ({
+            ...prev,
+            [sessionId]: participants
+          }));
+        } catch (error) {
+          console.error('Failed to fetch participants:', error);
+          toast({
+            title: "Error fetching participants",
+            description: "Please try again.",
+            variant: "destructive",
+          });
+        }
+      }
+    }
   };
 
-  const generateShortCode = () => {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const numbers = '0123456789';
-    let result = '';
-    for (let i = 0; i < 3; i++) {
-      result += letters.charAt(Math.floor(Math.random() * letters.length));
-    }
-    for (let i = 0; i < 3; i++) {
-      result += numbers.charAt(Math.floor(Math.random() * numbers.length));
-    }
-    return result;
-  };
-
-  // Fetch available wine packages
-  const { data: packages = [] } = useQuery({
-    queryKey: ['/api/packages'],
-    enabled: false // We'll create packages dynamically
+  // Fetch packages
+  const { data: packages, isLoading: packagesLoading } = useQuery<Package[]>({
+    queryKey: ["/api/packages"],
+    enabled: true,
   });
 
-  // Fetch active sessions
-  const { data: sessions = [] } = useQuery({
-    queryKey: ['/api/sessions'],
-    enabled: false // We'll implement this when needed
+  // Fetch sessions
+  const { data: sessions, isLoading: sessionsLoading } = useQuery<Session[]>({
+    queryKey: ["/api/sessions"],
+    enabled: activeTab === "sessions",
   });
 
-  // Create custom wine package
+  // Create package mutation
   const createPackageMutation = useMutation({
-    mutationFn: async ({ code, name, description }: { code: string; name: string; description: string }) => {
-      const response = await apiRequest('POST', '/api/packages', { code, name, description });
-      return response.json();
+    mutationFn: (data: any) => {
+      console.log("Creating package with data:", data);
+      return apiRequest("POST", "/api/packages", data);
     },
-    onSuccess: (newPackage) => {
+    onSuccess: (result) => {
+      console.log("Package created successfully:", result);
+      // Force immediate cache refresh and refetch
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      queryClient.refetchQueries({ queryKey: ["/api/packages"] });
+      setPackageModalOpen(false);
       toast({
-        title: "Wine Package Created!",
-        description: `Package "${newPackage.code}" is ready for tastings`
+        title: "Package created successfully",
+        description: "Your wine package has been created.",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/packages'] });
-      setCustomCode("");
-      setPackageName("");
-      setPackageDescription("");
-      setIsCreatingCustom(false);
     },
-    onError: (error: any) => {
+    onError: (error) => {
+      console.error("Error creating package:", error);
       toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
+        title: "Error creating package",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
       });
-    }
+    },
   });
 
-  // Create new tasting session
+  // Update package mutation
+  const updatePackageMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest("PATCH", `/api/packages/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      setPackageModalOpen(false);
+      toast({
+        title: "Package updated successfully",
+        description: "Your changes have been saved.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error updating package",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete package mutation
+  const deletePackageMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/packages/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      toast({
+        title: "Package deleted successfully",
+        description: "The wine package has been removed.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error deleting package",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create wine mutation
+  const createWineMutation = useMutation({
+    mutationFn: (data: any) => {
+      console.log("Mutation function called with:", data);
+      return apiRequest("POST", "/api/package-wines", data);
+    },
+    onSuccess: (result) => {
+      console.log("Wine creation successful:", result);
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      setWineModalOpen(false);
+      toast({
+        title: "Wine added successfully",
+        description: "The wine has been added to your package.",
+      });
+    },
+    onError: (error) => {
+      console.error("Wine creation error:", error);
+      toast({
+        title: "Error adding wine",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update wine mutation
+  const updateWineMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: WineForm }) =>
+      apiRequest("PATCH", `/api/package-wines/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      setWineModalOpen(false);
+      toast({
+        title: "Wine updated successfully",
+        description: "Your changes have been saved.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error updating wine",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete wine mutation
+  const deleteWineMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/package-wines/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
+      toast({
+        title: "Wine removed successfully",
+        description: "The wine has been removed from your package.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error removing wine",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create session mutation
   const createSessionMutation = useMutation({
-    mutationFn: async () => {
-      // Create session using the correct endpoint that matches our backend
-      const sessionResponse = await apiRequest('POST', '/api/sessions', {
-        packageCode: selectedPackage,
-        hostName: 'Sommelier',
-        createHost: true
-      });
-      return sessionResponse.json();
-    },
-    onSuccess: (sessionData) => {
+    mutationFn: (packageCode: string) =>
+      apiRequest("POST", "/api/sessions", { packageCode }),
+    onSuccess: (session: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      setSelectedSessionForQR(session as Session);
+      setShowQRModal(true);
       toast({
-        title: "Session Created!",
-        description: `Your tasting session "${newSessionName}" is ready.`
+        title: "Session created successfully",
+        description: "Your tasting session is ready for participants.",
       });
-      setNewSessionName("");
-      // Navigate to host dashboard
-      window.location.href = `/host/${sessionData.session.id}/${sessionData.hostParticipantId}`;
     },
-    onError: (error: any) => {
+    onError: () => {
       toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
+        title: "Error creating session",
+        description: "Please try again.",
+        variant: "destructive",
       });
-    }
+    },
   });
 
-  const generateQRData = (code: string) => {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/join?code=${code}`;
+  const openPackageModal = (mode: PackageModalMode, pkg?: Package) => {
+    setPackageModalMode(mode);
+    setSelectedPackage(pkg || null);
+    setPackageModalOpen(true);
   };
 
-  const copyQRLink = (code: string) => {
-    navigator.clipboard.writeText(generateQRData(code));
-    toast({
-      title: "Link Copied!",
-      description: "Share this link with your guests"
-    });
+  const openWineModal = (mode: WineModalMode, wine?: PackageWine) => {
+    console.log("Opening wine modal:", { mode, wine, selectedPackage });
+    setWineModalMode(mode);
+    setSelectedWine(wine || null);
+    setWineModalOpen(true);
   };
 
-  const downloadQR = (code: string, sessionName: string) => {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&data=${encodeURIComponent(generateQRData(code))}`;
-    
-    const link = document.createElement('a');
-    link.href = qrUrl;
-    link.download = `${sessionName.replace(/\s+/g, '-')}-qr-code.png`;
-    link.click();
-    
-    toast({
-      title: "QR Code Downloaded!",
-      description: "Print and display for your guests"
-    });
+  const openSlideEditor = (wine: PackageWine) => {
+    setLocation(`/video-editor?packageWineId=${wine.id}&wineName=${encodeURIComponent(wine.wineName)}`);
   };
 
-  const viewQR = (code: string, sessionName: string) => {
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&format=png&data=${encodeURIComponent(generateQRData(code))}`;
-    window.open(qrUrl, '_blank');
-    
-    toast({
-      title: "QR Code Opened!",
-      description: "QR code opened in new tab"
+  const openSessionCreationModal = (pkg: Package) => {
+    setSelectedPackageForSession(pkg);
+    setShowSessionCreationModal(true);
+  };
+
+  const handleSessionCreated = (session: any) => {
+    setSelectedSessionForQR(session);
+    setShowQRModal(true);
+  };
+
+  const togglePackageExpansion = (packageId: string) => {
+    setExpandedPackages((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(packageId)) {
+        newSet.delete(packageId);
+      } else {
+        newSet.add(packageId);
+      }
+      return newSet;
     });
   };
 
   return (
-    <div className="min-h-screen bg-gradient-primary">
-      <div className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">
-            Sommelier Dashboard
-          </h1>
-          <p className="text-purple-200">
-            Create and manage your wine tasting experiences
-          </p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="sticky top-0 z-50 bg-black/30 backdrop-blur-xl border-b border-white/10"
+      >
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLocation("/")}
+                className="text-white hover:bg-white/10"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">Back</span>
+              </Button>
+              <div className="flex items-center space-x-2">
+                <Wine className="w-6 h-6 text-white flex items-center" />
+                <h1 className="text-white font-bold text-xl flex items-center">
+                  Sommelier Dashboard
+                </h1>
+              </div>
+            </div>
 
-        <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-          {/* Create Custom Wine Package */}
-          <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Wine size={20} />
-                Create Wine Package
-              </CardTitle>
-              <CardDescription className="text-purple-200">
-                Design your custom wine tasting experience
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="packageName" className="text-white">
-                  Package Name
-                </Label>
-                <Input
-                  id="packageName"
-                  value={packageName}
-                  onChange={(e) => setPackageName(e.target.value)}
-                  placeholder="e.g., Italian Reds Collection"
-                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+            <Button
+              onClick={() => openPackageModal("create")}
+              className="bg-white text-purple-900 hover:bg-white/90 flex items-center"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Package
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Navigation Tabs */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
+          <TabsList className="bg-white/10 backdrop-blur-xl border-white/20">
+            <TabsTrigger
+              value="packages"
+              className="data-[state=active]:bg-white data-[state=active]:text-purple-900"
+            >
+              <Wine className="w-4 h-4 mr-2" />
+              Packages
+            </TabsTrigger>
+            <TabsTrigger
+              value="sessions"
+              className="data-[state=active]:bg-white data-[state=active]:text-purple-900"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Sessions
+            </TabsTrigger>
+            <TabsTrigger
+              value="analytics"
+              className="data-[state=active]:bg-white data-[state=active]:text-purple-900"
+            >
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Analytics
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Packages Tab */}
+          <TabsContent value="packages" className="mt-6">
+            {packagesLoading ? (
+              <div className="flex justify-center py-12">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{
+                    duration: 1,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                  className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full"
                 />
               </div>
+            ) : (
+              <div className="space-y-6">
+                {packages?.length ? (
+                  <div className="space-y-4">
+                    {packages.map((pkg, index) => (
+                      <motion.div
+                        key={pkg.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <Card className="bg-gradient-card backdrop-blur-xl border-white/20 overflow-hidden">
+                          <div className="p-6">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-3 mb-2">
+                                  <h3 className="text-white font-semibold text-lg">
+                                    {pkg.name}
+                                  </h3>
+                                  <Badge
+                                    className={`${
+                                      pkg.isActive
+                                        ? "bg-green-500/20 text-green-400"
+                                        : "bg-gray-500/20 text-gray-400"
+                                    }`}
+                                  >
+                                    {pkg.isActive ? "Active" : "Inactive"}
+                                  </Badge>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      navigator.clipboard.writeText(pkg.code)
+                                    }
+                                    className="p-1 h-auto text-white/60 hover:text-white hover:bg-white/10"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </Button>
+                                </div>
 
-              <div>
-                <Label htmlFor="customCode" className="text-white">
-                  Package Code
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="customCode"
-                    value={customCode}
-                    onChange={(e) => setCustomCode(e.target.value.toUpperCase())}
-                    placeholder="e.g., ITALY01"
-                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                    maxLength={10}
+                                <p className="text-white/70 text-sm mb-4">
+                                  {pkg.description}
+                                </p>
+
+                                <div className="flex items-center space-x-4 text-sm text-white/60">
+                                  <div className="flex items-center space-x-1">
+                                    <Wine className="w-4 h-4" />
+                                    <span>{pkg.wines?.filter(w => w.position > 0).length || 0} wines</span>
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <Clock className="w-4 h-4" />
+                                    <span>
+                                      {new Date(
+                                        pkg.createdAt,
+                                      ).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => togglePackageExpansion(pkg.id)}
+                                className="text-white/60 hover:text-white hover:bg-white/10"
+                              >
+                                {expandedPackages.has(pkg.id) ? (
+                                  <ChevronUp className="w-4 h-4" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </div>
+
+                            <div className="flex space-x-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openSessionCreationModal(pkg)}
+                                className="text-white hover:bg-white/10"
+                              >
+                                <QrCode className="w-4 h-4 mr-2" />
+                                Create Session
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setLocation(`/editor/${pkg.code}`)
+                                }
+                                className="text-purple-300 hover:bg-purple-500/20 border border-purple-400/30"
+                              >
+                                <Edit3 className="w-4 h-4 mr-2" />
+                                Edit Package
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-white hover:bg-white/10"
+                                  >
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="bg-black/90 border-white/20">
+                                  <DropdownMenuItem 
+                                    onClick={() => openPackageModal("view", pkg)}
+                                    className="text-white hover:bg-white/10 cursor-pointer"
+                                  >
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => openPackageModal("edit", pkg)}
+                                    className="text-white hover:bg-white/10 cursor-pointer"
+                                  >
+                                    <Settings className="w-4 h-4 mr-2" />
+                                    Settings
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => deletePackageMutation.mutate(pkg.id)}
+                                    className="text-red-300 hover:bg-red-500/20 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Delete Package
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+
+                          {/* Expandable Wine Management Section */}
+                          <AnimatePresence>
+                            {expandedPackages.has(pkg.id) && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="p-6 space-y-4">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-white font-medium">
+                                      Wines in Package
+                                    </h4>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedPackage(pkg);
+                                        openWineModal("create");
+                                      }}
+                                      className="bg-white/10 text-white hover:bg-white/20"
+                                    >
+                                      <Plus className="w-4 h-4 mr-2" />
+                                      Add Wine
+                                    </Button>
+                                  </div>
+
+                                  {pkg.wines && pkg.wines.length > 0 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      {pkg.wines.map((wine) => (
+                                        <motion.div
+                                          key={wine.id}
+                                          initial={{ opacity: 0, scale: 0.9 }}
+                                          animate={{ opacity: 1, scale: 1 }}
+                                          className="bg-white/5 rounded-lg p-4 border border-white/10"
+                                        >
+                                          <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                              <h5 className="text-white font-medium mb-1">
+                                                {wine.wineName}
+                                              </h5>
+                                              <p className="text-white/60 text-sm mb-2">
+                                                {wine.wineDescription}
+                                              </p>
+
+                                            </div>
+
+                                            <div className="flex space-x-1">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                  setSelectedPackage(pkg);
+                                                  openWineModal("edit", wine);
+                                                }}
+                                                className="text-white/60 hover:text-white hover:bg-white/10"
+                                              >
+                                                <Edit3 className="w-3 h-3" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() =>
+                                                  deleteWineMutation.mutate(
+                                                    wine.id,
+                                                  )
+                                                }
+                                                className="text-red-300/60 hover:text-red-300 hover:bg-red-500/10"
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        </motion.div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="text-center py-8 text-white/50">
+                                      <Wine className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                                      <p className="text-sm">
+                                        No wines added yet
+                                      </p>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setSelectedPackage(pkg);
+                                          openWineModal("create");
+                                        }}
+                                        className="mt-2 text-white/70 hover:text-white hover:bg-white/10"
+                                      >
+                                        Add your first wine
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-12 text-center">
+                    <Wine className="w-16 h-16 text-white/30 mx-auto mb-4" />
+                    <h3 className="text-white font-semibold text-lg mb-2">
+                      No Wine Packages
+                    </h3>
+                    <p className="text-white/70 mb-6">
+                      Create your first wine package to get started.
+                    </p>
+                    <Button
+                      onClick={() => openPackageModal("create")}
+                      className="bg-white text-purple-900 hover:bg-white/90"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Package
+                    </Button>
+                  </Card>
+                )}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Sessions Tab */}
+          <TabsContent value="sessions" className="mt-6">
+            <div className="space-y-6">
+              {sessionsLoading ? (
+                <div className="flex justify-center py-12">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
+                    className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full"
                   />
+                </div>
+              ) : sessions?.length ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {sessions.map((session, index) => (
+                    <motion.div
+                      key={session.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                    >
+                      <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center space-x-2">
+                            <QrCode className="w-5 h-5 text-purple-400" />
+                            <span className="text-white font-semibold">
+                              {session.short_code || session.packageCode}
+                            </span>
+                          </div>
+                          <Badge
+                            className={`${
+                              session.status === "active"
+                                ? "bg-green-500/20 text-green-400"
+                                : session.status === "completed"
+                                ? "bg-blue-500/20 text-blue-400"
+                                : "bg-gray-500/20 text-gray-400"
+                            }`}
+                          >
+                            {session.status}
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-2 text-sm text-white/70 mb-4">
+                          <div className="flex items-center justify-between">
+                            <span>Package:</span>
+                            <span className="text-white font-medium">
+                              {session.packageName || session.packageCode}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Participants:</span>
+                            <button
+                              onClick={() => toggleParticipants(session.id)}
+                              className="text-white hover:text-purple-300 transition-all duration-200 flex items-center gap-1 px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 border border-white/20"
+                            >
+                              <span>{session.participantCount}</span>
+                              <ChevronUp 
+                                className={`w-3 h-3 transition-transform duration-200 ${
+                                  expandedParticipants.has(session.id) ? 'rotate-180' : ''
+                                }`} 
+                              />
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Created:</span>
+                            <span className="text-white">
+                              {new Date(session.startedAt || session.updatedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Expandable Participants List */}
+                        {expandedParticipants.has(session.id) && (
+                          <div className="mb-4 p-3 bg-white/8 rounded-lg border border-white/20 backdrop-blur-sm">
+                            <h4 className="text-white text-sm font-medium mb-3 flex items-center gap-2">
+                              <Users className="w-4 h-4" />
+                              Participants
+                            </h4>
+                            <div className="space-y-2 max-h-32 overflow-y-auto">
+                              {sessionParticipants[session.id]?.length > 0 ? (
+                                // Sort participants - host first, then others
+                                [...sessionParticipants[session.id]]
+                                  .sort((a, b) => (b.isHost ? 1 : 0) - (a.isHost ? 1 : 0))
+                                  .map((participant) => (
+                                    <div 
+                                      key={participant.id} 
+                                      className={`flex justify-between items-center text-xs p-2 rounded-md ${
+                                        participant.isHost 
+                                          ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-400/30' 
+                                          : 'bg-white/5 hover:bg-white/10'
+                                      } transition-colors`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-white/90 font-medium">{participant.displayName}</span>
+                                        {participant.isHost && (
+                                          <span className="px-1.5 py-0.5 bg-purple-500/30 text-purple-300 text-xs rounded-full font-medium">
+                                            HOST
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-white/60">{participant.email}</span>
+                                    </div>
+                                  ))
+                              ) : (
+                                <div className="text-white/60 text-xs p-2 text-center">Loading participants...</div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedSessionForQR(session);
+                              setShowQRModal(true);
+                            }}
+                            className="flex-1 text-white hover:bg-white/10"
+                          >
+                            <QrCode className="w-4 h-4 mr-2" />
+                            QR Code
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setLocation(`/session/${session.id}/monitor`)}
+                            className="flex-1 text-purple-300 hover:bg-purple-500/20"
+                          >
+                            <Monitor className="w-4 h-4 mr-2" />
+                            Monitor
+                          </Button>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-12 text-center">
+                  <Users className="w-16 h-16 text-white/30 mx-auto mb-4" />
+                  <h3 className="text-white font-semibold text-lg mb-2">
+                    No Active Sessions
+                  </h3>
+                  <p className="text-white/70 mb-6">
+                    Create a session from your wine packages to get started.
+                  </p>
                   <Button
-                    onClick={() => setCustomCode(generateRandomCode())}
-                    variant="outline"
-                    className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                    onClick={() => setActiveTab("packages")}
+                    className="bg-white text-purple-900 hover:bg-white/90"
                   >
-                    🎲 Random
+                    <QrCode className="w-4 h-4 mr-2" />
+                    Create Session
                   </Button>
-                  <Button
-                    onClick={() => setCustomCode(generateShortCode())}
-                    variant="outline"
-                    className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                  >
-                    Short
-                  </Button>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="mt-6">
+            <div className="space-y-6">
+              {packagesLoading || sessionsLoading ? (
+                <div className="flex justify-center py-12">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
+                    className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full"
+                  />
                 </div>
-              </div>
+              ) : (
+                <>
+                  {/* Overview Stats - Bento Box Mobile Layout */}
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+                    {/* Large card - spans 2 columns on mobile */}
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center col-span-2 lg:col-span-1">
+                      <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-blue-400 mx-auto mb-2" />
+                      <div className="text-xl md:text-2xl font-bold text-white">
+                        {packages?.length || 0}
+                      </div>
+                      <div className="text-white/70 text-xs md:text-sm">
+                        Total Packages
+                      </div>
+                      <div className="text-green-400 text-xs mt-1">
+                        {packages?.filter(p => p.isActive).length || 0} active
+                      </div>
+                    </Card>
 
-              <div>
-                <Label htmlFor="packageDescription" className="text-white">
-                  Description
-                </Label>
-                <Input
-                  id="packageDescription"
-                  value={packageDescription}
-                  onChange={(e) => setPackageDescription(e.target.value)}
-                  placeholder="Describe your wine selection..."
-                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                />
-              </div>
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
+                      <Users className="w-6 h-6 md:w-8 md:h-8 text-purple-400 mx-auto mb-2" />
+                      <div className="text-xl md:text-2xl font-bold text-white">
+                        {sessions?.length || 0}
+                      </div>
+                      <div className="text-white/70 text-xs md:text-sm">
+                        Sessions
+                      </div>
+                      <div className="text-green-400 text-xs mt-1">
+                        {sessions?.filter(s => s.status === 'active').length || 0} active
+                      </div>
+                    </Card>
 
-              <Button
-                onClick={() => createPackageMutation.mutate({ 
-                  code: customCode, 
-                  name: packageName, 
-                  description: packageDescription 
-                })}
-                disabled={!customCode.trim() || !packageName.trim() || createPackageMutation.isPending}
-                className="w-full bg-gradient-button text-white font-semibold"
-              >
-                {createPackageMutation.isPending ? "Creating..." : "Create Package & QR Code"}
-              </Button>
-            </CardContent>
-          </Card>
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
+                      <Activity className="w-6 h-6 md:w-8 md:h-8 text-pink-400 mx-auto mb-2" />
+                      <div className="text-xl md:text-2xl font-bold text-white">
+                        {sessions?.reduce((total, s) => total + s.participantCount, 0) || 0}
+                      </div>
+                      <div className="text-white/70 text-xs md:text-sm">
+                        Participants
+                      </div>
+                    </Card>
 
-          {/* Create New Session */}
-          <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Plus size={20} />
-                Create Tasting Session
-              </CardTitle>
-              <CardDescription className="text-purple-200">
-                Start a session with existing wine packages
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="sessionName" className="text-white">
-                  Session Name
-                </Label>
-                <Input
-                  id="sessionName"
-                  value={newSessionName}
-                  onChange={(e) => setNewSessionName(e.target.value)}
-                  placeholder="e.g., Evening Bordeaux Tasting"
-                  className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="winePackage" className="text-white">
-                  Wine Collection
-                </Label>
-                <select
-                  id="winePackage"
-                  value={selectedPackage}
-                  onChange={(e) => setSelectedPackage(e.target.value)}
-                  className="w-full mt-1 px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white"
-                >
-                  <option value="WINE01">Bordeaux Discovery Collection</option>
-                  {/* Add created packages dynamically here */}
-                </select>
-              </div>
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
+                      <BarChart3 className="w-6 h-6 md:w-8 md:h-8 text-yellow-400 mx-auto mb-2" />
+                      <div className="text-xl md:text-2xl font-bold text-white">
+                        {sessions && sessions.length > 0
+                          ? Math.round(
+                              (sessions.reduce((total, s) => total + s.participantCount, 0) /
+                                sessions.length) *
+                                10,
+                            ) / 10
+                          : 0}
+                      </div>
+                      <div className="text-white/70 text-xs md:text-sm">
+                        Avg Rate
+                      </div>
+                    </Card>
 
-              <Button
-                onClick={() => createSessionMutation.mutate()}
-                disabled={!newSessionName.trim() || createSessionMutation.isPending}
-                className="w-full bg-gradient-button text-white font-semibold"
-              >
-                {createSessionMutation.isPending ? "Creating..." : "Create Session"}
-              </Button>
-            </CardContent>
-          </Card>
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6 text-center">
+                      <Wine className="w-6 h-6 md:w-8 md:h-8 text-red-400 mx-auto mb-2" />
+                      <div className="text-xl md:text-2xl font-bold text-white">
+                        {packages?.reduce((total, p) => total + (p.wines?.filter(w => w.position > 0).length || 0), 0) || 0}
+                      </div>
+                      <div className="text-white/70 text-xs md:text-sm">
+                        Total Wines
+                      </div>
+                    </Card>
+                  </div>
 
-          {/* Quick Start Guide */}
-          <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Wine size={20} />
-                How to Host a Tasting
-              </CardTitle>
-              <CardDescription className="text-purple-200">
-                Your step-by-step guide
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-purple-500 text-white text-sm flex items-center justify-center font-semibold mt-0.5">
-                    1
-                  </div>
-                  <div>
-                    <p className="text-white font-medium">Create Your Session</p>
-                    <p className="text-purple-200 text-sm">Give it a memorable name and select your wine collection</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-purple-500 text-white text-sm flex items-center justify-center font-semibold mt-0.5">
-                    2
-                  </div>
-                  <div>
-                    <p className="text-white font-medium">Generate QR Code</p>
-                    <p className="text-purple-200 text-sm">Download and print the QR code for easy guest access</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-purple-500 text-white text-sm flex items-center justify-center font-semibold mt-0.5">
-                    3
-                  </div>
-                  <div>
-                    <p className="text-white font-medium">Host Your Tasting</p>
-                    <p className="text-purple-200 text-sm">Guests scan to join and follow along with the guided experience</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                  {/* Package Performance - Mobile Optimized */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6">
+                      <h3 className="text-white font-semibold text-base md:text-lg mb-3 md:mb-4">
+                        Package Performance
+                      </h3>
+                      <div className="space-y-2 md:space-y-3">
+                        {packages?.slice(0, 3).map((pkg, index) => (
+                          <motion.div
+                            key={pkg.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                            className="bg-white/5 rounded-lg p-3 border border-white/10"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 flex-shrink-0"></div>
+                                <h4 className="text-white font-medium text-sm truncate">
+                                  {pkg.name}
+                                </h4>
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs border-white/20 text-white/70 flex-shrink-0"
+                                >
+                                  {pkg.wines?.filter(w => w.position > 0).length || 0}
+                                </Badge>
+                              </div>
+                              <div className="text-white/60 text-xs md:text-sm flex-shrink-0 ml-2">
+                                {sessions?.filter(s => s.packageCode === pkg.code).length || 0} sessions
+                              </div>
+                            </div>
+                          </motion.div>
+                        )) || []}
+                      </div>
+                    </Card>
 
-        {/* Demo Session for Testing */}
-        <div className="mt-8 max-w-4xl mx-auto">
-          <Card className="bg-gradient-card border-white/20 backdrop-blur-xl">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <QrCode size={20} />
-                Demo Session Available
-              </CardTitle>
-              <CardDescription className="text-purple-200">
-                Test the platform with our ready-made Bordeaux tasting
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-4">
-                <Button
-                  onClick={() => copyQRLink('WINE01')}
-                  variant="outline"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  <Copy size={16} className="mr-2" />
-                  Copy Demo Link
-                </Button>
-                
-                <Button
-                  onClick={() => viewQR('WINE01', 'Bordeaux Demo')}
-                  variant="outline"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  <QrCode size={16} className="mr-2" />
-                  View QR Code
-                </Button>
-                
-                <Button
-                  onClick={() => downloadQR('WINE01', 'Bordeaux Demo')}
-                  variant="outline"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  <Download size={16} className="mr-2" />
-                  Download QR Code
-                </Button>
-                
-                <Link href="/join?code=WINE01">
-                  <Button className="bg-gradient-button text-white">
-                    <Users size={16} className="mr-2" />
-                    Join as Guest
-                  </Button>
-                </Link>
-              </div>
-              
-              <div className="mt-4 p-4 bg-white/5 rounded-lg">
-                <p className="text-purple-200 text-sm">
-                  <strong>Demo Code:</strong> WINE01 | 
-                  <strong className="ml-2">Experience:</strong> 8 interactive wine tasting questions covering aroma, taste, body, and overall rating
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                    <Card className="bg-gradient-card backdrop-blur-xl border-white/20 p-4 md:p-6">
+                      <h3 className="text-white font-semibold text-base md:text-lg mb-3 md:mb-4">
+                        Recent Activity
+                      </h3>
+                      <div className="space-y-2 md:space-y-3">
+                        {sessions?.slice(0, 3).map((session, index) => (
+                          <motion.div
+                            key={session.id}
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                            className="bg-white/5 rounded-lg p-3 border border-white/10"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="min-w-0 flex-1">
+                                <div className="text-white font-medium text-sm truncate">
+                                  Session {session.short_code || session.packageCode}
+                                </div>
+                                <div className="text-white/60 text-xs">
+                                  {session.participantCount} participants
+                                </div>
+                              </div>
+                              <Badge 
+                                className={`text-xs flex-shrink-0 ml-2 ${
+                                  session.status === 'active' 
+                                    ? 'bg-green-500/20 text-green-400' 
+                                    : 'bg-gray-500/20 text-gray-400'
+                                }`}
+                              >
+                                {session.status}
+                              </Badge>
+                            </div>
+                          </motion.div>
+                        )) || []}
+                      </div>
+                    </Card>
+                  </div>
+                </>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
+
+      {/* Slide Editor Modal */}
+      {slideEditorOpen && selectedWineForSlides && (
+        <SlideEditor
+          packageWineId={selectedWineForSlides.id}
+          wineName={selectedWineForSlides.wineName}
+          onClose={() => setSlideEditorOpen(false)}
+        />
+      )}
+
+      {/* Package Modal */}
+      {packageModalOpen && (
+        <PackageModal
+          mode={packageModalMode}
+          package={selectedPackage}
+          onClose={() => setPackageModalOpen(false)}
+          onSave={(data) => {
+            console.log("PackageModal onSave called with:", { data, mode: packageModalMode });
+            if (packageModalMode === "create") {
+              console.log("Calling createPackageMutation.mutate with:", data);
+              createPackageMutation.mutate(data);
+            } else if (packageModalMode === "edit" && selectedPackage) {
+              updatePackageMutation.mutate({ id: selectedPackage.id, data });
+            }
+          }}
+        />
+      )}
+
+      {/* Wine Modal */}
+      {wineModalOpen && selectedPackage && (
+        <WineModal
+          mode={wineModalMode}
+          wine={selectedWine}
+          packageId={selectedPackage.id}
+          onClose={() => setWineModalOpen(false)}
+          isLoading={createWineMutation.isPending || updateWineMutation.isPending}
+          onSave={async (data) => {
+            console.log("Wine save triggered:", { data, mode: wineModalMode, packageId: selectedPackage.id });
+            if (wineModalMode === "create") {
+              const wineData = {
+                ...data,
+                packageId: selectedPackage.id,
+              };
+              console.log("Creating wine with data:", wineData);
+              await createWineMutation.mutateAsync(wineData);
+            } else if (wineModalMode === "edit" && selectedWine) {
+              await updateWineMutation.mutateAsync({ id: selectedWine.id, data: data as WineForm });
+            }
+          }}
+        />
+      )}
+
+      {/* QR Code Modal */}
+      {showQRModal && selectedSessionForQR && (
+        <QRCodeModal
+          session={selectedSessionForQR}
+          isOpen={showQRModal}
+          onClose={() => setShowQRModal(false)}
+        />
+      )}
+
+      {/* Session Creation Modal */}
+      {showSessionCreationModal && selectedPackageForSession && (
+        <SessionCreationModal
+          packageCode={selectedPackageForSession.code}
+          packageName={selectedPackageForSession.name}
+          isOpen={showSessionCreationModal}
+          onClose={() => setShowSessionCreationModal(false)}
+          onSessionCreated={handleSessionCreated}
+        />
+      )}
+    </div>
+  );
+}
+
+// Package Modal Component
+interface PackageModalProps {
+  mode: PackageModalMode;
+  package: Package | null;
+  onClose: () => void;
+  onSave: (data: any) => void;
+}
+
+function PackageModal({
+  mode,
+  package: pkg,
+  onClose,
+  onSave,
+}: PackageModalProps) {
+  const [formData, setFormData] = useState({
+    name: pkg?.name || "",
+    description: pkg?.description || "",
+    imageUrl: pkg?.imageUrl || "",
+    isActive: pkg?.isActive ?? true,
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("PackageModal handleSubmit called with formData:", formData);
+    onSave(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-gradient-card backdrop-blur-xl border border-white/20 rounded-lg p-6 w-full max-w-md"
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-white font-semibold text-lg">
+            {mode === "create"
+              ? "Create Package"
+              : mode === "edit"
+                ? "Edit Package"
+                : "Package Details"}
+          </h2>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="text-white/60 hover:text-white hover:bg-white/10"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label className="text-white/80">Package Name</Label>
+            <Input
+              value={formData.name}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
+              className="bg-white/10 border-white/20 text-white"
+              placeholder="Enter package name"
+              disabled={mode === "view"}
+              required
+            />
+          </div>
+
+          <div>
+            <Label className="text-white/80">Description</Label>
+            <Textarea
+              value={formData.description}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
+              className="bg-white/10 border-white/20 text-white"
+              placeholder="Enter package description"
+              disabled={mode === "view"}
+              rows={3}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-white/80 flex items-center space-x-2">
+              <span>Package Cover Image</span>
+              <span className="text-white/50 text-xs font-normal">(shown on Gateway)</span>
+            </Label>
+            <ImageUpload
+              label=""
+              value={formData.imageUrl}
+              onChange={(imageUrl) =>
+                setFormData({ ...formData, imageUrl })
+              }
+              disabled={mode === "view"}
+              placeholder="Upload a cover image for this wine package"
+            />
+            <p className="text-white/40 text-xs">This image will be displayed when participants are joining a tasting session.</p>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              checked={formData.isActive}
+              onCheckedChange={(checked) =>
+                setFormData({ ...formData, isActive: checked })
+              }
+              disabled={mode === "view"}
+            />
+            <Label className="text-white/80">Active Package</Label>
+          </div>
+
+          {mode !== "view" && (
+            <div className="flex space-x-2 pt-4">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onClose}
+                className="flex-1 text-white hover:bg-white/10"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1 bg-white text-purple-900 hover:bg-white/90"
+              >
+                {mode === "create" ? "Create" : "Save Changes"}
+              </Button>
+            </div>
+          )}
+        </form>
+      </motion.div>
     </div>
   );
 }

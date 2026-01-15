@@ -1,0 +1,55 @@
+Hey guys,
+
+Really enjoyed getting to chat and meet you last night. Thank you again for all the work you’ve done—we’re really excited about what’s next.
+
+We put together some thoughts on the revised product scope based on our discussion. Right now, our focus is on the near-term goals—what we feel like we need to be able to run more tastings and what we think falls within the scope of the first build. Whatever you guys can do to turn that around quickly would be awesome.
+
+We included our long-term goals so you can be cognizant of those as you build out the near-term to ensure we’re still leaving room for those future features. Very energizing to see how aligned we all are on the long-term goals.
+
+Also sharing the notes from our meeting incase they're helpful.
+
+Our last ask is that you test the product once it’s ready! Would love to send you guys some wine (on us).
+
+Let us know if you have any questions.
+
+Andres + Sean
+
++++++++++
+
+Revised Project Scope
+
+Near-Term Goals:
+
+1. UI Improvements:
+   - Make the email field mandatory for report delivery and future updates.
+   - Ensure all content is visible on one screen without scrolling.
+    - Open to making text box a dropdown menu
+   - Implement a progress bar that breaks down tastings into intro, deep dive, and ending sections.
+   - Add helper buttons/tooltips for wine terminology (10-12 key terms identified).
+   - Introduce dropdown text fields for user notes to conserve space.
+   - Enhance the slider interface with clearer click targets.
+- Ensure that multiple choice questions allow for larger description field in the text box
+
+2. Database Changes:
+   - Optimize the database structure to accommodate multiple wines per session (4-7 wines).
+   - Ensure the package object can store custom text/content, wine selection, question sets, and sommelier feedback.
+⁃ Test case that needs to be functional is our current package format for Cerbone Intro
+- Ensure that user answers are easily accessible and exportable in a readable format
+
+Long-Term Goals:
+
+1. User Education Journey:
+   - Develop a learning progression similar to Duolingo, focusing on personalized wine education.
+   - Provide immediate feedback post-tasting, followed by a full profile review by a sommelier.
+   - Recommend next packages based on user preferences.
+
+2. Easy Package Creation for Sommeliers:
+   - Enable sommeliers to create custom packages and choose from preset question archetypes.
+   - Allow selection of question formats (multiple choice, slider, etc.) and input of expert tasting notes.
+   - Facilitate customization of wine selections and personalized feedback.
+
+3. Feedback Deliverables:
+   - Implement a feedback delivery system that provides immediate insights to users post-tasting.
+   - Maintain flexibility for future feature additions and potential AI integration for customized follow-ups.
+- Implement a live feedback system that provides the tasting group with insights and comparisons with other tasters in between section
+    - i.e. knowing what other users said about a wine after you finish tasting that specific wine

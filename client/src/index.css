@@ -86,6 +86,42 @@
   }
 }
 
+/* Mobile-First Responsive Design */
+@media (max-width: 640px) {
+  .mobile-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+  
+  .wine-actions-mobile {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+  }
+  
+  .wine-actions-mobile button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+  
+  .tab-container {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .tab-container::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .touch-button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
 /* Custom slider styling */
 .slider::-webkit-slider-thumb {
   appearance: none;
@@ -137,4 +173,122 @@ input:focus, textarea:focus, button:focus {
 
 .animate-wine-glass {
   animation: wine-glass 4s ease-in-out infinite;
+}
+
+/* Dynamic viewport height support for mobile */
+.h-dynamic-screen {
+  height: 100vh; /* Fallback for older browsers */
+  height: var(--app-height, 100dvh); /* Use our JS-calculated value first, then dvh as fallback */
+}
+
+/* Safe area padding for iOS devices */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.pt-safe {
+  padding-top: max(1.5rem, env(safe-area-inset-top));
+}
+
+/* Prevent mobile overflow */
+.mobile-no-overflow {
+  overflow: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile-optimized transitions */
+@media (max-width: 768px) {
+  /* Ensure transition slides fit within viewport */
+  .transition-slide {
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow-y: auto;
+  }
+  
+  /* Reduce padding on mobile for more content space */
+  .mobile-padding {
+    padding: 1rem;
+  }
+  
+  /* Optimize font sizes for mobile readability */
+  .mobile-text-optimize {
+    font-size: clamp(0.875rem, 2vw, 1rem);
+    line-height: 1.6;
+  }
+  
+  /* Better touch targets */
+  .mobile-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Mobile-specific transition animations */
+  .mobile-transition-content {
+    animation-duration: 0.3s !important; /* Faster animations on mobile */
+  }
+  
+  /* Responsive text scaling for transitions */
+  .mobile-heading {
+    font-size: clamp(1.5rem, 6vw, 2.5rem);
+  }
+  
+  .mobile-subheading {
+    font-size: clamp(1rem, 4vw, 1.5rem);
+  }
+  
+  .mobile-body {
+    font-size: clamp(0.875rem, 3vw, 1.125rem);
+  }
+  
+  /* Optimize image sizes for mobile */
+  .mobile-wine-image {
+    max-width: 60vw;
+    max-height: 40vh;
+  }
+  
+  /* Reduce motion for better performance */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* CSS custom properties for dynamic scaling */
+:root {
+  --mobile-scale: clamp(0.75, 2vw, 1);
+  --transition-padding: clamp(1rem, 4vw, 2rem);
+  --wine-image-size: clamp(8rem, 20vw, 12rem);
+  --button-padding-x: clamp(0.75rem, 3vw, 1.5rem);
+  --button-padding-y: clamp(0.5rem, 2vw, 1rem);
+}
+
+@media (max-width: 400px) {
+  .hide-on-xs {
+    display: none !important;
+  }
+}
+
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #2e5270;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(99, 40, 218, 0.89);
+  border-radius: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #555;
 }

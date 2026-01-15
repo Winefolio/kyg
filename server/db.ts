@@ -2,14 +2,8 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "@shared/schema";
 
-// Force connection to Supabase database and clear conflicting PG environment variables
-delete process.env.PGHOST;
-delete process.env.PGUSER;
-delete process.env.PGPASSWORD;
-delete process.env.PGDATABASE;
-delete process.env.PGPORT;
-
-const connectionString = "postgresql://postgres.byearryckdwmajygqdpx:wineboyman1@aws-0-us-west-1.pooler.supabase.com:6543/postgres";
+// Use Supabase connection from environment variables
+const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
   console.error("FATAL ERROR: DATABASE_URL environment variable is not set. The application cannot connect to the database. Please ensure DATABASE_URL is configured in your Replit Secrets or environment.");
@@ -19,8 +13,12 @@ if (!connectionString) {
 console.log("Connecting to PostgreSQL database...");
 console.log("Connection string (masked):", connectionString?.replace(/:([^:@]+)@/, ':***@'));
 
-// Create the database connection with explicit SSL requirement
+// Create the database connection with SSL configuration for local development
 const sql = postgres(connectionString as string, {
-  ssl: 'require'
+  ssl: process.env.NODE_ENV === 'production' ? 'require' : false, // Only require SSL in production
+  max: 20,              // Maximum number of connections in pool
+  idle_timeout: 30,     // Close idle connections after 30 seconds
+  connect_timeout: 30,  // Connection timeout in seconds (increased from 10)
+  max_lifetime: 60 * 30 // Max connection lifetime: 30 minutes
 });
 export const db = drizzle(sql, { schema });

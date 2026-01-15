@@ -33,6 +33,19 @@ export const animations = {
     y: [0, -10, 0],
     rotate: [0, 2, -2, 0],
     transition: { duration: 6, repeat: Infinity, ease: "easeInOut" }
+  },
+  
+  // Varied float animations for background elements
+  floatSlow: {
+    y: [0, -8, 0],
+    rotate: [0, 1, -1, 0],
+    transition: { duration: 8, repeat: Infinity, ease: "easeInOut" }
+  },
+  
+  floatFast: {
+    y: [0, -12, 0],
+    rotate: [0, 3, -3, 0],
+    transition: { duration: 5, repeat: Infinity, ease: "easeInOut" }
   }
 };
 

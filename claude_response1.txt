@@ -1,0 +1,89 @@
+Know Your Grape: AI Project Brief & Technical Deep-Dive (Revised)
+This document provides the context for the "Know Your Grape" project. Please use this as your primary source of truth for understanding our goals, conventions, and immediate tasks.
+Clarifications from Lead Developer
+On the "Multi-Wine Flow" (Task 1.1): The core problem is not that slides aren't created for all wines. The issue is that newly created slides in the PackageEditor do not appear correctly for participants in a live TastingSession. While slide records are successfully created in the Supabase database, they seem to be disconnected from the rendering logic on the user's end. The user-facing experience is broken or "screwed" when custom slides are added.
+On the "Dynamic Slide Template System" (Task 1.2): The PackageEditor UI does exist for adding slides. There is a dropdown menu and an "Add from Full Library" section (as seen in the provided screenshot). However, using these UI elements to add a slide (e.g., "Body Assessment") results in a "blank" slide in the editor—it only shows the title but not the actual question, options, or scale. This indicates a broken connection between the template selection action and the creation of a fully-formed slide payload. The editor is creating a shell of a slide, not a complete one based on a template.
+Summary of Core Problem: The fundamental issue is a broken data-pipeline between the PackageEditor and the TastingSession. The editor's UI for adding slides from templates is not correctly populating the payloadJson for new slides, leading to incomplete slide data that cannot be rendered properly for participants.
+1. Project Overview & Goals
+Know Your Grape is a real-time, interactive wine-tasting platform. It enables sommeliers (Hosts) to create tasting "packages," each containing multiple wines and a corresponding set of presentation slides.
+Our current focus is a major overhaul to fix a critical bug in our content pipeline and build out a robust, intuitive content management system (the "PackageEditor") for sommeliers.
+Primary Goals:
+Fix the Content Pipeline: Ensure that slides created in the PackageEditor using templates are fully formed, saved correctly, and render perfectly for participants in a live session. This is our highest priority.
+Enhance the Editor UX: Make the PackageEditor a first-class content creation tool with live previews and intuitive slide arrangement.
+Create a Rich, Personalized User Journey: Deliver a seamless multi-wine tasting flow and cap it with a dynamic, personalized summary screen.
+Polish and Standardize the UI: Refine the user interface by removing redundant components (like conflicting tooltip systems) and creating a polished, predictable experience.
+2. Technical Stack & Conventions
+Backend: Node.js, Express, PostgreSQL, Drizzle ORM.
+Frontend: React, Vite, TypeScript, wouter (routing).
+Data & State: @tanstack/react-query for server state, React Context for global UI state.
+UI & Styling: tailwindcss, shadcn/ui, framer-motion.
+3. Detailed Task Breakdown & Implementation Paths
+This section outlines our immediate objectives with the new context provided.
+Group 1: Core Architecture & Content Pipeline
+Task 1.1 & 1.2 (Combined): Fix and Implement a Dynamic Slide Template System
+Problem: The PackageEditor's UI for adding slides from templates is broken. It creates a slide record in the database but fails to include the essential content (question text, options, scale settings) from the template's payloadJson. This results in "blank" slides in the editor and a broken experience for participants.
+Analysis (The "Why"):
+The PackageEditor.tsx component has two UI mechanisms for adding slides: a dropdown (<Select>) and a "Template Library" list. Both are visible in the screenshot.
+The addSlideFromTemplate function (around line 337 in SlideEditor.tsx) is likely the point of failure. It correctly identifies the packageWineId and calculates a new position, but it appears to be constructing a new slide object with only a title and description, while ignoring the rich payloadTemplate from the SLIDE_TEMPLATES constant.
+This explains why a new slide record is created in Supabase but appears empty in the editor and session—its payloadJson is missing the critical question_type, options, etc.
+Suggested Implementation Path (A Potential "How"):
+Locate and Fix addSlideFromTemplate:
+In client/src/components/SlideEditor.tsx, find the addSlideFromTemplate function.
+The current implementation probably looks something like this (conceptually):
+// BROKEN LOGIC
+const newSlide = {
+  // ... position, type, etc.
+  title: template.name, // Only uses the name
+  payloadJson: { title: template.name } // Ignores the actual template payload
+};
+Use code with caution.
+TypeScript
+The fix is to ensure the entire payloadTemplate object is deeply copied into the new slide's payloadJson:
+// CORRECTED LOGIC
+const newSlide = {
+  packageWineId,
+  position: slides.length + 1,
+  type: template.type,
+  sectionType: template.sectionType,
+  title: template.payloadTemplate.question || template.payloadTemplate.title || 'New Slide',
+  description: template.payloadTemplate.description || '',
+  // CRITICAL FIX: Use the full payload from the template
+  payloadJson: { ...template.payloadTemplate } 
+};
+createSlideMutation.mutate(newSlide);
+Use code with caution.
+TypeScript
+Verify Both UI Paths: Ensure this corrected logic is called by both the top dropdown menu and the "Add from Full Library" buttons.
+Confirm Database payloadJson: After implementing the fix, create a new slide from the editor and inspect the slides table in Supabase. The payload_json column for the new record should now contain the complete object with question_type, options, etc.
+Key Files to Investigate:
+client/src/components/SlideEditor.tsx: The addSlideFromTemplate function is the primary target.
+Task 1.3: Consolidate Tooltip UI
+Problem: We have two conflicting tooltip mechanisms. We want to standardize on the top-right info panel and remove the pop-up that appears when text is clicked.
+Analysis (The "Why"):
+The "Keep" System: The info icon and panel in MultipleChoiceQuestion.tsx is the desired UX.
+The "Remove" System: The DynamicTextRenderer.tsx component's onClick functionality is creating the unwanted pop-ups.
+Suggested Implementation Path (A Potential "How"):
+Modify DynamicTextRenderer.tsx: Change the component to render glossary terms inside a styled, non-interactive <span> instead of a <button>. This preserves the visual highlighting while removing the unwanted click behavior.
+Create a Reusable HelpfulTermsPanel.tsx: Extract the info panel UI and logic from MultipleChoiceQuestion.tsx into a new, reusable component. It should accept slide content as props and display the relevant terms.
+Deploy the Panel: Add this new <HelpfulTermsPanel /> to the header of all question components to provide a consistent help mechanism.
+Key Files to Investigate:
+client/src/components/ui/DynamicTextRenderer.tsx: To remove the onClick handler.
+client/src/components/questions/MultipleChoiceQuestion.tsx: To use as the source for the new panel component.
+Group 2: Host & Editor Experience
+Task 2.1: Implement Host Wine Selection & Ordering
+Problem: Hosts cannot customize which wines from a package are used in a session or change their order.
+Analysis (The "Why"): The SessionWineSelector.tsx component is feature-complete but is not integrated into the HostDashboard.tsx. The backend API also needs to be updated to respect these session-specific selections when serving slides.
+Suggested Implementation Path (A Potential "How"):
+Integrate Component: In HostDashboard.tsx, add the <SessionWineSelector /> component, passing it the sessionId and packageId.
+Wire Up Save Logic: Ensure the "Save" button within the selector correctly calls the POST /api/sessions/:sessionId/wine-selections endpoint to persist the host's choices.
+Update Backend Slide Fetching: This is a crucial backend change. In server/storage.ts, the function that serves slides for a session (getPackageWithWinesAndSlides or similar) must be modified. It needs to first query the sessionWineSelections table for the given sessionId. If custom selections exist, it must build the slide deck using that specific wine list and order. Otherwise, it should default to using all wines from the package.
+Key Files: client/src/pages/HostDashboard.tsx, client/src/components/SessionWineSelector.tsx, server/storage.ts.
+Task 2.2: Implement a True Live Preview in the Editor
+Problem: The PackageEditor's preview is a static mock-up that doesn't update in real-time and doesn't accurately represent the final slide.
+Analysis (The "Why"): SlidePreviewPanel.tsx uses its own hardcoded rendering instead of the real components. State is not shared between the form and the preview.
+Suggested Implementation Path (A Potential "How"):
+Lift State: Move the state for the slide being edited from SlideConfigPanel up to the parent PackageEditor.tsx.
+Share State: Pass the live state down to both the form (SlideConfigPanel) and the preview (SlidePreviewPanel).
+Refactor Preview Panel: Rewrite SlidePreviewPanel.tsx to be a pure presenter. It should contain a switch statement that, based on the live data's type, renders the actual participant-facing component (e.g., <MultipleChoiceQuestion>). This ensures 100% fidelity.
+Debounce: To optimize performance, debounce the onChange handler in the form so the preview only re-renders after the user has paused typing.
+Key Files: client/src/pages/PackageEditor.tsx, client/src/components/editor/SlideConfigPanel.tsx, client/src/components/editor/SlidePreviewPanel.tsx.

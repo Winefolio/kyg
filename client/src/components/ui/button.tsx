@@ -1,8 +1,11 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
+import { motion } from "framer-motion"
+import { modernButtonVariants, springTransition } from "@/lib/modern-animations"
 
 import { cn } from "@/lib/utils"
+import { useHaptics } from "@/hooks/useHaptics"
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
@@ -37,17 +40,68 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
+  loading?: boolean
+  hapticFeedback?: boolean
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
+  ({ className, variant, size, asChild = false, loading = false, hapticFeedback = true, onClick, ...props }, ref) => {
+    const { triggerHaptic } = useHaptics()
+    const [isPressed, setIsPressed] = React.useState(false)
+
+    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (hapticFeedback) {
+        triggerHaptic('selection')
+      }
+      if (onClick) {
+        onClick(e)
+      }
+    }
+
+    const handlePointerDown = () => setIsPressed(true)
+    const handlePointerUp = () => setIsPressed(false)
+    const handlePointerLeave = () => setIsPressed(false)
+
+    if (asChild) {
+      return (
+        <Slot
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          onClick={handleClick}
+          {...props}
+        />
+      );
+    }
+
     return (
-      <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+      <motion.button
+        className={cn(
+          buttonVariants({ variant, size, className }),
+          "relative overflow-hidden transform-gpu"
+        )}
         ref={ref}
-        {...props}
-      />
+        onClick={handleClick}
+        variants={modernButtonVariants}
+        initial="initial"
+        whileHover="hover"
+        whileTap="tap"
+        animate={loading ? "loading" : "initial"}
+        transition={springTransition}
+        style={{
+          transformOrigin: "center"
+        }}
+        disabled={loading}
+        {...(props as any)}
+      >
+        {loading && (
+          <motion.div 
+            className="w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          />
+        )}
+        {props.children}
+      </motion.button>
     )
   }
 )

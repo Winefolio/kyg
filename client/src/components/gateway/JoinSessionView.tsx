@@ -10,6 +10,8 @@ interface JoinSessionViewProps {
   handleJoinSession: () => void;
   setShowQRScanner: (show: boolean) => void;
   triggerHaptic: (type: keyof typeof hapticPatterns) => void;
+  isValidating?: boolean;
+  validationError?: string | null;
 }
 
 export function JoinSessionView({
@@ -17,7 +19,9 @@ export function JoinSessionView({
   setSessionId,
   handleJoinSession,
   setShowQRScanner,
-  triggerHaptic
+  triggerHaptic,
+  isValidating = false,
+  validationError = null
 }: JoinSessionViewProps) {
   return (
     <div className="w-full max-w-xl mx-auto px-4 space-y-8">
@@ -63,13 +67,23 @@ export function JoinSessionView({
             />
           </div>
 
+          {validationError && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 mx-4"
+            >
+              <p className="text-red-200 text-sm text-center">{validationError}</p>
+            </motion.div>
+          )}
+
           <div className="flex flex-col sm:flex-row gap-4">
             <Button
               onClick={handleJoinSession}
-              disabled={!sessionId.trim() || sessionId.length < 4}
+              disabled={!sessionId.trim() || sessionId.length < 4 || isValidating}
               className="flex-1 py-6 px-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl text-white font-semibold shadow-xl hover:shadow-2xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:transform-none text-xl"
             >
-              Join Session
+              {isValidating ? "Validating..." : "Join Session"}
             </Button>
             <Button
               onClick={() => setShowQRScanner(true)}
