@@ -19,6 +19,8 @@ import { registerDashboardRoutes } from './routes/dashboard';
 import { registerAuthRoutes } from './routes/auth';
 import { registerTastingsRoutes } from './routes/tastings';
 import { registerWinesRoutes } from './routes/wines';
+import { registerJourneyRoutes } from './routes/journeys';
+import { registerTranscriptionRoutes } from './routes/transcription';
 
 // Configure multer for file uploads with comprehensive image support
 const upload = multer({
@@ -2233,6 +2235,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register dashboard routes
   registerDashboardRoutes(app);
+
+  // Register journey routes (Sprint 3)
+  registerJourneyRoutes(app);
+
+  // Register audio transcription routes
+  registerTranscriptionRoutes(app);
 
   // Register media proxy routes
   registerMediaProxyRoutes(app);

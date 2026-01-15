@@ -20,6 +20,13 @@ import {
   type SommelierTips,
   type User,
   type Tasting,
+  type Journey,
+  type InsertJourney,
+  type Chapter,
+  type InsertChapter,
+  type UserJourney,
+  type InsertUserJourney,
+  type CompletedChapter,
   packages,
   packageWines,
   slides,
@@ -33,6 +40,9 @@ import {
   wineResponseAnalytics,
   users,
   tastings,
+  journeys,
+  chapters,
+  userJourneys,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull, isNotNull } from "drizzle-orm";
@@ -5463,6 +5473,227 @@ export class DatabaseStorage implements IStorage {
   async generateSommelierTips(email: string): Promise<SommelierTips> {
     return generateSommelierTips(email);
   }
+
+  // ============================================
+  // LEARNING JOURNEYS (Sprint 3)
+  // ============================================
+
+  async getPublishedJourneys(filters?: { difficulty?: string; wineType?: string }): Promise<Journey[]> {
+    try {
+      let query = db.select().from(journeys).where(eq(journeys.isPublished, true));
+
+      const result = await query.orderBy(desc(journeys.createdAt));
+
+      // Apply filters in memory for simplicity
+      let filtered = result;
+      if (filters?.difficulty) {
+        filtered = filtered.filter(j => j.difficultyLevel === filters.difficulty);
+      }
+      if (filters?.wineType) {
+        filtered = filtered.filter(j => j.wineType === filters.wineType);
+      }
+
+      return filtered;
+    } catch (error) {
+      console.error("Error fetching published journeys:", error);
+      return [];
+    }
+  }
+
+  async getJourneyWithChapters(journeyId: number): Promise<{ journey: Journey; chapters: Chapter[] } | null> {
+    try {
+      const journey = await db.query.journeys.findFirst({
+        where: eq(journeys.id, journeyId)
+      });
+
+      if (!journey) return null;
+
+      const journeyChapters = await db
+        .select()
+        .from(chapters)
+        .where(eq(chapters.journeyId, journeyId))
+        .orderBy(asc(chapters.chapterNumber));
+
+      return { journey, chapters: journeyChapters };
+    } catch (error) {
+      console.error("Error fetching journey with chapters:", error);
+      return null;
+    }
+  }
+
+  async getUserJourneyProgress(email: string, journeyId: number): Promise<UserJourney | null> {
+    try {
+      const user = await this.getUserByEmail(email);
+      if (!user) return null;
+
+      const progress = await db.query.userJourneys.findFirst({
+        where: and(
+          eq(userJourneys.userId, user.id),
+          eq(userJourneys.journeyId, journeyId)
+        )
+      });
+
+      return progress || null;
+    } catch (error) {
+      console.error("Error fetching user journey progress:", error);
+      return null;
+    }
+  }
+
+  async startJourney(email: string, journeyId: number): Promise<UserJourney> {
+    // Get or create user
+    let user = await this.getUserByEmail(email);
+    if (!user) {
+      const [newUser] = await db.insert(users).values({ email }).returning();
+      user = newUser;
+    }
+
+    // Check if already enrolled
+    const existing = await db.query.userJourneys.findFirst({
+      where: and(
+        eq(userJourneys.userId, user.id),
+        eq(userJourneys.journeyId, journeyId)
+      )
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    // Create new enrollment
+    const [userJourney] = await db
+      .insert(userJourneys)
+      .values({
+        userId: user.id,
+        journeyId: journeyId,
+        currentChapter: 1,
+        completedChapters: []
+      })
+      .returning();
+
+    return userJourney;
+  }
+
+  async completeChapter(
+    email: string,
+    journeyId: number,
+    chapterId: number,
+    tastingId: number
+  ): Promise<UserJourney | null> {
+    try {
+      const user = await this.getUserByEmail(email);
+      if (!user) return null;
+
+      const userJourney = await db.query.userJourneys.findFirst({
+        where: and(
+          eq(userJourneys.userId, user.id),
+          eq(userJourneys.journeyId, journeyId)
+        )
+      });
+
+      if (!userJourney) return null;
+
+      // Get chapter info to determine next chapter
+      const chapter = await db.query.chapters.findFirst({
+        where: eq(chapters.id, chapterId)
+      });
+
+      if (!chapter) return null;
+
+      // Update completed chapters array
+      const completedChaptersArray = (userJourney.completedChapters as CompletedChapter[]) || [];
+      const alreadyCompleted = completedChaptersArray.some(c => c.chapterId === chapterId);
+
+      if (!alreadyCompleted) {
+        completedChaptersArray.push({
+          chapterId,
+          completedAt: new Date().toISOString(),
+          tastingId
+        });
+      }
+
+      // Check if journey is complete
+      const journeyData = await this.getJourneyWithChapters(journeyId);
+      const isComplete = journeyData && completedChaptersArray.length >= journeyData.chapters.length;
+
+      // Update user journey
+      const [updated] = await db
+        .update(userJourneys)
+        .set({
+          completedChapters: completedChaptersArray,
+          currentChapter: isComplete ? chapter.chapterNumber : chapter.chapterNumber + 1,
+          lastActivityAt: new Date(),
+          completedAt: isComplete ? new Date() : null
+        })
+        .where(eq(userJourneys.id, userJourney.id))
+        .returning();
+
+      return updated;
+    } catch (error) {
+      console.error("Error completing chapter:", error);
+      return null;
+    }
+  }
+
+  async getUserActiveJourneys(email: string): Promise<Array<{
+    userJourney: UserJourney;
+    journey: Journey;
+    chapters: Chapter[];
+    progress: number;
+  }>> {
+    try {
+      const user = await this.getUserByEmail(email);
+      if (!user) return [];
+
+      const userJourneyList = await db
+        .select()
+        .from(userJourneys)
+        .where(eq(userJourneys.userId, user.id))
+        .orderBy(desc(userJourneys.lastActivityAt));
+
+      const result = [];
+      for (const uj of userJourneyList) {
+        const journeyData = await this.getJourneyWithChapters(uj.journeyId);
+        if (journeyData) {
+          const completedCount = (uj.completedChapters as CompletedChapter[])?.length || 0;
+          const totalChapters = journeyData.chapters.length;
+          const progress = totalChapters > 0 ? (completedCount / totalChapters) * 100 : 0;
+
+          result.push({
+            userJourney: uj,
+            journey: journeyData.journey,
+            chapters: journeyData.chapters,
+            progress: Math.round(progress)
+          });
+        }
+      }
+
+      return result;
+    } catch (error) {
+      console.error("Error fetching user active journeys:", error);
+      return [];
+    }
+  }
+
+  async createJourney(data: InsertJourney): Promise<Journey> {
+    const [journey] = await db.insert(journeys).values(data).returning();
+    return journey;
+  }
+
+  async createChapter(data: InsertChapter): Promise<Chapter> {
+    const [chapter] = await db.insert(chapters).values(data).returning();
+
+    // Update journey total chapters count
+    await db
+      .update(journeys)
+      .set({
+        totalChapters: sql`${journeys.totalChapters} + 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(journeys.id, data.journeyId));
+
+    return chapter;
+  }
 }
 
 // Initialize OpenAI client (optional)
@@ -5568,7 +5799,7 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
 
       console.log(`🤖 Calling OpenAI API...`);
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5-mini", // Upgraded from gpt-4o - better accuracy, lower cost
         messages: [
           {
             role: "system",

@@ -129,7 +129,7 @@ Response format (JSON only):
 }`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5.2', // Using GPT-5.2 for best wine knowledge accuracy
+      model: 'gpt-5-mini', // Using GPT-5 mini - same low hallucination as GPT-5, but faster and cheaper
       messages: [
         {
           role: 'system',

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Wine, Users, UserPlus, ArrowRight, Sparkles, LogIn, GlassWater } from "lucide-react";
+import { Wine, Users, UserPlus, ArrowRight, Sparkles, LogIn, GlassWater, GraduationCap } from "lucide-react";
 import { animations } from "@/lib/animations";
 import { containerVariants, itemVariants } from "@/lib/micro-animations";
 import { hapticPatterns } from "@/lib/animations";
@@ -136,6 +136,43 @@ export function SelectionView({
                 </h3>
                 <p className="text-white/70 text-base">
                   Your Personal Wine Journal
+                </p>
+              </div>
+            </div>
+            <ArrowRight
+              className="text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all duration-300"
+              size={20}
+            />
+          </div>
+        </motion.div>
+
+        {/* Learning Journeys Card */}
+        <motion.div
+          className="group relative bg-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/20 shadow-xl cursor-pointer overflow-hidden"
+          variants={itemVariants}
+          whileHover={{
+            scale: 1.02,
+            y: -3,
+            backgroundColor: "rgba(255, 255, 255, 0.12)",
+            boxShadow: "0 15px 30px -8px rgba(236, 72, 153, 0.25)"
+          }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => {
+            triggerHaptic("selection");
+            window.location.href = "/journeys";
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="bg-gradient-to-br from-pink-500 to-rose-600 p-3 rounded-xl shadow-lg">
+                <GraduationCap className="text-white" size={24} />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white group-hover:text-pink-100 transition-colors duration-300">
+                  Learning Journeys
+                </h3>
+                <p className="text-white/70 text-base">
+                  Structured Wine Education
                 </p>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,8 +10,10 @@ import { Progress } from '@/components/ui/progress';
 import { useGlossarySafe } from '@/contexts/GlossaryContext';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useDebounce } from '@/hooks/useDebounce';
-import { Info, BookOpen } from 'lucide-react';
+import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { Info, Mic, MicOff, Loader2 } from 'lucide-react';
 import { ModernButton } from '@/components/ui/modern-button';
+import { useToast } from '@/hooks/use-toast';
 
 interface TextQuestionProps {
   question: {
@@ -31,10 +33,80 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
   const [localValue, setLocalValue] = useState(value);
   const [isFocused, setIsFocused] = useState(false);
   const [isInfoPanelOpen, setIsInfoPanelOpen] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const glossaryContext = useGlossarySafe();
   const terms = glossaryContext?.terms || [];
   const { triggerHaptic } = useHaptics();
-  
+  const { toast } = useToast();
+
+  // Handle transcription when recording completes
+  const handleRecordingComplete = useCallback(async (blob: Blob) => {
+    setIsTranscribing(true);
+    triggerHaptic('success');
+
+    try {
+      const formData = new FormData();
+      formData.append('audio', blob, 'recording.webm');
+
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.text) {
+        // Append transcribed text to existing value
+        const newValue = localValue.trim()
+          ? `${localValue.trim()} ${data.text}`
+          : data.text;
+        setLocalValue(newValue);
+        toast({
+          title: "Transcribed!",
+          description: "Your voice note has been added."
+        });
+      } else {
+        throw new Error(data.error || 'Transcription failed');
+      }
+    } catch (error) {
+      console.error('Transcription error:', error);
+      toast({
+        title: "Transcription failed",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTranscribing(false);
+    }
+  }, [localValue, toast, triggerHaptic]);
+
+  const { isRecording, isSupported, startRecording, stopRecording, error: recorderError } = useAudioRecorder({
+    onRecordingComplete: handleRecordingComplete,
+    maxDuration: 60
+  });
+
+  // Show error toast if recorder has an error
+  useEffect(() => {
+    if (recorderError) {
+      toast({
+        title: "Recording error",
+        description: recorderError,
+        variant: "destructive"
+      });
+    }
+  }, [recorderError, toast]);
+
+  const toggleRecording = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+      triggerHaptic('success');
+    } else {
+      startRecording();
+      triggerHaptic('selection');
+    }
+  }, [isRecording, startRecording, stopRecording, triggerHaptic]);
+
   // Debounce the value to reduce the number of onChange calls
   const debouncedValue = useDebounce(localValue, 300);
 
@@ -139,13 +211,55 @@ export function TextQuestion({ question, value = '', onChange }: TextQuestionPro
                 placeholder={question.placeholder || "Type your answer here..."}
                 rows={question.rows || 4}
                 className={`
-                  w-full bg-white/10 border-white/20 text-white 
-                  placeholder:text-white/40 resize-none
+                  w-full bg-white/10 border-white/20 text-white
+                  placeholder:text-white/40 resize-none pr-14
                   transition-all duration-200
                   ${isFocused ? 'border-purple-400/50 bg-white/15' : ''}
                 `}
               />
-              
+
+              {/* Voice Recording Button */}
+              {isSupported && (
+                <ModernButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleRecording}
+                  disabled={isTranscribing}
+                  className={`
+                    absolute right-2 bottom-2 p-2 rounded-full
+                    transition-all duration-200
+                    ${isRecording
+                      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                      : 'text-purple-300 hover:text-white hover:bg-white/10'
+                    }
+                  `}
+                  title={isRecording ? "Stop recording" : "Record voice note"}
+                >
+                  {isTranscribing ? (
+                    <Loader2 size={20} className="animate-spin" />
+                  ) : isRecording ? (
+                    <MicOff size={20} className="animate-pulse" />
+                  ) : (
+                    <Mic size={20} />
+                  )}
+                </ModernButton>
+              )}
+
+              {/* Recording indicator */}
+              <AnimatePresence>
+                {isRecording && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    className="absolute top-2 right-2 flex items-center gap-2 bg-red-500/20 px-2 py-1 rounded-full"
+                  >
+                    <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                    <span className="text-xs text-red-400">Recording...</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Focus indicator */}
               {isFocused && (
                 <motion.div

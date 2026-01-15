@@ -87,7 +87,7 @@ Respond in JSON format only:
 }`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-5-mini", // Upgraded from gpt-3.5-turbo - better accuracy, still cheap
       messages: [
         {
           role: "system",
@@ -361,7 +361,7 @@ Respond in JSON format only:
 }`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-5-mini", // Upgraded from gpt-3.5-turbo - better accuracy, still cheap
       messages: [
         {
           role: "system",

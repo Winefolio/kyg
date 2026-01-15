@@ -16,7 +16,7 @@ import {
   ArrowLeft, Search, Calendar, Trophy, TrendingUp,
   Heart, Eye, Share2, Download, MoreHorizontal,
   Globe, Users, Mic, Map, Menu, AlertCircle, RefreshCcw, Wifi, WifiOff, LogOut,
-  User, Users2
+  User, Users2, GraduationCap
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -611,7 +611,28 @@ export default function UserDashboard() {
               
               {/* Desktop dropdown menu */}
              {desktopMenuOpen && (
-               <div className="dropdown-menu absolute right-12 top-12 z-50 bg-white/90 backdrop-blur-xl rounded-lg shadow-lg border border-white/20 py-2 min-w-[150px]">
+               <div className="dropdown-menu absolute right-12 top-12 z-50 bg-white/90 backdrop-blur-xl rounded-lg shadow-lg border border-white/20 py-2 min-w-[180px]">
+                 <div
+                   className="flex items-center w-full px-4 py-2 cursor-pointer text-purple-900 hover:bg-purple-100 hover:text-black rounded transition"
+                   onClick={() => {
+                     setDesktopMenuOpen(false);
+                     setLocation('/journeys');
+                   }}
+                 >
+                   <GraduationCap className="w-4 h-4 mr-2" />
+                   Learning Journeys
+                 </div>
+                 <div
+                   className="flex items-center w-full px-4 py-2 cursor-pointer text-purple-900 hover:bg-purple-100 hover:text-black rounded transition"
+                   onClick={() => {
+                     setDesktopMenuOpen(false);
+                     setLocation('/solo');
+                   }}
+                 >
+                   <Wine className="w-4 h-4 mr-2" />
+                   Solo Tasting
+                 </div>
+                 <div className="border-t border-purple-200 my-1" />
                  <div
                    className="flex items-center w-full px-4 py-2 cursor-pointer text-purple-900 hover:bg-purple-100 hover:text-black rounded transition"
                    onClick={() => {
@@ -634,10 +655,33 @@ export default function UserDashboard() {
 
             {/* Mobile dropdown menu */}
             {mobileMenuOpen && (
-                <div className="dropdown-menu absolute right-4 top-16 z-50 flex flex-col bg-white/90 rounded-lg shadow-lg p-4 space-y-3 md:hidden">
-                  <Button 
-                    variant="ghost" 
-                    className="text-purple-900 hover:bg-purple-100"
+                <div className="dropdown-menu absolute right-4 top-16 z-50 flex flex-col bg-white/90 rounded-lg shadow-lg p-4 space-y-2 md:hidden min-w-[180px]">
+                  <Button
+                    variant="ghost"
+                    className="text-purple-900 hover:bg-purple-100 justify-start"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setLocation('/journeys');
+                    }}
+                  >
+                    <GraduationCap className="w-5 h-5 mr-2" />
+                    Learning Journeys
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="text-purple-900 hover:bg-purple-100 justify-start"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setLocation('/solo');
+                    }}
+                  >
+                    <Wine className="w-5 h-5 mr-2" />
+                    Solo Tasting
+                  </Button>
+                  <div className="border-t border-purple-200 my-1" />
+                  <Button
+                    variant="ghost"
+                    className="text-purple-900 hover:bg-purple-100 justify-start"
                     onClick={() => {
                       setMobileMenuOpen(false);
                       setLocation('/');
@@ -646,11 +690,6 @@ export default function UserDashboard() {
                     <LogOut className="w-5 h-5 mr-2" />
                     Logout
                   </Button>
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-purple-200 text-purple-900">
-                      {finalDashboardData.user.displayName.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
                 </div>
             )}
           </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
@@ -30,10 +30,18 @@ interface WineInfo {
   photoUrl?: string;
 }
 
+interface ChapterContext {
+  chapterNumber: number;
+  title: string;
+  tastingPrompts: Array<{ question: string; category?: string }>;
+  learningObjectives: string[];
+}
+
 interface SoloTastingSessionProps {
   wine: WineInfo;
   onComplete: () => void;
   onCancel: () => void;
+  chapterContext?: ChapterContext;
 }
 
 // Question definition type
@@ -196,26 +204,60 @@ const TASTING_QUESTIONS: TastingQuestion[] = [
 ];
 
 // Section info for headers (simplified - only sections we use)
-const SECTIONS = {
+const SECTIONS: Record<string, { name: string; icon: any; color: string }> = {
   aroma: { name: 'Aroma', icon: Droplets, color: 'from-purple-500 to-pink-500' },
   taste: { name: 'Taste', icon: Grape, color: 'from-red-500 to-orange-500' },
-  overall: { name: 'Overall', icon: Star, color: 'from-emerald-500 to-teal-500' }
+  overall: { name: 'Overall', icon: Star, color: 'from-emerald-500 to-teal-500' },
+  chapter: { name: 'Chapter Focus', icon: Wine, color: 'from-amber-500 to-yellow-500' }
 };
 
-export default function SoloTastingSession({ wine, onComplete, onCancel }: SoloTastingSessionProps) {
+// Convert chapter prompts to TastingQuestion format
+function convertChapterPrompts(prompts: Array<{ question: string; category?: string }>): TastingQuestion[] {
+  return prompts.map((prompt, index) => ({
+    id: `chapter_prompt_${index}`,
+    section: 'chapter' as any, // Special section for chapter-specific questions
+    type: 'text' as const,
+    config: {
+      title: prompt.question,
+      description: 'Take your time to reflect on this.',
+      placeholder: 'Share your observations...',
+      rows: 2
+    }
+  }));
+}
+
+export default function SoloTastingSession({ wine, onComplete, onCancel, chapterContext }: SoloTastingSessionProps) {
   const [, setLocation] = useLocation();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [isComplete, setIsComplete] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const currentQuestion = TASTING_QUESTIONS[currentQuestionIndex];
-  const progress = ((currentQuestionIndex + 1) / TASTING_QUESTIONS.length) * 100;
+  // Build the full question list: standard questions + chapter prompts (if any)
+  const allQuestions = useMemo(() => {
+    if (!chapterContext?.tastingPrompts?.length) {
+      return TASTING_QUESTIONS;
+    }
+
+    // Insert chapter prompts after the taste section (before overall)
+    const chapterQuestions = convertChapterPrompts(chapterContext.tastingPrompts);
+    const tasteEndIndex = TASTING_QUESTIONS.findIndex(q => q.section === 'overall');
+
+    return [
+      ...TASTING_QUESTIONS.slice(0, tasteEndIndex),
+      ...chapterQuestions,
+      ...TASTING_QUESTIONS.slice(tasteEndIndex)
+    ];
+  }, [chapterContext]);
+
+  const currentQuestion = allQuestions[currentQuestionIndex];
+  const progress = ((currentQuestionIndex + 1) / allQuestions.length) * 100;
   const sectionInfo = currentQuestion ? SECTIONS[currentQuestion.section] : null;
+  const isChapterQuestion = currentQuestion?.section === 'chapter';
 
   // Group answers by section for saving
-  const formatResponsesForSave = (): TastingResponses => {
-    const responses: TastingResponses = {
+  const formatResponsesForSave = () => {
+    const responses: TastingResponses & { chapterPrompts?: Record<string, string> } = {
       visual: {},
       aroma: {},
       taste: {},
@@ -223,17 +265,30 @@ export default function SoloTastingSession({ wine, onComplete, onCancel }: SoloT
       overall: {}
     };
 
-    TASTING_QUESTIONS.forEach(q => {
+    // Collect chapter prompt answers separately
+    const chapterAnswers: Record<string, string> = {};
+
+    allQuestions.forEach(q => {
       const answer = answers[q.id];
       if (answer !== undefined) {
-        const section = responses[q.section];
-        if (section) {
-          // Map question ID to response field
-          const fieldName = q.id.split('_').slice(1).join('_') || q.id;
-          (section as any)[fieldName] = answer;
+        if (q.section === 'chapter') {
+          // Store chapter prompt answers with the question text as key
+          chapterAnswers[q.config.title] = answer;
+        } else {
+          const section = responses[q.section as keyof TastingResponses];
+          if (section) {
+            // Map question ID to response field
+            const fieldName = q.id.split('_').slice(1).join('_') || q.id;
+            (section as any)[fieldName] = answer;
+          }
         }
       }
     });
+
+    // Add chapter answers if any
+    if (Object.keys(chapterAnswers).length > 0) {
+      responses.chapterPrompts = chapterAnswers;
+    }
 
     return responses;
   };
@@ -275,7 +330,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel }: SoloT
   };
 
   const handleNext = () => {
-    if (currentQuestionIndex < TASTING_QUESTIONS.length - 1) {
+    if (currentQuestionIndex < allQuestions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
     } else {
       // Last question - save and complete
@@ -411,7 +466,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel }: SoloT
               </span>
             </div>
             <span className="text-white/60 text-sm">
-              {currentQuestionIndex + 1}/{TASTING_QUESTIONS.length}
+              {currentQuestionIndex + 1}/{allQuestions.length}
             </span>
           </div>
 
@@ -464,7 +519,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel }: SoloT
           >
             {isSaving ? (
               'Saving...'
-            ) : currentQuestionIndex === TASTING_QUESTIONS.length - 1 ? (
+            ) : currentQuestionIndex === allQuestions.length - 1 ? (
               <>
                 Complete
                 <CheckCircle className="w-4 h-4 ml-2" />
