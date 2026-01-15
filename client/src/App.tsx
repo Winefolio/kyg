@@ -16,6 +16,9 @@ import PackageEditor from "@/pages/PackageEditor";
 import UserDashboard from "@/pages/UserDashboard";
 import TastingDetailView from "@/pages/TastingDetailView";
 import Login from "@/pages/Login";
+import SoloDashboard from "@/pages/SoloDashboard";
+import SoloTastingDetail from "@/pages/SoloTastingDetail";
+import SoloProfile from "@/pages/SoloProfile";
 
 import Profile from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
@@ -35,6 +38,9 @@ function Router() {
       <Route path="/completion/:sessionId/:participantId" component={TastingCompletion} />
       <Route path="/host/:sessionId/:participantId" component={HostDashboard} />
       <Route path="/login" component={Login} />
+      <Route path="/solo" component={SoloDashboard} />
+      <Route path="/solo/tasting/:id" component={SoloTastingDetail} />
+      <Route path="/solo/profile" component={SoloProfile} />
       <Route component={NotFound} />
     </Switch>
   );

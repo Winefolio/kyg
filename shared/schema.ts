@@ -536,3 +536,118 @@ export interface SommelierTips {
   questions: string[];
   priceGuidance: string;
 }
+
+// ============================================
+// SOLO TASTING TABLES (Product Pivot - Sprint 1)
+// ============================================
+
+// Users table for solo tasters (email-only auth)
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+}, (table) => ({
+  emailIdx: index("idx_users_email").on(table.email)
+}));
+
+// Auth attempts table for rate limiting
+export const authAttempts = pgTable("auth_attempts", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  attemptedAt: timestamp("attempted_at").defaultNow().notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }) // IPv6 max length
+}, (table) => ({
+  emailIdx: index("idx_auth_attempts_email").on(table.email),
+  ipIdx: index("idx_auth_attempts_ip").on(table.ipAddress),
+  attemptedAtIdx: index("idx_auth_attempts_attempted_at").on(table.attemptedAt)
+}));
+
+// Solo tastings table (stores full questionnaire responses)
+export const tastings = pgTable("tastings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  wineName: varchar("wine_name", { length: 255 }).notNull(),
+  wineRegion: varchar("wine_region", { length: 255 }),
+  wineVintage: integer("wine_vintage"),
+  grapeVariety: varchar("grape_variety", { length: 255 }),
+  wineType: varchar("wine_type", { length: 50 }), // 'red', 'white', 'rosé', etc.
+  photoUrl: text("photo_url"),
+  tastedAt: timestamp("tasted_at").defaultNow().notNull(),
+  responses: jsonb("responses").notNull() // Full tasting questionnaire responses
+}, (table) => ({
+  userIdIdx: index("idx_tastings_user_id").on(table.userId),
+  tastedAtIdx: index("idx_tastings_tasted_at").on(table.tastedAt),
+  responsesIdx: index("idx_tastings_responses").using("gin", table.responses)
+}));
+
+// Insert schemas for solo tasting
+export const insertUserSchema = createInsertSchema(users, {
+  email: z.string().email("Invalid email address").transform(e => e.toLowerCase())
+}).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertAuthAttemptSchema = createInsertSchema(authAttempts, {
+  email: z.string().email().transform(e => e.toLowerCase()),
+  ipAddress: z.string().nullable().optional()
+}).omit({
+  id: true,
+  attemptedAt: true
+});
+
+export const insertTastingSchema = createInsertSchema(tastings, {
+  wineName: z.string().min(1, "Wine name is required"),
+  wineRegion: z.string().nullable().optional(),
+  wineVintage: z.number().int().min(1900).max(2100).nullable().optional(),
+  grapeVariety: z.string().nullable().optional(),
+  wineType: z.enum(['red', 'white', 'rosé', 'sparkling', 'dessert', 'fortified', 'orange']).nullable().optional(),
+  photoUrl: z.string().url().nullable().optional(),
+  responses: z.record(z.any()) // JSONB object for tasting responses
+}).omit({
+  id: true,
+  tastedAt: true
+});
+
+// Types for solo tasting
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type AuthAttempt = typeof authAttempts.$inferSelect;
+export type InsertAuthAttempt = z.infer<typeof insertAuthAttemptSchema>;
+export type Tasting = typeof tastings.$inferSelect;
+export type InsertTasting = z.infer<typeof insertTastingSchema>;
+
+// Tasting responses structure (for type safety)
+export interface TastingResponses {
+  visual?: {
+    clarity?: number;
+    intensity?: number;
+    color?: string;
+    notes?: string;
+  };
+  aroma?: {
+    intensity?: number;
+    primaryAromas?: string[];
+    secondaryAromas?: string[];
+    notes?: string;
+  };
+  taste?: {
+    sweetness?: number;
+    acidity?: number;
+    tannins?: number;
+    body?: number;
+    flavors?: string[];
+    notes?: string;
+  };
+  structure?: {
+    balance?: number;
+    finish?: number;
+    complexity?: number;
+    notes?: string;
+  };
+  overall?: {
+    rating?: number;
+    wouldBuyAgain?: boolean;
+    notes?: string;
+  };
+}
