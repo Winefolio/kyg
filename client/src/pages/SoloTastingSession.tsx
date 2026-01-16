@@ -229,17 +229,19 @@ const SECTIONS: Record<string, { name: string; icon: any; color: string }> = {
 
 // Convert chapter prompts to TastingQuestion format
 function convertChapterPrompts(prompts: Array<{ question: string; category?: string }>): TastingQuestion[] {
-  return prompts.map((prompt, index) => ({
-    id: `chapter_prompt_${index}`,
-    section: 'chapter' as const,
-    type: 'text' as const,
-    config: {
-      title: prompt.question,
-      description: 'Take your time to reflect on this.',
-      placeholder: 'Share your observations...',
-      rows: 2
-    }
-  }));
+  return prompts
+    .filter(prompt => prompt && prompt.question && prompt.question.trim()) // Filter out empty prompts
+    .map((prompt, index) => ({
+      id: `chapter_prompt_${index}`,
+      section: 'chapter' as const,
+      type: 'text' as const,
+      config: {
+        title: prompt.question,
+        description: 'Take your time to reflect on this.',
+        placeholder: 'Share your observations...',
+        rows: 2
+      }
+    }));
 }
 
 // Convert AI-generated questions to TastingQuestion format
@@ -253,7 +255,9 @@ function convertAIQuestions(questions: AIQuestion[]): TastingQuestion[] {
     'overall': 'overall'
   };
 
-  return questions.map((q) => ({
+  return questions
+    .filter(q => q && q.title && q.title.trim()) // Filter out questions with empty titles
+    .map((q) => ({
     id: q.id,
     section: categoryToSection[q.category] || 'taste',
     type: q.questionType === 'multiple_choice' ? 'multiple_choice' :
@@ -408,6 +412,12 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
     if (!currentQuestion) return null;
 
     const { id, type, config } = currentQuestion;
+
+    // Skip rendering if the question has no title/content
+    if (!config.title || !config.title.trim()) {
+      console.warn('[SoloTastingSession] Skipping question with empty title:', currentQuestion);
+      return null;
+    }
 
     switch (type) {
       case 'scale':
