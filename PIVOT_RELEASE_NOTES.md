@@ -2,7 +2,7 @@
 
 **Date**: January 2026
 **Version**: Pivot Release 1.0
-**Live URL**: https://kyg.up.railway.app
+**Live URL**: https://knowyourgrape-production.up.railway.app
 
 ---
 
@@ -60,7 +60,7 @@ KnowYourGrape has evolved from a host-focused group tasting platform into a comp
 ## How to Test
 
 ### Getting Started
-1. Go to **https://kyg.up.railway.app**
+1. Go to **https://knowyourgrape-production.up.railway.app**
 2. You'll see entry points for all three experiences
 
 ### Test Solo Tastings
@@ -95,7 +95,7 @@ KnowYourGrape has evolved from a host-focused group tasting platform into a comp
 
 ## URLs Quick Reference
 
-Base URL: **https://kyg.up.railway.app**
+Base URL: **https://knowyourgrape-production.up.railway.app**
 
 | Page | Path |
 |------|------|
