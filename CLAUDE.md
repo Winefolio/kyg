@@ -5,12 +5,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Essential Commands
 
 ```bash
-npm run dev          # Start dev server (Vite + Express) on port 5000/5001
-npm run build        # Build for production
+npm run dev          # Start dev server (Express serves Vite, default port 5000)
+npm run build        # Build for production (vite build + esbuild server)
 npm start            # Run production server
 npm run db:push      # Push schema changes to database (Drizzle)
 npm run check        # TypeScript type checking
 ```
+
+Note: Dev server runs Express which serves the Vite frontend. Port can be overridden with `PORT` env var.
 
 ## Architecture Overview
 
@@ -29,6 +31,7 @@ npm run check        # TypeScript type checking
 server/
 ├── routes.ts          # Main API routes (large file, ~2200 lines)
 ├── routes/            # Modular route files (auth, dashboard, journeys, tastings, wines, transcription)
+├── services/          # Business logic (questionGenerator, wineValidation)
 ├── storage.ts         # Data access layer - all Drizzle queries
 ├── wine-intelligence.ts # GPT-powered wine characteristics lookup
 └── openai-client.ts   # Sentiment analysis, summaries
@@ -98,6 +101,9 @@ Optional:
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE` - For media uploads
 - `SESSION_SECRET` - For production session encryption
 
-## Feature Backlog
+## Planning & Documentation
 
-See `FEATURE_BACKLOG.md` for deprioritized features and future ideas.
+- `PRODUCT_ROADMAP.md` - Prioritized future features
+- `PIVOT_RELEASE_NOTES.md` - Current release overview and testing guide
+- `FEATURE_BACKLOG.md` - Deprioritized features and ideas
+- `plans/` - Detailed feature specifications
