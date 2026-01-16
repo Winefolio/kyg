@@ -129,20 +129,18 @@ Response format (JSON only):
 }`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5-mini', // Using GPT-5 mini - same low hallucination as GPT-5, but faster and cheaper
+      model: 'gpt-5.2', // Using GPT-5.2 for wine intelligence
       messages: [
         {
           role: 'system',
-          content: 'You are an expert sommelier providing wine characteristic assessments. Always respond with valid JSON only.'
+          content: 'You are an expert sommelier providing wine characteristic assessments. Always respond with valid JSON only, no markdown formatting.'
         },
         {
           role: 'user',
           content: prompt
         }
       ],
-      max_completion_tokens: 300,
-      temperature: 0.3,
-      response_format: { type: 'json_object' }
+      max_completion_tokens: 300
     });
 
     const response = completion.choices[0].message.content;
