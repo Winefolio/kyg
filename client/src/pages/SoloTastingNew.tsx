@@ -74,6 +74,9 @@ export default function SoloTastingNew() {
 
   const [view, setView] = useState<ViewState>('wine-entry');
   const [isScanning, setIsScanning] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [aiQuestions, setAiQuestions] = useState<any[] | null>(null);
   const [wineInfo, setWineInfo] = useState<WineInfo>({
     wineName: '',
     wineRegion: '',
@@ -221,9 +224,60 @@ export default function SoloTastingNew() {
     }
   });
 
-  const handleStartTasting = () => {
+  const handleStartTasting = async () => {
     if (!wineInfo.wineName.trim()) return;
-    setView('tasting');
+
+    // For journey chapters, validate wine and generate AI questions
+    if (journeyId && chapterId && user?.email) {
+      setIsValidating(true);
+      setValidationError(null);
+
+      try {
+        // Convert wineInfo to WineRecognitionResult format for the API
+        const wineRecognition = {
+          name: wineInfo.wineName,
+          region: wineInfo.wineRegion || 'Unknown',
+          grapeVarieties: wineInfo.grapeVariety ? [wineInfo.grapeVariety] : [],
+          vintage: wineInfo.wineVintage,
+          confidence: 0.8 // Assume high confidence since user entered/verified
+        };
+
+        const response = await fetch(`/api/journeys/${journeyId}/chapters/${chapterId}/start-tasting`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            wineInfo: wineRecognition,
+            email: user.email,
+            difficulty: 'intermediate', // Could be based on journey difficulty
+            skipValidation: chapter?.wineRequirements?.anyWine || false
+          }),
+          credentials: 'include'
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+          setValidationError(result.message || 'This wine does not match the chapter requirements.');
+          setIsValidating(false);
+          return;
+        }
+
+        // Store AI-generated questions
+        if (result.questions && result.questions.length > 0) {
+          setAiQuestions(result.questions);
+        }
+
+        setIsValidating(false);
+        setView('tasting');
+      } catch (error) {
+        console.error('Error starting tasting:', error);
+        setValidationError('Failed to validate wine. Please try again.');
+        setIsValidating(false);
+      }
+    } else {
+      // Non-journey tasting - go straight to tasting
+      setView('tasting');
+    }
   };
 
   const handleTastingComplete = async () => {
@@ -266,6 +320,7 @@ export default function SoloTastingNew() {
           tastingPrompts: chapter.tastingPrompts || [],
           learningObjectives: chapter.learningObjectives || []
         } : undefined}
+        aiQuestions={aiQuestions || undefined}
       />
     );
   }
@@ -543,12 +598,26 @@ export default function SoloTastingNew() {
                 </div>
               )}
 
+              {/* Validation error message */}
+              {validationError && (
+                <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3 mt-4">
+                  <p className="text-red-300 text-sm">{validationError}</p>
+                </div>
+              )}
+
               <Button
                 onClick={handleStartTasting}
-                disabled={!wineInfo.wineName.trim()}
+                disabled={!wineInfo.wineName.trim() || isValidating}
                 className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-6 text-lg mt-4"
               >
-                Start Tasting
+                {isValidating ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Preparing Tasting...
+                  </>
+                ) : (
+                  'Start Tasting'
+                )}
               </Button>
             </div>
           </div>

@@ -5694,6 +5694,86 @@ export class DatabaseStorage implements IStorage {
 
     return chapter;
   }
+
+  // ============================================
+  // SPRINT 5: ADDITIONAL JOURNEY/CHAPTER CRUD
+  // ============================================
+
+  async getChapterById(chapterId: number): Promise<Chapter | null> {
+    const chapter = await db.query.chapters.findFirst({
+      where: eq(chapters.id, chapterId)
+    });
+    return chapter || null;
+  }
+
+  async updateJourney(journeyId: number, updates: Partial<InsertJourney>): Promise<Journey | null> {
+    const [updated] = await db
+      .update(journeys)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(journeys.id, journeyId))
+      .returning();
+    return updated || null;
+  }
+
+  async deleteJourney(journeyId: number): Promise<void> {
+    // Chapters will be cascade deleted due to foreign key constraint
+    await db.delete(journeys).where(eq(journeys.id, journeyId));
+  }
+
+  async updateChapter(chapterId: number, updates: Partial<InsertChapter>): Promise<Chapter | null> {
+    const [updated] = await db
+      .update(chapters)
+      .set(updates)
+      .where(eq(chapters.id, chapterId))
+      .returning();
+    return updated || null;
+  }
+
+  async deleteChapter(chapterId: number): Promise<void> {
+    // Get the chapter first to update journey's total count
+    const chapter = await this.getChapterById(chapterId);
+    if (chapter) {
+      await db.delete(chapters).where(eq(chapters.id, chapterId));
+
+      // Decrement journey's total chapters count
+      await db
+        .update(journeys)
+        .set({
+          totalChapters: sql`GREATEST(${journeys.totalChapters} - 1, 0)`,
+          updatedAt: new Date()
+        })
+        .where(eq(journeys.id, chapter.journeyId));
+    }
+  }
+
+  async getAllJourneys(): Promise<Journey[]> {
+    // Returns all journeys (including unpublished) for admin view
+    return await db.query.journeys.findMany({
+      orderBy: [desc(journeys.createdAt)]
+    });
+  }
+
+  async getAllJourneysWithChapters(): Promise<Array<Journey & { chapters: Chapter[] }>> {
+    // Returns all journeys with their chapters for admin view
+    const allJourneys = await db.query.journeys.findMany({
+      orderBy: [desc(journeys.createdAt)]
+    });
+
+    const result = await Promise.all(
+      allJourneys.map(async (journey) => {
+        const journeyChapters = await db.query.chapters.findMany({
+          where: eq(chapters.journeyId, journey.id),
+          orderBy: [asc(chapters.chapterNumber)]
+        });
+        return { ...journey, chapters: journeyChapters };
+      })
+    );
+
+    return result;
+  }
 }
 
 // Initialize OpenAI client (optional)

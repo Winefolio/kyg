@@ -37,17 +37,33 @@ interface ChapterContext {
   learningObjectives: string[];
 }
 
+// AI-generated question format from Sprint 5
+interface AIQuestion {
+  id: string;
+  category: 'appearance' | 'aroma' | 'taste' | 'structure' | 'overall';
+  questionType: 'multiple_choice' | 'scale' | 'text';
+  title: string;
+  description?: string;
+  options?: Array<{ id: string; text: string; description?: string }>;
+  allowMultiple?: boolean;
+  scaleMin?: number;
+  scaleMax?: number;
+  scaleLabels?: [string, string];
+  wineContext?: string;
+}
+
 interface SoloTastingSessionProps {
   wine: WineInfo;
   onComplete: () => void;
   onCancel: () => void;
   chapterContext?: ChapterContext;
+  aiQuestions?: AIQuestion[];
 }
 
 // Question definition type
 interface TastingQuestion {
   id: string;
-  section: 'aroma' | 'taste' | 'overall';
+  section: 'aroma' | 'taste' | 'overall' | 'chapter';
   type: 'scale' | 'multiple_choice' | 'text' | 'boolean';
   config: {
     title: string;
@@ -215,7 +231,7 @@ const SECTIONS: Record<string, { name: string; icon: any; color: string }> = {
 function convertChapterPrompts(prompts: Array<{ question: string; category?: string }>): TastingQuestion[] {
   return prompts.map((prompt, index) => ({
     id: `chapter_prompt_${index}`,
-    section: 'chapter' as any, // Special section for chapter-specific questions
+    section: 'chapter' as const,
     type: 'text' as const,
     config: {
       title: prompt.question,
@@ -226,15 +242,58 @@ function convertChapterPrompts(prompts: Array<{ question: string; category?: str
   }));
 }
 
-export default function SoloTastingSession({ wine, onComplete, onCancel, chapterContext }: SoloTastingSessionProps) {
+// Convert AI-generated questions to TastingQuestion format
+function convertAIQuestions(questions: AIQuestion[]): TastingQuestion[] {
+  // Map AI category to section
+  const categoryToSection: Record<string, 'aroma' | 'taste' | 'overall'> = {
+    'appearance': 'aroma', // Group appearance with aroma for display
+    'aroma': 'aroma',
+    'taste': 'taste',
+    'structure': 'taste',
+    'overall': 'overall'
+  };
+
+  return questions.map((q) => ({
+    id: q.id,
+    section: categoryToSection[q.category] || 'taste',
+    type: q.questionType === 'multiple_choice' ? 'multiple_choice' :
+          q.questionType === 'scale' ? 'scale' : 'text',
+    config: {
+      title: q.title,
+      description: q.description || q.wineContext,
+      // Scale config
+      scaleMin: q.scaleMin,
+      scaleMax: q.scaleMax,
+      scaleLabels: q.scaleLabels,
+      // Multiple choice config
+      options: q.options?.map(opt => ({
+        id: opt.id,
+        text: opt.text,
+        value: opt.id
+      })),
+      allowMultiple: q.allowMultiple,
+      // Text config
+      placeholder: q.questionType === 'text' ? 'Share your observations...' : undefined,
+      rows: q.questionType === 'text' ? 3 : undefined
+    }
+  }));
+}
+
+export default function SoloTastingSession({ wine, onComplete, onCancel, chapterContext, aiQuestions }: SoloTastingSessionProps) {
   const [, setLocation] = useLocation();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [isComplete, setIsComplete] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Build the full question list: standard questions + chapter prompts (if any)
+  // Build the full question list: AI questions (if available) or standard questions + chapter prompts
   const allQuestions = useMemo(() => {
+    // If we have AI-generated questions, use them instead of defaults
+    if (aiQuestions && aiQuestions.length > 0) {
+      return convertAIQuestions(aiQuestions);
+    }
+
+    // Fallback to standard questions + chapter prompts
     if (!chapterContext?.tastingPrompts?.length) {
       return TASTING_QUESTIONS;
     }
@@ -248,7 +307,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
       ...chapterQuestions,
       ...TASTING_QUESTIONS.slice(tasteEndIndex)
     ];
-  }, [chapterContext]);
+  }, [chapterContext, aiQuestions]);
 
   const currentQuestion = allQuestions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / allQuestions.length) * 100;
