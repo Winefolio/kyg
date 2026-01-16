@@ -229,8 +229,8 @@ export default function JourneyAdmin() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400" />
       </div>
     );
   }
@@ -238,31 +238,31 @@ export default function JourneyAdmin() {
   const journeys = journeysData?.journeys || [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black">
       {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-10">
+      <header className="bg-black/30 backdrop-blur-xl border-b border-white/10 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/sommelier">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back
               </Button>
             </Link>
-            <h1 className="text-xl font-semibold flex items-center gap-2">
+            <h1 className="text-xl font-semibold flex items-center gap-2 text-white">
               <Book className="w-5 h-5" />
               Journey Management
             </h1>
           </div>
-          <Badge variant="outline">{journeys.length} journeys</Badge>
+          <Badge variant="outline" className="border-white/30 text-white/70">{journeys.length} journeys</Badge>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
         {/* Create New Journey Form */}
-        <Card>
+        <Card className="bg-white/5 backdrop-blur-xl border-white/10">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-white">
               <Plus className="w-5 h-5" />
               {editingJourney ? 'Edit Journey' : 'Create New Journey'}
             </CardTitle>
@@ -280,7 +280,7 @@ export default function JourneyAdmin() {
               className="grid grid-cols-1 md:grid-cols-2 gap-4"
             >
               <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
+                <Label htmlFor="title" className="text-white/80">Title</Label>
                 <Input
                   id="title"
                   value={journeyForm.title}
@@ -291,7 +291,7 @@ export default function JourneyAdmin() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="difficultyLevel">Difficulty</Label>
+                <Label htmlFor="difficultyLevel" className="text-white/80">Difficulty</Label>
                 <Select
                   value={journeyForm.difficultyLevel}
                   onValueChange={(v) => setJourneyForm(prev => ({ ...prev, difficultyLevel: v as JourneyFormData['difficultyLevel'] }))}
@@ -308,7 +308,7 @@ export default function JourneyAdmin() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="wineType">Wine Type</Label>
+                <Label htmlFor="wineType" className="text-white/80">Wine Type</Label>
                 <Select
                   value={journeyForm.wineType}
                   onValueChange={(v) => setJourneyForm(prev => ({ ...prev, wineType: v as JourneyFormData['wineType'] }))}
@@ -326,7 +326,7 @@ export default function JourneyAdmin() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="duration">Estimated Duration</Label>
+                <Label htmlFor="duration" className="text-white/80">Estimated Duration</Label>
                 <Input
                   id="duration"
                   value={journeyForm.estimatedDuration || ''}
@@ -336,7 +336,7 @@ export default function JourneyAdmin() {
               </div>
 
               <div className="col-span-full space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description" className="text-white/80">Description</Label>
                 <Textarea
                   id="description"
                   value={journeyForm.description}
@@ -352,7 +352,7 @@ export default function JourneyAdmin() {
                   checked={journeyForm.isPublished}
                   onCheckedChange={(checked) => setJourneyForm(prev => ({ ...prev, isPublished: checked }))}
                 />
-                <Label htmlFor="published">Published (visible to users)</Label>
+                <Label htmlFor="published" className="text-white/80">Published (visible to users)</Label>
               </div>
 
               <div className="col-span-full flex gap-2">
@@ -376,17 +376,17 @@ export default function JourneyAdmin() {
 
         {/* Journeys List */}
         <div className="space-y-4">
-          <h2 className="text-lg font-semibold">Existing Journeys</h2>
+          <h2 className="text-lg font-semibold text-white">Existing Journeys</h2>
 
           {journeys.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-gray-500">
+            <Card className="bg-white/5 backdrop-blur-xl border-white/10">
+              <CardContent className="py-8 text-center text-white/50">
                 No journeys yet. Create your first journey above!
               </CardContent>
             </Card>
           ) : (
             journeys.map((journey) => (
-              <Card key={journey.id} className="overflow-hidden">
+              <Card key={journey.id} className="overflow-hidden bg-white/5 backdrop-blur-xl border-white/10">
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
                     <div
@@ -394,19 +394,19 @@ export default function JourneyAdmin() {
                       onClick={() => toggleJourneyExpanded(journey.id)}
                     >
                       {expandedJourneys.has(journey.id) ? (
-                        <ChevronDown className="w-5 h-5" />
+                        <ChevronDown className="w-5 h-5 text-white/70" />
                       ) : (
-                        <ChevronRight className="w-5 h-5" />
+                        <ChevronRight className="w-5 h-5 text-white/70" />
                       )}
                       <div>
-                        <CardTitle className="text-lg">{journey.title}</CardTitle>
+                        <CardTitle className="text-lg text-white">{journey.title}</CardTitle>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant={journey.isPublished ? 'default' : 'secondary'}>
                             {journey.isPublished ? 'Published' : 'Draft'}
                           </Badge>
-                          <Badge variant="outline">{journey.difficultyLevel}</Badge>
-                          <Badge variant="outline">{journey.wineType || 'mixed'}</Badge>
-                          <span className="text-sm text-gray-500">
+                          <Badge variant="outline" className="border-white/30 text-white/70">{journey.difficultyLevel}</Badge>
+                          <Badge variant="outline" className="border-white/30 text-white/70">{journey.wineType || 'mixed'}</Badge>
+                          <span className="text-sm text-white/50">
                             {journey.totalChapters} chapters
                           </span>
                         </div>
@@ -438,9 +438,9 @@ export default function JourneyAdmin() {
 
                 {expandedJourneys.has(journey.id) && (
                   <CardContent className="pt-0">
-                    <div className="mt-4 border-t pt-4">
+                    <div className="mt-4 border-t border-white/10 pt-4">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-medium flex items-center gap-2">
+                        <h3 className="font-medium flex items-center gap-2 text-white">
                           <GraduationCap className="w-4 h-4" />
                           Chapters
                         </h3>
@@ -455,7 +455,7 @@ export default function JourneyAdmin() {
 
                       {/* Chapter Editor Form */}
                       {editingChapter?.journeyId === journey.id && (
-                        <Card className="mb-4 bg-purple-50">
+                        <Card className="mb-4 bg-purple-900/20 border-purple-500/20">
                           <CardContent className="pt-4">
                             <form
                               onSubmit={(e) => {
@@ -476,7 +476,7 @@ export default function JourneyAdmin() {
                             >
                               <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                  <Label>Chapter Title</Label>
+                                  <Label className="text-white/80">Chapter Title</Label>
                                   <Input
                                     value={chapterForm.title}
                                     onChange={(e) => setChapterForm(prev => ({ ...prev, title: e.target.value }))}
@@ -485,7 +485,7 @@ export default function JourneyAdmin() {
                                   />
                                 </div>
                                 <div className="space-y-2">
-                                  <Label>Chapter Number</Label>
+                                  <Label className="text-white/80">Chapter Number</Label>
                                   <Input
                                     type="number"
                                     value={chapterForm.chapterNumber}
@@ -497,7 +497,7 @@ export default function JourneyAdmin() {
                               </div>
 
                               <div className="space-y-2">
-                                <Label>Description</Label>
+                                <Label className="text-white/80">Description</Label>
                                 <Textarea
                                   value={chapterForm.description}
                                   onChange={(e) => setChapterForm(prev => ({ ...prev, description: e.target.value }))}
@@ -515,13 +515,13 @@ export default function JourneyAdmin() {
                                       wineRequirements: { ...prev.wineRequirements, anyWine: checked }
                                     }))}
                                   />
-                                  <Label>Accept any wine (no validation)</Label>
+                                  <Label className="text-white/80">Accept any wine (no validation)</Label>
                                 </div>
                               </div>
 
                               {!chapterForm.wineRequirements.anyWine && (
                                 <div className="space-y-2">
-                                  <Label>Wine Requirements Description</Label>
+                                  <Label className="text-white/80">Wine Requirements Description</Label>
                                   <Input
                                     value={chapterForm.wineRequirements.description || ''}
                                     onChange={(e) => setChapterForm(prev => ({
@@ -534,7 +534,7 @@ export default function JourneyAdmin() {
                               )}
 
                               <div className="space-y-2">
-                                <Label>Shopping Tips</Label>
+                                <Label className="text-white/80">Shopping Tips</Label>
                                 <Textarea
                                   value={chapterForm.shoppingTips || ''}
                                   onChange={(e) => setChapterForm(prev => ({ ...prev, shoppingTips: e.target.value }))}
@@ -544,7 +544,7 @@ export default function JourneyAdmin() {
                               </div>
 
                               <div className="space-y-2">
-                                <Label>Ask For (what to tell staff)</Label>
+                                <Label className="text-white/80">Ask For (what to tell staff)</Label>
                                 <Input
                                   value={chapterForm.askFor || ''}
                                   onChange={(e) => setChapterForm(prev => ({ ...prev, askFor: e.target.value }))}
@@ -585,14 +585,14 @@ export default function JourneyAdmin() {
                             .map((chapter) => (
                               <div
                                 key={chapter.id}
-                                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                                className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10"
                               >
                                 <div>
-                                  <div className="font-medium">
+                                  <div className="font-medium text-white">
                                     Chapter {chapter.chapterNumber}: {chapter.title}
                                   </div>
                                   {chapter.description && (
-                                    <p className="text-sm text-gray-500 line-clamp-1">
+                                    <p className="text-sm text-white/50 line-clamp-1">
                                       {chapter.description}
                                     </p>
                                   )}
@@ -622,7 +622,7 @@ export default function JourneyAdmin() {
                             ))}
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-500 text-center py-4">
+                        <p className="text-sm text-white/50 text-center py-4">
                           No chapters yet. Add your first chapter!
                         </p>
                       )}
