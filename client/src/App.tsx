@@ -20,8 +20,10 @@ import SoloDashboard from "@/pages/SoloDashboard";
 import SoloTastingDetail from "@/pages/SoloTastingDetail";
 import SoloTastingNew from "@/pages/SoloTastingNew";
 import SoloProfile from "@/pages/SoloProfile";
+import SoloLogin from "@/pages/SoloLogin";
 import JourneyBrowser from "@/pages/JourneyBrowser";
 import JourneyDetail from "@/pages/JourneyDetail";
+import JourneyAdmin from "@/pages/JourneyAdmin";
 
 import Profile from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
@@ -42,11 +44,14 @@ function Router() {
       <Route path="/host/:sessionId/:participantId" component={HostDashboard} />
       <Route path="/login" component={Login} />
       <Route path="/solo" component={SoloDashboard} />
+      <Route path="/solo/login" component={SoloLogin} />
+      <Route path="/solo/journal" component={SoloDashboard} />
       <Route path="/solo/new" component={SoloTastingNew} />
       <Route path="/solo/tasting/:id" component={SoloTastingDetail} />
       <Route path="/solo/profile" component={SoloProfile} />
       <Route path="/journeys" component={JourneyBrowser} />
       <Route path="/journeys/:id" component={JourneyDetail} />
+      <Route path="/admin/journeys" component={JourneyAdmin} />
       <Route component={NotFound} />
     </Switch>
   );

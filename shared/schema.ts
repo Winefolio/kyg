@@ -866,3 +866,106 @@ export interface ChapterShoppingGuide {
   alternatives?: WineAlternative[];
   askFor?: string;
 }
+
+// ============================================
+// SPRINT 5: AI QUESTION GENERATION & VALIDATION
+// ============================================
+
+// Chapter completions - tracks individual chapter completion with validation
+export const chapterCompletions = pgTable("chapter_completions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  chapterId: integer("chapter_id").notNull().references(() => chapters.id, { onDelete: "cascade" }),
+  tastingId: integer("tasting_id").notNull().references(() => tastings.id),
+  winePhotoUrl: text("wine_photo_url"),
+  wineValidation: jsonb("wine_validation"), // WineValidationResult
+  completedAt: timestamp("completed_at").defaultNow().notNull()
+}, (table) => ({
+  userChapterUnique: unique().on(table.userId, table.chapterId),
+  userIdx: index("idx_chapter_completions_user").on(table.userId),
+  chapterIdx: index("idx_chapter_completions_chapter").on(table.chapterId)
+}));
+
+// Generated questions - AI-generated questions for chapter tastings
+export const generatedQuestions = pgTable("generated_questions", {
+  id: serial("id").primaryKey(),
+  chapterCompletionId: integer("chapter_completion_id").notNull().references(() => chapterCompletions.id, { onDelete: "cascade" }),
+  questions: jsonb("questions").notNull(), // Array of GeneratedQuestion
+  wineContext: jsonb("wine_context").notNull(), // WineRecognitionResult used for generation
+  generatedAt: timestamp("generated_at").defaultNow().notNull()
+}, (table) => ({
+  completionIdx: index("idx_generated_questions_completion").on(table.chapterCompletionId)
+}));
+
+// Wine validation result structure
+export interface WineValidationResult {
+  passed: boolean;
+  confidence: number;
+  criteriaResults: Array<{
+    field: string;
+    operator: string;
+    expected: string | string[];
+    actual: string | null;
+    passed: boolean;
+  }>;
+  wineInfo: WineRecognitionResult;
+}
+
+// Wine recognition result from GPT Vision
+export interface WineRecognitionResult {
+  name: string;
+  region: string;
+  grapeVarieties: string[];
+  vintage?: number;
+  producer?: string;
+  confidence: number;
+}
+
+// Generated question structure (follows existing tasting flow)
+export interface GeneratedQuestion {
+  id: string;
+  category: 'appearance' | 'aroma' | 'taste' | 'structure' | 'overall';
+  questionType: 'multiple_choice' | 'scale' | 'text';
+  title: string;
+  description?: string;
+  // For multiple_choice
+  options?: Array<{
+    id: string;
+    text: string;
+    description?: string;
+  }>;
+  allowMultiple?: boolean;
+  // For scale
+  scaleMin?: number;
+  scaleMax?: number;
+  scaleLabels?: [string, string];
+  // Wine-specific context
+  wineContext?: string; // e.g., "Classic Barolo characteristics include..."
+}
+
+// Insert schemas
+export const insertChapterCompletionSchema = createInsertSchema(chapterCompletions, {
+  userId: z.number().int().positive(),
+  chapterId: z.number().int().positive(),
+  tastingId: z.number().int().positive(),
+  winePhotoUrl: z.string().url().nullable().optional(),
+  wineValidation: z.any().nullable().optional()
+}).omit({
+  id: true,
+  completedAt: true
+});
+
+export const insertGeneratedQuestionsSchema = createInsertSchema(generatedQuestions, {
+  chapterCompletionId: z.number().int().positive(),
+  questions: z.array(z.any()),
+  wineContext: z.any()
+}).omit({
+  id: true,
+  generatedAt: true
+});
+
+// Types
+export type ChapterCompletion = typeof chapterCompletions.$inferSelect;
+export type InsertChapterCompletion = z.infer<typeof insertChapterCompletionSchema>;
+export type GeneratedQuestionsRecord = typeof generatedQuestions.$inferSelect;
+export type InsertGeneratedQuestions = z.infer<typeof insertGeneratedQuestionsSchema>;
