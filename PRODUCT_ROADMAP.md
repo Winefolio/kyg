@@ -12,6 +12,17 @@ Transform KnowYourGrape into "your personal sommelier in your pocket" - an app t
 
 ## Priority 1: Dashboard & Engagement
 
+### UI/UX Redesign
+Transform the dashboard from basic stats into an engaging wine intelligence hub.
+
+- [ ] **New Visual Design System** - Move beyond purple gradients to a sophisticated palette
+- [ ] **Mobile-First Layout** - Thumb-zone navigation, swipe gestures, bottom sheets
+- [ ] **Information Hierarchy** - Hero → Actions → Discovery → Progress → Deep Dive
+- [ ] **Micro-interactions** - Haptic feedback, celebrations for achievements, smooth transitions
+- [ ] **Empty States** - Encouraging, not depressing; guide users to first action
+
+*See `plans/feat-dashboard-redesign-v2.md` for full design vision.*
+
 ### Wine Personality & Identity
 Make users feel understood and give them something to share.
 
