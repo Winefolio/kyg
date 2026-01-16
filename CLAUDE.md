@@ -81,6 +81,13 @@ All question types in `client/src/components/questions/`:
 - Journey routes: `/api/journeys`, `/api/journeys/:id/chapters/:chapterId/complete`
 - Dashboard: `/api/dashboard/:email`
 
+## Deployment
+
+- **Platform**: Railway
+- **Production URL**: https://knowyourgrape-production.up.railway.app
+- **Deploy trigger**: Push to `main` branch auto-deploys
+- **Config**: `railway.json` in repo root
+
 ## Environment Variables
 
 Required:
