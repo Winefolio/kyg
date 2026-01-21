@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { useHaptics } from "@/hooks/useHaptics";
@@ -12,12 +12,14 @@ import {
   WifiOff,
   Wifi,
   ArrowLeft,
+  Loader2,
 } from "lucide-react";
 import { QRScanner } from "@/components/QRScanner";
 import { SelectionView } from "@/components/gateway/SelectionView";
 import { JoinSessionView } from "@/components/gateway/JoinSessionView";
 import { HostSessionView } from "@/components/gateway/HostSessionView";
 import { SessionRestoreModal } from "@/components/SessionRestoreModal";
+import type { User } from "@shared/schema";
 
 type UserMode = "selection" | "join" | "host";
 
@@ -32,6 +34,26 @@ export default function Gateway() {
   const [sessionValidationError, setSessionValidationError] = useState<string | null>(null);
   const { triggerHaptic } = useHaptics();
   const { activeSession, endSession } = useSessionPersistence();
+
+  // Check if user is authenticated - redirect to unified home
+  const { data: authData, isLoading: authLoading } = useQuery<{ user: User }>({
+    queryKey: ["/api/auth/me"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/auth/me", null);
+      if (!response.ok) {
+        throw new Error("Not authenticated");
+      }
+      return response.json();
+    },
+    retry: false,
+  });
+
+  // Redirect authenticated users to the unified home
+  useEffect(() => {
+    if (authData?.user) {
+      setLocation("/home");
+    }
+  }, [authData, setLocation]);
 
   // Check for active session on mount
   useEffect(() => {
@@ -158,6 +180,24 @@ export default function Gateway() {
     await endSession();
     triggerHaptic("navigation");
   };
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+      </div>
+    );
+  }
+
+  // If authenticated, the useEffect will redirect - show loading
+  if (authData?.user) {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-primary relative overflow-hidden font-sans">
