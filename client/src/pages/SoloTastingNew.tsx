@@ -60,7 +60,11 @@ interface Journey {
 
 type ViewState = 'wine-entry' | 'tasting' | 'complete';
 
-export default function SoloTastingNew() {
+interface SoloTastingNewProps {
+  returnPath?: string;
+}
+
+export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewProps) {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const { user } = useAuth();
@@ -368,7 +372,7 @@ export default function SoloTastingNew() {
               Continue Journey
             </Button>
             <Button
-              onClick={() => setLocation("/solo")}
+              onClick={() => setLocation(returnPath)}
               variant="outline"
               className="w-full border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
             >
@@ -388,7 +392,7 @@ export default function SoloTastingNew() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <button
-              onClick={() => journeyId ? setLocation(`/journeys/${journeyId}`) : setLocation("/solo")}
+              onClick={() => journeyId ? setLocation(`/journeys/${journeyId}`) : setLocation(returnPath)}
               className="flex items-center gap-2 text-purple-300 hover:text-white transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />

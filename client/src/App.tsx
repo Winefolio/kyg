@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -24,6 +24,8 @@ import SoloLogin from "@/pages/SoloLogin";
 import JourneyBrowser from "@/pages/JourneyBrowser";
 import JourneyDetail from "@/pages/JourneyDetail";
 import JourneyAdmin from "@/pages/JourneyAdmin";
+// New unified home experience
+import Home from "@/pages/Home";
 
 import Profile from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
@@ -32,6 +34,39 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Gateway} />
+
+      {/* New unified home experience */}
+      <Route path="/home" component={Home} />
+      <Route path="/home/:rest*" component={Home} />
+      <Route path="/tasting/new">
+        <SoloTastingNew returnPath="/home" />
+      </Route>
+
+      {/* Redirects from old routes to new unified home */}
+      <Route path="/solo">
+        <Redirect to="/home" />
+      </Route>
+      <Route path="/solo/journal">
+        <Redirect to="/home" />
+      </Route>
+      <Route path="/solo/profile">
+        <Redirect to="/home/profile" />
+      </Route>
+      <Route path="/journeys">
+        <Redirect to="/home/journeys" />
+      </Route>
+
+      {/* Keep solo tasting routes working (detail views) */}
+      <Route path="/solo/login" component={SoloLogin} />
+      <Route path="/solo/new">
+        <SoloTastingNew />
+      </Route>
+      <Route path="/solo/tasting/:id" component={SoloTastingDetail} />
+
+      {/* Journey detail (not in tabs) */}
+      <Route path="/journeys/:id" component={JourneyDetail} />
+
+      {/* Group session routes (unchanged) */}
       <Route path="/sommelier" component={SommelierDashboard} />
       <Route path="/editor/:code" component={PackageEditor} />
       <Route path="/profile" component={Profile} />
@@ -43,15 +78,10 @@ function Router() {
       <Route path="/completion/:sessionId/:participantId" component={TastingCompletion} />
       <Route path="/host/:sessionId/:participantId" component={HostDashboard} />
       <Route path="/login" component={Login} />
-      <Route path="/solo" component={SoloDashboard} />
-      <Route path="/solo/login" component={SoloLogin} />
-      <Route path="/solo/journal" component={SoloDashboard} />
-      <Route path="/solo/new" component={SoloTastingNew} />
-      <Route path="/solo/tasting/:id" component={SoloTastingDetail} />
-      <Route path="/solo/profile" component={SoloProfile} />
-      <Route path="/journeys" component={JourneyBrowser} />
-      <Route path="/journeys/:id" component={JourneyDetail} />
+
+      {/* Admin routes */}
       <Route path="/admin/journeys" component={JourneyAdmin} />
+
       <Route component={NotFound} />
     </Switch>
   );
