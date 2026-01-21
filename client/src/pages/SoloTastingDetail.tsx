@@ -380,7 +380,7 @@ export default function SoloTastingDetail() {
         </motion.div>
 
         {/* Wine Intelligence - Compare user perception to typical characteristics */}
-        {tasting.wineCharacteristics && (
+        {tasting.wineCharacteristics ? (
           <WineInsights
             characteristics={tasting.wineCharacteristics as WineCharacteristicsData}
             userRatings={{
@@ -391,7 +391,7 @@ export default function SoloTastingDetail() {
             }}
             overallRating={responses?.overall?.rating}
           />
-        )}
+        ) : null}
 
         {/* Response Sections */}
         {responses?.visual && <ResponseSection section="visual" data={responses.visual} />}
