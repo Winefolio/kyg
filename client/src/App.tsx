@@ -24,8 +24,8 @@ import SoloLogin from "@/pages/SoloLogin";
 import JourneyBrowser from "@/pages/JourneyBrowser";
 import JourneyDetail from "@/pages/JourneyDetail";
 import JourneyAdmin from "@/pages/JourneyAdmin";
-// New unified home experience
-import Home from "@/pages/Home";
+// New unified home experience - Three Pillars (Solo, Group, Dashboard)
+import HomeV2 from "@/pages/HomeV2";
 
 import Profile from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
@@ -35,9 +35,11 @@ function Router() {
     <Switch>
       <Route path="/" component={Gateway} />
 
-      {/* New unified home experience */}
-      <Route path="/home" component={Home} />
-      <Route path="/home/:rest*" component={Home} />
+      {/* New unified home experience - Three Pillars (Solo, Group, Dashboard) */}
+      <Route path="/home" component={HomeV2} />
+      <Route path="/home/group" component={HomeV2} />
+      <Route path="/home/dashboard" component={HomeV2} />
+      <Route path="/home/:rest*" component={HomeV2} />
       <Route path="/tasting/new">
         <SoloTastingNew returnPath="/home" />
       </Route>
@@ -52,9 +54,7 @@ function Router() {
       <Route path="/solo/profile">
         <Redirect to="/home/profile" />
       </Route>
-      <Route path="/journeys">
-        <Redirect to="/home/journeys" />
-      </Route>
+      <Route path="/journeys" component={JourneyBrowser} />
 
       {/* Keep solo tasting routes working (detail views) */}
       <Route path="/solo/login" component={SoloLogin} />
