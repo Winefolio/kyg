@@ -5,7 +5,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
-import { Wine, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 
 export default function SoloLogin() {

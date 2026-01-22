@@ -59,22 +59,17 @@ export function SelectionView({
         initial="hidden"
         animate="visible"
       >
-        <motion.div
-          className="inline-flex items-center justify-center w-20 h-20 mb-6 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl"
+        <motion.img
+          src="/logo-cata.svg"
+          alt="Cata"
+          className="w-20 h-20 mb-6 mx-auto"
           variants={itemVariants}
           animate={{
             rotate: [0, 3, -3, 0],
             scale: [1, 1.02, 1],
-            boxShadow: [
-              "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-              "0 30px 60px -12px rgba(139, 92, 246, 0.4)",
-              "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-            ],
           }}
           transition={{ duration: 6, repeat: Infinity }}
-        >
-          <Wine className="text-white" size={36} />
-        </motion.div>
+        />
         
         <motion.h1
           className="text-3xl font-bold text-white mb-3 tracking-tight"

@@ -7,6 +7,7 @@ import { GlossaryProvider } from "@/contexts/GlossaryContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useDynamicViewportHeight } from "@/hooks/useDynamicViewportHeight";
 import Gateway from "@/pages/Gateway";
+import Landing from "@/pages/Landing";
 import SessionJoin from "@/pages/SessionJoin";
 import TastingSession from "@/pages/TastingSession";
 import TastingCompletion from "@/pages/TastingCompletion";
@@ -33,7 +34,8 @@ import NotFound from "@/pages/not-found";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Gateway} />
+      <Route path="/" component={Landing} />
+      <Route path="/gateway" component={Gateway} /> {/* Keep old gateway accessible */}
 
       {/* New unified home experience - Three Pillars (Solo, Group, Dashboard) */}
       <Route path="/home" component={HomeV2} />

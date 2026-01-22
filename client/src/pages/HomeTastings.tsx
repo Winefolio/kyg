@@ -1,6 +1,7 @@
+import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { motion } from "framer-motion";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
 import { apiRequest } from "@/lib/queryClient";
 import { useHomeUser } from "@/contexts/HomeUserContext";
 import {
@@ -13,6 +14,8 @@ import {
   Users,
   User as UserIcon,
   Sparkles,
+  LogOut,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Tasting } from "@shared/schema";
@@ -45,6 +48,31 @@ interface DashboardData {
 export default function HomeTastings() {
   const [, setLocation] = useLocation();
   const user = useHomeUser();
+  const queryClient = useQueryClient();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout", null);
+      localStorage.removeItem("kyg_user_email");
+      queryClient.clear();
+      setLocation("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   // Get dashboard data with unified stats
   const { data: dashboardData } = useQuery<DashboardData>({
@@ -94,9 +122,43 @@ export default function HomeTastings() {
             alt="Cata"
             className="h-8 w-auto"
           />
-          <span className="text-white/60 text-sm hidden sm:block truncate max-w-[150px]">
-            {user.email}
-          </span>
+          {/* User Menu */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center gap-2 text-white/60 hover:text-white/80 transition-colors text-sm"
+            >
+              <span className="hidden sm:block truncate max-w-[150px]">
+                {user.email}
+              </span>
+              <UserIcon className="w-5 h-5 sm:hidden" />
+              <ChevronDown className={`w-4 h-4 transition-transform ${showUserMenu ? "rotate-180" : ""}`} />
+            </button>
+
+            <AnimatePresence>
+              {showUserMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 mt-2 w-48 bg-gray-900/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-xl overflow-hidden"
+                >
+                  <div className="px-4 py-3 border-b border-white/10">
+                    <p className="text-white/40 text-xs">Signed in as</p>
+                    <p className="text-white text-sm truncate">{user.email}</p>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-4 py-3 flex items-center gap-3 text-red-400 hover:bg-white/5 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="text-sm">Sign Out</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </header>
 

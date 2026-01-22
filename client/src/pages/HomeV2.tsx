@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiRequest } from "@/lib/queryClient";
 import { BottomNav } from "@/components/home/BottomNav";
@@ -28,6 +28,8 @@ import {
   Clock,
   MapPin,
   Globe,
+  LogOut,
+  ChevronDown,
 } from "lucide-react";
 import type { User, Tasting } from "@shared/schema";
 
@@ -46,14 +48,119 @@ interface GroupTasting {
 }
 
 // ============================================================================
+// USER MENU COMPONENT
+// ============================================================================
+
+function UserMenu({
+  userEmail,
+  onLogout
+}: {
+  userEmail: string;
+  onLogout: () => void;
+}) {
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setShowUserMenu(!showUserMenu)}
+        className="flex items-center gap-2 text-white/60 hover:text-white/80 transition-colors text-sm"
+      >
+        <span className="hidden sm:block truncate max-w-[150px]">
+          {userEmail}
+        </span>
+        <UserIcon className="w-5 h-5 sm:hidden" />
+        <ChevronDown className={`w-4 h-4 transition-transform ${showUserMenu ? "rotate-180" : ""}`} />
+      </button>
+
+      <AnimatePresence>
+        {showUserMenu && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 mt-2 w-48 bg-gray-900/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-xl overflow-hidden z-50"
+          >
+            <div className="px-4 py-3 border-b border-white/10">
+              <p className="text-white/40 text-xs">Signed in as</p>
+              <p className="text-white text-sm truncate">{userEmail}</p>
+            </div>
+            <button
+              onClick={() => {
+                setShowUserMenu(false);
+                onLogout();
+              }}
+              className="w-full px-4 py-3 flex items-center gap-3 text-red-400 hover:bg-white/5 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="text-sm">Sign Out</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ============================================================================
+// HEADER COMPONENT WITH USER MENU
+// ============================================================================
+
+function HomeHeader({
+  userEmail,
+  onLogout
+}: {
+  userEmail: string;
+  onLogout: () => void;
+}) {
+  return (
+    <header className="sticky top-0 z-40 bg-black/30 backdrop-blur-xl border-b border-white/10">
+      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <img
+          src="/logo-cata-horizontal.svg"
+          alt="Cata"
+          className="h-8 w-auto"
+        />
+        <UserMenu userEmail={userEmail} onLogout={onLogout} />
+      </div>
+    </header>
+  );
+}
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
 export default function HomeV2() {
   const [location, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout", null);
+      localStorage.removeItem("kyg_user_email");
+      queryClient.clear();
+      setLocation("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   // Determine active tab based on current path
   const getActiveTab = (): TabKey => {
@@ -191,7 +298,7 @@ export default function HomeV2() {
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.2 }}
             >
-              <SoloTabContent user={user!} />
+              <SoloTabContent user={user!} onLogout={handleLogout} />
             </motion.div>
           )}
           {activeTab === "group" && (
@@ -202,7 +309,7 @@ export default function HomeV2() {
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.2 }}
             >
-              <GroupTabContent user={user!} />
+              <GroupTabContent user={user!} onLogout={handleLogout} />
             </motion.div>
           )}
           {activeTab === "dashboard" && (
@@ -213,7 +320,7 @@ export default function HomeV2() {
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.2 }}
             >
-              <DashboardTabContent user={user!} />
+              <DashboardTabContent user={user!} onLogout={handleLogout} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -230,6 +337,7 @@ export default function HomeV2() {
 
 interface TabContentProps {
   user: User;
+  onLogout: () => void;
 }
 
 interface TastingStats {
@@ -257,7 +365,7 @@ interface DashboardData {
   unifiedTastingStats?: TastingStats;
 }
 
-function SoloTabContent({ user }: TabContentProps) {
+function SoloTabContent({ user, onLogout }: TabContentProps) {
   const [, setLocation] = useLocation();
 
   // Get dashboard data with unified stats
@@ -326,19 +434,7 @@ function SoloTabContent({ user }: TabContentProps) {
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-black/30 backdrop-blur-xl border-b border-white/10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <img
-            src="/logo-cata-horizontal.svg"
-            alt="Cata"
-            className="h-8 w-auto"
-          />
-          <span className="text-white/60 text-sm hidden sm:block truncate max-w-[150px]">
-            {user.email}
-          </span>
-        </div>
-      </header>
+      <HomeHeader userEmail={user.email} onLogout={onLogout} />
 
       <div className="container mx-auto px-4 py-6 space-y-6">
         {/* Welcome Section */}
@@ -553,7 +649,7 @@ function SoloTabContent({ user }: TabContentProps) {
 
 type GroupMode = "selection" | "join" | "host";
 
-function GroupTabContent({ user }: TabContentProps) {
+function GroupTabContent({ user, onLogout }: TabContentProps) {
   const [, setLocation] = useLocation();
   const [groupMode, setGroupMode] = useState<GroupMode>("selection");
   const [sessionId, setSessionId] = useState("");
@@ -753,9 +849,7 @@ function GroupTabContent({ user }: TabContentProps) {
               <span className="text-white font-semibold">Group Tastings</span>
             </div>
           )}
-          <span className="text-white/60 text-sm hidden sm:block truncate max-w-[150px]">
-            {user.email}
-          </span>
+          <UserMenu userEmail={user.email} onLogout={onLogout} />
         </div>
       </header>
 
@@ -1047,7 +1141,7 @@ interface SommelierTips {
   questions: string[];
 }
 
-function DashboardTabContent({ user }: TabContentProps) {
+function DashboardTabContent({ user, onLogout }: TabContentProps) {
   const [, setLocation] = useLocation();
 
   // Fetch dashboard data
@@ -1100,9 +1194,7 @@ function DashboardTabContent({ user }: TabContentProps) {
             <BarChart3 className="w-6 h-6 text-purple-400" />
             <span className="text-white font-semibold">Your Dashboard</span>
           </div>
-          <span className="text-white/60 text-sm hidden sm:block truncate max-w-[150px]">
-            {user.email}
-          </span>
+          <UserMenu userEmail={user.email} onLogout={onLogout} />
         </div>
       </header>
 

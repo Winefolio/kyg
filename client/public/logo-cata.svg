@@ -1,37 +1,55 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
   <defs>
-    <!-- Wine gradient - deep purple -->
-    <radialGradient id="wineGradient" cx="50%" cy="50%" r="50%" fx="40%" fy="40%">
-      <stop offset="0%" stop-color="#9333ea"/>
-      <stop offset="100%" stop-color="#581c87"/>
+    <!-- Wine gradient - deep purple with variation -->
+    <radialGradient id="wineGradient" cx="50%" cy="45%" r="45%" fx="45%" fy="40%">
+      <stop offset="0%" stop-color="#5a2d6e"/>
+      <stop offset="60%" stop-color="#3d1a4a"/>
+      <stop offset="100%" stop-color="#2a1233"/>
     </radialGradient>
-    <!-- Rim highlight -->
+
+    <!-- Glass rim gradient - dark with subtle highlights -->
     <linearGradient id="rimGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="50%" stop-color="#e8e6ed"/>
-      <stop offset="100%" stop-color="#d4d0db"/>
+      <stop offset="0%" stop-color="#2a2a30"/>
+      <stop offset="30%" stop-color="#1a1a1e"/>
+      <stop offset="70%" stop-color="#1a1a1e"/>
+      <stop offset="100%" stop-color="#2a2a30"/>
     </linearGradient>
-    <!-- Subtle pink reflection -->
-    <radialGradient id="reflectionGradient" cx="70%" cy="70%" r="40%" fx="70%" fy="70%">
-      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.4"/>
-      <stop offset="100%" stop-color="#581c87" stop-opacity="0"/>
-    </radialGradient>
+
+    <!-- Highlight on glass rim -->
+    <linearGradient id="rimHighlight" x1="0%" y1="0%" x2="50%" y2="50%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.3)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+
+    <!-- Pink reflection at bottom -->
+    <linearGradient id="pinkReflection" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="rgba(200,100,180,0)"/>
+      <stop offset="70%" stop-color="rgba(200,100,180,0.4)"/>
+      <stop offset="100%" stop-color="rgba(180,80,160,0.6)"/>
+    </linearGradient>
   </defs>
 
-  <!-- Background (transparent for now, black can be added) -->
+  <!-- Outer dark glass rim -->
+  <circle cx="50" cy="50" r="46" fill="url(#rimGradient)"/>
 
-  <!-- Outer rim - white/silver circle -->
-  <circle cx="50" cy="50" r="46" fill="none" stroke="url(#rimGradient)" stroke-width="4"/>
+  <!-- Rim highlight (top-left) -->
+  <path d="M 20 35 A 38 38 0 0 1 50 12" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="8" stroke-linecap="round"/>
 
-  <!-- Inner rim shadow -->
-  <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(0,0,0,0.2)" stroke-width="1"/>
+  <!-- White/silver inner rim line -->
+  <circle cx="50" cy="50" r="36" fill="none" stroke="rgba(220,220,225,0.8)" stroke-width="1.5"/>
 
-  <!-- Wine surface - deep purple -->
-  <circle cx="50" cy="50" r="40" fill="url(#wineGradient)"/>
+  <!-- Inner dark area (depth of glass) -->
+  <circle cx="50" cy="50" r="34" fill="#151518"/>
 
-  <!-- Pink highlight/reflection -->
-  <circle cx="50" cy="50" r="40" fill="url(#reflectionGradient)"/>
+  <!-- Wine surface -->
+  <circle cx="50" cy="50" r="30" fill="url(#wineGradient)"/>
 
-  <!-- Small highlight dot for dimension -->
-  <circle cx="35" cy="35" r="8" fill="rgba(255,255,255,0.15)"/>
+  <!-- Wine surface highlight (top) -->
+  <ellipse cx="45" cy="42" rx="15" ry="8" fill="rgba(255,255,255,0.08)"/>
+
+  <!-- Pink reflection on wine (bottom) -->
+  <path d="M 25 55 A 25 25 0 0 0 75 55 A 30 20 0 0 1 25 55" fill="url(#pinkReflection)"/>
+
+  <!-- Subtle surface sheen -->
+  <ellipse cx="50" cy="48" rx="22" ry="12" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
 </svg>
