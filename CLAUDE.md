@@ -16,7 +16,7 @@ Note: Dev server runs Express which serves the Vite frontend. Port can be overri
 
 ## Architecture Overview
 
-**Know Your Grape** is a wine tasting education platform with two main experiences:
+**Cata** is a wine tasting education platform with two main experiences:
 
 1. **Live Sessions**: Host-led group tastings with real-time participant responses
 2. **Solo Tastings**: Self-guided tastings via Learning Journeys or ad-hoc wines
@@ -87,7 +87,7 @@ All question types in `client/src/components/questions/`:
 ## Deployment
 
 - **Platform**: Railway
-- **Production URL**: https://knowyourgrape-production.up.railway.app
+- **Production URL**: https://cata-production.up.railway.app
 - **Deploy trigger**: Push to `main` branch auto-deploys
 - **Config**: `railway.json` in repo root
 

@@ -225,7 +225,7 @@ function ResponseSection({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/20"
+      className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10"
     >
       <div className="flex items-center gap-3 mb-4">
         <div className={`w-10 h-10 rounded-full bg-gradient-to-r ${info.color} flex items-center justify-center`}>
@@ -262,7 +262,7 @@ export default function SoloTastingDetail() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
       </div>
     );
@@ -270,8 +270,8 @@ export default function SoloTastingDetail() {
 
   if (error || !data?.tasting) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
-        <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/20 text-center max-w-md">
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
+        <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10 text-center max-w-md">
           <Wine className="w-12 h-12 text-white/30 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white mb-2">Tasting Not Found</h2>
           <p className="text-white/60 mb-4">
@@ -292,7 +292,7 @@ export default function SoloTastingDetail() {
   const responses = tasting.responses as Record<string, Record<string, any>>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-primary">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-black/30 backdrop-blur-xl border-b border-white/10">
         <div className="container mx-auto px-4 py-4">
@@ -327,7 +327,7 @@ export default function SoloTastingDetail() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/20"
+          className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10"
         >
           <div className="flex items-start gap-4">
             <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0">

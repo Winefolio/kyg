@@ -86,7 +86,7 @@ export function SelectionView({
             backgroundClip: "text",
           }}
         >
-          KnowYourGrape
+          Cata
         </motion.h1>
         
         <motion.p
