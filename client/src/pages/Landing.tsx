@@ -118,22 +118,22 @@ export default function Landing() {
           <FeatureCard
             icon={Users}
             title="Group Tastings"
-            description="Host dinner parties with friends"
+            description="All the software to host a wine dinner — guided questions, live voting, shared insights"
           />
           <FeatureCard
             icon={Camera}
             title="Snap & Learn"
-            description="Snap any bottle, get guided, build your profile"
+            description="Photo any bottle, we'll guide you through tasting it properly and save your notes"
           />
           <FeatureCard
             icon={BookOpen}
             title="Guided Journeys"
-            description="Pick up wines at your local shop"
+            description="Pick wines at your local shop, follow sommelier-designed tastings at home"
           />
           <FeatureCard
             icon={MapPin}
             title="Take Action"
-            description="Order smart at restaurants"
+            description="Know exactly what to order at restaurants or add to your collection"
           />
         </div>
       </motion.section>
