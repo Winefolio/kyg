@@ -123,7 +123,7 @@ export default function Landing() {
           <FeatureCard
             icon={Camera}
             title="Snap & Learn"
-            description="Photo any wine for instant info"
+            description="Photo any bottle, taste guided, add to your profile"
           />
           <FeatureCard
             icon={BookOpen}
