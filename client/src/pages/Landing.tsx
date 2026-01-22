@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
-import { Wine, Sparkles, Brain, ArrowRight, Users, UserPlus, GraduationCap } from "lucide-react";
+import { Wine, Sparkles, ArrowRight, GraduationCap, MessageCircle, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const containerVariants = {
@@ -88,8 +88,8 @@ export default function Landing() {
       >
         <div className="flex justify-center gap-4 max-w-md mx-auto">
           <MetricCard icon={Wine} value="500+" label="Wines" />
-          <MetricCard icon={Sparkles} value="10k+" label="Tastings" />
-          <MetricCard icon={Brain} value="AI" label="Powered" />
+          <MetricCard icon={User} value="Real" label="Sommeliers" />
+          <MetricCard icon={Sparkles} value="AI" label="Insights" />
         </div>
       </motion.section>
 
@@ -113,7 +113,7 @@ export default function Landing() {
           <StepCard
             number={2}
             title="Learn Your Palate"
-            description="AI builds your unique preference profile"
+            description="AI + real sommeliers build your preference profile"
           />
           <StepCard
             number={3}
@@ -139,18 +139,26 @@ export default function Landing() {
         </Button>
       </motion.section>
 
-      {/* Professional Section */}
+      {/* Sommelier Value Prop */}
       <motion.section
         className="py-10 px-4 border-t border-white/10"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1 }}
       >
-        <h3 className="text-lg font-medium text-white/80 text-center mb-6">
-          For Wine Professionals
+        <h3 className="text-lg font-medium text-white text-center mb-2">
+          Powered by Real Sommeliers
         </h3>
+        <p className="text-white/60 text-sm text-center max-w-xs mx-auto mb-6">
+          Every tasting and journey is crafted by certified sommeliers. Get live guidance or have experts review your palate.
+        </p>
 
         <div className="max-w-sm mx-auto space-y-4">
+          {/* For Wine Professionals */}
+          <p className="text-white/40 text-xs text-center uppercase tracking-wide">
+            For Wine Professionals
+          </p>
+
           {/* Sommelier Dashboard */}
           <button
             onClick={() => setLocation("/sommelier")}
@@ -166,23 +174,20 @@ export default function Landing() {
             <ArrowRight className="w-5 h-5 text-white/40" />
           </button>
 
-          {/* Host & Join Row */}
-          <div className="flex gap-3">
-            <button
-              onClick={() => setLocation("/join")}
-              className="flex-1 bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10 flex items-center gap-3 hover:bg-white/10 transition-colors"
-            >
-              <Users className="w-5 h-5 text-blue-400" />
-              <span className="text-white text-sm">Join Session</span>
-            </button>
-            <button
-              onClick={() => setLocation("/join")}
-              className="flex-1 bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10 flex items-center gap-3 hover:bg-white/10 transition-colors"
-            >
-              <UserPlus className="w-5 h-5 text-green-400" />
-              <span className="text-white text-sm">Host Session</span>
-            </button>
-          </div>
+          {/* Contact Team */}
+          <button
+            onClick={() => window.location.href = "mailto:hello@cata.wine"}
+            className="w-full bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10 flex items-center gap-4 hover:bg-white/10 transition-colors text-left"
+          >
+            <div className="bg-gradient-to-br from-purple-500 to-pink-600 p-2.5 rounded-lg">
+              <MessageCircle className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-white font-medium">Contact Our Team</p>
+              <p className="text-white/50 text-sm">Partner with us or get enterprise access</p>
+            </div>
+            <ArrowRight className="w-5 h-5 text-white/40" />
+          </button>
         </div>
 
         <p className="text-center text-white/30 text-xs mt-8">
