@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
-import { Wine, Sparkles, ArrowRight, GraduationCap, MessageCircle, User } from "lucide-react";
+import { Wine, Sparkles, ArrowRight, GraduationCap, MessageCircle, User, Camera, Users, MapPin, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const containerVariants = {
@@ -28,12 +28,19 @@ export default function Landing() {
         initial="hidden"
         animate="visible"
       >
-        <motion.img
-          src="/logo-cata.svg"
-          alt="Cata"
-          className="w-24 h-24 mx-auto mb-6"
+        <motion.div
+          className="relative w-28 h-28 mx-auto mb-6"
           variants={itemVariants}
-        />
+        >
+          {/* Glow effect behind logo */}
+          <div className="absolute inset-0 bg-purple-500/30 rounded-full blur-xl" />
+          <div className="absolute inset-2 bg-purple-400/20 rounded-full blur-md" />
+          <img
+            src="/logo-cata.svg"
+            alt="Cata"
+            className="relative w-full h-full drop-shadow-[0_0_15px_rgba(168,85,247,0.5)]"
+          />
+        </motion.div>
 
         <motion.h1
           className="text-4xl font-bold text-white mb-3"
@@ -93,12 +100,50 @@ export default function Landing() {
         </div>
       </motion.section>
 
-      {/* How It Works */}
+      {/* Features */}
       <motion.section
         className="py-10 px-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6 }}
+      >
+        <h2 className="text-xl font-semibold text-white text-center mb-2">
+          Everything You Need
+        </h2>
+        <p className="text-white/60 text-sm text-center max-w-xs mx-auto mb-8">
+          From casual tastings to building your collection
+        </p>
+
+        <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
+          <FeatureCard
+            icon={Users}
+            title="Group Tastings"
+            description="Host dinner parties with friends"
+          />
+          <FeatureCard
+            icon={Camera}
+            title="Snap & Learn"
+            description="Photo any wine for instant info"
+          />
+          <FeatureCard
+            icon={BookOpen}
+            title="Guided Journeys"
+            description="Pick up wines at your local shop"
+          />
+          <FeatureCard
+            icon={MapPin}
+            title="Take Action"
+            description="Order smart at restaurants"
+          />
+        </div>
+      </motion.section>
+
+      {/* How It Works */}
+      <motion.section
+        className="py-10 px-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.8 }}
       >
         <h2 className="text-xl font-semibold text-white text-center mb-8">
           How It Works
@@ -112,13 +157,13 @@ export default function Landing() {
           />
           <StepCard
             number={2}
-            title="Learn Your Palate"
-            description="AI + real sommeliers build your preference profile"
+            title="Build Your Profile"
+            description="AI + real sommeliers learn your unique palate"
           />
           <StepCard
             number={3}
-            title="Discover New Favorites"
-            description="Get personalized wine recommendations"
+            title="Take Action"
+            description="Know what to order, collect, and explore"
           />
         </div>
       </motion.section>
@@ -128,7 +173,7 @@ export default function Landing() {
         className="py-8 px-4 text-center"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.8 }}
+        transition={{ delay: 1 }}
       >
         <Button
           onClick={() => setLocation("/home")}
@@ -144,7 +189,7 @@ export default function Landing() {
         className="py-10 px-4 border-t border-white/10"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 1 }}
+        transition={{ delay: 1.2 }}
       >
         <h3 className="text-lg font-medium text-white text-center mb-2">
           Powered by Real Sommeliers
@@ -234,6 +279,24 @@ function StepCard({
         <h3 className="text-white font-medium mb-1">{title}</h3>
         <p className="text-white/60 text-sm">{description}</p>
       </div>
+    </div>
+  );
+}
+
+function FeatureCard({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: typeof Wine;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10">
+      <Icon className="w-6 h-6 text-purple-400 mb-2" />
+      <h3 className="text-white font-medium text-sm mb-1">{title}</h3>
+      <p className="text-white/50 text-xs">{description}</p>
     </div>
   );
 }
