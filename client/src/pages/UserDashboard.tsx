@@ -584,8 +584,8 @@ export default function UserDashboard() {
             {/*  <span className="hidden sm:inline">Back</span>*/}
             {/*</Button>*/}
             <div>
-              <h1 className="text-3xl font-bold text-white">KnowYourGrape</h1>
-              <p className="text-purple-200">Premium Wine Experience</p>
+              <h1 className="text-3xl font-bold text-white">Cata</h1>
+              <p className="text-purple-200">Your personal sommelier</p>
             </div>
           </div>
           <div className="flex items-center space-x-4">

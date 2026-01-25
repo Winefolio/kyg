@@ -188,7 +188,7 @@ export function registerAuthRoutes(app: Express): void {
         console.error("Logout error:", err);
         return res.status(500).json({ error: "Logout failed" });
       }
-      res.clearCookie("kyg.sid");
+      res.clearCookie("cata.sid");
       return res.json({ success: true });
     });
   });

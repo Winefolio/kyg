@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { apiRequest } from "@/lib/queryClient";
 import { BottomNav } from "@/components/home/BottomNav";
@@ -28,6 +28,8 @@ import {
   Clock,
   MapPin,
   Globe,
+  LogOut,
+  ChevronDown,
 } from "lucide-react";
 import type { User, Tasting } from "@shared/schema";
 
@@ -46,14 +48,119 @@ interface GroupTasting {
 }
 
 // ============================================================================
+// USER MENU COMPONENT
+// ============================================================================
+
+function UserMenu({
+  userEmail,
+  onLogout
+}: {
+  userEmail: string;
+  onLogout: () => void;
+}) {
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setShowUserMenu(!showUserMenu)}
+        className="flex items-center gap-2 text-white/60 hover:text-white/80 transition-colors text-sm"
+      >
+        <span className="hidden sm:block truncate max-w-[150px]">
+          {userEmail}
+        </span>
+        <UserIcon className="w-5 h-5 sm:hidden" />
+        <ChevronDown className={`w-4 h-4 transition-transform ${showUserMenu ? "rotate-180" : ""}`} />
+      </button>
+
+      <AnimatePresence>
+        {showUserMenu && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 mt-2 w-48 bg-gray-900/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-xl overflow-hidden z-50"
+          >
+            <div className="px-4 py-3 border-b border-white/10">
+              <p className="text-white/40 text-xs">Signed in as</p>
+              <p className="text-white text-sm truncate">{userEmail}</p>
+            </div>
+            <button
+              onClick={() => {
+                setShowUserMenu(false);
+                onLogout();
+              }}
+              className="w-full px-4 py-3 flex items-center gap-3 text-red-400 hover:bg-white/5 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="text-sm">Sign Out</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ============================================================================
+// HEADER COMPONENT WITH USER MENU
+// ============================================================================
+
+function HomeHeader({
+  userEmail,
+  onLogout
+}: {
+  userEmail: string;
+  onLogout: () => void;
+}) {
+  return (
+    <header className="sticky top-0 z-40 bg-black/30 backdrop-blur-xl border-b border-white/10">
+      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <img
+          src="/logo-cata-horizontal.svg"
+          alt="Cata"
+          className="h-8 w-auto"
+        />
+        <UserMenu userEmail={userEmail} onLogout={onLogout} />
+      </div>
+    </header>
+  );
+}
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
 export default function HomeV2() {
   const [location, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout", null);
+      localStorage.removeItem("cata_user_email");
+      queryClient.clear();
+      setLocation("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   // Determine active tab based on current path
   const getActiveTab = (): TabKey => {
@@ -112,7 +219,7 @@ export default function HomeV2() {
   // Loading state
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
       </div>
     );
@@ -121,21 +228,23 @@ export default function HomeV2() {
   // Login view
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
         >
-          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
+          <div className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 shadow-2xl">
             <div className="text-center mb-8">
-              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                <Wine className="w-10 h-10 text-white" />
-              </div>
+              <img
+                src="/logo-cata.svg"
+                alt="Cata - Wine Tasting"
+                className="w-20 h-20 mx-auto mb-4"
+              />
               <h1 className="text-2xl font-bold text-white mb-2">
-                Know Your Grape
+                Cata
               </h1>
-              <p className="text-white/60">Your personal wine journey</p>
+              <p className="text-white/60">Your personal sommelier</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4">
@@ -145,7 +254,7 @@ export default function HomeV2() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
-                  className="bg-white/10 border-white/20 text-white placeholder:text-white/40 py-3"
+                  className="bg-white/10 border-white/10 text-white placeholder:text-white/40 py-3"
                   required
                 />
               </div>
@@ -178,7 +287,7 @@ export default function HomeV2() {
 
   // Authenticated layout with three tabs
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-primary">
       <main className="pb-24">
         <AnimatePresence mode="wait">
           {activeTab === "solo" && (
@@ -189,7 +298,7 @@ export default function HomeV2() {
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.2 }}
             >
-              <SoloTabContent user={user!} />
+              <SoloTabContent user={user!} onLogout={handleLogout} />
             </motion.div>
           )}
           {activeTab === "group" && (
@@ -200,7 +309,7 @@ export default function HomeV2() {
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.2 }}
             >
-              <GroupTabContent user={user!} />
+              <GroupTabContent user={user!} onLogout={handleLogout} />
             </motion.div>
           )}
           {activeTab === "dashboard" && (
@@ -211,7 +320,7 @@ export default function HomeV2() {
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.2 }}
             >
-              <DashboardTabContent user={user!} />
+              <DashboardTabContent user={user!} onLogout={handleLogout} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -228,6 +337,7 @@ export default function HomeV2() {
 
 interface TabContentProps {
   user: User;
+  onLogout: () => void;
 }
 
 interface TastingStats {
@@ -255,7 +365,7 @@ interface DashboardData {
   unifiedTastingStats?: TastingStats;
 }
 
-function SoloTabContent({ user }: TabContentProps) {
+function SoloTabContent({ user, onLogout }: TabContentProps) {
   const [, setLocation] = useLocation();
 
   // Get dashboard data with unified stats
@@ -324,18 +434,7 @@ function SoloTabContent({ user }: TabContentProps) {
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-black/30 backdrop-blur-xl border-b border-white/10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Wine className="w-6 h-6 text-purple-400" />
-            <span className="text-white font-semibold">Know Your Grape</span>
-          </div>
-          <span className="text-white/60 text-sm hidden sm:block truncate max-w-[150px]">
-            {user.email}
-          </span>
-        </div>
-      </header>
+      <HomeHeader userEmail={user.email} onLogout={onLogout} />
 
       <div className="container mx-auto px-4 py-6 space-y-6">
         {/* Welcome Section */}
@@ -391,7 +490,7 @@ function SoloTabContent({ user }: TabContentProps) {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/20"
+            className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10"
           >
             <div className="flex items-center gap-2 mb-3">
               <GraduationCap className="w-5 h-5 text-purple-400" />
@@ -433,7 +532,7 @@ function SoloTabContent({ user }: TabContentProps) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25 }}
-              className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/20"
+              className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10"
             >
               <div className="flex items-center gap-2 mb-3">
                 <Sparkles className="w-5 h-5 text-purple-400" />
@@ -485,7 +584,7 @@ function SoloTabContent({ user }: TabContentProps) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.05 * index }}
                   onClick={() => setLocation(`/solo/tasting/${tasting.id}`)}
-                  className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-xl p-4 border border-white/20 cursor-pointer hover:bg-white/15 transition-colors"
+                  className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10 cursor-pointer hover:bg-white/15 transition-colors"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
@@ -532,7 +631,7 @@ function SoloTabContent({ user }: TabContentProps) {
               <Button
                 onClick={() => setLocation("/tasting/new")}
                 variant="outline"
-                className="border-white/20 text-white hover:bg-white/10"
+                className="border-white/10 text-white hover:bg-white/10"
               >
                 Start Your First Tasting
               </Button>
@@ -550,7 +649,7 @@ function SoloTabContent({ user }: TabContentProps) {
 
 type GroupMode = "selection" | "join" | "host";
 
-function GroupTabContent({ user }: TabContentProps) {
+function GroupTabContent({ user, onLogout }: TabContentProps) {
   const [, setLocation] = useLocation();
   const [groupMode, setGroupMode] = useState<GroupMode>("selection");
   const [sessionId, setSessionId] = useState("");
@@ -750,9 +849,7 @@ function GroupTabContent({ user }: TabContentProps) {
               <span className="text-white font-semibold">Group Tastings</span>
             </div>
           )}
-          <span className="text-white/60 text-sm hidden sm:block truncate max-w-[150px]">
-            {user.email}
-          </span>
+          <UserMenu userEmail={user.email} onLogout={onLogout} />
         </div>
       </header>
 
@@ -866,7 +963,7 @@ function GroupTabContent({ user }: TabContentProps) {
                             `/dashboard/${encodeURIComponent(user.email)}/tasting/${tasting.sessionId}`
                           )
                         }
-                        className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-xl p-4 border border-white/20 cursor-pointer hover:bg-white/15 transition-colors"
+                        className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10 cursor-pointer hover:bg-white/15 transition-colors"
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
@@ -952,7 +1049,7 @@ function GroupTabContent({ user }: TabContentProps) {
               initial={{ scale: 0.9, opacity: 0, y: 50 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 50 }}
-              className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 border border-white/20 max-w-sm w-full"
+              className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 border border-white/10 max-w-sm w-full"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-center mb-6">
@@ -1044,7 +1141,7 @@ interface SommelierTips {
   questions: string[];
 }
 
-function DashboardTabContent({ user }: TabContentProps) {
+function DashboardTabContent({ user, onLogout }: TabContentProps) {
   const [, setLocation] = useLocation();
 
   // Fetch dashboard data
@@ -1097,9 +1194,7 @@ function DashboardTabContent({ user }: TabContentProps) {
             <BarChart3 className="w-6 h-6 text-purple-400" />
             <span className="text-white font-semibold">Your Dashboard</span>
           </div>
-          <span className="text-white/60 text-sm hidden sm:block truncate max-w-[150px]">
-            {user.email}
-          </span>
+          <UserMenu userEmail={user.email} onLogout={onLogout} />
         </div>
       </header>
 
@@ -1145,7 +1240,7 @@ function DashboardTabContent({ user }: TabContentProps) {
             transition={{ delay: 0.15 }}
             className="grid grid-cols-2 gap-4"
           >
-            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/20">
+            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/10">
               <div className="flex items-center gap-2 mb-2">
                 <MapPin className="w-4 h-4 text-purple-400" />
                 <span className="text-white/60 text-sm">Top Region</span>
@@ -1154,7 +1249,7 @@ function DashboardTabContent({ user }: TabContentProps) {
                 {dashboardData.topPreferences.topRegion?.name || "Not enough data"}
               </p>
             </div>
-            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/20">
+            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/10">
               <div className="flex items-center gap-2 mb-2">
                 <Wine className="w-4 h-4 text-pink-400" />
                 <span className="text-white/60 text-sm">Top Grape</span>
@@ -1205,7 +1300,7 @@ function DashboardTabContent({ user }: TabContentProps) {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25 }}
-          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/20"
+          className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10"
         >
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="w-5 h-5 text-purple-400" />
@@ -1255,7 +1350,7 @@ function DashboardTabContent({ user }: TabContentProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           onClick={() => setLocation(`/dashboard/${encodeURIComponent(user.email)}`)}
-          className="w-full bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/20 flex items-center justify-between group hover:bg-white/15 transition-all"
+          className="w-full bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10 flex items-center justify-between group hover:bg-white/15 transition-all"
         >
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
@@ -1299,7 +1394,7 @@ function StatCard({
   };
 
   return (
-    <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-xl p-3 border border-white/20">
+    <div className="bg-white/5 backdrop-blur-md rounded-xl p-3 border border-white/10">
       <div
         className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${colorClasses[color]}`}
       >

@@ -1,12 +1,51 @@
 # KYG Product Roadmap
 
-**Last Updated**: January 2026
+**Last Updated**: January 21, 2026
 
 ---
 
 ## Vision
 
-Transform KnowYourGrape into "your personal sommelier in your pocket" - an app that knows your taste, suggests wines you'll love, and makes learning about wine feel like play.
+Transform Cata into "your personal sommelier in your pocket" - an app that knows your taste, suggests wines you'll love, and makes learning about wine feel like play.
+
+---
+
+## Navigation Architecture: Three Pillars + Discover
+
+The app uses a bottom tab navigation with **three current tabs** and one **planned future tab**:
+
+| Tab | Purpose | User Intent | Status |
+|-----|---------|-------------|--------|
+| **Solo** | Personal wine journal & learning journeys | "Record my experience" | ✅ Live |
+| **Group** | Live sessions - join or host | "Taste with others" | ✅ Live |
+| **Dashboard** | All your data, insights, taste profile | "Understand my palate" | ✅ Live |
+| **Discover** | Wine recommendations & where to buy | "Find wines I'll love" | 🔮 Future |
+
+### Why These Tabs?
+
+Each tab represents a **distinct user intent** that doesn't overlap:
+- **Solo** = Capture (recording experiences)
+- **Group** = Connect (real-time with others)
+- **Dashboard** = Reflect (viewing your data)
+- **Discover** = Explore (finding new wines)
+
+### What Stays Within Existing Tabs
+
+| Feature | Location | Rationale |
+|---------|----------|-----------|
+| Learning Journeys | Solo tab | Different navigation depth, not a peer-level experience |
+| Gamification (streaks, badges) | Dashboard | Rewards for activity, part of your data |
+| Wine Collection Manager | Dashboard | Tracking what you own is part of your data |
+| Social features | TBD | Low priority; may not need dedicated tab |
+
+### When to Add the Discover Tab
+
+Add the **Discover tab** when Priority 2 (Wine Discovery & Recommendations) is implemented:
+- Personalized recommendations engine is built
+- Purchase integration is ready (Where to Buy, Price Alerts)
+- Enough content to justify dedicated navigation
+
+**Design constraint**: Maximum 4-5 bottom tabs for mobile usability.
 
 ---
 

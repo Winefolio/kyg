@@ -1,6 +1,7 @@
+import { useState, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { motion } from "framer-motion";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
 import { apiRequest } from "@/lib/queryClient";
 import { useHomeUser } from "@/contexts/HomeUserContext";
 import {
@@ -13,6 +14,8 @@ import {
   Users,
   User as UserIcon,
   Sparkles,
+  LogOut,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Tasting } from "@shared/schema";
@@ -45,6 +48,31 @@ interface DashboardData {
 export default function HomeTastings() {
   const [, setLocation] = useLocation();
   const user = useHomeUser();
+  const queryClient = useQueryClient();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout", null);
+      localStorage.removeItem("cata_user_email");
+      queryClient.clear();
+      setLocation("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   // Get dashboard data with unified stats
   const { data: dashboardData } = useQuery<DashboardData>({
@@ -89,13 +117,48 @@ export default function HomeTastings() {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-black/30 backdrop-blur-xl border-b border-white/10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Wine className="w-6 h-6 text-purple-400" />
-            <span className="text-white font-semibold">Know Your Grape</span>
+          <img
+            src="/logo-cata-horizontal.svg"
+            alt="Cata"
+            className="h-8 w-auto"
+          />
+          {/* User Menu */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center gap-2 text-white/60 hover:text-white/80 transition-colors text-sm"
+            >
+              <span className="hidden sm:block truncate max-w-[150px]">
+                {user.email}
+              </span>
+              <UserIcon className="w-5 h-5 sm:hidden" />
+              <ChevronDown className={`w-4 h-4 transition-transform ${showUserMenu ? "rotate-180" : ""}`} />
+            </button>
+
+            <AnimatePresence>
+              {showUserMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 mt-2 w-48 bg-gray-900/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-xl overflow-hidden"
+                >
+                  <div className="px-4 py-3 border-b border-white/10">
+                    <p className="text-white/40 text-xs">Signed in as</p>
+                    <p className="text-white text-sm truncate">{user.email}</p>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-4 py-3 flex items-center gap-3 text-red-400 hover:bg-white/5 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="text-sm">Sign Out</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-          <span className="text-white/60 text-sm hidden sm:block truncate max-w-[150px]">
-            {user.email}
-          </span>
         </div>
       </header>
 
@@ -168,7 +231,7 @@ export default function HomeTastings() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/20"
+            className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10"
           >
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="w-5 h-5 text-purple-400" />
@@ -215,7 +278,7 @@ export default function HomeTastings() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.05 * index }}
                   onClick={() => setLocation(`/solo/tasting/${tasting.id}`)}
-                  className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-xl p-4 border border-white/20 cursor-pointer hover:bg-white/15 transition-colors"
+                  className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10 cursor-pointer hover:bg-white/15 transition-colors"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
@@ -285,7 +348,7 @@ function StatCard({
   };
 
   return (
-    <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-xl p-3 border border-white/20">
+    <div className="bg-white/5 backdrop-blur-md rounded-xl p-3 border border-white/10">
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${colorClasses[color]}`}>
         <Icon className="w-4 h-4" />
       </div>
@@ -304,7 +367,7 @@ function EmptyTastingsCard({ onStartTasting }: { onStartTasting: () => void }) {
       <Button
         onClick={onStartTasting}
         variant="outline"
-        className="border-white/20 text-white hover:bg-white/10"
+        className="border-white/10 text-white hover:bg-white/10"
       >
         Start Your First Tasting
       </Button>

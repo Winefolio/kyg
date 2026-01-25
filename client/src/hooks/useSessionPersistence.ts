@@ -20,21 +20,84 @@ interface SessionData {
   isActive: boolean;
 }
 
+const DB_NAME_OLD = 'KnowYourGrapeDB';
+const DB_NAME = 'CataDB';
+const DB_VERSION = 3;
+
+// Migrate data from old database name to new
+const migrateFromOldDB = async (): Promise<void> => {
+  try {
+    // Check if old database exists
+    const databases = await indexedDB.databases();
+    const oldDBExists = databases.some(db => db.name === DB_NAME_OLD);
+
+    if (!oldDBExists) return;
+
+    // Open old DB and copy data
+    const oldDB = await openDB(DB_NAME_OLD, 2);
+    const newDB = await openDB(DB_NAME, DB_VERSION, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains('offlineResponses')) {
+          const responseStore = db.createObjectStore('offlineResponses', { keyPath: 'id' });
+          responseStore.createIndex('by-synced', 'synced');
+          responseStore.createIndex('by-timestamp', 'timestamp');
+        }
+        if (!db.objectStoreNames.contains('sessionData')) {
+          const sessionStore = db.createObjectStore('sessionData', { keyPath: 'sessionId' });
+          sessionStore.createIndex('by-active', 'isActive');
+        }
+      },
+    });
+
+    // Copy offline responses
+    try {
+      const oldResponses = await oldDB.getAll('offlineResponses');
+      for (const response of oldResponses) {
+        await newDB.put('offlineResponses', response);
+      }
+    } catch (e) {
+      // Store might not exist in old DB
+    }
+
+    // Copy session data
+    try {
+      const oldSessions = await oldDB.getAll('sessionData');
+      for (const session of oldSessions) {
+        await newDB.put('sessionData', session);
+      }
+    } catch (e) {
+      // Store might not exist in old DB
+    }
+
+    oldDB.close();
+    newDB.close();
+
+    // Delete old database
+    await indexedDB.deleteDatabase(DB_NAME_OLD);
+    console.log('Successfully migrated from KnowYourGrapeDB to CataDB');
+  } catch (error) {
+    console.warn('Database migration failed (non-critical):', error);
+  }
+};
+
 // Initialize IndexedDB - Only when user joins a session
 const initDB = async (): Promise<IDBPDatabase | null> => {
   try {
-    return await openDB('KnowYourGrapeDB', 2, {
+    // Migrate from old database name if needed
+    await migrateFromOldDB();
+
+    return await openDB(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion) {
         // Clear old data on upgrade
-        if (oldVersion < 2) {
+        if (oldVersion < 3) {
           const storeNames = Array.from(db.objectStoreNames);
           storeNames.forEach(name => db.deleteObjectStore(name));
         }
-        
+
         const responseStore = db.createObjectStore('offlineResponses', { keyPath: 'id' });
         responseStore.createIndex('by-synced', 'synced');
         responseStore.createIndex('by-timestamp', 'timestamp');
-        
+
         const sessionStore = db.createObjectStore('sessionData', { keyPath: 'sessionId' });
         sessionStore.createIndex('by-active', 'isActive');
       },

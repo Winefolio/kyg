@@ -58,7 +58,7 @@ export default function SoloProfile() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
       </div>
     );
@@ -72,7 +72,7 @@ export default function SoloProfile() {
   const user = authData.user;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-primary">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-black/30 backdrop-blur-xl border-b border-white/10">
         <div className="container mx-auto px-4 py-4">
@@ -94,7 +94,7 @@ export default function SoloProfile() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/20"
+          className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10"
         >
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
@@ -115,7 +115,7 @@ export default function SoloProfile() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/20"
+          className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10"
         >
           <h3 className="text-lg font-semibold text-white mb-4">Your Stats</h3>
           <div className="flex items-center gap-6">
@@ -139,7 +139,7 @@ export default function SoloProfile() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/20"
+            className="bg-white/5 backdrop-blur-md rounded-2xl p-6 border border-white/10"
           >
             <h3 className="text-lg font-semibold text-white mb-4">Your Taste Profile</h3>
             <p className="text-white/80 mb-4">{preferencesData.summary}</p>
