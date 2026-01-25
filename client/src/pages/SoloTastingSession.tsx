@@ -491,11 +491,11 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
   // Completion screen
   if (isComplete) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl text-center max-w-md"
+          className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 shadow-2xl text-center max-w-md"
         >
           <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full flex items-center justify-center">
             <CheckCircle className="w-10 h-10 text-white" />
@@ -516,7 +516,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-primary">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-black/30 backdrop-blur-xl border-b border-white/10">
         <div className="container mx-auto px-4 py-3">
@@ -576,7 +576,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
             variant="outline"
             onClick={handlePrevious}
             disabled={currentQuestionIndex === 0}
-            className="flex-1 border-white/20 text-white hover:bg-white/10 disabled:opacity-30"
+            className="flex-1 border-white/10 text-white hover:bg-white/10 disabled:opacity-30"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Previous

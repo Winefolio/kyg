@@ -1,8 +1,8 @@
 // client/public/service-worker.js
 
 // IMPORTANT: Increment this version string every time you deploy a new build!
-const CACHE_VERSION = "v1.4.0"; // Chrome compatibility update
-const CACHE_PREFIX = "knowyourgrape-shell-";
+const CACHE_VERSION = "v2.0.0"; // Brand overhaul - renamed to Cata
+const CACHE_PREFIX = "cata-shell-";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 // Only cache essential files - no aggressive caching

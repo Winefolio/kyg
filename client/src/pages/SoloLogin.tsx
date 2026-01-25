@@ -5,7 +5,7 @@ import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
-import { Wine, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 
 export default function SoloLogin() {
@@ -60,26 +60,28 @@ export default function SoloLogin() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
+        <div className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 shadow-2xl">
           <div className="text-center mb-8">
-            <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-              <Wine className="w-10 h-10 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Know Your Grape</h1>
-            <p className="text-white/60">Your personal wine tasting journal</p>
+            <img
+              src="/logo-cata.svg"
+              alt="Cata - Wine Tasting"
+              className="w-20 h-20 mx-auto mb-4"
+            />
+            <h1 className="text-2xl font-bold text-white mb-2">Cata</h1>
+            <p className="text-white/60">Your personal sommelier</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -89,7 +91,7 @@ export default function SoloLogin() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 py-3"
+                className="bg-white/10 border-white/10 text-white placeholder:text-white/40 py-3"
                 required
               />
             </div>
