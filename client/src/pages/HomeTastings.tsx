@@ -66,7 +66,7 @@ export default function HomeTastings() {
   const handleLogout = async () => {
     try {
       await apiRequest("POST", "/api/auth/logout", null);
-      localStorage.removeItem("kyg_user_email");
+      localStorage.removeItem("cata_user_email");
       queryClient.clear();
       setLocation("/");
     } catch (error) {

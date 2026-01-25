@@ -16,10 +16,11 @@ Note: Dev server runs Express which serves the Vite frontend. Port can be overri
 
 ## Architecture Overview
 
-**Cata** is a wine tasting education platform with two main experiences:
+**Cata** is a wine tasting education platform with three main experiences:
 
-1. **Live Sessions**: Host-led group tastings with real-time participant responses
-2. **Solo Tastings**: Self-guided tastings via Learning Journeys or ad-hoc wines
+1. **Solo Tastings**: Self-guided tastings via Learning Journeys or ad-hoc wines (snap any bottle)
+2. **Group Sessions**: Host-led tastings with real-time participant responses, voting, shared insights
+3. **Sommelier Tools**: Dashboard for wine professionals to create and manage tasting packages
 
 ### Tech Stack
 - **Backend**: Express + TypeScript (tsx), PostgreSQL with Drizzle ORM
@@ -37,7 +38,11 @@ server/
 └── openai-client.ts   # Sentiment analysis, summaries
 
 client/src/
-├── pages/             # Route components (Gateway, TastingSession, UserDashboard, etc.)
+├── pages/             # Route components
+│   ├── Landing.tsx        # Public landing page (/)
+│   ├── HomeV2.tsx         # Authenticated home with tabs (/home)
+│   ├── SommelierDashboard.tsx  # Package management (/sommelier)
+│   └── PackageEditor.tsx  # Slide/question builder (/editor/:code)
 ├── components/
 │   ├── questions/     # Question type components (MultipleChoice, Scale, Text, etc.)
 │   └── ui/            # shadcn/ui components + custom (video-player, audio-player, etc.)
@@ -83,11 +88,21 @@ All question types in `client/src/components/questions/`:
 - Solo tasting routes: `/api/solo/tastings`, `/api/solo/wines`, `/api/solo/preferences`
 - Journey routes: `/api/journeys`, `/api/journeys/:id/chapters/:chapterId/complete`
 - Dashboard: `/api/dashboard/:email`
+- Package routes: `/api/packages`, `/api/package-wines`, `/api/slides`
+- Session routes: `/api/sessions`, `/api/sessions/:id/participants`, `/api/sessions/:id/analytics`
+
+### Frontend Routes
+- `/` - Landing page (unauthenticated)
+- `/home` - Unified home with tabs: Solo, Group, Dashboard (authenticated)
+- `/sommelier` - Sommelier dashboard for creating packages
+- `/editor/:code` - Package slide editor
+- `/join` - Join a group session
+- `/tasting/:sessionId/:participantId` - Active tasting session
 
 ## Deployment
 
 - **Platform**: Railway
-- **Production URL**: https://cata-production.up.railway.app
+- **Production URL**: https://cata-production.up.railway.app (or https://cata.wine when DNS configured)
 - **Deploy trigger**: Push to `main` branch auto-deploys
 - **Config**: `railway.json` in repo root
 
