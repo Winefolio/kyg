@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { storage } from "../storage";
 import { validateWineForChapter, getValidationMessage } from "../services/wineValidation";
 import { generateQuestionsForWine, getFallbackQuestions } from "../services/questionGenerator";
-import type { WineRecognitionResult } from "@shared/schema";
+import type { WineRecognitionResult, TastingLevel } from "@shared/schema";
 
 export function registerJourneyRoutes(app: Express) {
   console.log("🗺️ Registering journey endpoints...");
@@ -179,9 +179,9 @@ export function registerJourneyRoutes(app: Express) {
     try {
       const journeyId = parseInt(req.params.journeyId);
       const chapterId = parseInt(req.params.chapterId);
-      const { wineInfo, difficulty = 'intermediate' } = req.body as {
+      const { wineInfo, userLevel = 'intro' } = req.body as {
         wineInfo: WineRecognitionResult;
-        difficulty?: 'beginner' | 'intermediate' | 'advanced';
+        userLevel?: TastingLevel;
       };
 
       if (isNaN(journeyId) || isNaN(chapterId)) {
@@ -199,7 +199,7 @@ export function registerJourneyRoutes(app: Express) {
       }
 
       // Generate questions
-      const questions = await generateQuestionsForWine(wineInfo, chapter, difficulty);
+      const questions = await generateQuestionsForWine(wineInfo, chapter, userLevel);
 
       res.json({
         questions,
@@ -230,13 +230,13 @@ export function registerJourneyRoutes(app: Express) {
         wineInfo,
         winePhotoUrl,
         email,
-        difficulty = 'intermediate',
+        userLevel = 'intro',
         skipValidation = false
       } = req.body as {
         wineInfo: WineRecognitionResult;
         winePhotoUrl?: string;
         email: string;
-        difficulty?: 'beginner' | 'intermediate' | 'advanced';
+        userLevel?: TastingLevel;
         skipValidation?: boolean;
       };
 
@@ -274,7 +274,7 @@ export function registerJourneyRoutes(app: Express) {
       }
 
       // Generate questions
-      const questions = await generateQuestionsForWine(wineInfo, chapter, difficulty);
+      const questions = await generateQuestionsForWine(wineInfo, chapter, userLevel);
 
       res.json({
         success: true,

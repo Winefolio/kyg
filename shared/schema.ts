@@ -545,7 +545,11 @@ export interface SommelierTips {
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  createdAt: timestamp("created_at").defaultNow().notNull()
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  // Tasting level progression
+  tastingLevel: varchar("tasting_level", { length: 20 }).default('intro').notNull(), // 'intro', 'intermediate', 'advanced'
+  tastingsCompleted: integer("tastings_completed").default(0).notNull(),
+  levelUpPromptEligible: boolean("level_up_prompt_eligible").default(false).notNull()
 }, (table) => ({
   emailIdx: index("idx_users_email").on(table.email)
 }));
@@ -574,7 +578,8 @@ export const tastings = pgTable("tastings", {
   photoUrl: text("photo_url"),
   tastedAt: timestamp("tasted_at").defaultNow().notNull(),
   responses: jsonb("responses").notNull(), // Full tasting questionnaire responses
-  wineCharacteristics: jsonb("wine_characteristics") // Baseline wine data from GPT-4
+  wineCharacteristics: jsonb("wine_characteristics"), // Baseline wine data from GPT-4
+  recommendations: jsonb("recommendations") // AI-generated next bottle recommendations
 }, (table) => ({
   userIdIdx: index("idx_tastings_user_id").on(table.userId),
   tastedAtIdx: index("idx_tastings_tasted_at").on(table.tastedAt),
@@ -716,6 +721,8 @@ export const chapters = pgTable("chapters", {
   priceRange: jsonb("price_range"), // { min: number, max: number, currency: string }
   alternatives: jsonb("alternatives"), // Array of acceptable substitute wines/criteria
   askFor: text("ask_for"), // What to tell the wine shop staff
+  // Multiple wine options at different price points
+  wineOptions: jsonb("wine_options"), // Array of WineOption objects
   createdAt: timestamp("created_at").defaultNow().notNull()
 }, (table) => ({
   journeyChapterIdx: unique().on(table.journeyId, table.chapterNumber),
@@ -867,6 +874,28 @@ export interface ChapterShoppingGuide {
   askFor?: string;
 }
 
+// Wine options for flexible journey pricing
+export interface WineOption {
+  description: string; // e.g., "Any Oregon Pinot Noir"
+  askFor: string; // What to tell the wine shop staff
+  priceRange: PriceRange;
+  exampleProducers?: string[]; // e.g., ["Willamette Valley Vineyards", "A to Z"]
+  level: 'entry' | 'mid' | 'premium'; // Price tier
+  whyThisWine?: string; // Optional explanation of fit for learning objective
+}
+
+// AI-generated next bottle recommendations
+export interface TastingRecommendation {
+  type: 'similar' | 'step_up' | 'exploration'; // Similar style, more complex, or different direction
+  wineName: string; // e.g., "Willamette Valley Pinot Noir"
+  reason: string; // Why this is recommended based on their responses
+  priceRange: PriceRange;
+  askFor: string; // What to tell the wine shop staff
+}
+
+// User tasting level progression
+export type TastingLevel = 'intro' | 'intermediate' | 'advanced';
+
 // ============================================
 // SPRINT 5: AI QUESTION GENERATION & VALIDATION
 // ============================================
@@ -922,9 +951,12 @@ export interface WineRecognitionResult {
 }
 
 // Generated question structure (follows existing tasting flow)
+// Question categories - the 5 core components + overall
+export type QuestionCategory = 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall';
+
 export interface GeneratedQuestion {
   id: string;
-  category: 'appearance' | 'aroma' | 'taste' | 'structure' | 'overall';
+  category: QuestionCategory;
   questionType: 'multiple_choice' | 'scale' | 'text';
   title: string;
   description?: string;

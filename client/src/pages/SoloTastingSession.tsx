@@ -37,10 +37,10 @@ interface ChapterContext {
   learningObjectives: string[];
 }
 
-// AI-generated question format from Sprint 5
+// AI-generated question format from Sprint 5 - 5 core components
 interface AIQuestion {
   id: string;
-  category: 'appearance' | 'aroma' | 'taste' | 'structure' | 'overall';
+  category: 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall';
   questionType: 'multiple_choice' | 'scale' | 'text';
   title: string;
   description?: string;
@@ -60,10 +60,10 @@ interface SoloTastingSessionProps {
   aiQuestions?: AIQuestion[];
 }
 
-// Question definition type
+// Question definition type - supports both legacy and 5 core components
 interface TastingQuestion {
   id: string;
-  section: 'aroma' | 'taste' | 'overall' | 'chapter';
+  section: 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall' | 'aroma' | 'taste' | 'chapter';
   type: 'scale' | 'multiple_choice' | 'text' | 'boolean';
   config: {
     title: string;
@@ -219,11 +219,17 @@ const TASTING_QUESTIONS: TastingQuestion[] = [
   }
 ];
 
-// Section info for headers (simplified - only sections we use)
+// Section info for headers - 5 core components + chapter focus
 const SECTIONS: Record<string, { name: string; icon: any; color: string }> = {
+  fruit: { name: 'Fruit Flavors', icon: Grape, color: 'from-red-500 to-pink-500' },
+  secondary: { name: 'Secondary Notes', icon: Droplets, color: 'from-purple-500 to-indigo-500' },
+  tertiary: { name: 'Aged Character', icon: Wine, color: 'from-amber-500 to-orange-500' },
+  body: { name: 'Body & Texture', icon: Wine, color: 'from-rose-500 to-red-500' },
+  acidity: { name: 'Acidity', icon: Droplets, color: 'from-yellow-500 to-lime-500' },
+  overall: { name: 'Overall', icon: Star, color: 'from-emerald-500 to-teal-500' },
+  // Legacy sections for fallback questions
   aroma: { name: 'Aroma', icon: Droplets, color: 'from-purple-500 to-pink-500' },
   taste: { name: 'Taste', icon: Grape, color: 'from-red-500 to-orange-500' },
-  overall: { name: 'Overall', icon: Star, color: 'from-emerald-500 to-teal-500' },
   chapter: { name: 'Chapter Focus', icon: Wine, color: 'from-amber-500 to-yellow-500' }
 };
 
@@ -246,13 +252,21 @@ function convertChapterPrompts(prompts: Array<{ question: string; category?: str
 
 // Convert AI-generated questions to TastingQuestion format
 function convertAIQuestions(questions: AIQuestion[]): TastingQuestion[] {
-  // Map AI category to section
-  const categoryToSection: Record<string, 'aroma' | 'taste' | 'overall'> = {
-    'appearance': 'aroma', // Group appearance with aroma for display
+  // Map AI category to section - now using 5 core components
+  type SectionType = 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall' | 'aroma' | 'taste' | 'chapter';
+  const categoryToSection: Record<string, SectionType> = {
+    // New 5 core components (direct mapping)
+    'fruit': 'fruit',
+    'secondary': 'secondary',
+    'tertiary': 'tertiary',
+    'body': 'body',
+    'acidity': 'acidity',
+    'overall': 'overall',
+    // Legacy categories (for backwards compatibility)
+    'appearance': 'aroma',
     'aroma': 'aroma',
     'taste': 'taste',
-    'structure': 'taste',
-    'overall': 'overall'
+    'structure': 'body'
   };
 
   return questions

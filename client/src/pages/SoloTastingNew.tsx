@@ -252,7 +252,7 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
           body: JSON.stringify({
             wineInfo: wineRecognition,
             email: user.email,
-            difficulty: 'intermediate', // Could be based on journey difficulty
+            userLevel: 'intro', // User's level will be fetched from their profile in production
             skipValidation: chapter?.wineRequirements?.anyWine || false
           }),
           credentials: 'include'

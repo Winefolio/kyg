@@ -158,9 +158,36 @@ These remain in backlog as the pivot focuses on solo/learning experiences:
 
 ---
 
+## Premium Features (Future)
+
+These are revenue-generating features that require the core product to be mature first.
+
+### Sommelier Matching & Personal Wine Advisor
+Connect users with real sommeliers for personalized guidance.
+
+- [ ] **Sommelier Profiles** - Browse somms by specialty (Burgundy, Italian, New World), teaching style (nerdy vs. feeling-based), credentials
+- [ ] **Try Before You Commit** - Users can take tastings from different somms before choosing
+- [ ] **Lock-In System** - After 3 tastings with same somm, prompt: "Make them your personal sommelier?"
+- [ ] **Direct Messaging** - Locked-in users can text their somm for advice anytime
+- [ ] **Custom Journeys** - Somms create personalized learning paths for locked-in users
+
+*Source: Chief Sommelier feedback (Jan 2026)*
+
+### Cellar Building Service
+Premium cellar consultation for serious collectors.
+
+- [ ] **Cellar Questionnaire** - Budget, bottle count, purpose (daily vs. collecting vs. party cellar)
+- [ ] **Personalized Recommendations** - Somm creates curated purchase list
+- [ ] **Drink Windows** - When to open each bottle
+- [ ] **Inventory Tracking** - What you own vs. what you've consumed
+- [ ] **Seasonal Updates** - Quarterly cellar plan adjustments based on new tastings
+
+*Requires locked-in sommelier relationship. Pricing TBD.*
+
+---
+
 ## Future Ideas (Not Yet Scoped)
 
-- **Sommelier Matching** - Connect with real sommeliers for personalized advice
 - **Wine Pairing AI** - Suggest pairings based on what you're cooking
 - **Tasting Calendar** - Schedule and get reminders for upcoming tastings
 - **Group Journey Mode** - Do journeys together with friends
