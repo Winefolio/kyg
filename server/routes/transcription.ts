@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { requireAuth } from "./auth";
 import { transcriptionRateLimit } from "../middleware/rateLimiter";
-import OpenAI from "openai";
+import { openai } from "../lib/openai";
 import multer from "multer";
 
 // Configure multer for audio uploads
@@ -22,11 +22,6 @@ const audioUpload = multer({
     }
   }
 });
-
-// Initialize OpenAI client
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
 
 /**
  * Register transcription routes

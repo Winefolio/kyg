@@ -12,13 +12,9 @@
  * Questions are conversational and focused on what the user LIKES, not testing knowledge.
  */
 
-import OpenAI from 'openai';
 import { z } from 'zod';
 import type { GeneratedQuestion, WineRecognitionResult, Chapter, TastingLevel, QuestionCategory } from "@shared/schema";
-
-const openai = new OpenAI({
-  timeout: 30000 // 30 second timeout
-});
+import { openai } from "../lib/openai";
 
 // Zod schema for structured output from GPT
 const QuestionOptionSchema = z.object({
@@ -44,6 +40,21 @@ const GeneratedQuestionSchema = z.object({
 const QuestionSetSchema = z.object({
   questions: z.array(GeneratedQuestionSchema)
 });
+
+// Interface for raw GPT response before transformation
+interface RawGPTQuestion {
+  id: string;
+  category: string;
+  questionType: string;
+  title: string;
+  description?: string;
+  options?: Array<{ id: string; text: string; description?: string }>;
+  allowMultiple?: boolean;
+  scaleMin?: number;
+  scaleMax?: number;
+  scaleLabels?: string[];
+  wineContext?: string;
+}
 
 // Fallback questions when AI generation fails - based on 5 core components
 const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
@@ -190,6 +201,12 @@ export async function generateQuestionsForWine(
   chapter?: Chapter,
   userLevel: TastingLevel = 'intro'
 ): Promise<GeneratedQuestion[]> {
+  // Return fallback questions if OpenAI is not configured
+  if (!openai) {
+    console.log('[QuestionGenerator] OpenAI not configured, returning fallback questions');
+    return getFallbackQuestions();
+  }
+
   try {
     const completion = await openai.chat.completions.create({
       model: 'gpt-5-mini', // Fast, cheap model for question generation
@@ -268,8 +285,10 @@ export async function generateQuestionsForWine(
     }
 
     // Transform scaleLabels from array to tuple if needed
-    const questions: GeneratedQuestion[] = parsed.questions.map((q: any) => ({
+    const questions: GeneratedQuestion[] = (parsed.questions as RawGPTQuestion[]).map((q) => ({
       ...q,
+      category: q.category as GeneratedQuestion['category'],
+      questionType: q.questionType as GeneratedQuestion['questionType'],
       scaleLabels: q.scaleLabels && q.scaleLabels.length >= 2
         ? [q.scaleLabels[0], q.scaleLabels[1]] as [string, string]
         : undefined
@@ -277,10 +296,10 @@ export async function generateQuestionsForWine(
 
     // Ensure we have all 5 core components represented
     const categories = new Set(questions.map(q => q.category));
-    const requiredCategories = ['fruit', 'secondary', 'tertiary', 'body', 'acidity', 'overall'];
+    const requiredCategories: QuestionCategory[] = ['fruit', 'secondary', 'tertiary', 'body', 'acidity', 'overall'];
 
     for (const cat of requiredCategories) {
-      if (!categories.has(cat as any)) {
+      if (!categories.has(cat)) {
         // Add fallback question for missing category
         const fallback = FALLBACK_QUESTIONS.find(q => q.category === cat);
         if (fallback) {

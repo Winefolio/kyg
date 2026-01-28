@@ -1,15 +1,10 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { storage, generateSommelierTips } from "../storage";
-import OpenAI from 'openai';
-
-// Only create OpenAI client if API key is available
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
-
-if (!openai) {
-  console.warn("⚠️  OPENAI_API_KEY not set - AI features will be disabled");
-}
+import { openai } from "../lib/openai";
+import { requireAuth } from "./auth";
+import { db } from "../db";
+import { users, tastings } from "@shared/schema";
+import { eq, desc, sql } from "drizzle-orm";
 
 
 export function registerDashboardRoutes(app: Express) {
@@ -462,6 +457,83 @@ export function registerDashboardRoutes(app: Express) {
     }
   });
   */
+
+  // Agent-native endpoint: Get current user's dashboard summary without requiring email in URL
+  // This endpoint is designed for automated workflows and AI agents
+  app.get("/api/me/summary", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
+      const userEmail = req.session.userEmail;
+
+      if (!userId || !userEmail) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Get user info
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId)
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get recent solo tastings
+      const recentTastings = await db
+        .select()
+        .from(tastings)
+        .where(eq(tastings.userId, userId))
+        .orderBy(desc(tastings.tastedAt))
+        .limit(5);
+
+      // Get tasting stats
+      const statsResult = await db
+        .select({
+          totalTastings: sql<number>`count(*)`,
+          avgOverallRating: sql<number>`avg((responses->'overall'->>'rating')::numeric)`
+        })
+        .from(tastings)
+        .where(eq(tastings.userId, userId));
+
+      const stats = statsResult[0] || { totalTastings: 0, avgOverallRating: null };
+
+      // Get active journeys count
+      const activeJourneys = await storage.getUserActiveJourneys(userEmail);
+
+      return res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          tastingLevel: user.tastingLevel,
+          tastingsCompleted: user.tastingsCompleted,
+          levelUpPromptEligible: user.levelUpPromptEligible,
+          createdAt: user.createdAt
+        },
+        stats: {
+          totalSoloTastings: Number(stats.totalTastings),
+          averageRating: stats.avgOverallRating ? Number(stats.avgOverallRating).toFixed(1) : null,
+          activeJourneys: activeJourneys.length
+        },
+        recentTastings: recentTastings.map(t => ({
+          id: t.id,
+          wineName: t.wineName,
+          wineType: t.wineType,
+          tastedAt: t.tastedAt
+        })),
+        links: {
+          // Agent-native: provide links for follow-up actions
+          fullDashboard: `/api/dashboard/${encodeURIComponent(userEmail)}`,
+          preferences: '/api/solo/preferences',
+          recommendations: '/api/solo/recommendations',
+          levelStatus: '/api/solo/level',
+          tastings: '/api/solo/tastings'
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching user summary:", error);
+      return res.status(500).json({ error: "Failed to fetch user summary" });
+    }
+  });
 }
 
   function getTopHalfByType(wines: any[], type: 'red' | 'white') {

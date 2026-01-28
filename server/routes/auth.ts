@@ -219,6 +219,7 @@ export function registerAuthRoutes(app: Express): void {
   });
 
   // Get current user endpoint
+  // Enhanced for agent-native access - returns full user state
   app.get("/api/auth/me", async (req: Request, res: Response) => {
     if (!req.session?.userId) {
       return res.status(401).json({ error: "Not authenticated" });
@@ -238,7 +239,11 @@ export function registerAuthRoutes(app: Express): void {
         user: {
           id: user.id,
           email: user.email,
-          createdAt: user.createdAt
+          createdAt: user.createdAt,
+          // Agent-native: include tasting level info for automated workflows
+          tastingLevel: user.tastingLevel,
+          tastingsCompleted: user.tastingsCompleted,
+          levelUpPromptEligible: user.levelUpPromptEligible
         }
       });
     } catch (error) {

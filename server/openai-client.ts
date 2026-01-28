@@ -1,13 +1,4 @@
-import OpenAI from 'openai';
-
-// Initialize OpenAI client (optional - only if API key is set)
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
-
-if (!openai) {
-  console.warn("⚠️  OPENAI_API_KEY not set in openai-client.ts - AI features disabled");
-}
+import { openai } from './lib/openai';
 
 export interface TextAnalysisResult {
   sentiment: 'positive' | 'neutral' | 'negative';
@@ -563,6 +554,23 @@ interface WineContext {
   wineType?: string;
 }
 
+// Interface for raw recommendation from OpenAI response (before validation)
+interface RawRecommendation {
+  type?: string;
+  wineName?: string;
+  reason?: string;
+  priceRange?: {
+    min?: number;
+    max?: number;
+    currency?: string;
+  };
+  askFor?: string;
+}
+
+interface RecommendationsResponse {
+  recommendations?: RawRecommendation[];
+}
+
 /**
  * Generate AI-powered next bottle recommendations based on user's tasting responses
  */
@@ -652,7 +660,7 @@ Be specific about what to ask for at a wine shop.`
       return getDefaultRecommendations(tastedWine);
     }
 
-    const parsed = JSON.parse(content);
+    const parsed: RecommendationsResponse = JSON.parse(content);
 
     if (!parsed.recommendations || !Array.isArray(parsed.recommendations)) {
       console.warn('Invalid recommendations format, using defaults');
@@ -660,8 +668,10 @@ Be specific about what to ask for at a wine shop.`
     }
 
     // Validate and return recommendations
-    return parsed.recommendations.map((rec: any) => ({
-      type: ['similar', 'step_up', 'exploration'].includes(rec.type) ? rec.type : 'similar',
+    return parsed.recommendations.map((rec: RawRecommendation): TastingRecommendation => ({
+      type: (rec.type && ['similar', 'step_up', 'exploration'].includes(rec.type))
+        ? rec.type as 'similar' | 'step_up' | 'exploration'
+        : 'similar',
       wineName: rec.wineName || 'Unknown Wine',
       reason: rec.reason || 'Based on your tasting preferences',
       priceRange: {
@@ -670,7 +680,7 @@ Be specific about what to ask for at a wine shop.`
         currency: rec.priceRange?.currency || 'USD'
       },
       askFor: rec.askFor || `Ask for ${rec.wineName || 'a similar wine'}`
-    })) as TastingRecommendation[];
+    }));
 
   } catch (error) {
     console.error('Error generating recommendations:', error);

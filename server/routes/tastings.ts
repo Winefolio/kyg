@@ -7,6 +7,20 @@ import { aiRateLimit } from "../middleware/rateLimiter";
 import { attachCharacteristicsToTasting } from "../wine-intelligence";
 import { generateNextBottleRecommendations } from "../openai-client";
 
+// User preferences derived from tasting history
+interface UserPreferences {
+  sweetness: string | null;
+  acidity: string | null;
+  tannins: string | null;
+  body: string | null;
+  tasting_count: string | number;
+}
+
+// Raw SQL query result type
+interface PreferencesQueryResult {
+  rows?: UserPreferences[];
+}
+
 // Level-up thresholds
 const LEVEL_UP_THRESHOLDS: Record<TastingLevel, number | null> = {
   intro: 10,         // After 10 tastings, eligible for intermediate
@@ -76,7 +90,7 @@ async function incrementTastingCount(userId: number): Promise<void> {
 /**
  * Get user's taste preferences derived from their tastings
  */
-async function getUserPreferences(userId: number) {
+async function getUserPreferences(userId: number): Promise<UserPreferences> {
   const result = await db.execute(sql`
     SELECT
       AVG((responses->'taste'->>'sweetness')::numeric) as sweetness,
@@ -88,14 +102,14 @@ async function getUserPreferences(userId: number) {
     WHERE user_id = ${userId}
   `);
 
-  const row = Array.isArray(result) ? result[0] : (result as any).rows?.[0];
-  return row || { sweetness: null, acidity: null, tannins: null, body: null, tasting_count: 0 };
+  const row = Array.isArray(result) ? result[0] : (result as PreferencesQueryResult).rows?.[0];
+  return (row as UserPreferences) || { sweetness: null, acidity: null, tannins: null, body: null, tasting_count: 0 };
 }
 
 /**
  * Format preferences as human-readable text
  */
-function formatPreferences(prefs: any): string {
+function formatPreferences(prefs: UserPreferences): string {
   const descriptions: string[] = [];
 
   if (prefs.body !== null) {
@@ -135,7 +149,7 @@ interface WineRecommendation {
 /**
  * Generate wine recommendations based on user preferences
  */
-function generateRecommendations(prefs: any): WineRecommendation[] {
+function generateRecommendations(prefs: UserPreferences): WineRecommendation[] {
   const recommendations: WineRecommendation[] = [];
   const body = prefs.body ? Number(prefs.body) : 3;
   const tannins = prefs.tannins ? Number(prefs.tannins) : 3;

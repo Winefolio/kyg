@@ -49,7 +49,7 @@ import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull, isNotNull } 
 import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
-import OpenAI from "openai";
+import { openai } from "./lib/openai";
 import { 
   updateSlidePositionSafely, 
   calculateNewSlidePosition, 
@@ -5798,11 +5798,6 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 }
-
-// Initialize OpenAI client (optional)
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
 
 // LLM Integration Function for Sommelier Tips
 export async function generateSommelierTips(email: string): Promise<SommelierTips> {
