@@ -46,8 +46,8 @@ export default function Login() {
           throw new Error(authResult.error || "Authentication failed");
         }
 
-        // Redirect to original page or dashboard
-        const destination = redirectTo || `/dashboard/${encodeURIComponent(email.trim())}`;
+        // Redirect to original page or unified home
+        const destination = redirectTo || '/home';
         setLocation(destination);
         toast({
           title: "Welcome Back!",
@@ -72,7 +72,7 @@ export default function Login() {
             title: "No Tasting History",
             description: "You can start with solo tastings or learning journeys to build your profile.",
           });
-          setLocation('/journeys');
+          setLocation('/home');
         }
       } else {
         throw new Error("Failed to check account");
