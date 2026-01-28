@@ -1,11 +1,13 @@
 import type { Express, Request, Response } from "express";
 import { db, sql as pgClient } from "../db";
 import { tastings, users, insertTastingSchema, type TastingLevel, type TastingResponses } from "@shared/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, ilike } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { aiRateLimit } from "../middleware/rateLimiter";
 import { attachCharacteristicsToTasting } from "../wine-intelligence";
 import { generateNextBottleRecommendations } from "../openai-client";
+import { wineIntelQueue } from "../lib/background-queue";
+import { unauthorized, notFound, validationError, internalError, forbidden } from "../lib/api-error";
 
 // User preferences derived from tasting history
 interface UserPreferences {
@@ -279,7 +281,7 @@ export function registerTastingsRoutes(app: Express): void {
     try {
       const userId = req.session.userId;
       if (!userId) {
-        return res.status(401).json({ error: "Not authenticated" });
+        return unauthorized(res);
       }
 
       // Validate input
@@ -289,108 +291,166 @@ export function registerTastingsRoutes(app: Express): void {
       });
 
       if (!parseResult.success) {
-        return res.status(400).json({
-          error: "Invalid tasting data",
-          details: parseResult.error.errors
-        });
+        return validationError(res, "Invalid tasting data", parseResult.error.errors);
       }
 
       const tastingData = parseResult.data;
 
-      // Insert the tasting
-      const [newTasting] = await db.insert(tastings).values({
-        userId,
-        wineName: tastingData.wineName,
-        wineRegion: tastingData.wineRegion || null,
-        wineVintage: tastingData.wineVintage || null,
-        grapeVariety: tastingData.grapeVariety || null,
-        wineType: tastingData.wineType || null,
-        photoUrl: tastingData.photoUrl || null,
-        responses: tastingData.responses
-      }).returning();
-
-      // Async: Attach wine characteristics (don't wait for it)
-      attachCharacteristicsToTasting(newTasting.id).catch(err => {
-        console.error("Background wine intel error:", err);
-      });
-
-      // Increment tasting count and check level-up eligibility
-      await incrementTastingCount(userId);
-
-      // Check if user is now eligible for level-up
-      const levelUpStatus = await checkLevelUpEligibility(userId);
-
-      // Generate AI recommendations in background and update tasting
-      generateNextBottleRecommendations(
-        {
+      // P2-006 & P2-007: Use transaction to ensure atomicity and return updated user state
+      const result = await db.transaction(async (tx) => {
+        // Insert the tasting
+        const [newTasting] = await tx.insert(tastings).values({
+          userId,
           wineName: tastingData.wineName,
-          grapeVariety: tastingData.grapeVariety || undefined,
-          wineRegion: tastingData.wineRegion || undefined,
-          wineType: tastingData.wineType || undefined
-        },
-        tastingData.responses as TastingResponses
-      ).then(async (recommendations) => {
-        await db
-          .update(tastings)
-          .set({ recommendations })
-          .where(eq(tastings.id, newTasting.id));
-        console.log(`Recommendations saved for tasting ${newTasting.id}`);
-      }).catch(err => {
-        console.error("Background recommendation generation error:", err);
+          wineRegion: tastingData.wineRegion || null,
+          wineVintage: tastingData.wineVintage || null,
+          grapeVariety: tastingData.grapeVariety || null,
+          wineType: tastingData.wineType || null,
+          photoUrl: tastingData.photoUrl || null,
+          responses: tastingData.responses
+        }).returning();
+
+        // Atomic update: increment count and check threshold, return updated state
+        const [updatedUser] = await tx
+          .update(users)
+          .set({
+            tastingsCompleted: sql`${users.tastingsCompleted} + 1`,
+            // Set levelUpPromptEligible if reaching threshold (atomic check)
+            levelUpPromptEligible: sql`
+              CASE
+                WHEN ${users.tastingLevel} = 'intro' AND ${users.tastingsCompleted} + 1 >= 10 THEN true
+                WHEN ${users.tastingLevel} = 'intermediate' AND ${users.tastingsCompleted} + 1 >= 25 THEN true
+                ELSE ${users.levelUpPromptEligible}
+              END
+            `
+          })
+          .where(eq(users.id, userId))
+          .returning({
+            tastingLevel: users.tastingLevel,
+            tastingsCompleted: users.tastingsCompleted,
+            levelUpPromptEligible: users.levelUpPromptEligible
+          });
+
+        return { newTasting, updatedUser };
       });
+
+      const { newTasting, updatedUser } = result;
+
+      // P1-005: Use background queue with retries instead of fire-and-forget
+      wineIntelQueue.add(
+        `wine-characteristics-${newTasting.id}`,
+        () => attachCharacteristicsToTasting(newTasting.id)
+      );
+
+      wineIntelQueue.add(
+        `recommendations-${newTasting.id}`,
+        async () => {
+          const recommendations = await generateNextBottleRecommendations(
+            {
+              wineName: tastingData.wineName,
+              grapeVariety: tastingData.grapeVariety || undefined,
+              wineRegion: tastingData.wineRegion || undefined,
+              wineType: tastingData.wineType || undefined
+            },
+            tastingData.responses as TastingResponses
+          );
+          await db
+            .update(tastings)
+            .set({ recommendations })
+            .where(eq(tastings.id, newTasting.id));
+          console.log(`Recommendations saved for tasting ${newTasting.id}`);
+        }
+      );
+
+      // P2-007: Use the RETURNED value from transaction, not a stale read
+      const currentLevel = updatedUser.tastingLevel as TastingLevel;
+      const isEligible = updatedUser.levelUpPromptEligible;
+      const nextLevel: TastingLevel | undefined = isEligible
+        ? (currentLevel === 'intro' ? 'intermediate' : 'advanced')
+        : undefined;
 
       return res.status(201).json({
         tasting: newTasting,
         message: "Tasting saved successfully",
-        levelUp: levelUpStatus.eligible ? {
+        levelUp: isEligible ? {
           eligible: true,
-          currentLevel: levelUpStatus.currentLevel,
-          nextLevel: levelUpStatus.nextLevel,
-          tastingsCompleted: levelUpStatus.tastingsCompleted
+          currentLevel,
+          nextLevel,
+          tastingsCompleted: updatedUser.tastingsCompleted
         } : undefined
       });
     } catch (error) {
       console.error("Error saving tasting:", error);
-      return res.status(500).json({ error: "Failed to save tasting" });
+      return internalError(res, "Failed to save tasting");
     }
   });
 
   // Get user's tastings (authenticated)
+  // P3-010: Added filtering support for agent-native access
   app.get("/api/solo/tastings", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId;
       if (!userId) {
-        return res.status(401).json({ error: "Not authenticated" });
+        return unauthorized(res);
       }
 
-      const limit = parseInt(req.query.limit as string) || 20;
+      const limit = Math.min(100, parseInt(req.query.limit as string) || 20);
       const offset = parseInt(req.query.offset as string) || 0;
+
+      // P3-010: Support filters for agent-native access
+      const { grape, region, wineType, minRating } = req.query;
+
+      // Build conditions array
+      const conditions = [eq(tastings.userId, userId)];
+
+      if (grape && typeof grape === 'string') {
+        conditions.push(ilike(tastings.grapeVariety, `%${grape}%`));
+      }
+      if (region && typeof region === 'string') {
+        conditions.push(ilike(tastings.wineRegion, `%${region}%`));
+      }
+      if (wineType && typeof wineType === 'string') {
+        conditions.push(eq(tastings.wineType, wineType));
+      }
 
       const userTastings = await db
         .select()
         .from(tastings)
-        .where(eq(tastings.userId, userId))
+        .where(and(...conditions))
         .orderBy(desc(tastings.tastedAt))
         .limit(limit)
         .offset(offset);
 
-      // Get total count
+      // Filter by minRating in memory (JSON field)
+      let filteredTastings = userTastings;
+      if (minRating && typeof minRating === 'string') {
+        const minRatingNum = parseInt(minRating);
+        if (!isNaN(minRatingNum)) {
+          filteredTastings = userTastings.filter(t => {
+            const responses = t.responses as TastingResponses | null;
+            const rating = responses?.overall?.rating;
+            return rating !== undefined && rating >= minRatingNum;
+          });
+        }
+      }
+
+      // Get total count with filters
       const countResult = await db
         .select({ count: sql<number>`count(*)` })
         .from(tastings)
-        .where(eq(tastings.userId, userId));
+        .where(and(...conditions));
 
       const total = Number(countResult[0]?.count || 0);
 
       return res.json({
-        tastings: userTastings,
+        tastings: filteredTastings,
         total,
         limit,
         offset
       });
     } catch (error) {
       console.error("Error fetching tastings:", error);
-      return res.status(500).json({ error: "Failed to fetch tastings" });
+      return internalError(res, "Failed to fetch tastings");
     }
   });
 
@@ -401,11 +461,11 @@ export function registerTastingsRoutes(app: Express): void {
       const tastingId = parseInt(req.params.id);
 
       if (!userId) {
-        return res.status(401).json({ error: "Not authenticated" });
+        return unauthorized(res);
       }
 
       if (isNaN(tastingId)) {
-        return res.status(400).json({ error: "Invalid tasting ID" });
+        return validationError(res, "Invalid tasting ID");
       }
 
       const tasting = await db.query.tastings.findFirst({
@@ -413,17 +473,72 @@ export function registerTastingsRoutes(app: Express): void {
       });
 
       if (!tasting) {
-        return res.status(404).json({ error: "Tasting not found" });
+        return notFound(res, "Tasting");
       }
 
       if (tasting.userId !== userId) {
-        return res.status(403).json({ error: "Not authorized to view this tasting" });
+        return forbidden(res, "Not authorized to view this tasting");
       }
 
       return res.json({ tasting });
     } catch (error) {
       console.error("Error fetching tasting:", error);
-      return res.status(500).json({ error: "Failed to fetch tasting" });
+      return internalError(res, "Failed to fetch tasting");
+    }
+  });
+
+  // P3-010: Update a tasting (authenticated, must be owner)
+  app.patch("/api/solo/tastings/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
+      const tastingId = parseInt(req.params.id);
+
+      if (!userId) {
+        return unauthorized(res);
+      }
+
+      if (isNaN(tastingId)) {
+        return validationError(res, "Invalid tasting ID");
+      }
+
+      // Check ownership
+      const tasting = await db.query.tastings.findFirst({
+        where: eq(tastings.id, tastingId)
+      });
+
+      if (!tasting) {
+        return notFound(res, "Tasting");
+      }
+
+      if (tasting.userId !== userId) {
+        return forbidden(res, "Not authorized to update this tasting");
+      }
+
+      // Only allow updating specific fields
+      const allowedUpdates: Partial<typeof tastings.$inferInsert> = {};
+      const { wineName, wineRegion, wineVintage, grapeVariety, wineType, responses } = req.body;
+
+      if (wineName !== undefined) allowedUpdates.wineName = wineName;
+      if (wineRegion !== undefined) allowedUpdates.wineRegion = wineRegion;
+      if (wineVintage !== undefined) allowedUpdates.wineVintage = wineVintage;
+      if (grapeVariety !== undefined) allowedUpdates.grapeVariety = grapeVariety;
+      if (wineType !== undefined) allowedUpdates.wineType = wineType;
+      if (responses !== undefined) allowedUpdates.responses = responses;
+
+      if (Object.keys(allowedUpdates).length === 0) {
+        return validationError(res, "No valid fields to update");
+      }
+
+      const [updated] = await db
+        .update(tastings)
+        .set(allowedUpdates)
+        .where(eq(tastings.id, tastingId))
+        .returning();
+
+      return res.json({ tasting: updated, message: "Tasting updated" });
+    } catch (error) {
+      console.error("Error updating tasting:", error);
+      return internalError(res, "Failed to update tasting");
     }
   });
 
@@ -434,11 +549,11 @@ export function registerTastingsRoutes(app: Express): void {
       const tastingId = parseInt(req.params.id);
 
       if (!userId) {
-        return res.status(401).json({ error: "Not authenticated" });
+        return unauthorized(res);
       }
 
       if (isNaN(tastingId)) {
-        return res.status(400).json({ error: "Invalid tasting ID" });
+        return validationError(res, "Invalid tasting ID");
       }
 
       // Check ownership
@@ -447,11 +562,11 @@ export function registerTastingsRoutes(app: Express): void {
       });
 
       if (!tasting) {
-        return res.status(404).json({ error: "Tasting not found" });
+        return notFound(res, "Tasting");
       }
 
       if (tasting.userId !== userId) {
-        return res.status(403).json({ error: "Not authorized to delete this tasting" });
+        return forbidden(res, "Not authorized to delete this tasting");
       }
 
       await db.delete(tastings).where(eq(tastings.id, tastingId));
@@ -459,7 +574,7 @@ export function registerTastingsRoutes(app: Express): void {
       return res.json({ success: true, message: "Tasting deleted" });
     } catch (error) {
       console.error("Error deleting tasting:", error);
-      return res.status(500).json({ error: "Failed to delete tasting" });
+      return internalError(res, "Failed to delete tasting");
     }
   });
 
@@ -468,7 +583,7 @@ export function registerTastingsRoutes(app: Express): void {
     try {
       const userId = req.session.userId;
       if (!userId) {
-        return res.status(401).json({ error: "Not authenticated" });
+        return unauthorized(res);
       }
 
       const prefs = await getUserPreferences(userId);
@@ -486,7 +601,7 @@ export function registerTastingsRoutes(app: Express): void {
       });
     } catch (error) {
       console.error("Error fetching preferences:", error);
-      return res.status(500).json({ error: "Failed to fetch preferences" });
+      return internalError(res, "Failed to fetch preferences");
     }
   });
 
@@ -495,7 +610,7 @@ export function registerTastingsRoutes(app: Express): void {
     try {
       const userId = req.session.userId;
       if (!userId) {
-        return res.status(401).json({ error: "Not authenticated" });
+        return unauthorized(res);
       }
 
       const prefs = await getUserPreferences(userId);
@@ -507,7 +622,7 @@ export function registerTastingsRoutes(app: Express): void {
       });
     } catch (error) {
       console.error("Error fetching recommendations:", error);
-      return res.status(500).json({ error: "Failed to fetch recommendations" });
+      return internalError(res, "Failed to fetch recommendations");
     }
   });
 
@@ -516,7 +631,7 @@ export function registerTastingsRoutes(app: Express): void {
     try {
       const userId = req.session.userId;
       if (!userId) {
-        return res.status(401).json({ error: "Not authenticated" });
+        return unauthorized(res);
       }
 
       const user = await db.query.users.findFirst({
@@ -524,7 +639,7 @@ export function registerTastingsRoutes(app: Express): void {
       });
 
       if (!user) {
-        return res.status(404).json({ error: "User not found" });
+        return notFound(res, "User");
       }
 
       const levelUpStatus = await checkLevelUpEligibility(userId);
@@ -541,7 +656,7 @@ export function registerTastingsRoutes(app: Express): void {
       });
     } catch (error) {
       console.error("Error fetching level status:", error);
-      return res.status(500).json({ error: "Failed to fetch level status" });
+      return internalError(res, "Failed to fetch level status");
     }
   });
 
@@ -551,7 +666,7 @@ export function registerTastingsRoutes(app: Express): void {
     try {
       const userId = req.session.userId;
       if (!userId) {
-        return res.status(401).json({ error: "Not authenticated" });
+        return unauthorized(res);
       }
 
       // Atomic conditional update: only upgrade if eligible and update in single query
@@ -572,7 +687,7 @@ export function registerTastingsRoutes(app: Express): void {
         .returning();
 
       if (result.length === 0) {
-        return res.status(400).json({ error: "Not eligible for level-up" });
+        return validationError(res, "Not eligible for level-up");
       }
 
       const updatedUser = result[0];
@@ -584,7 +699,7 @@ export function registerTastingsRoutes(app: Express): void {
       });
     } catch (error) {
       console.error("Error upgrading level:", error);
-      return res.status(500).json({ error: "Failed to upgrade level" });
+      return internalError(res, "Failed to upgrade level");
     }
   });
 
@@ -593,7 +708,7 @@ export function registerTastingsRoutes(app: Express): void {
     try {
       const userId = req.session.userId;
       if (!userId) {
-        return res.status(401).json({ error: "Not authenticated" });
+        return unauthorized(res);
       }
 
       // Just mark as not eligible for now (will be re-checked at next milestone)
@@ -608,7 +723,7 @@ export function registerTastingsRoutes(app: Express): void {
       });
     } catch (error) {
       console.error("Error declining level-up:", error);
-      return res.status(500).json({ error: "Failed to decline level-up" });
+      return internalError(res, "Failed to decline level-up");
     }
   });
 }

@@ -15,6 +15,7 @@
 import { z } from 'zod';
 import type { GeneratedQuestion, WineRecognitionResult, Chapter, TastingLevel, QuestionCategory } from "@shared/schema";
 import { openai } from "../lib/openai";
+import { sanitizeForPrompt, sanitizeWineInfo } from "../lib/sanitize";
 
 // Zod schema for structured output from GPT
 const QuestionOptionSchema = z.object({
@@ -362,58 +363,69 @@ Bad: "Identify the primary fruit aromas."`;
 }
 
 function getUserPrompt(wineInfo: WineRecognitionResult, chapter?: Chapter, userLevel?: TastingLevel): string {
-  const varietal = wineInfo.grapeVarieties?.[0] || 'Unknown';
+  // P1-004: Sanitize all user-controlled input before prompt interpolation
+  const sanitized = sanitizeWineInfo({
+    name: wineInfo.name,
+    region: wineInfo.region,
+    grapeVarieties: wineInfo.grapeVarieties,
+    vintage: wineInfo.vintage,
+    producer: wineInfo.producer
+  });
+  const varietal = sanitized.grapeVariety;
 
   let prompt = `Generate tasting questions for this wine:
 
-Wine: ${wineInfo.name}
+Wine: ${sanitized.name}
 Varietal: ${varietal}
-Region: ${wineInfo.region}
-${wineInfo.vintage ? `Vintage: ${wineInfo.vintage}` : ''}
-${wineInfo.producer ? `Producer: ${wineInfo.producer}` : ''}`;
+Region: ${sanitized.region}
+${sanitized.vintage !== 'NV' ? `Vintage: ${sanitized.vintage}` : ''}
+${sanitized.producer ? `Producer: ${sanitized.producer}` : ''}`;
 
   if (chapter) {
+    // Sanitize chapter content as well (could be user-generated)
+    const chapterTitle = sanitizeForPrompt(chapter.title, 100);
+    const chapterDesc = sanitizeForPrompt(chapter.description, 200);
     prompt += `
 
 Learning Context:
-Chapter: ${chapter.title}
-${chapter.description ? `Description: ${chapter.description}` : ''}
-${chapter.learningObjectives ? `Learning Objectives: ${JSON.stringify(chapter.learningObjectives)}` : ''}`;
+Chapter: ${chapterTitle}
+${chapterDesc ? `Description: ${chapterDesc}` : ''}`;
   }
 
-  // Add varietal-specific guidance
+  // Add varietal-specific guidance (using sanitized varietal)
   prompt += `
 
 Include 2-3 questions specific to ${varietal} characteristics:`;
 
-  if (varietal.toLowerCase().includes('sangiovese') || varietal.toLowerCase().includes('chianti')) {
+  const varietalLower = varietal.toLowerCase();
+  if (varietalLower.includes('sangiovese') || varietalLower.includes('chianti')) {
     prompt += `
 - For Sangiovese, ask about cherry notes, tomato-like acidity, and earthy characteristics.`;
-  } else if (varietal.toLowerCase().includes('pinot noir')) {
+  } else if (varietalLower.includes('pinot noir')) {
     prompt += `
 - For Pinot Noir, ask about red fruit vs. earth balance, mushroom/forest notes.`;
-  } else if (varietal.toLowerCase().includes('cabernet')) {
+  } else if (varietalLower.includes('cabernet')) {
     prompt += `
 - For Cabernet, ask about dark fruit intensity, green/herbal notes, oak influence.`;
-  } else if (varietal.toLowerCase().includes('chardonnay')) {
+  } else if (varietalLower.includes('chardonnay')) {
     prompt += `
 - For Chardonnay, ask about citrus vs. tropical fruit, oak/butter influence, minerality.`;
-  } else if (varietal.toLowerCase().includes('sauvignon blanc')) {
+  } else if (varietalLower.includes('sauvignon blanc')) {
     prompt += `
 - For Sauvignon Blanc, ask about citrus, grassy notes, and minerality.`;
-  } else if (varietal.toLowerCase().includes('riesling')) {
+  } else if (varietalLower.includes('riesling')) {
     prompt += `
 - For Riesling, ask about sweetness level, petrol notes, and stone fruit.`;
   } else {
     prompt += `
-- Ask about characteristics typical of ${varietal} from ${wineInfo.region || 'this region'}.`;
+- Ask about characteristics typical of ${varietal} from ${sanitized.region}.`;
   }
 
   // Add region-specific guidance
-  if (wineInfo.region) {
+  if (sanitized.region && sanitized.region !== 'Unknown Region') {
     prompt += `
 
-Include 1-2 questions about what makes ${wineInfo.region} wines distinctive.`;
+Include 1-2 questions about what makes ${sanitized.region} wines distinctive.`;
   }
 
   prompt += `

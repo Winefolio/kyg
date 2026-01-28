@@ -2,6 +2,7 @@ import { db } from './db';
 import { wineCharacteristicsCache, tastings, type WineCharacteristicsData } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { openai } from './lib/openai';
+import { sanitizeForPrompt } from './lib/sanitize';
 
 /**
  * Normalize wine information into a consistent cache key
@@ -96,12 +97,18 @@ async function fetchWineCharacteristicsFromGPT(
   if (!openai) return null;
 
   try {
+    // P1-004: Sanitize all user-controlled input before prompt interpolation
+    const sanitizedName = sanitizeForPrompt(wineName, 150);
+    const sanitizedRegion = sanitizeForPrompt(wineRegion, 100);
+    const sanitizedGrape = sanitizeForPrompt(grapeVariety, 100);
+    const sanitizedType = sanitizeForPrompt(wineType, 50);
+
     const prompt = `You are a sommelier. For the following wine, provide the TYPICAL characteristics on a 1-5 scale. This is not about a specific bottle but about what is generally expected from this wine style.
 
-Wine: ${wineName}
-${wineRegion ? `Region: ${wineRegion}` : ''}
-${grapeVariety ? `Grape: ${grapeVariety}` : ''}
-${wineType ? `Type: ${wineType}` : ''}
+Wine: ${sanitizedName}
+${sanitizedRegion ? `Region: ${sanitizedRegion}` : ''}
+${sanitizedGrape ? `Grape: ${sanitizedGrape}` : ''}
+${sanitizedType ? `Type: ${sanitizedType}` : ''}
 
 Provide your response as JSON with these fields:
 - sweetness: 1-5 (1=bone dry, 5=very sweet)
