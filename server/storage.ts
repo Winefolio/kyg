@@ -49,7 +49,7 @@ import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull, isNotNull } 
 import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
-import OpenAI from "openai";
+import { openai } from "./lib/openai";
 import { 
   updateSlidePositionSafely, 
   calculateNewSlidePosition, 
@@ -5645,28 +5645,51 @@ export class DatabaseStorage implements IStorage {
       const user = await this.getUserByEmail(email);
       if (!user) return [];
 
-      const userJourneyList = await db
-        .select()
+      // Fetch user journeys with journey data in a single query (fix N+1)
+      const userJourneyWithJourney = await db
+        .select({
+          userJourney: userJourneys,
+          journey: journeys
+        })
         .from(userJourneys)
+        .innerJoin(journeys, eq(userJourneys.journeyId, journeys.id))
         .where(eq(userJourneys.userId, user.id))
         .orderBy(desc(userJourneys.lastActivityAt));
 
-      const result = [];
-      for (const uj of userJourneyList) {
-        const journeyData = await this.getJourneyWithChapters(uj.journeyId);
-        if (journeyData) {
-          const completedCount = (uj.completedChapters as CompletedChapter[])?.length || 0;
-          const totalChapters = journeyData.chapters.length;
-          const progress = totalChapters > 0 ? (completedCount / totalChapters) * 100 : 0;
+      if (userJourneyWithJourney.length === 0) return [];
 
-          result.push({
-            userJourney: uj,
-            journey: journeyData.journey,
-            chapters: journeyData.chapters,
-            progress: Math.round(progress)
-          });
-        }
+      // Get all journey IDs to fetch chapters in a single query
+      const journeyIds = userJourneyWithJourney.map(r => r.journey.id);
+
+      // Fetch all chapters for all journeys in one query
+      const allChapters = await db
+        .select()
+        .from(chapters)
+        .where(sql`${chapters.journeyId} IN (${sql.join(journeyIds, sql`, `)})`)
+        .orderBy(chapters.chapterNumber);
+
+      // Group chapters by journey ID
+      const chaptersByJourney = new Map<number, Chapter[]>();
+      for (const chapter of allChapters) {
+        const existing = chaptersByJourney.get(chapter.journeyId) || [];
+        existing.push(chapter);
+        chaptersByJourney.set(chapter.journeyId, existing);
       }
+
+      // Build result with progress calculation
+      const result = userJourneyWithJourney.map(({ userJourney, journey }) => {
+        const journeyChapters = chaptersByJourney.get(journey.id) || [];
+        const completedCount = (userJourney.completedChapters as CompletedChapter[])?.length || 0;
+        const totalChapters = journeyChapters.length;
+        const progress = totalChapters > 0 ? (completedCount / totalChapters) * 100 : 0;
+
+        return {
+          userJourney,
+          journey,
+          chapters: journeyChapters,
+          progress: Math.round(progress)
+        };
+      });
 
       return result;
     } catch (error) {
@@ -5775,11 +5798,6 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 }
-
-// Initialize OpenAI client (optional)
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
 
 // LLM Integration Function for Sommelier Tips
 export async function generateSommelierTips(email: string): Promise<SommelierTips> {

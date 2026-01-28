@@ -1,14 +1,96 @@
 import type { Express, Request, Response } from "express";
-import { db } from "../db";
-import { tastings, users, insertTastingSchema } from "@shared/schema";
+import { db, sql as pgClient } from "../db";
+import { tastings, users, insertTastingSchema, type TastingLevel, type TastingResponses } from "@shared/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { requireAuth } from "./auth";
+import { aiRateLimit } from "../middleware/rateLimiter";
 import { attachCharacteristicsToTasting } from "../wine-intelligence";
+import { generateNextBottleRecommendations } from "../openai-client";
+
+// User preferences derived from tasting history
+interface UserPreferences {
+  sweetness: string | null;
+  acidity: string | null;
+  tannins: string | null;
+  body: string | null;
+  tasting_count: string | number;
+}
+
+// Raw SQL query result type
+interface PreferencesQueryResult {
+  rows?: UserPreferences[];
+}
+
+// Level-up thresholds
+const LEVEL_UP_THRESHOLDS: Record<TastingLevel, number | null> = {
+  intro: 10,         // After 10 tastings, eligible for intermediate
+  intermediate: 25,  // After 25 tastings, eligible for advanced
+  advanced: null     // Already at max level
+};
+
+/**
+ * Check if user is eligible for level-up based on tasting count
+ */
+async function checkLevelUpEligibility(userId: number): Promise<{
+  eligible: boolean;
+  currentLevel: TastingLevel;
+  tastingsCompleted: number;
+  nextLevel?: TastingLevel;
+}> {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId)
+  });
+
+  if (!user) {
+    return { eligible: false, currentLevel: 'intro', tastingsCompleted: 0 };
+  }
+
+  const currentLevel = user.tastingLevel as TastingLevel;
+  const tastingsCompleted = user.tastingsCompleted;
+  const threshold = LEVEL_UP_THRESHOLDS[currentLevel];
+
+  if (threshold === null || tastingsCompleted < threshold) {
+    return { eligible: false, currentLevel, tastingsCompleted };
+  }
+
+  // User has reached threshold and hasn't been prompted yet (or declined)
+  const nextLevel: TastingLevel = currentLevel === 'intro' ? 'intermediate' : 'advanced';
+
+  return {
+    eligible: true,
+    currentLevel,
+    tastingsCompleted,
+    nextLevel
+  };
+}
+
+/**
+ * Increment user's tasting count and check level-up eligibility
+ * Uses atomic update to prevent race conditions
+ */
+async function incrementTastingCount(userId: number): Promise<void> {
+  // Atomic update: increment count and check threshold in a single query
+  // This prevents race conditions where multiple requests could both pass the threshold
+  await db
+    .update(users)
+    .set({
+      tastingsCompleted: sql`${users.tastingsCompleted} + 1`,
+      // Set levelUpPromptEligible if reaching threshold (atomic check)
+      levelUpPromptEligible: sql`
+        CASE
+          WHEN ${users.tastingLevel} = 'intro' AND ${users.tastingsCompleted} + 1 >= 10 THEN true
+          WHEN ${users.tastingLevel} = 'intermediate' AND ${users.tastingsCompleted} + 1 >= 25 THEN true
+          ELSE ${users.levelUpPromptEligible}
+        END
+      `
+    })
+    .where(eq(users.id, userId));
+}
 
 /**
  * Get user's taste preferences derived from their tastings
  */
-async function getUserPreferences(userId: number) {
+async function getUserPreferences(userId: number): Promise<UserPreferences> {
   const result = await db.execute(sql`
     SELECT
       AVG((responses->'taste'->>'sweetness')::numeric) as sweetness,
@@ -20,14 +102,14 @@ async function getUserPreferences(userId: number) {
     WHERE user_id = ${userId}
   `);
 
-  const row = Array.isArray(result) ? result[0] : (result as any).rows?.[0];
-  return row || { sweetness: null, acidity: null, tannins: null, body: null, tasting_count: 0 };
+  const row = Array.isArray(result) ? result[0] : (result as PreferencesQueryResult).rows?.[0];
+  return (row as UserPreferences) || { sweetness: null, acidity: null, tannins: null, body: null, tasting_count: 0 };
 }
 
 /**
  * Format preferences as human-readable text
  */
-function formatPreferences(prefs: any): string {
+function formatPreferences(prefs: UserPreferences): string {
   const descriptions: string[] = [];
 
   if (prefs.body !== null) {
@@ -67,7 +149,7 @@ interface WineRecommendation {
 /**
  * Generate wine recommendations based on user preferences
  */
-function generateRecommendations(prefs: any): WineRecommendation[] {
+function generateRecommendations(prefs: UserPreferences): WineRecommendation[] {
   const recommendations: WineRecommendation[] = [];
   const body = prefs.body ? Number(prefs.body) : 3;
   const tannins = prefs.tannins ? Number(prefs.tannins) : 3;
@@ -192,7 +274,8 @@ function generateRecommendations(prefs: any): WineRecommendation[] {
  */
 export function registerTastingsRoutes(app: Express): void {
   // Create a new tasting (authenticated)
-  app.post("/api/solo/tastings", requireAuth, async (req: Request, res: Response) => {
+  // Rate limited because it triggers AI (wine characteristics + recommendations)
+  app.post("/api/solo/tastings", requireAuth, aiRateLimit, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId;
       if (!userId) {
@@ -231,9 +314,40 @@ export function registerTastingsRoutes(app: Express): void {
         console.error("Background wine intel error:", err);
       });
 
+      // Increment tasting count and check level-up eligibility
+      await incrementTastingCount(userId);
+
+      // Check if user is now eligible for level-up
+      const levelUpStatus = await checkLevelUpEligibility(userId);
+
+      // Generate AI recommendations in background and update tasting
+      generateNextBottleRecommendations(
+        {
+          wineName: tastingData.wineName,
+          grapeVariety: tastingData.grapeVariety || undefined,
+          wineRegion: tastingData.wineRegion || undefined,
+          wineType: tastingData.wineType || undefined
+        },
+        tastingData.responses as TastingResponses
+      ).then(async (recommendations) => {
+        await db
+          .update(tastings)
+          .set({ recommendations })
+          .where(eq(tastings.id, newTasting.id));
+        console.log(`Recommendations saved for tasting ${newTasting.id}`);
+      }).catch(err => {
+        console.error("Background recommendation generation error:", err);
+      });
+
       return res.status(201).json({
         tasting: newTasting,
-        message: "Tasting saved successfully"
+        message: "Tasting saved successfully",
+        levelUp: levelUpStatus.eligible ? {
+          eligible: true,
+          currentLevel: levelUpStatus.currentLevel,
+          nextLevel: levelUpStatus.nextLevel,
+          tastingsCompleted: levelUpStatus.tastingsCompleted
+        } : undefined
       });
     } catch (error) {
       console.error("Error saving tasting:", error);
@@ -394,6 +508,107 @@ export function registerTastingsRoutes(app: Express): void {
     } catch (error) {
       console.error("Error fetching recommendations:", error);
       return res.status(500).json({ error: "Failed to fetch recommendations" });
+    }
+  });
+
+  // Get user's tasting level status (authenticated)
+  app.get("/api/solo/level", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const user = await db.query.users.findFirst({
+        where: eq(users.id, userId)
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const levelUpStatus = await checkLevelUpEligibility(userId);
+
+      return res.json({
+        tastingLevel: user.tastingLevel,
+        tastingsCompleted: user.tastingsCompleted,
+        levelUpEligible: levelUpStatus.eligible,
+        nextLevel: levelUpStatus.nextLevel,
+        thresholds: {
+          intro: LEVEL_UP_THRESHOLDS.intro,
+          intermediate: LEVEL_UP_THRESHOLDS.intermediate
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching level status:", error);
+      return res.status(500).json({ error: "Failed to fetch level status" });
+    }
+  });
+
+  // Accept level-up (authenticated)
+  // Uses atomic conditional update to prevent race conditions
+  app.post("/api/solo/level/upgrade", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Atomic conditional update: only upgrade if eligible and update in single query
+      // This prevents double level-ups from race conditions
+      const result = await db
+        .update(users)
+        .set({
+          tastingLevel: sql`
+            CASE
+              WHEN ${users.levelUpPromptEligible} = true AND ${users.tastingLevel} = 'intro' THEN 'intermediate'
+              WHEN ${users.levelUpPromptEligible} = true AND ${users.tastingLevel} = 'intermediate' THEN 'advanced'
+              ELSE ${users.tastingLevel}
+            END
+          `,
+          levelUpPromptEligible: false
+        })
+        .where(sql`${users.id} = ${userId} AND ${users.levelUpPromptEligible} = true`)
+        .returning();
+
+      if (result.length === 0) {
+        return res.status(400).json({ error: "Not eligible for level-up" });
+      }
+
+      const updatedUser = result[0];
+
+      return res.json({
+        success: true,
+        newLevel: updatedUser.tastingLevel,
+        message: `Congratulations! You've leveled up to ${updatedUser.tastingLevel}!`
+      });
+    } catch (error) {
+      console.error("Error upgrading level:", error);
+      return res.status(500).json({ error: "Failed to upgrade level" });
+    }
+  });
+
+  // Decline level-up for now (authenticated) - will be asked again later
+  app.post("/api/solo/level/decline", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Just mark as not eligible for now (will be re-checked at next milestone)
+      await db
+        .update(users)
+        .set({ levelUpPromptEligible: false })
+        .where(eq(users.id, userId));
+
+      return res.json({
+        success: true,
+        message: "No problem! We'll ask again after a few more tastings."
+      });
+    } catch (error) {
+      console.error("Error declining level-up:", error);
+      return res.status(500).json({ error: "Failed to decline level-up" });
     }
   });
 }

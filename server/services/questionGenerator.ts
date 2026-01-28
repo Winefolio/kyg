@@ -1,16 +1,20 @@
 /**
  * AI Question Generation Service
- * Sprint 5: Generates wine-specific tasting questions following the existing structure
+ * Sprint 5: Generates wine-specific tasting questions
  *
- * Key Principle: The AI enhances questions with wine-specific options/context,
- * but KEEPS the existing flow structure: appearance → aroma → taste → structure → overall
+ * Key Principle: Questions focus on 5 core components to help users understand their preferences:
+ * 1. Fruit flavors - primary taste driver
+ * 2. Secondary flavors - herbal, floral, earthy notes (complexity indicators)
+ * 3. Tertiary flavors - oak, vanilla, aged characteristics (winemaking influence)
+ * 4. Body - weight and texture in the mouth
+ * 5. Acidity - brightness and crispness
+ *
+ * Questions are conversational and focused on what the user LIKES, not testing knowledge.
  */
 
-import OpenAI from 'openai';
 import { z } from 'zod';
-import type { GeneratedQuestion, WineRecognitionResult, Chapter } from "@shared/schema";
-
-const openai = new OpenAI();
+import type { GeneratedQuestion, WineRecognitionResult, Chapter, TastingLevel, QuestionCategory } from "@shared/schema";
+import { openai } from "../lib/openai";
 
 // Zod schema for structured output from GPT
 const QuestionOptionSchema = z.object({
@@ -21,7 +25,7 @@ const QuestionOptionSchema = z.object({
 
 const GeneratedQuestionSchema = z.object({
   id: z.string(),
-  category: z.enum(['appearance', 'aroma', 'taste', 'structure', 'overall']),
+  category: z.enum(['fruit', 'secondary', 'tertiary', 'body', 'acidity', 'overall']),
   questionType: z.enum(['multiple_choice', 'scale', 'text']),
   title: z.string(),
   description: z.string().optional(),
@@ -37,117 +41,183 @@ const QuestionSetSchema = z.object({
   questions: z.array(GeneratedQuestionSchema)
 });
 
-// Fallback questions when AI generation fails
+// Interface for raw GPT response before transformation
+interface RawGPTQuestion {
+  id: string;
+  category: string;
+  questionType: string;
+  title: string;
+  description?: string;
+  options?: Array<{ id: string; text: string; description?: string }>;
+  allowMultiple?: boolean;
+  scaleMin?: number;
+  scaleMax?: number;
+  scaleLabels?: string[];
+  wineContext?: string;
+}
+
+// Fallback questions when AI generation fails - based on 5 core components
 const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
   {
-    id: 'appearance-1',
-    category: 'appearance',
-    questionType: 'multiple_choice',
-    title: 'What is the color intensity?',
-    description: 'Observe the wine against a white background',
-    options: [
-      { id: 'pale', text: 'Pale', description: 'Light, watery color' },
-      { id: 'medium', text: 'Medium', description: 'Moderate color depth' },
-      { id: 'deep', text: 'Deep', description: 'Rich, intense color' }
-    ]
+    id: 'fruit-1',
+    category: 'fruit',
+    questionType: 'scale',
+    title: 'How much do you enjoy the fruit flavors you\'re tasting?',
+    description: 'Think about berries, citrus, stone fruit, or tropical notes',
+    scaleMin: 1,
+    scaleMax: 5,
+    scaleLabels: ['Not at all', 'Love them']
   },
   {
-    id: 'aroma-1',
-    category: 'aroma',
+    id: 'fruit-2',
+    category: 'fruit',
     questionType: 'multiple_choice',
-    title: 'What aromas do you detect?',
-    description: 'Swirl the glass and take a few sniffs',
+    title: 'What fruit flavors stand out to you?',
+    description: 'Select all that you notice',
     options: [
-      { id: 'fruit', text: 'Fruit (berries, citrus, stone fruit)' },
-      { id: 'floral', text: 'Floral (rose, violet, blossom)' },
-      { id: 'earth', text: 'Earth (soil, mushroom, forest floor)' },
-      { id: 'oak', text: 'Oak (vanilla, toast, spice)' },
-      { id: 'other', text: 'Other' }
+      { id: 'red-berries', text: 'Red berries (cherry, raspberry, strawberry)' },
+      { id: 'dark-berries', text: 'Dark berries (blackberry, blueberry, plum)' },
+      { id: 'citrus', text: 'Citrus (lemon, lime, grapefruit)' },
+      { id: 'stone-fruit', text: 'Stone fruit (peach, apricot, nectarine)' },
+      { id: 'tropical', text: 'Tropical (pineapple, mango, passion fruit)' }
     ],
     allowMultiple: true
   },
   {
-    id: 'taste-1',
-    category: 'taste',
-    questionType: 'scale',
-    title: 'How sweet is this wine?',
-    description: 'Focus on the tip of your tongue',
-    scaleMin: 1,
-    scaleMax: 5,
-    scaleLabels: ['Bone Dry', 'Sweet']
+    id: 'secondary-1',
+    category: 'secondary',
+    questionType: 'multiple_choice',
+    title: 'Do you notice any herbal, floral, or earthy notes?',
+    description: 'These add complexity to the wine',
+    options: [
+      { id: 'herbal', text: 'Herbal (mint, eucalyptus, bell pepper)' },
+      { id: 'floral', text: 'Floral (rose, violet, honeysuckle)' },
+      { id: 'earthy', text: 'Earthy (mushroom, soil, forest floor)' },
+      { id: 'mineral', text: 'Mineral (wet stones, chalk, slate)' },
+      { id: 'none', text: 'Not really noticing any' }
+    ],
+    allowMultiple: true
   },
   {
-    id: 'taste-2',
-    category: 'taste',
+    id: 'secondary-2',
+    category: 'secondary',
     questionType: 'scale',
-    title: 'How would you rate the acidity?',
+    title: 'How do you feel about these secondary notes?',
+    description: 'Do they add to your enjoyment or distract from it?',
+    scaleMin: 1,
+    scaleMax: 5,
+    scaleLabels: ['Dislike them', 'Really enjoy them']
+  },
+  {
+    id: 'tertiary-1',
+    category: 'tertiary',
+    questionType: 'multiple_choice',
+    title: 'Do you notice any oak, vanilla, or aged characteristics?',
+    description: 'These come from winemaking and aging',
+    options: [
+      { id: 'vanilla', text: 'Vanilla' },
+      { id: 'toast', text: 'Toast or baking spices' },
+      { id: 'smoke', text: 'Smoke or char' },
+      { id: 'leather', text: 'Leather or tobacco' },
+      { id: 'none', text: 'Not noticing these' }
+    ],
+    allowMultiple: true
+  },
+  {
+    id: 'tertiary-2',
+    category: 'tertiary',
+    questionType: 'scale',
+    title: 'How do you feel about these oak/aged characteristics?',
+    scaleMin: 1,
+    scaleMax: 5,
+    scaleLabels: ['Too much', 'Love them']
+  },
+  {
+    id: 'body-1',
+    category: 'body',
+    questionType: 'scale',
+    title: 'How does the weight feel in your mouth?',
+    description: 'Think of it like milk - skim milk (light) to whole milk (full)',
+    scaleMin: 1,
+    scaleMax: 5,
+    scaleLabels: ['Light body', 'Full body']
+  },
+  {
+    id: 'body-2',
+    category: 'body',
+    questionType: 'scale',
+    title: 'Do you enjoy this body style?',
+    scaleMin: 1,
+    scaleMax: 5,
+    scaleLabels: ['Prefer lighter', 'Prefer fuller']
+  },
+  {
+    id: 'acidity-1',
+    category: 'acidity',
+    questionType: 'scale',
+    title: 'How bright or crisp does this wine taste?',
     description: 'Does it make your mouth water?',
     scaleMin: 1,
     scaleMax: 5,
-    scaleLabels: ['Low Acidity', 'High Acidity']
+    scaleLabels: ['Soft, mellow', 'Bright, crisp']
   },
   {
-    id: 'structure-1',
-    category: 'structure',
+    id: 'acidity-2',
+    category: 'acidity',
     questionType: 'scale',
-    title: 'How would you describe the body?',
-    description: 'The weight and fullness in your mouth',
+    title: 'Do you enjoy this level of acidity?',
     scaleMin: 1,
     scaleMax: 5,
-    scaleLabels: ['Light Body', 'Full Body']
-  },
-  {
-    id: 'structure-2',
-    category: 'structure',
-    questionType: 'scale',
-    title: 'Rate the tannin level',
-    description: 'The drying sensation on your gums (for red wines)',
-    scaleMin: 1,
-    scaleMax: 5,
-    scaleLabels: ['Soft Tannins', 'Firm Tannins']
+    scaleLabels: ['Too much', 'Perfect']
   },
   {
     id: 'overall-1',
     category: 'overall',
     questionType: 'scale',
-    title: 'Overall, how would you rate this wine?',
+    title: 'Overall, how much do you enjoy this wine?',
     scaleMin: 1,
     scaleMax: 10,
-    scaleLabels: ['Poor', 'Excellent']
+    scaleLabels: ['Not for me', 'Love it!']
   },
   {
     id: 'overall-2',
     category: 'overall',
     questionType: 'text',
-    title: 'Any final tasting notes?',
-    description: 'Share your overall impressions'
+    title: 'What stood out to you most about this wine?',
+    description: 'Share what you liked or didn\'t like'
   }
 ];
 
 /**
- * Generate wine-specific tasting questions
+ * Generate wine-specific tasting questions focused on 5 core components
  *
  * @param wineInfo - Recognition result from photographed wine
  * @param chapter - Chapter context for additional guidance
- * @param difficulty - User's skill level
- * @returns Array of generated questions following the standard flow
+ * @param userLevel - User's tasting level (intro, intermediate, advanced)
+ * @returns Array of generated questions focused on understanding preferences
  */
 export async function generateQuestionsForWine(
   wineInfo: WineRecognitionResult,
   chapter?: Chapter,
-  difficulty: 'beginner' | 'intermediate' | 'advanced' = 'intermediate'
+  userLevel: TastingLevel = 'intro'
 ): Promise<GeneratedQuestion[]> {
+  // Return fallback questions if OpenAI is not configured
+  if (!openai) {
+    console.log('[QuestionGenerator] OpenAI not configured, returning fallback questions');
+    return getFallbackQuestions();
+  }
+
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5.2', // Use latest GPT-5 for complex wine-specific question generation
+      model: 'gpt-5-mini', // Fast, cheap model for question generation
       messages: [
         {
           role: 'system',
-          content: getSystemPrompt(difficulty)
+          content: getSystemPrompt(userLevel)
         },
         {
           role: 'user',
-          content: getUserPrompt(wineInfo, chapter)
+          content: getUserPrompt(wineInfo, chapter, userLevel)
         }
       ],
       response_format: {
@@ -164,7 +234,7 @@ export async function generateQuestionsForWine(
                   type: 'object',
                   properties: {
                     id: { type: 'string' },
-                    category: { type: 'string', enum: ['appearance', 'aroma', 'taste', 'structure', 'overall'] },
+                    category: { type: 'string', enum: ['fruit', 'secondary', 'tertiary', 'body', 'acidity', 'overall'] },
                     questionType: { type: 'string', enum: ['multiple_choice', 'scale', 'text'] },
                     title: { type: 'string' },
                     description: { type: 'string' },
@@ -215,19 +285,21 @@ export async function generateQuestionsForWine(
     }
 
     // Transform scaleLabels from array to tuple if needed
-    const questions: GeneratedQuestion[] = parsed.questions.map((q: any) => ({
+    const questions: GeneratedQuestion[] = (parsed.questions as RawGPTQuestion[]).map((q) => ({
       ...q,
+      category: q.category as GeneratedQuestion['category'],
+      questionType: q.questionType as GeneratedQuestion['questionType'],
       scaleLabels: q.scaleLabels && q.scaleLabels.length >= 2
         ? [q.scaleLabels[0], q.scaleLabels[1]] as [string, string]
         : undefined
     }));
 
-    // Ensure we have all categories represented
+    // Ensure we have all 5 core components represented
     const categories = new Set(questions.map(q => q.category));
-    const requiredCategories = ['appearance', 'aroma', 'taste', 'structure', 'overall'];
+    const requiredCategories: QuestionCategory[] = ['fruit', 'secondary', 'tertiary', 'body', 'acidity', 'overall'];
 
     for (const cat of requiredCategories) {
-      if (!categories.has(cat as any)) {
+      if (!categories.has(cat)) {
         // Add fallback question for missing category
         const fallback = FALLBACK_QUESTIONS.find(q => q.category === cat);
         if (fallback) {
@@ -236,8 +308,8 @@ export async function generateQuestionsForWine(
       }
     }
 
-    // Sort by category order
-    const categoryOrder = { appearance: 0, aroma: 1, taste: 2, structure: 3, overall: 4 };
+    // Sort by category order (5 core components + overall)
+    const categoryOrder = { fruit: 0, secondary: 1, tertiary: 2, body: 3, acidity: 4, overall: 5 };
     questions.sort((a, b) => categoryOrder[a.category] - categoryOrder[b.category]);
 
     return questions;
@@ -248,34 +320,55 @@ export async function generateQuestionsForWine(
   }
 }
 
-function getSystemPrompt(difficulty: string): string {
-  return `You are a sommelier and wine educator creating tasting questions.
+function getSystemPrompt(userLevel: TastingLevel): string {
+  const questionCount = userLevel === 'intro' ? '6-8' : userLevel === 'intermediate' ? '10-12' : '12-15';
 
-CRITICAL: You MUST follow this exact category flow:
-1. appearance (1-2 questions about color, clarity)
-2. aroma (1-2 questions about what you smell)
-3. taste (2-3 questions about flavors, sweetness, acidity)
-4. structure (1-2 questions about body, tannins, finish)
-5. overall (1-2 questions for rating and final notes)
+  return `You are a friendly sommelier helping someone discover what they like about wine.
+Your goal is to ask questions that help THEM understand their own preferences.
 
-Generate 8-10 questions total. For a ${difficulty} level taster:
-${difficulty === 'beginner' ? '- Use simple, approachable language\n- Provide helpful descriptions for each option\n- Focus on basic characteristics' : ''}
-${difficulty === 'intermediate' ? '- Use standard wine vocabulary\n- Include some specific regional terms\n- Balance education with evaluation' : ''}
-${difficulty === 'advanced' ? '- Use professional tasting terminology\n- Include nuanced distinctions\n- Challenge the taster with specific assessments' : ''}
+Focus on these 5 core components (in this order):
+1. Fruit flavors - "How much do you enjoy the fruit flavors you're tasting?"
+2. Secondary flavors - herbal, floral, earthy notes
+3. Tertiary flavors - oak, vanilla, aged characteristics
+4. Body - weight and texture in the mouth
+5. Acidity - brightness and crispness
+6. Overall - final rating and impressions
 
-For multiple_choice questions: provide 4-5 options specific to this wine.
+Generate ${questionCount} questions total.
+
+For ${userLevel} users:
+${userLevel === 'intro' ? `- Keep questions simple and approachable. Use everyday language.
+- Provide helpful descriptions for each option.
+- Focus on "do you like this?" rather than "what is this?"
+- Avoid wine jargon - use comparisons like "like skim milk vs whole milk" for body` : ''}
+${userLevel === 'intermediate' ? `- Can use some wine terminology.
+- Ask about specific flavor notes.
+- Include questions about why they like/dislike certain characteristics.
+- Start introducing regional characteristics.` : ''}
+${userLevel === 'advanced' ? `- Dive deeper into terroir, winemaking, vintage characteristics.
+- Include nuanced distinctions.
+- Ask about balance, complexity, and aging potential.
+- Challenge them to identify specific characteristics.` : ''}
+
+Make it interactive and conversational. The goal is to help them understand what they like about this wine, not test their knowledge.
+
+For multiple_choice questions: provide 4-5 options specific to this wine type.
 For scale questions: use 1-5 for characteristics, 1-10 for overall rating.
-For text questions: use only for final notes.
+For text questions: use only for final impressions.
 
-Include wineContext field with a brief educational note about what to expect from this specific wine type.`;
+CRITICAL: Frame questions around enjoyment and preference, not identification.
+Good: "How much do you enjoy the fruit flavors?"
+Bad: "Identify the primary fruit aromas."`;
 }
 
-function getUserPrompt(wineInfo: WineRecognitionResult, chapter?: Chapter): string {
+function getUserPrompt(wineInfo: WineRecognitionResult, chapter?: Chapter, userLevel?: TastingLevel): string {
+  const varietal = wineInfo.grapeVarieties?.[0] || 'Unknown';
+
   let prompt = `Generate tasting questions for this wine:
 
 Wine: ${wineInfo.name}
+Varietal: ${varietal}
 Region: ${wineInfo.region}
-Grape Varieties: ${wineInfo.grapeVarieties.join(', ')}
 ${wineInfo.vintage ? `Vintage: ${wineInfo.vintage}` : ''}
 ${wineInfo.producer ? `Producer: ${wineInfo.producer}` : ''}`;
 
@@ -288,13 +381,45 @@ ${chapter.description ? `Description: ${chapter.description}` : ''}
 ${chapter.learningObjectives ? `Learning Objectives: ${JSON.stringify(chapter.learningObjectives)}` : ''}`;
   }
 
+  // Add varietal-specific guidance
   prompt += `
 
-Generate questions with options specifically tailored to characteristics typical of this wine and region. For example:
-- For a Barolo, aroma options might include "tar and roses", "dried cherry", "truffle"
-- For a Marlborough Sauvignon Blanc, aroma options might include "passion fruit", "gooseberry", "freshly cut grass"
+Include 2-3 questions specific to ${varietal} characteristics:`;
 
-Make the options educational - teach the taster what to look for in this specific wine.`;
+  if (varietal.toLowerCase().includes('sangiovese') || varietal.toLowerCase().includes('chianti')) {
+    prompt += `
+- For Sangiovese, ask about cherry notes, tomato-like acidity, and earthy characteristics.`;
+  } else if (varietal.toLowerCase().includes('pinot noir')) {
+    prompt += `
+- For Pinot Noir, ask about red fruit vs. earth balance, mushroom/forest notes.`;
+  } else if (varietal.toLowerCase().includes('cabernet')) {
+    prompt += `
+- For Cabernet, ask about dark fruit intensity, green/herbal notes, oak influence.`;
+  } else if (varietal.toLowerCase().includes('chardonnay')) {
+    prompt += `
+- For Chardonnay, ask about citrus vs. tropical fruit, oak/butter influence, minerality.`;
+  } else if (varietal.toLowerCase().includes('sauvignon blanc')) {
+    prompt += `
+- For Sauvignon Blanc, ask about citrus, grassy notes, and minerality.`;
+  } else if (varietal.toLowerCase().includes('riesling')) {
+    prompt += `
+- For Riesling, ask about sweetness level, petrol notes, and stone fruit.`;
+  } else {
+    prompt += `
+- Ask about characteristics typical of ${varietal} from ${wineInfo.region || 'this region'}.`;
+  }
+
+  // Add region-specific guidance
+  if (wineInfo.region) {
+    prompt += `
+
+Include 1-2 questions about what makes ${wineInfo.region} wines distinctive.`;
+  }
+
+  prompt += `
+
+Remember: Focus on what the taster ENJOYS about these characteristics, not just identification.
+Frame questions conversationally: "How do you feel about..." rather than "Identify..."`;
 
   return prompt;
 }
