@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { requireAuth } from "./auth";
+import { transcriptionRateLimit } from "../middleware/rateLimiter";
 import OpenAI from "openai";
 import multer from "multer";
 
@@ -35,8 +36,9 @@ export function registerTranscriptionRoutes(app: Express): void {
   /**
    * Transcribe audio to text using Whisper
    * POST /api/transcribe
+   * Rate limited: 5 requests per minute per user
    */
-  app.post("/api/transcribe", requireAuth, audioUpload.single('audio'), async (req: Request, res: Response) => {
+  app.post("/api/transcribe", requireAuth, transcriptionRateLimit, audioUpload.single('audio'), async (req: Request, res: Response) => {
     try {
       if (!openai) {
         return res.status(503).json({

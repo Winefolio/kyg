@@ -3,6 +3,8 @@ import { storage } from "../storage";
 import { validateWineForChapter, getValidationMessage } from "../services/wineValidation";
 import { generateQuestionsForWine, getFallbackQuestions } from "../services/questionGenerator";
 import type { WineRecognitionResult, TastingLevel } from "@shared/schema";
+import { requireAuth, requireAdmin } from "./auth";
+import { aiRateLimit } from "../middleware/rateLimiter";
 
 export function registerJourneyRoutes(app: Express) {
   console.log("🗺️ Registering journey endpoints...");
@@ -175,7 +177,8 @@ export function registerJourneyRoutes(app: Express) {
   });
 
   // Generate AI questions for a chapter tasting
-  app.post("/api/journeys/:journeyId/chapters/:chapterId/questions", async (req, res) => {
+  // Rate limited because it uses OpenAI
+  app.post("/api/journeys/:journeyId/chapters/:chapterId/questions", aiRateLimit, async (req, res) => {
     try {
       const journeyId = parseInt(req.params.journeyId);
       const chapterId = parseInt(req.params.chapterId);
@@ -222,7 +225,8 @@ export function registerJourneyRoutes(app: Express) {
   });
 
   // Combined endpoint: validate wine AND generate questions in one call
-  app.post("/api/journeys/:journeyId/chapters/:chapterId/start-tasting", async (req, res) => {
+  // Rate limited because it uses OpenAI for question generation
+  app.post("/api/journeys/:journeyId/chapters/:chapterId/start-tasting", aiRateLimit, async (req, res) => {
     try {
       const journeyId = parseInt(req.params.journeyId);
       const chapterId = parseInt(req.params.chapterId);
@@ -300,10 +304,11 @@ export function registerJourneyRoutes(app: Express) {
 
   // ============================================
   // ADMIN ROUTES FOR JOURNEY MANAGEMENT
+  // All admin routes require authentication + admin privileges
   // ============================================
 
   // Create a new journey (admin/liaison)
-  app.post("/api/admin/journeys", async (req, res) => {
+  app.post("/api/admin/journeys", requireAuth, requireAdmin, async (req, res) => {
     try {
       const journeyData = req.body;
 
@@ -320,7 +325,7 @@ export function registerJourneyRoutes(app: Express) {
   });
 
   // Update a journey (admin/liaison)
-  app.put("/api/admin/journeys/:journeyId", async (req, res) => {
+  app.put("/api/admin/journeys/:journeyId", requireAuth, requireAdmin, async (req, res) => {
     try {
       const journeyId = parseInt(req.params.journeyId);
       const updates = req.body;
@@ -342,7 +347,7 @@ export function registerJourneyRoutes(app: Express) {
   });
 
   // Delete a journey (admin/liaison)
-  app.delete("/api/admin/journeys/:journeyId", async (req, res) => {
+  app.delete("/api/admin/journeys/:journeyId", requireAuth, requireAdmin, async (req, res) => {
     try {
       const journeyId = parseInt(req.params.journeyId);
 
@@ -359,7 +364,7 @@ export function registerJourneyRoutes(app: Express) {
   });
 
   // Create a chapter (admin/liaison)
-  app.post("/api/admin/journeys/:journeyId/chapters", async (req, res) => {
+  app.post("/api/admin/journeys/:journeyId/chapters", requireAuth, requireAdmin, async (req, res) => {
     try {
       const journeyId = parseInt(req.params.journeyId);
       const chapterData = req.body;
@@ -385,7 +390,7 @@ export function registerJourneyRoutes(app: Express) {
   });
 
   // Update a chapter (admin/liaison)
-  app.put("/api/admin/chapters/:chapterId", async (req, res) => {
+  app.put("/api/admin/chapters/:chapterId", requireAuth, requireAdmin, async (req, res) => {
     try {
       const chapterId = parseInt(req.params.chapterId);
       const updates = req.body;
@@ -407,7 +412,7 @@ export function registerJourneyRoutes(app: Express) {
   });
 
   // Delete a chapter (admin/liaison)
-  app.delete("/api/admin/chapters/:chapterId", async (req, res) => {
+  app.delete("/api/admin/chapters/:chapterId", requireAuth, requireAdmin, async (req, res) => {
     try {
       const chapterId = parseInt(req.params.chapterId);
 
@@ -424,7 +429,7 @@ export function registerJourneyRoutes(app: Express) {
   });
 
   // Get all journeys with chapters (admin view - includes unpublished)
-  app.get("/api/admin/journeys", async (req, res) => {
+  app.get("/api/admin/journeys", requireAuth, requireAdmin, async (req, res) => {
     try {
       const journeys = await storage.getAllJourneysWithChapters();
       res.json({ journeys });

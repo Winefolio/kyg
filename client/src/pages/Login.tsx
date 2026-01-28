@@ -18,8 +18,21 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Get redirect URL from query params
-  const redirectTo = new URLSearchParams(search).get("redirect");
+  // Get redirect URL from query params with security validation
+  const rawRedirect = new URLSearchParams(search).get("redirect");
+
+  // Validate redirect URL to prevent open redirect attacks
+  // Only allow relative paths starting with / (not // which would be protocol-relative)
+  const validateRedirect = (url: string | null): string | null => {
+    if (!url) return null;
+    // Only allow paths starting with single / (not // or external URLs)
+    if (url.startsWith('/') && !url.startsWith('//') && !url.includes(':')) {
+      return url;
+    }
+    return null; // Invalid redirect, will fallback to /home
+  };
+
+  const redirectTo = validateRedirect(rawRedirect);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

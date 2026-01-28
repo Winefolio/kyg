@@ -106,6 +106,31 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   next();
 }
 
+// Admin email whitelist - in production, this should be from database or env var
+const ADMIN_EMAILS = new Set([
+  process.env.ADMIN_EMAIL, // Primary admin from env
+  // Add additional admin emails here or load from database
+].filter(Boolean));
+
+/**
+ * Middleware to require admin privileges
+ * Must be used after requireAuth
+ */
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  if (!req.session?.userId || !req.session?.userEmail) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  // Check if user email is in admin list
+  if (!ADMIN_EMAILS.has(req.session.userEmail)) {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+
+  next();
+}
+
 /**
  * Register auth routes
  */

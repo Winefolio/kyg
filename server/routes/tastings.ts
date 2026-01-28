@@ -1,8 +1,9 @@
 import type { Express, Request, Response } from "express";
-import { db } from "../db";
+import { db, sql as pgClient } from "../db";
 import { tastings, users, insertTastingSchema, type TastingLevel, type TastingResponses } from "@shared/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { requireAuth } from "./auth";
+import { aiRateLimit } from "../middleware/rateLimiter";
 import { attachCharacteristicsToTasting } from "../wine-intelligence";
 import { generateNextBottleRecommendations } from "../openai-client";
 
@@ -51,23 +52,25 @@ async function checkLevelUpEligibility(userId: number): Promise<{
 
 /**
  * Increment user's tasting count and check level-up eligibility
+ * Uses atomic update to prevent race conditions
  */
 async function incrementTastingCount(userId: number): Promise<void> {
+  // Atomic update: increment count and check threshold in a single query
+  // This prevents race conditions where multiple requests could both pass the threshold
   await db
     .update(users)
     .set({
-      tastingsCompleted: sql`${users.tastingsCompleted} + 1`
+      tastingsCompleted: sql`${users.tastingsCompleted} + 1`,
+      // Set levelUpPromptEligible if reaching threshold (atomic check)
+      levelUpPromptEligible: sql`
+        CASE
+          WHEN ${users.tastingLevel} = 'intro' AND ${users.tastingsCompleted} + 1 >= 10 THEN true
+          WHEN ${users.tastingLevel} = 'intermediate' AND ${users.tastingsCompleted} + 1 >= 25 THEN true
+          ELSE ${users.levelUpPromptEligible}
+        END
+      `
     })
     .where(eq(users.id, userId));
-
-  // Check if user should be marked eligible for level-up
-  const eligibility = await checkLevelUpEligibility(userId);
-  if (eligibility.eligible) {
-    await db
-      .update(users)
-      .set({ levelUpPromptEligible: true })
-      .where(eq(users.id, userId));
-  }
 }
 
 /**
@@ -257,7 +260,8 @@ function generateRecommendations(prefs: any): WineRecommendation[] {
  */
 export function registerTastingsRoutes(app: Express): void {
   // Create a new tasting (authenticated)
-  app.post("/api/solo/tastings", requireAuth, async (req: Request, res: Response) => {
+  // Rate limited because it triggers AI (wine characteristics + recommendations)
+  app.post("/api/solo/tastings", requireAuth, aiRateLimit, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId;
       if (!userId) {
@@ -528,6 +532,7 @@ export function registerTastingsRoutes(app: Express): void {
   });
 
   // Accept level-up (authenticated)
+  // Uses atomic conditional update to prevent race conditions
   app.post("/api/solo/level/upgrade", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId;
@@ -535,25 +540,33 @@ export function registerTastingsRoutes(app: Express): void {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
-      const levelUpStatus = await checkLevelUpEligibility(userId);
+      // Atomic conditional update: only upgrade if eligible and update in single query
+      // This prevents double level-ups from race conditions
+      const result = await db
+        .update(users)
+        .set({
+          tastingLevel: sql`
+            CASE
+              WHEN ${users.levelUpPromptEligible} = true AND ${users.tastingLevel} = 'intro' THEN 'intermediate'
+              WHEN ${users.levelUpPromptEligible} = true AND ${users.tastingLevel} = 'intermediate' THEN 'advanced'
+              ELSE ${users.tastingLevel}
+            END
+          `,
+          levelUpPromptEligible: false
+        })
+        .where(sql`${users.id} = ${userId} AND ${users.levelUpPromptEligible} = true`)
+        .returning();
 
-      if (!levelUpStatus.eligible || !levelUpStatus.nextLevel) {
+      if (result.length === 0) {
         return res.status(400).json({ error: "Not eligible for level-up" });
       }
 
-      // Upgrade the user's level
-      await db
-        .update(users)
-        .set({
-          tastingLevel: levelUpStatus.nextLevel,
-          levelUpPromptEligible: false
-        })
-        .where(eq(users.id, userId));
+      const updatedUser = result[0];
 
       return res.json({
         success: true,
-        newLevel: levelUpStatus.nextLevel,
-        message: `Congratulations! You've leveled up to ${levelUpStatus.nextLevel}!`
+        newLevel: updatedUser.tastingLevel,
+        message: `Congratulations! You've leveled up to ${updatedUser.tastingLevel}!`
       });
     } catch (error) {
       console.error("Error upgrading level:", error);
