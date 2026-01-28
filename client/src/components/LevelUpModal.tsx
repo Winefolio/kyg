@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Sparkles, ArrowUp, X } from "lucide-react";
+import { motion } from "framer-motion";
+import { Trophy, Sparkles, ArrowUp } from "lucide-react";
 import {
   Dialog,
   DialogContent,

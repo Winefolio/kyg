@@ -1,4 +1,5 @@
 import { openai } from './lib/openai';
+import { sanitizeForPrompt, sanitizeWineInfo, sanitizeTastingText } from './lib/sanitize';
 
 export interface TextAnalysisResult {
   sentiment: 'positive' | 'neutral' | 'negative';
@@ -50,9 +51,13 @@ export async function analyzeSingleTextSentiment(
       };
     }
 
-    const prompt = `Analyze the sentiment of the following wine tasting note for the question "${questionContext}":
+    // P1-004: Sanitize user input before prompt interpolation
+    const sanitizedQuestion = sanitizeForPrompt(questionContext, 100);
+    const sanitizedText = sanitizeTastingText(textContent);
 
-Text: "${textContent}"
+    const prompt = `Analyze the sentiment of the following wine tasting note for the question "${sanitizedQuestion}":
+
+Text: "${sanitizedText}"
 
 Please provide:
 1. Overall sentiment (positive, neutral, or negative)
@@ -319,9 +324,13 @@ async function analyzeTextForSummary(textContent: string, questionContext: strin
   }
 
   try {
-    const prompt = `Analyze the following wine tasting responses for the question "${questionContext}":
+    // P1-004: Sanitize user input before prompt interpolation
+    const sanitizedQuestion = sanitizeForPrompt(questionContext, 100);
+    const sanitizedText = sanitizeTastingText(textContent);
 
-"${textContent}"
+    const prompt = `Analyze the following wine tasting responses for the question "${sanitizedQuestion}":
+
+"${sanitizedText}"
 
 Please provide a comprehensive written summary that captures the essence of these responses. Focus on:
 
@@ -584,16 +593,28 @@ export async function generateNextBottleRecommendations(
   }
 
   try {
-    const prompt = `A user just tasted ${tastedWine.wineName} (${tastedWine.grapeVariety || 'Unknown varietal'} from ${tastedWine.wineRegion || 'Unknown region'}).
+    // P1-004: Sanitize all user-controlled input
+    const sanitized = sanitizeWineInfo({
+      name: tastedWine.wineName,
+      region: tastedWine.wineRegion,
+      grapeVariety: tastedWine.grapeVariety,
+      wineType: tastedWine.wineType
+    });
+    const sanitizedNotes = sanitizeTastingText(responses.overall?.notes);
+    const sanitizedFlavors = (responses.taste?.flavors || [])
+      .slice(0, 10)
+      .map(f => sanitizeForPrompt(String(f), 30));
+
+    const prompt = `A user just tasted ${sanitized.name} (${sanitized.grapeVariety} from ${sanitized.region}).
 
 Their tasting responses:
 - Sweetness: ${responses.taste?.sweetness || 'Not recorded'}/5
 - Acidity: ${responses.taste?.acidity || 'Not recorded'}/5
 - Tannins: ${responses.taste?.tannins || 'Not recorded'}/5
 - Body: ${responses.taste?.body || 'Not recorded'}/5
-- Flavors: ${JSON.stringify(responses.taste?.flavors || [])}
+- Flavors: ${JSON.stringify(sanitizedFlavors)}
 - Overall rating: ${responses.overall?.rating || 'Not recorded'}/10
-- Notes: "${responses.overall?.notes || 'No notes provided'}"
+- Notes: "${sanitizedNotes || 'No notes provided'}"
 
 Based on what they enjoyed (and didn't enjoy), suggest 3 wines to try next:
 
