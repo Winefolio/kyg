@@ -1,12 +1,7 @@
-import OpenAI from 'openai';
 import { db } from './db';
 import { wineCharacteristicsCache, tastings, type WineCharacteristicsData } from '@shared/schema';
 import { eq } from 'drizzle-orm';
-
-// Initialize OpenAI client
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+import { openai } from './lib/openai';
 
 /**
  * Normalize wine information into a consistent cache key
