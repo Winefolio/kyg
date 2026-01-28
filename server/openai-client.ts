@@ -95,7 +95,6 @@ Respond in JSON format only:
         }
       ],
       max_completion_tokens: 350,
-      temperature: 0.2, // Very low temperature for consistent analysis
       response_format: { type: "json_object" } // Ensure JSON response
     });
 
@@ -373,7 +372,6 @@ Respond in JSON format only:
         }
       ],
       max_completion_tokens: 600, // Increased for comprehensive summaries
-      temperature: 0.3, // Balanced for creative yet consistent summaries
       response_format: { type: "json_object" }
     });
 
@@ -671,7 +669,6 @@ Be specific about what to ask for at a wine shop.`
         }
       ],
       max_completion_tokens: 1000,
-      temperature: 0.7,
       response_format: { type: 'json_object' }
     });
 
