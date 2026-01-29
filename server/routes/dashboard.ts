@@ -111,6 +111,10 @@ export function registerDashboardRoutes(app: Express) {
         return res.status(400).json({ message: "Email parameter is required" });
       }
 
+      // Get user for level-aware insights
+      const user = await storage.getUserByEmail(email);
+      const userLevel = user?.tastingLevel || 'intro';
+
       // Call the new optimized method to get all data at once
       const profileData = await storage.getUserTasteProfileData(email);
 
@@ -119,9 +123,10 @@ export function registerDashboardRoutes(app: Express) {
       }
 
       const { scores, dashboardData } = profileData;
+      const totalWines = scores?.length || 0;
 
       // Generate taste profile analysis with the efficiently fetched data
-      const tasteProfile = await generateTasteProfileAnalysis(scores, dashboardData);
+      const tasteProfile = await generateTasteProfileAnalysis(scores, dashboardData, userLevel, totalWines);
 
       res.json(tasteProfile);
     } catch (error) {
@@ -595,10 +600,10 @@ export function registerDashboardRoutes(app: Express) {
 
 
 // Helper functions for generating enhanced dashboard data
-async function generateTasteProfileAnalysis(wines: any[], dashboardData: any) {
+async function generateTasteProfileAnalysis(wines: any[], dashboardData: any, userLevel: string = 'intro', totalWines: number = 0) {
   const redWines = wines.filter(w => w.wineType === 'red');
   const whiteWines = wines.filter(w => w.wineType === 'white');
-  
+
   // Analyze red wine preferences
   const redProfile = analyzeWineTypeProfile(redWines, 'red');
   const whiteProfile = analyzeWineTypeProfile(whiteWines, 'white');
@@ -614,7 +619,7 @@ async function generateTasteProfileAnalysis(wines: any[], dashboardData: any) {
   let redSommelierSummary: string | undefined;
   let whiteSommelierSummary: string | undefined;
   try {
-    const summaries = await generateWineProfileSummaries(redWineData, whiteWineData);
+    const summaries = await generateWineProfileSummaries(redWineData, whiteWineData, userLevel, totalWines);
     redSommelierSummary = summaries.redSummary;
     whiteSommelierSummary = summaries.whiteSummary;
   } catch (error) {
@@ -770,7 +775,9 @@ function generateLegacySommelierTips(dashboardData: any, wines: any[]) {
 
 async function generateWineProfileSummaries(
   redWineTraits: any,
-  whiteWineTraits: any
+  whiteWineTraits: any,
+  userLevel: string = 'intro',
+  totalWines: number = 0
 ): Promise<{ redSummary: string; whiteSummary: string }> {
   if (!openai || !process.env.OPENAI_API_KEY) {
     console.warn("⚠️  OpenAI not configured for wine profile summaries");
@@ -794,6 +801,8 @@ async function generateWineProfileSummaries(
     }
 
     const prompt = promptTemplate
+      .replace('{userLevel}', userLevel)
+      .replace('{totalWines}', totalWines.toString())
       .replace('{red_preferences}', JSON.stringify(redWineTraits, null, 2))
       .replace('{white_preferences}', JSON.stringify(whiteWineTraits, null, 2));
 
