@@ -3558,7 +3558,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPackageWineFromDashboard(wine: InsertPackageWine): Promise<PackageWine> {
-    // Get the next position for this package
+    // Get the next position for this package (read outside transaction is safe)
     const existingWines = await this.getPackageWines(wine.packageId);
     const nextPosition = existingWines.length + 1;
 
@@ -3580,61 +3580,91 @@ export class DatabaseStorage implements IStorage {
       discussionQuestions: wine.discussionQuestions || []
     };
 
-    const [newWine] = await db.insert(packageWines).values(wineData).returning();
+    // Use transaction to ensure wine and all slides are created atomically
+    return db.transaction(async (tx) => {
+      const [newWine] = await tx.insert(packageWines).values(wineData).returning();
 
-    // Create wine introduction slide with wine-specific information
-    await this.createSlide({
-      packageWineId: newWine.id,
-      position: 1,
-      type: "interlude",
-      section_type: "intro",
-      payloadJson: {
-        title: `Meet ${newWine.wineName}`,
-        description: newWine.wineDescription || `Discover the unique characteristics of this exceptional wine.`,
-        wine_name: newWine.wineName,
-        wine_image: newWine.wineImageUrl || "",
-        wine_type: newWine.wineType || "",
-        wine_region: newWine.region || "",
-        wine_vintage: newWine.vintage || "",
-        is_welcome: true,
-        is_wine_intro: true
-      },
-    });
+      // Calculate global position base for this wine
+      const wineBasePosition = newWine.position * 1000;
 
-    // Create default slide templates for this wine
-    const slideTemplates = this.getDefaultSlideTemplates();
-    let position = 2; // Start after the wine intro slide
-
-    for (const template of slideTemplates.slice(1)) { // Skip the first template (intro) since we already created wine intro
-      // Add wine context to all slides while preserving template structure
-      const payloadJson = {
-        ...template.payloadJson,
-        // Add wine context as additional fields without overwriting existing structure
-        wine_name: newWine.wineName,
-        wine_image: newWine.wineImageUrl || "",
-        wine_type: newWine.wineType || ""
+      // Helper to calculate global position for a slide
+      const calculateGlobalPosition = (sectionType: string, isWineIntro: boolean, localPosition: number): number => {
+        let sectionOffset = 0;
+        if (sectionType === 'intro') {
+          sectionOffset = isWineIntro ? 10 : 50;
+        } else if (sectionType === 'deep_dive' || sectionType === 'tasting') {
+          sectionOffset = 100;
+        } else if (sectionType === 'ending' || sectionType === 'conclusion') {
+          sectionOffset = 200;
+        }
+        // Add local position offset within section (10 per slide)
+        return wineBasePosition + sectionOffset + (localPosition * 10);
       };
 
-      // Validate payload before creating slide
-      if (!payloadJson || Object.keys(payloadJson).length === 0) {
-        console.error('[SLIDE_CREATE_ERROR] Empty payload detected for slide:', {
+      // Create wine introduction slide with wine-specific information
+      await tx.insert(slides).values({
+        packageWineId: newWine.id,
+        position: 1,
+        globalPosition: calculateGlobalPosition('intro', true, 0),
+        type: "interlude",
+        section_type: "intro",
+        payloadJson: {
+          title: `Meet ${newWine.wineName}`,
+          description: newWine.wineDescription || `Discover the unique characteristics of this exceptional wine.`,
+          wine_name: newWine.wineName,
+          wine_image: newWine.wineImageUrl || "",
+          wine_type: newWine.wineType || "",
+          wine_region: newWine.region || "",
+          wine_vintage: newWine.vintage || "",
+          is_welcome: true,
+          is_wine_intro: true
+        },
+      });
+
+      // Create default slide templates for this wine
+      const slideTemplates = this.getDefaultSlideTemplates();
+      let localPosition = 2; // Start after the wine intro slide
+
+      // Track position within each section for global position calculation
+      const sectionCounters: Record<string, number> = { intro: 1, deep_dive: 0, ending: 0 };
+
+      for (const template of slideTemplates.slice(1)) { // Skip the first template (intro) since we already created wine intro
+        // Add wine context to all slides while preserving template structure
+        const payloadJson = {
+          ...template.payloadJson,
+          // Add wine context as additional fields without overwriting existing structure
+          wine_name: newWine.wineName,
+          wine_image: newWine.wineImageUrl || "",
+          wine_type: newWine.wineType || ""
+        };
+
+        // Validate payload before creating slide
+        if (!payloadJson || Object.keys(payloadJson).length === 0) {
+          console.error('[SLIDE_CREATE_ERROR] Empty payload detected for slide:', {
+            type: template.type,
+            section_type: template.section_type,
+            position: localPosition
+          });
+          continue; // Skip this slide to prevent empty data
+        }
+
+        const sectionType = (template.section_type || 'intro') as string;
+        const sectionKey = (sectionType === 'tasting') ? 'deep_dive' :
+                          (sectionType === 'conclusion') ? 'ending' : sectionType;
+        sectionCounters[sectionKey] = (sectionCounters[sectionKey] || 0) + 1;
+
+        await tx.insert(slides).values({
+          packageWineId: newWine.id,
+          position: localPosition++,
+          globalPosition: calculateGlobalPosition(sectionType, false, sectionCounters[sectionKey]),
           type: template.type,
           section_type: template.section_type,
-          position
+          payloadJson: payloadJson,
         });
-        continue; // Skip this slide to prevent empty data
       }
 
-      await this.createSlide({
-        packageWineId: newWine.id,
-        position: position++,
-        type: template.type,
-        section_type: template.section_type,
-        payloadJson: payloadJson,
-      });
-    }
-
-    return newWine;
+      return newWine;
+    });
   }
 
   async updatePackageWine(id: string, data: Partial<InsertPackageWine>): Promise<PackageWine> {
@@ -3647,27 +3677,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePackageWine(id: string): Promise<void> {
-    // Get the wine to be deleted to know its package and position
-    const wineToDelete = await db.select().from(packageWines)
-      .where(eq(packageWines.id, id)).limit(1);
+    await db.transaction(async (tx) => {
+      // Get the wine to be deleted to know its package and position
+      const wineToDelete = await tx.select().from(packageWines)
+        .where(eq(packageWines.id, id)).limit(1);
 
-    if (wineToDelete.length === 0) return;
+      if (wineToDelete.length === 0) return;
 
-    const { packageId, position } = wineToDelete[0];
+      const { packageId, position } = wineToDelete[0];
 
-    // First delete associated slides
-    await db.delete(slides).where(eq(slides.packageWineId, id));
+      // First delete associated slides
+      await tx.delete(slides).where(eq(slides.packageWineId, id));
 
-    // Then delete the wine
-    await db.delete(packageWines).where(eq(packageWines.id, id));
+      // Then delete the wine
+      await tx.delete(packageWines).where(eq(packageWines.id, id));
 
-    // Update positions of wines that came after the deleted one
-    await db.update(packageWines)
-      .set({ position: sql`position - 1` })
-      .where(and(
-        eq(packageWines.packageId, packageId),
-        gt(packageWines.position, position)
-      ));
+      // Update positions of wines that came after the deleted one
+      await tx.update(packageWines)
+        .set({ position: sql`position - 1` })
+        .where(and(
+          eq(packageWines.packageId, packageId),
+          gt(packageWines.position, position)
+        ));
+    });
   }
 
   async updateSlide(id: string, data: Partial<InsertSlide>): Promise<Slide> {
@@ -3702,21 +3734,23 @@ export class DatabaseStorage implements IStorage {
 
   // Session Wine Selections - Host wine selection feature
   async createSessionWineSelections(sessionId: string, selections: InsertSessionWineSelection[]): Promise<SessionWineSelection[]> {
-    // First delete existing selections for this session
-    await this.deleteSessionWineSelections(sessionId);
+    return db.transaction(async (tx) => {
+      // First delete existing selections for this session
+      await tx.delete(sessionWineSelections).where(eq(sessionWineSelections.sessionId, sessionId));
 
-    // Insert new selections
-    const insertData = selections.map(selection => ({
-      ...selection,
-      sessionId
-    }));
+      // Insert new selections
+      const insertData = selections.map(selection => ({
+        ...selection,
+        sessionId
+      }));
 
-    const newSelections = await db
-      .insert(sessionWineSelections)
-      .values(insertData)
-      .returning();
+      const newSelections = await tx
+        .insert(sessionWineSelections)
+        .values(insertData)
+        .returning();
 
-    return newSelections;
+      return newSelections;
+    });
   }
 
   async getSessionWineSelections(sessionId: string): Promise<(SessionWineSelection & { wine: PackageWine })[]> {

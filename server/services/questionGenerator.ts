@@ -210,7 +210,7 @@ export async function generateQuestionsForWine(
 
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5-mini', // Fast, cheap model for question generation
+      model: 'gpt-5.2', // Complex reasoning for quality questions
       messages: [
         {
           role: 'system',
