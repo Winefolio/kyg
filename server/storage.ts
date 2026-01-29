@@ -5837,11 +5837,15 @@ export class DatabaseStorage implements IStorage {
 export async function generateSommelierTips(email: string): Promise<SommelierTips> {
   try {
     console.log(`🍷 Generating sommelier tips for: ${email}`);
-    
+
     // 1. Get user's wine preferences from their responses
     const userDashboardData = await storage.getUserDashboardData(email);
     const userWineScores = await storage.getUserWineScores(email);
-    
+
+    // Get user's tasting level for personalized insights
+    const user = await storage.getUserByEmail(email);
+    const userLevel = user?.tastingLevel || 'intro';
+
     // 2. Get sommelier feedback from previous tasting sessions
     const sommelierFeedback = await storage.getUserSommelierFeedback(email);
     
@@ -5897,6 +5901,7 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
       // Step 2: Replace placeholders with user data
       const MAX_TOKENS = 128000; // gpt-4o → 128k tokens max
       let prompt = templateContent
+        .replace('{userLevel}', userLevel)
         .replace('{totalWines}', totalWines.toString())
         .replace('{avgRating}', avgRating.toFixed(1))
         .replace('{topRegion}', topRegion)
@@ -5935,17 +5940,26 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
         messages: [
           {
             role: "system",
-            content: `
-              You are an expert wine sommelier. Do not include any text outside the JSON response.
-              Write in second person (you/your) addressing the user directly.
-              {
-                "preferenceProfile": "overall summary",
-                "redDescription": "red wine preferences",
-                "whiteDescription": "white wine preferences",
-                "questions": ["question1", "question2", "question3", "question4"],
-                "priceGuidance": "price guidance"
-              }
-              `
+            content: `You are a friendly sommelier helping someone feel confident about wine. Your job is to give them memorable things they can say that make them sound knowledgeable to friends - not to experts, just to normal people.
+
+Give them:
+- A wine identity they can claim ("I'm a bold red person")
+- ONE grape for red, ONE grape for white they can call "theirs"
+- Simple phrases they can actually say at a wine shop or restaurant
+- Practical price guidance
+
+Write in second person (you/your). Sound like a knowledgeable friend, not a lecturer.
+Make every insight feel like a revelation, even if they've only done one tasting.
+Never hedge with "limited data" or "need more tastings" - treat their choices as meaningful signals.
+
+Respond ONLY with JSON in this exact format:
+{
+  "preferenceProfile": "2-3 sentences describing their palate like a wine-savvy friend would",
+  "redDescription": "their red wine identity + one grape + one region + what to say",
+  "whiteDescription": "their white wine identity + one grape + one region + what to say",
+  "questions": ["natural phrase 1", "natural phrase 2", "natural phrase 3", "natural phrase 4"],
+  "priceGuidance": "simple, practical price advice"
+}`
           },
           {
             role: "user",
