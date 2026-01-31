@@ -273,7 +273,7 @@ export default function PackageEditor() {
       console.error('Failed to update comparable state:', error);
         toast({
             title: "Error updating comparable state",
-            description: error.message,
+            description: error instanceof Error ? error.message : "Unknown error",
             variant: "destructive"
         });
     }

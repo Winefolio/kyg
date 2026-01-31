@@ -601,6 +601,15 @@ export default function TastingSession() {
         isLastSlideOfSection
     } = processedSlidesData;
 
+    // Safely correct out-of-bounds slide index via effect (not during render)
+    useEffect(() => {
+        if (slides && slides.length > 0 &&
+            (currentSlideIndex >= slides.length || currentSlideIndex < 0)) {
+            const validIndex = Math.min(Math.max(0, currentSlideIndex), slides.length - 1);
+            setCurrentSlideIndex(validIndex);
+        }
+    }, [slides?.length, currentSlideIndex]);
+
     // Wine completion tracking function - defined as callback to follow Rules of Hooks
     const checkWineCompletion = useCallback((wineId: string): boolean => {
         if (!wineId || !slides || slides.length === 0) {
@@ -1070,10 +1079,8 @@ export default function TastingSession() {
         return <LoadingOverlay isVisible={true} message="Loading slides..."/>;
     }
 
-    // Handle case where currentSlideIndex is out of bounds
+    // Handle case where currentSlideIndex is out of bounds (correction happens via useEffect)
     if (currentSlideIndex >= slides.length || currentSlideIndex < 0) {
-        // Reset to valid index instead of showing loading
-        setCurrentSlideIndex(Math.min(currentSlideIndex, slides.length - 1));
         return <LoadingOverlay isVisible={true} message="Loading..."/>;
     }
 

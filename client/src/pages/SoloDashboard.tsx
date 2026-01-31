@@ -144,7 +144,7 @@ export default function SoloDashboard() {
   // Loading state
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
       </div>
     );
@@ -153,19 +153,21 @@ export default function SoloDashboard() {
   // Login view
   if (view === 'login') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-md"
         >
-          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl">
+          <div className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 shadow-2xl">
             <div className="text-center mb-8">
-              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                <Wine className="w-10 h-10 text-white" />
-              </div>
-              <h1 className="text-2xl font-bold text-white mb-2">Know Your Grape</h1>
-              <p className="text-white/60">Your personal wine tasting journal</p>
+              <img
+                src="/logo-cata.svg"
+                alt="Cata - Wine Tasting"
+                className="w-20 h-20 mx-auto mb-4"
+              />
+              <h1 className="text-2xl font-bold text-white mb-2">Cata</h1>
+              <p className="text-white/60">Your personal sommelier</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4">
@@ -175,7 +177,7 @@ export default function SoloDashboard() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
-                  className="bg-white/10 border-white/20 text-white placeholder:text-white/40 py-3"
+                  className="bg-white/10 border-white/10 text-white placeholder:text-white/40 py-3"
                   required
                 />
               </div>
@@ -232,14 +234,15 @@ export default function SoloDashboard() {
 
   // Dashboard view
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-primary">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-black/30 backdrop-blur-xl border-b border-white/10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Wine className="w-6 h-6 text-purple-400" />
-            <span className="text-white font-semibold">Know Your Grape</span>
-          </div>
+          <img
+            src="/logo-cata-horizontal.svg"
+            alt="Cata"
+            className="h-8 w-auto"
+          />
           <div className="flex items-center gap-3">
             <span className="text-white/60 text-sm hidden sm:block">
               {authData?.user?.email}
@@ -285,7 +288,7 @@ export default function SoloDashboard() {
 
         {/* Preferences Summary */}
         {preferencesData && preferencesData.tastingCount > 0 && (
-          <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl p-6 mb-8 border border-white/20">
+          <div className="bg-white/5 backdrop-blur-md rounded-2xl p-6 mb-8 border border-white/10">
             <h2 className="text-lg font-semibold text-white mb-3">Your Taste Profile</h2>
             <p className="text-white/80">{preferencesData.summary}</p>
           </div>
@@ -307,7 +310,7 @@ export default function SoloDashboard() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   onClick={() => setLocation(`/solo/tasting/${tasting.id}`)}
-                  className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-xl p-4 border border-white/20 cursor-pointer hover:bg-white/15 transition-colors"
+                  className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10 cursor-pointer hover:bg-white/15 transition-colors"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -354,7 +357,7 @@ export default function SoloDashboard() {
               <Button
                 onClick={() => setView('wine-entry')}
                 variant="outline"
-                className="border-white/20 text-white hover:bg-white/10"
+                className="border-white/10 text-white hover:bg-white/10"
               >
                 Start Your First Tasting
               </Button>
