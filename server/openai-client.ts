@@ -1,13 +1,5 @@
-import OpenAI from 'openai';
-
-// Initialize OpenAI client (optional - only if API key is set)
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
-
-if (!openai) {
-  console.warn("⚠️  OPENAI_API_KEY not set in openai-client.ts - AI features disabled");
-}
+import { openai } from './lib/openai';
+import { sanitizeForPrompt, sanitizeWineInfo, sanitizeTastingText } from './lib/sanitize';
 
 export interface TextAnalysisResult {
   sentiment: 'positive' | 'neutral' | 'negative';
@@ -59,9 +51,13 @@ export async function analyzeSingleTextSentiment(
       };
     }
 
-    const prompt = `Analyze the sentiment of the following wine tasting note for the question "${questionContext}":
+    // P1-004: Sanitize user input before prompt interpolation
+    const sanitizedQuestion = sanitizeForPrompt(questionContext, 100);
+    const sanitizedText = sanitizeTastingText(textContent);
 
-Text: "${textContent}"
+    const prompt = `Analyze the sentiment of the following wine tasting note for the question "${sanitizedQuestion}":
+
+Text: "${sanitizedText}"
 
 Please provide:
 1. Overall sentiment (positive, neutral, or negative)
@@ -99,7 +95,6 @@ Respond in JSON format only:
         }
       ],
       max_completion_tokens: 350,
-      temperature: 0.2, // Very low temperature for consistent analysis
       response_format: { type: "json_object" } // Ensure JSON response
     });
 
@@ -328,9 +323,13 @@ async function analyzeTextForSummary(textContent: string, questionContext: strin
   }
 
   try {
-    const prompt = `Analyze the following wine tasting responses for the question "${questionContext}":
+    // P1-004: Sanitize user input before prompt interpolation
+    const sanitizedQuestion = sanitizeForPrompt(questionContext, 100);
+    const sanitizedText = sanitizeTastingText(textContent);
 
-"${textContent}"
+    const prompt = `Analyze the following wine tasting responses for the question "${sanitizedQuestion}":
+
+"${sanitizedText}"
 
 Please provide a comprehensive written summary that captures the essence of these responses. Focus on:
 
@@ -373,7 +372,6 @@ Respond in JSON format only:
         }
       ],
       max_completion_tokens: 600, // Increased for comprehensive summaries
-      temperature: 0.3, // Balanced for creative yet consistent summaries
       response_format: { type: "json_object" }
     });
 
@@ -548,4 +546,233 @@ export function getFallbackSentimentAnalysis(textContent: string): TextAnalysisR
  */
 export function isOpenAIConfigured(): boolean {
   return !!process.env.OPENAI_API_KEY;
+}
+
+// ===========================================
+// NEXT BOTTLE RECOMMENDATIONS (Solo Tastings)
+// ===========================================
+
+import type { TastingRecommendation, TastingResponses, PriceRange } from "@shared/schema";
+
+interface WineContext {
+  wineName: string;
+  grapeVariety?: string;
+  wineRegion?: string;
+  wineType?: string;
+}
+
+// Interface for raw recommendation from OpenAI response (before validation)
+interface RawRecommendation {
+  type?: string;
+  wineName?: string;
+  reason?: string;
+  priceRange?: {
+    min?: number;
+    max?: number;
+    currency?: string;
+  };
+  askFor?: string;
+}
+
+interface RecommendationsResponse {
+  recommendations?: RawRecommendation[];
+}
+
+/**
+ * Generate AI-powered next bottle recommendations based on user's tasting responses
+ */
+export async function generateNextBottleRecommendations(
+  tastedWine: WineContext,
+  responses: TastingResponses
+): Promise<TastingRecommendation[]> {
+  if (!openai) {
+    console.warn('OpenAI not configured - returning default recommendations');
+    return getDefaultRecommendations(tastedWine);
+  }
+
+  try {
+    // P1-004: Sanitize all user-controlled input
+    const sanitized = sanitizeWineInfo({
+      name: tastedWine.wineName,
+      region: tastedWine.wineRegion,
+      grapeVariety: tastedWine.grapeVariety,
+      wineType: tastedWine.wineType
+    });
+    const sanitizedNotes = sanitizeTastingText(responses.overall?.notes);
+    const sanitizedFlavors = (responses.taste?.flavors || [])
+      .slice(0, 10)
+      .map(f => sanitizeForPrompt(String(f), 30));
+
+    const prompt = `A user just tasted ${sanitized.name} (${sanitized.grapeVariety} from ${sanitized.region}).
+
+Their tasting responses:
+- Sweetness: ${responses.taste?.sweetness || 'Not recorded'}/5
+- Acidity: ${responses.taste?.acidity || 'Not recorded'}/5
+- Tannins: ${responses.taste?.tannins || 'Not recorded'}/5
+- Body: ${responses.taste?.body || 'Not recorded'}/5
+- Flavors: ${JSON.stringify(sanitizedFlavors)}
+- Overall rating: ${responses.overall?.rating || 'Not recorded'}/10
+- Notes: "${sanitizedNotes || 'No notes provided'}"
+
+Based on what they enjoyed (and didn't enjoy), suggest 3 wines to try next:
+
+1. **Similar style** - Another wine they'll likely enjoy for the same reasons
+2. **Step up** - A more interesting/complex version of what they liked
+3. **Exploration** - Something different that might expand their palate
+
+For each recommendation include:
+- Wine name/type (e.g., "Willamette Valley Pinot Noir")
+- Why you're recommending it based on their responses
+- Price range to expect (min and max in USD)
+- What to ask for at a wine shop
+
+Return as JSON with this exact structure:
+{
+  "recommendations": [
+    {
+      "type": "similar",
+      "wineName": "...",
+      "reason": "...",
+      "priceRange": { "min": 15, "max": 30, "currency": "USD" },
+      "askFor": "..."
+    },
+    {
+      "type": "step_up",
+      "wineName": "...",
+      "reason": "...",
+      "priceRange": { "min": 30, "max": 50, "currency": "USD" },
+      "askFor": "..."
+    },
+    {
+      "type": "exploration",
+      "wineName": "...",
+      "reason": "...",
+      "priceRange": { "min": 20, "max": 40, "currency": "USD" },
+      "askFor": "..."
+    }
+  ]
+}`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-5-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a friendly sommelier helping someone discover their next favorite wine.
+
+Your job is to give them specific, actionable recommendations they can actually find and buy:
+- Name real wines or specific grape + region combinations (e.g., "Marlborough Sauvignon Blanc" not just "a white wine")
+- Keep prices realistic and accessible - most recommendations should be $15-35
+- Make "askFor" something natural they could actually say out loud: "Do you have any Malbec from Argentina?" not wine-jargon
+
+For the three recommendation types:
+1. SIMILAR: Something they'll definitely like for the same reasons. Safe, satisfying choice.
+2. STEP UP: A more interesting version - better quality or more character, worth spending a bit more.
+3. EXPLORATION: Something that expands their horizons. New grape OR new region (not both at once). Should feel like an adventure, not a risk.
+
+Base everything on their actual responses - what they rated highly, what flavors they noted, what they said in their notes.
+Make them feel like you really understood what they liked about this wine.`
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_completion_tokens: 1000,
+      response_format: { type: 'json_object' }
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) {
+      console.warn('No content in OpenAI response, using default recommendations');
+      return getDefaultRecommendations(tastedWine);
+    }
+
+    const parsed: RecommendationsResponse = JSON.parse(content);
+
+    if (!parsed.recommendations || !Array.isArray(parsed.recommendations)) {
+      console.warn('Invalid recommendations format, using defaults');
+      return getDefaultRecommendations(tastedWine);
+    }
+
+    // Validate and return recommendations
+    return parsed.recommendations.map((rec: RawRecommendation): TastingRecommendation => ({
+      type: (rec.type && ['similar', 'step_up', 'exploration'].includes(rec.type))
+        ? rec.type as 'similar' | 'step_up' | 'exploration'
+        : 'similar',
+      wineName: rec.wineName || 'Unknown Wine',
+      reason: rec.reason || 'Based on your tasting preferences',
+      priceRange: {
+        min: rec.priceRange?.min || 15,
+        max: rec.priceRange?.max || 30,
+        currency: rec.priceRange?.currency || 'USD'
+      },
+      askFor: rec.askFor || `Ask for ${rec.wineName || 'a similar wine'}`
+    }));
+
+  } catch (error) {
+    console.error('Error generating recommendations:', error);
+    return getDefaultRecommendations(tastedWine);
+  }
+}
+
+/**
+ * Default recommendations when AI is unavailable
+ */
+function getDefaultRecommendations(wine: WineContext): TastingRecommendation[] {
+  const isRed = wine.wineType === 'red' ||
+    ['cabernet', 'pinot noir', 'merlot', 'syrah', 'shiraz', 'nebbiolo', 'sangiovese'].some(
+      v => wine.grapeVariety?.toLowerCase().includes(v)
+    );
+
+  if (isRed) {
+    return [
+      {
+        type: 'similar',
+        wineName: 'Côtes du Rhône Red',
+        reason: 'A versatile red blend with similar fruit-forward character and approachable tannins',
+        priceRange: { min: 12, max: 20, currency: 'USD' },
+        askFor: 'Ask for a Côtes du Rhône red blend, something fruit-forward and easy drinking'
+      },
+      {
+        type: 'step_up',
+        wineName: 'Châteauneuf-du-Pape',
+        reason: 'A more complex version of the Rhône style with depth and aging potential',
+        priceRange: { min: 35, max: 60, currency: 'USD' },
+        askFor: 'Ask for a Châteauneuf-du-Pape, preferably from a recent vintage'
+      },
+      {
+        type: 'exploration',
+        wineName: 'Oregon Pinot Noir',
+        reason: 'Try something lighter and more elegant to explore the other end of the red wine spectrum',
+        priceRange: { min: 20, max: 35, currency: 'USD' },
+        askFor: 'Ask for a Willamette Valley Pinot Noir, something with bright fruit and earthy notes'
+      }
+    ];
+  }
+
+  // White/other wines
+  return [
+    {
+      type: 'similar',
+      wineName: 'Marlborough Sauvignon Blanc',
+      reason: 'A crisp, refreshing white with vibrant acidity and citrus notes',
+      priceRange: { min: 12, max: 18, currency: 'USD' },
+      askFor: 'Ask for a Marlborough Sauvignon Blanc from New Zealand'
+    },
+    {
+      type: 'step_up',
+      wineName: 'Pouilly-Fumé',
+      reason: 'A more refined Loire Valley Sauvignon Blanc with mineral complexity',
+      priceRange: { min: 25, max: 40, currency: 'USD' },
+      askFor: 'Ask for a Pouilly-Fumé or Sancerre from the Loire Valley'
+    },
+    {
+      type: 'exploration',
+      wineName: 'Grüner Veltliner',
+      reason: 'Explore Austrian whites - crisp, peppery, and wonderfully food-friendly',
+      priceRange: { min: 15, max: 25, currency: 'USD' },
+      askFor: 'Ask for an Austrian Grüner Veltliner, something fresh and zippy'
+    }
+  ];
 }

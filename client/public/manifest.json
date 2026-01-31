@@ -1,6 +1,6 @@
 {
-  "name": "KnowYourGrape - Wine Tasting",
-  "short_name": "KnowGrape",
+  "name": "Cata - Wine Tasting",
+  "short_name": "Cata",
   "description": "Your personal sommelier for delightful wine tasting experiences.",
   "start_url": "/",
   "display": "standalone",
