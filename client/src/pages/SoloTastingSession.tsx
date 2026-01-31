@@ -37,17 +37,33 @@ interface ChapterContext {
   learningObjectives: string[];
 }
 
+// AI-generated question format from Sprint 5 - 5 core components
+interface AIQuestion {
+  id: string;
+  category: 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall';
+  questionType: 'multiple_choice' | 'scale' | 'text';
+  title: string;
+  description?: string;
+  options?: Array<{ id: string; text: string; description?: string }>;
+  allowMultiple?: boolean;
+  scaleMin?: number;
+  scaleMax?: number;
+  scaleLabels?: [string, string];
+  wineContext?: string;
+}
+
 interface SoloTastingSessionProps {
   wine: WineInfo;
   onComplete: () => void;
   onCancel: () => void;
   chapterContext?: ChapterContext;
+  aiQuestions?: AIQuestion[];
 }
 
-// Question definition type
+// Question definition type - supports both legacy and 5 core components
 interface TastingQuestion {
   id: string;
-  section: 'aroma' | 'taste' | 'overall';
+  section: 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall' | 'aroma' | 'taste' | 'chapter';
   type: 'scale' | 'multiple_choice' | 'text' | 'boolean';
   config: {
     title: string;
@@ -203,38 +219,99 @@ const TASTING_QUESTIONS: TastingQuestion[] = [
   }
 ];
 
-// Section info for headers (simplified - only sections we use)
+// Section info for headers - 5 core components + chapter focus
 const SECTIONS: Record<string, { name: string; icon: any; color: string }> = {
+  fruit: { name: 'Fruit Flavors', icon: Grape, color: 'from-red-500 to-pink-500' },
+  secondary: { name: 'Secondary Notes', icon: Droplets, color: 'from-purple-500 to-indigo-500' },
+  tertiary: { name: 'Aged Character', icon: Wine, color: 'from-amber-500 to-orange-500' },
+  body: { name: 'Body & Texture', icon: Wine, color: 'from-rose-500 to-red-500' },
+  acidity: { name: 'Acidity', icon: Droplets, color: 'from-yellow-500 to-lime-500' },
+  overall: { name: 'Overall', icon: Star, color: 'from-emerald-500 to-teal-500' },
+  // Legacy sections for fallback questions
   aroma: { name: 'Aroma', icon: Droplets, color: 'from-purple-500 to-pink-500' },
   taste: { name: 'Taste', icon: Grape, color: 'from-red-500 to-orange-500' },
-  overall: { name: 'Overall', icon: Star, color: 'from-emerald-500 to-teal-500' },
   chapter: { name: 'Chapter Focus', icon: Wine, color: 'from-amber-500 to-yellow-500' }
 };
 
 // Convert chapter prompts to TastingQuestion format
 function convertChapterPrompts(prompts: Array<{ question: string; category?: string }>): TastingQuestion[] {
-  return prompts.map((prompt, index) => ({
-    id: `chapter_prompt_${index}`,
-    section: 'chapter' as any, // Special section for chapter-specific questions
-    type: 'text' as const,
+  return prompts
+    .filter(prompt => prompt && prompt.question && prompt.question.trim()) // Filter out empty prompts
+    .map((prompt, index) => ({
+      id: `chapter_prompt_${index}`,
+      section: 'chapter' as const,
+      type: 'text' as const,
+      config: {
+        title: prompt.question,
+        description: 'Take your time to reflect on this.',
+        placeholder: 'Share your observations...',
+        rows: 2
+      }
+    }));
+}
+
+// Convert AI-generated questions to TastingQuestion format
+function convertAIQuestions(questions: AIQuestion[]): TastingQuestion[] {
+  // Map AI category to section - now using 5 core components
+  type SectionType = 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall' | 'aroma' | 'taste' | 'chapter';
+  const categoryToSection: Record<string, SectionType> = {
+    // New 5 core components (direct mapping)
+    'fruit': 'fruit',
+    'secondary': 'secondary',
+    'tertiary': 'tertiary',
+    'body': 'body',
+    'acidity': 'acidity',
+    'overall': 'overall',
+    // Legacy categories (for backwards compatibility)
+    'appearance': 'aroma',
+    'aroma': 'aroma',
+    'taste': 'taste',
+    'structure': 'body'
+  };
+
+  return questions
+    .filter(q => q && q.title && q.title.trim()) // Filter out questions with empty titles
+    .map((q) => ({
+    id: q.id,
+    section: categoryToSection[q.category] || 'taste',
+    type: q.questionType === 'multiple_choice' ? 'multiple_choice' :
+          q.questionType === 'scale' ? 'scale' : 'text',
     config: {
-      title: prompt.question,
-      description: 'Take your time to reflect on this.',
-      placeholder: 'Share your observations...',
-      rows: 2
+      title: q.title,
+      description: q.description || q.wineContext,
+      // Scale config
+      scaleMin: q.scaleMin,
+      scaleMax: q.scaleMax,
+      scaleLabels: q.scaleLabels,
+      // Multiple choice config
+      options: q.options?.map(opt => ({
+        id: opt.id,
+        text: opt.text,
+        value: opt.id
+      })),
+      allowMultiple: q.allowMultiple,
+      // Text config
+      placeholder: q.questionType === 'text' ? 'Share your observations...' : undefined,
+      rows: q.questionType === 'text' ? 3 : undefined
     }
   }));
 }
 
-export default function SoloTastingSession({ wine, onComplete, onCancel, chapterContext }: SoloTastingSessionProps) {
+export default function SoloTastingSession({ wine, onComplete, onCancel, chapterContext, aiQuestions }: SoloTastingSessionProps) {
   const [, setLocation] = useLocation();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [isComplete, setIsComplete] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Build the full question list: standard questions + chapter prompts (if any)
+  // Build the full question list: AI questions (if available) or standard questions + chapter prompts
   const allQuestions = useMemo(() => {
+    // If we have AI-generated questions, use them instead of defaults
+    if (aiQuestions && aiQuestions.length > 0) {
+      return convertAIQuestions(aiQuestions);
+    }
+
+    // Fallback to standard questions + chapter prompts
     if (!chapterContext?.tastingPrompts?.length) {
       return TASTING_QUESTIONS;
     }
@@ -248,7 +325,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
       ...chapterQuestions,
       ...TASTING_QUESTIONS.slice(tasteEndIndex)
     ];
-  }, [chapterContext]);
+  }, [chapterContext, aiQuestions]);
 
   const currentQuestion = allQuestions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / allQuestions.length) * 100;
@@ -350,6 +427,12 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
 
     const { id, type, config } = currentQuestion;
 
+    // Skip rendering if the question has no title/content
+    if (!config.title || !config.title.trim()) {
+      console.warn('[SoloTastingSession] Skipping question with empty title:', currentQuestion);
+      return null;
+    }
+
     switch (type) {
       case 'scale':
         return (
@@ -422,11 +505,11 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
   // Completion screen
   if (isComplete) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl text-center max-w-md"
+          className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 shadow-2xl text-center max-w-md"
         >
           <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full flex items-center justify-center">
             <CheckCircle className="w-10 h-10 text-white" />
@@ -447,7 +530,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-primary">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-black/30 backdrop-blur-xl border-b border-white/10">
         <div className="container mx-auto px-4 py-3">
@@ -507,7 +590,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
             variant="outline"
             onClick={handlePrevious}
             disabled={currentQuestionIndex === 0}
-            className="flex-1 border-white/20 text-white hover:bg-white/10 disabled:opacity-30"
+            className="flex-1 border-white/10 text-white hover:bg-white/10 disabled:opacity-30"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Previous

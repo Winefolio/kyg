@@ -160,13 +160,13 @@ export default function WineEntryForm({ onSubmit, onCancel, initialData }: WineE
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
+        <div className="bg-white/5 backdrop-blur-md rounded-3xl p-6 border border-white/10 shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
@@ -243,7 +243,7 @@ export default function WineEntryForm({ onSubmit, onCancel, initialData }: WineE
                 onChange={(e) => setWineName(e.target.value)}
                 placeholder="e.g., Chateau Margaux 2015"
                 required
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-purple-500"
+                className="bg-white/10 border-white/10 text-white placeholder:text-white/40 focus:border-purple-500"
               />
             </div>
 
@@ -253,7 +253,7 @@ export default function WineEntryForm({ onSubmit, onCancel, initialData }: WineE
                 Wine Type
               </Label>
               <Select value={wineType} onValueChange={setWineType}>
-                <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                <SelectTrigger className="bg-white/10 border-white/10 text-white">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -277,7 +277,7 @@ export default function WineEntryForm({ onSubmit, onCancel, initialData }: WineE
                 onChange={(e) => setWineRegion(e.target.value)}
                 placeholder="e.g., Bordeaux, France"
                 list="regions"
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-purple-500"
+                className="bg-white/10 border-white/10 text-white placeholder:text-white/40 focus:border-purple-500"
               />
               <datalist id="regions">
                 {COMMON_REGIONS.map((region) => (
@@ -292,7 +292,7 @@ export default function WineEntryForm({ onSubmit, onCancel, initialData }: WineE
                 Vintage
               </Label>
               <Select value={wineVintage} onValueChange={setWineVintage}>
-                <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                <SelectTrigger className="bg-white/10 border-white/10 text-white">
                   <SelectValue placeholder="Select year" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[200px]">
@@ -317,7 +317,7 @@ export default function WineEntryForm({ onSubmit, onCancel, initialData }: WineE
                 onChange={(e) => setGrapeVariety(e.target.value)}
                 placeholder="e.g., Cabernet Sauvignon"
                 list="grapes"
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-purple-500"
+                className="bg-white/10 border-white/10 text-white placeholder:text-white/40 focus:border-purple-500"
               />
               <datalist id="grapes">
                 {COMMON_GRAPES.map((grape) => (

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import { ArrowLeft, Mail, Wine, Loader2 } from "lucide-react";
+import { ArrowLeft, Mail, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -18,8 +18,21 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Get redirect URL from query params
-  const redirectTo = new URLSearchParams(search).get("redirect");
+  // Get redirect URL from query params with security validation
+  const rawRedirect = new URLSearchParams(search).get("redirect");
+
+  // Validate redirect URL to prevent open redirect attacks
+  // Only allow relative paths starting with / (not // which would be protocol-relative)
+  const validateRedirect = (url: string | null): string | null => {
+    if (!url) return null;
+    // Only allow paths starting with single / (not // or external URLs)
+    if (url.startsWith('/') && !url.startsWith('//') && !url.includes(':')) {
+      return url;
+    }
+    return null; // Invalid redirect, will fallback to /home
+  };
+
+  const redirectTo = validateRedirect(rawRedirect);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,8 +59,8 @@ export default function Login() {
           throw new Error(authResult.error || "Authentication failed");
         }
 
-        // Redirect to original page or dashboard
-        const destination = redirectTo || `/dashboard/${encodeURIComponent(email.trim())}`;
+        // Redirect to original page or unified home
+        const destination = redirectTo || '/home';
         setLocation(destination);
         toast({
           title: "Welcome Back!",
@@ -72,7 +85,7 @@ export default function Login() {
             title: "No Tasting History",
             description: "You can start with solo tastings or learning journeys to build your profile.",
           });
-          setLocation('/journeys');
+          setLocation('/home');
         }
       } else {
         throw new Error("Failed to check account");
@@ -110,9 +123,11 @@ export default function Login() {
         {/* Login Card */}
         <Card className="bg-white/10 backdrop-blur-xl border-white/20">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 p-3 bg-purple-500/20 rounded-full w-fit">
-              <Wine className="w-8 h-8 text-purple-300" />
-            </div>
+            <img
+              src="/logo-cata.svg"
+              alt="Cata"
+              className="w-14 h-14 mx-auto mb-4"
+            />
             <CardTitle className="text-2xl font-bold text-white">Welcome Back</CardTitle>
             <CardDescription className="text-purple-200">
               Enter your email to access your wine tasting dashboard

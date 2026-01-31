@@ -4,7 +4,8 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useHaptics } from "@/hooks/useHaptics";
 
-interface ModernButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+// Omit native events that conflict with Framer Motion's signatures
+interface ModernButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onDrag' | 'onDragStart' | 'onDragEnd' | 'onAnimationStart'> {
   variant?: "primary" | "secondary" | "ghost" | "destructive";
   size?: "sm" | "md" | "lg";
   loading?: boolean;

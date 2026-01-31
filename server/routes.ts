@@ -1093,7 +1093,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 if (typeof (ans as any).value === 'boolean') val = (ans as any).value;
               }
 
-              const name = participantIdToName.get(r.participantId) || 'Participant';
+              const name = participantIdToName.get(r.participantId!) ?? 'Participant';
               if (val === true) yesUsers.push(name);
               else if (val === false) noUsers.push(name);
             }

@@ -121,13 +121,13 @@ export default function PhotoCapture({ onCapture, onCancel, isProcessing = false
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/20 shadow-2xl">
+        <div className="bg-white/5 backdrop-blur-md rounded-3xl p-6 border border-white/10 shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -197,7 +197,7 @@ export default function PhotoCapture({ onCapture, onCancel, isProcessing = false
                   <Button
                     variant="outline"
                     onClick={handleCancel}
-                    className="w-full border-white/20 text-white hover:bg-white/10"
+                    className="w-full border-white/10 text-white hover:bg-white/10"
                   >
                     Enter Manually Instead
                   </Button>
@@ -234,7 +234,7 @@ export default function PhotoCapture({ onCapture, onCancel, isProcessing = false
                   <Button
                     variant="outline"
                     onClick={() => { stopCamera(); setMode('select'); }}
-                    className="flex-1 border-white/20 text-white hover:bg-white/10"
+                    className="flex-1 border-white/10 text-white hover:bg-white/10"
                   >
                     Cancel
                   </Button>
@@ -279,7 +279,7 @@ export default function PhotoCapture({ onCapture, onCancel, isProcessing = false
                     variant="outline"
                     onClick={handleRetake}
                     disabled={isProcessing}
-                    className="flex-1 border-white/20 text-white hover:bg-white/10"
+                    className="flex-1 border-white/10 text-white hover:bg-white/10"
                   >
                     <RotateCcw className="w-4 h-4 mr-2" />
                     Retake
