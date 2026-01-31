@@ -545,7 +545,11 @@ export interface SommelierTips {
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  createdAt: timestamp("created_at").defaultNow().notNull()
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  // Tasting level progression
+  tastingLevel: varchar("tasting_level", { length: 20 }).default('intro').notNull(), // 'intro', 'intermediate', 'advanced'
+  tastingsCompleted: integer("tastings_completed").default(0).notNull(),
+  levelUpPromptEligible: boolean("level_up_prompt_eligible").default(false).notNull()
 }, (table) => ({
   emailIdx: index("idx_users_email").on(table.email)
 }));
@@ -574,7 +578,8 @@ export const tastings = pgTable("tastings", {
   photoUrl: text("photo_url"),
   tastedAt: timestamp("tasted_at").defaultNow().notNull(),
   responses: jsonb("responses").notNull(), // Full tasting questionnaire responses
-  wineCharacteristics: jsonb("wine_characteristics") // Baseline wine data from GPT-4
+  wineCharacteristics: jsonb("wine_characteristics"), // Baseline wine data from GPT-4
+  recommendations: jsonb("recommendations") // AI-generated next bottle recommendations
 }, (table) => ({
   userIdIdx: index("idx_tastings_user_id").on(table.userId),
   tastedAtIdx: index("idx_tastings_tasted_at").on(table.tastedAt),
@@ -716,6 +721,8 @@ export const chapters = pgTable("chapters", {
   priceRange: jsonb("price_range"), // { min: number, max: number, currency: string }
   alternatives: jsonb("alternatives"), // Array of acceptable substitute wines/criteria
   askFor: text("ask_for"), // What to tell the wine shop staff
+  // Multiple wine options at different price points
+  wineOptions: jsonb("wine_options"), // Array of WineOption objects
   createdAt: timestamp("created_at").defaultNow().notNull()
 }, (table) => ({
   journeyChapterIdx: unique().on(table.journeyId, table.chapterNumber),
@@ -866,3 +873,131 @@ export interface ChapterShoppingGuide {
   alternatives?: WineAlternative[];
   askFor?: string;
 }
+
+// Wine options for flexible journey pricing
+export interface WineOption {
+  description: string; // e.g., "Any Oregon Pinot Noir"
+  askFor: string; // What to tell the wine shop staff
+  priceRange: PriceRange;
+  exampleProducers?: string[]; // e.g., ["Willamette Valley Vineyards", "A to Z"]
+  level: 'entry' | 'mid' | 'premium'; // Price tier
+  whyThisWine?: string; // Optional explanation of fit for learning objective
+}
+
+// AI-generated next bottle recommendations
+export interface TastingRecommendation {
+  type: 'similar' | 'step_up' | 'exploration'; // Similar style, more complex, or different direction
+  wineName: string; // e.g., "Willamette Valley Pinot Noir"
+  reason: string; // Why this is recommended based on their responses
+  priceRange: PriceRange;
+  askFor: string; // What to tell the wine shop staff
+}
+
+// User tasting level progression
+export type TastingLevel = 'intro' | 'intermediate' | 'advanced';
+
+// ============================================
+// SPRINT 5: AI QUESTION GENERATION & VALIDATION
+// ============================================
+
+// Chapter completions - tracks individual chapter completion with validation
+export const chapterCompletions = pgTable("chapter_completions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  chapterId: integer("chapter_id").notNull().references(() => chapters.id, { onDelete: "cascade" }),
+  tastingId: integer("tasting_id").notNull().references(() => tastings.id),
+  winePhotoUrl: text("wine_photo_url"),
+  wineValidation: jsonb("wine_validation"), // WineValidationResult
+  completedAt: timestamp("completed_at").defaultNow().notNull()
+}, (table) => ({
+  userChapterUnique: unique().on(table.userId, table.chapterId),
+  userIdx: index("idx_chapter_completions_user").on(table.userId),
+  chapterIdx: index("idx_chapter_completions_chapter").on(table.chapterId)
+}));
+
+// Generated questions - AI-generated questions for chapter tastings
+export const generatedQuestions = pgTable("generated_questions", {
+  id: serial("id").primaryKey(),
+  chapterCompletionId: integer("chapter_completion_id").notNull().references(() => chapterCompletions.id, { onDelete: "cascade" }),
+  questions: jsonb("questions").notNull(), // Array of GeneratedQuestion
+  wineContext: jsonb("wine_context").notNull(), // WineRecognitionResult used for generation
+  generatedAt: timestamp("generated_at").defaultNow().notNull()
+}, (table) => ({
+  completionIdx: index("idx_generated_questions_completion").on(table.chapterCompletionId)
+}));
+
+// Wine validation result structure
+export interface WineValidationResult {
+  passed: boolean;
+  confidence: number;
+  criteriaResults: Array<{
+    field: string;
+    operator: string;
+    expected: string | string[];
+    actual: string | null;
+    passed: boolean;
+  }>;
+  wineInfo: WineRecognitionResult;
+}
+
+// Wine recognition result from GPT Vision
+export interface WineRecognitionResult {
+  name: string;
+  region: string;
+  grapeVarieties: string[];
+  vintage?: number;
+  producer?: string;
+  confidence: number;
+}
+
+// Generated question structure (follows existing tasting flow)
+// Question categories - the 5 core components + overall
+export type QuestionCategory = 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall';
+
+export interface GeneratedQuestion {
+  id: string;
+  category: QuestionCategory;
+  questionType: 'multiple_choice' | 'scale' | 'text';
+  title: string;
+  description?: string;
+  // For multiple_choice
+  options?: Array<{
+    id: string;
+    text: string;
+    description?: string;
+  }>;
+  allowMultiple?: boolean;
+  // For scale
+  scaleMin?: number;
+  scaleMax?: number;
+  scaleLabels?: [string, string];
+  // Wine-specific context
+  wineContext?: string; // e.g., "Classic Barolo characteristics include..."
+}
+
+// Insert schemas
+export const insertChapterCompletionSchema = createInsertSchema(chapterCompletions, {
+  userId: z.number().int().positive(),
+  chapterId: z.number().int().positive(),
+  tastingId: z.number().int().positive(),
+  winePhotoUrl: z.string().url().nullable().optional(),
+  wineValidation: z.any().nullable().optional()
+}).omit({
+  id: true,
+  completedAt: true
+});
+
+export const insertGeneratedQuestionsSchema = createInsertSchema(generatedQuestions, {
+  chapterCompletionId: z.number().int().positive(),
+  questions: z.array(z.any()),
+  wineContext: z.any()
+}).omit({
+  id: true,
+  generatedAt: true
+});
+
+// Types
+export type ChapterCompletion = typeof chapterCompletions.$inferSelect;
+export type InsertChapterCompletion = z.infer<typeof insertChapterCompletionSchema>;
+export type GeneratedQuestionsRecord = typeof generatedQuestions.$inferSelect;
+export type InsertGeneratedQuestions = z.infer<typeof insertGeneratedQuestionsSchema>;

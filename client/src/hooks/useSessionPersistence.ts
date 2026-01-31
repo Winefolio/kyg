@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { openDB, IDBPDatabase } from 'idb';
 import { apiRequest } from "@/lib/queryClient";
 
@@ -20,21 +20,84 @@ interface SessionData {
   isActive: boolean;
 }
 
+const DB_NAME_OLD = 'KnowYourGrapeDB';
+const DB_NAME = 'CataDB';
+const DB_VERSION = 3;
+
+// Migrate data from old database name to new
+const migrateFromOldDB = async (): Promise<void> => {
+  try {
+    // Check if old database exists
+    const databases = await indexedDB.databases();
+    const oldDBExists = databases.some(db => db.name === DB_NAME_OLD);
+
+    if (!oldDBExists) return;
+
+    // Open old DB and copy data
+    const oldDB = await openDB(DB_NAME_OLD, 2);
+    const newDB = await openDB(DB_NAME, DB_VERSION, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains('offlineResponses')) {
+          const responseStore = db.createObjectStore('offlineResponses', { keyPath: 'id' });
+          responseStore.createIndex('by-synced', 'synced');
+          responseStore.createIndex('by-timestamp', 'timestamp');
+        }
+        if (!db.objectStoreNames.contains('sessionData')) {
+          const sessionStore = db.createObjectStore('sessionData', { keyPath: 'sessionId' });
+          sessionStore.createIndex('by-active', 'isActive');
+        }
+      },
+    });
+
+    // Copy offline responses
+    try {
+      const oldResponses = await oldDB.getAll('offlineResponses');
+      for (const response of oldResponses) {
+        await newDB.put('offlineResponses', response);
+      }
+    } catch (e) {
+      // Store might not exist in old DB
+    }
+
+    // Copy session data
+    try {
+      const oldSessions = await oldDB.getAll('sessionData');
+      for (const session of oldSessions) {
+        await newDB.put('sessionData', session);
+      }
+    } catch (e) {
+      // Store might not exist in old DB
+    }
+
+    oldDB.close();
+    newDB.close();
+
+    // Delete old database
+    await indexedDB.deleteDatabase(DB_NAME_OLD);
+    console.log('Successfully migrated from KnowYourGrapeDB to CataDB');
+  } catch (error) {
+    console.warn('Database migration failed (non-critical):', error);
+  }
+};
+
 // Initialize IndexedDB - Only when user joins a session
 const initDB = async (): Promise<IDBPDatabase | null> => {
   try {
-    return await openDB('KnowYourGrapeDB', 2, {
+    // Migrate from old database name if needed
+    await migrateFromOldDB();
+
+    return await openDB(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion) {
         // Clear old data on upgrade
-        if (oldVersion < 2) {
+        if (oldVersion < 3) {
           const storeNames = Array.from(db.objectStoreNames);
           storeNames.forEach(name => db.deleteObjectStore(name));
         }
-        
+
         const responseStore = db.createObjectStore('offlineResponses', { keyPath: 'id' });
         responseStore.createIndex('by-synced', 'synced');
         responseStore.createIndex('by-timestamp', 'timestamp');
-        
+
         const sessionStore = db.createObjectStore('sessionData', { keyPath: 'sessionId' });
         sessionStore.createIndex('by-active', 'isActive');
       },
@@ -60,6 +123,19 @@ export function useSessionPersistence() {
   const [offlineQueue, setOfflineQueue] = useState<OfflineResponse[]>([]);
   const [db, setDb] = useState<IDBPDatabase | null>(null);
   const [activeSession, setActiveSession] = useState<SessionData | null>(null);
+
+  // Refs to stabilize values for the sync interval (prevents interval recreation)
+  const offlineQueueRef = useRef<OfflineResponse[]>([]);
+  const dbRef = useRef<IDBPDatabase | null>(null);
+
+  // Keep refs updated
+  useEffect(() => {
+    offlineQueueRef.current = offlineQueue;
+  }, [offlineQueue]);
+
+  useEffect(() => {
+    dbRef.current = db;
+  }, [db]);
 
   // Initialize IndexedDB ONLY when needed, not on mount
   const initializeForSession = async (sessionId: string, participantId: string) => {
@@ -235,35 +311,37 @@ export function useSessionPersistence() {
     return Promise.resolve();
   };
 
-  // Background sync when online
+  // Background sync when online (uses refs to prevent interval recreation)
   useEffect(() => {
     const syncOfflineData = async () => {
       if (!navigator.onLine) return;
-      
+
+      const currentDb = dbRef.current;
+      const currentQueue = offlineQueueRef.current;
       let unsyncedResponses: OfflineResponse[] = [];
-      
+
       // Get unsynced responses from IndexedDB
-      if (db) {
+      if (currentDb) {
         try {
-          const tx = db.transaction('offlineResponses', 'readonly');
+          const tx = currentDb.transaction('offlineResponses', 'readonly');
           const store = tx.objectStore('offlineResponses');
           const all = await store.getAll();
           unsyncedResponses = all.filter(item => !item.synced);
         } catch (error) {
           console.warn('Failed to get unsynced responses from IndexedDB:', error);
           // Fall back to memory queue
-          unsyncedResponses = offlineQueue.filter(item => !item.synced);
+          unsyncedResponses = currentQueue.filter(item => !item.synced);
         }
       } else {
         // Use memory queue if IndexedDB not available
-        unsyncedResponses = offlineQueue.filter(item => !item.synced);
+        unsyncedResponses = currentQueue.filter(item => !item.synced);
       }
-      
+
       if (unsyncedResponses.length === 0) return;
-      
+
       setSyncStatus('syncing');
       const failed: OfflineResponse[] = [];
-      
+
       for (const item of unsyncedResponses) {
         try {
           await apiRequest('POST', '/api/responses', {
@@ -272,17 +350,17 @@ export function useSessionPersistence() {
             answerJson: item.answerJson,
             synced: true
           });
-          
+
           // Remove successfully synced item from IndexedDB
-          if (db) {
-            await db.delete('offlineResponses', item.id);
+          if (currentDb) {
+            await currentDb.delete('offlineResponses', item.id);
           }
         } catch (error: any) {
           // If participant not found (404), remove the stale offline response
           if (error.status === 404 || error.message?.includes('Participant not found')) {
             // Removing stale offline response
-            if (db) {
-              await db.delete('offlineResponses', item.id);
+            if (currentDb) {
+              await currentDb.delete('offlineResponses', item.id);
             }
           } else {
             // For other errors, keep trying to sync
@@ -290,26 +368,26 @@ export function useSessionPersistence() {
           }
         }
       }
-      
+
       setOfflineQueue(failed);
       setSyncStatus(failed.length > 0 ? 'partial' : 'synced');
     };
-    
+
     // Sync when coming online
     window.addEventListener('online', syncOfflineData);
-    
+
     // Try syncing every 30 seconds if there are items to sync
     const interval = setInterval(() => {
-      if (offlineQueue.length > 0) {
+      if (offlineQueueRef.current.length > 0) {
         syncOfflineData();
       }
     }, 30000);
-    
+
     return () => {
       window.removeEventListener('online', syncOfflineData);
       clearInterval(interval);
     };
-  }, [db, offlineQueue]);
+  }, []); // Empty deps - runs once on mount
 
   return { 
     saveResponse, 

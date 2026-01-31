@@ -254,8 +254,10 @@ export function VideoPlayer({
     const videoEl = videoRef.current;
     if (!videoEl) return;
 
-    if (videoEl.webkitEnterFullscreen) {
-      videoEl.webkitEnterFullscreen();
+    // Safari-specific fullscreen API (vendor-prefixed, deprecated)
+    const webkitVideo = videoEl as any;
+    if (webkitVideo.webkitEnterFullscreen) {
+      webkitVideo.webkitEnterFullscreen();
       setIsFullscreen(true);
       return;
     }

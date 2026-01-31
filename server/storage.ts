@@ -49,7 +49,7 @@ import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull, isNotNull } 
 import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
-import OpenAI from "openai";
+import { openai } from "./lib/openai";
 import { 
   updateSlidePositionSafely, 
   calculateNewSlidePosition, 
@@ -3558,7 +3558,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPackageWineFromDashboard(wine: InsertPackageWine): Promise<PackageWine> {
-    // Get the next position for this package
+    // Get the next position for this package (read outside transaction is safe)
     const existingWines = await this.getPackageWines(wine.packageId);
     const nextPosition = existingWines.length + 1;
 
@@ -3580,61 +3580,91 @@ export class DatabaseStorage implements IStorage {
       discussionQuestions: wine.discussionQuestions || []
     };
 
-    const [newWine] = await db.insert(packageWines).values(wineData).returning();
+    // Use transaction to ensure wine and all slides are created atomically
+    return db.transaction(async (tx) => {
+      const [newWine] = await tx.insert(packageWines).values(wineData).returning();
 
-    // Create wine introduction slide with wine-specific information
-    await this.createSlide({
-      packageWineId: newWine.id,
-      position: 1,
-      type: "interlude",
-      section_type: "intro",
-      payloadJson: {
-        title: `Meet ${newWine.wineName}`,
-        description: newWine.wineDescription || `Discover the unique characteristics of this exceptional wine.`,
-        wine_name: newWine.wineName,
-        wine_image: newWine.wineImageUrl || "",
-        wine_type: newWine.wineType || "",
-        wine_region: newWine.region || "",
-        wine_vintage: newWine.vintage || "",
-        is_welcome: true,
-        is_wine_intro: true
-      },
-    });
+      // Calculate global position base for this wine
+      const wineBasePosition = newWine.position * 1000;
 
-    // Create default slide templates for this wine
-    const slideTemplates = this.getDefaultSlideTemplates();
-    let position = 2; // Start after the wine intro slide
-
-    for (const template of slideTemplates.slice(1)) { // Skip the first template (intro) since we already created wine intro
-      // Add wine context to all slides while preserving template structure
-      const payloadJson = {
-        ...template.payloadJson,
-        // Add wine context as additional fields without overwriting existing structure
-        wine_name: newWine.wineName,
-        wine_image: newWine.wineImageUrl || "",
-        wine_type: newWine.wineType || ""
+      // Helper to calculate global position for a slide
+      const calculateGlobalPosition = (sectionType: string, isWineIntro: boolean, localPosition: number): number => {
+        let sectionOffset = 0;
+        if (sectionType === 'intro') {
+          sectionOffset = isWineIntro ? 10 : 50;
+        } else if (sectionType === 'deep_dive' || sectionType === 'tasting') {
+          sectionOffset = 100;
+        } else if (sectionType === 'ending' || sectionType === 'conclusion') {
+          sectionOffset = 200;
+        }
+        // Add local position offset within section (10 per slide)
+        return wineBasePosition + sectionOffset + (localPosition * 10);
       };
 
-      // Validate payload before creating slide
-      if (!payloadJson || Object.keys(payloadJson).length === 0) {
-        console.error('[SLIDE_CREATE_ERROR] Empty payload detected for slide:', {
+      // Create wine introduction slide with wine-specific information
+      await tx.insert(slides).values({
+        packageWineId: newWine.id,
+        position: 1,
+        globalPosition: calculateGlobalPosition('intro', true, 0),
+        type: "interlude",
+        section_type: "intro",
+        payloadJson: {
+          title: `Meet ${newWine.wineName}`,
+          description: newWine.wineDescription || `Discover the unique characteristics of this exceptional wine.`,
+          wine_name: newWine.wineName,
+          wine_image: newWine.wineImageUrl || "",
+          wine_type: newWine.wineType || "",
+          wine_region: newWine.region || "",
+          wine_vintage: newWine.vintage || "",
+          is_welcome: true,
+          is_wine_intro: true
+        },
+      });
+
+      // Create default slide templates for this wine
+      const slideTemplates = this.getDefaultSlideTemplates();
+      let localPosition = 2; // Start after the wine intro slide
+
+      // Track position within each section for global position calculation
+      const sectionCounters: Record<string, number> = { intro: 1, deep_dive: 0, ending: 0 };
+
+      for (const template of slideTemplates.slice(1)) { // Skip the first template (intro) since we already created wine intro
+        // Add wine context to all slides while preserving template structure
+        const payloadJson = {
+          ...template.payloadJson,
+          // Add wine context as additional fields without overwriting existing structure
+          wine_name: newWine.wineName,
+          wine_image: newWine.wineImageUrl || "",
+          wine_type: newWine.wineType || ""
+        };
+
+        // Validate payload before creating slide
+        if (!payloadJson || Object.keys(payloadJson).length === 0) {
+          console.error('[SLIDE_CREATE_ERROR] Empty payload detected for slide:', {
+            type: template.type,
+            section_type: template.section_type,
+            position: localPosition
+          });
+          continue; // Skip this slide to prevent empty data
+        }
+
+        const sectionType = (template.section_type || 'intro') as string;
+        const sectionKey = (sectionType === 'tasting') ? 'deep_dive' :
+                          (sectionType === 'conclusion') ? 'ending' : sectionType;
+        sectionCounters[sectionKey] = (sectionCounters[sectionKey] || 0) + 1;
+
+        await tx.insert(slides).values({
+          packageWineId: newWine.id,
+          position: localPosition++,
+          globalPosition: calculateGlobalPosition(sectionType, false, sectionCounters[sectionKey]),
           type: template.type,
           section_type: template.section_type,
-          position
+          payloadJson: payloadJson,
         });
-        continue; // Skip this slide to prevent empty data
       }
 
-      await this.createSlide({
-        packageWineId: newWine.id,
-        position: position++,
-        type: template.type,
-        section_type: template.section_type,
-        payloadJson: payloadJson,
-      });
-    }
-
-    return newWine;
+      return newWine;
+    });
   }
 
   async updatePackageWine(id: string, data: Partial<InsertPackageWine>): Promise<PackageWine> {
@@ -3647,27 +3677,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePackageWine(id: string): Promise<void> {
-    // Get the wine to be deleted to know its package and position
-    const wineToDelete = await db.select().from(packageWines)
-      .where(eq(packageWines.id, id)).limit(1);
+    await db.transaction(async (tx) => {
+      // Get the wine to be deleted to know its package and position
+      const wineToDelete = await tx.select().from(packageWines)
+        .where(eq(packageWines.id, id)).limit(1);
 
-    if (wineToDelete.length === 0) return;
+      if (wineToDelete.length === 0) return;
 
-    const { packageId, position } = wineToDelete[0];
+      const { packageId, position } = wineToDelete[0];
 
-    // First delete associated slides
-    await db.delete(slides).where(eq(slides.packageWineId, id));
+      // First delete associated slides
+      await tx.delete(slides).where(eq(slides.packageWineId, id));
 
-    // Then delete the wine
-    await db.delete(packageWines).where(eq(packageWines.id, id));
+      // Then delete the wine
+      await tx.delete(packageWines).where(eq(packageWines.id, id));
 
-    // Update positions of wines that came after the deleted one
-    await db.update(packageWines)
-      .set({ position: sql`position - 1` })
-      .where(and(
-        eq(packageWines.packageId, packageId),
-        gt(packageWines.position, position)
-      ));
+      // Update positions of wines that came after the deleted one
+      await tx.update(packageWines)
+        .set({ position: sql`position - 1` })
+        .where(and(
+          eq(packageWines.packageId, packageId),
+          gt(packageWines.position, position)
+        ));
+    });
   }
 
   async updateSlide(id: string, data: Partial<InsertSlide>): Promise<Slide> {
@@ -3702,21 +3734,23 @@ export class DatabaseStorage implements IStorage {
 
   // Session Wine Selections - Host wine selection feature
   async createSessionWineSelections(sessionId: string, selections: InsertSessionWineSelection[]): Promise<SessionWineSelection[]> {
-    // First delete existing selections for this session
-    await this.deleteSessionWineSelections(sessionId);
+    return db.transaction(async (tx) => {
+      // First delete existing selections for this session
+      await tx.delete(sessionWineSelections).where(eq(sessionWineSelections.sessionId, sessionId));
 
-    // Insert new selections
-    const insertData = selections.map(selection => ({
-      ...selection,
-      sessionId
-    }));
+      // Insert new selections
+      const insertData = selections.map(selection => ({
+        ...selection,
+        sessionId
+      }));
 
-    const newSelections = await db
-      .insert(sessionWineSelections)
-      .values(insertData)
-      .returning();
+      const newSelections = await tx
+        .insert(sessionWineSelections)
+        .values(insertData)
+        .returning();
 
-    return newSelections;
+      return newSelections;
+    });
   }
 
   async getSessionWineSelections(sessionId: string): Promise<(SessionWineSelection & { wine: PackageWine })[]> {
@@ -5747,28 +5781,51 @@ export class DatabaseStorage implements IStorage {
       const user = await this.getUserByEmail(email);
       if (!user) return [];
 
-      const userJourneyList = await db
-        .select()
+      // Fetch user journeys with journey data in a single query (fix N+1)
+      const userJourneyWithJourney = await db
+        .select({
+          userJourney: userJourneys,
+          journey: journeys
+        })
         .from(userJourneys)
+        .innerJoin(journeys, eq(userJourneys.journeyId, journeys.id))
         .where(eq(userJourneys.userId, user.id))
         .orderBy(desc(userJourneys.lastActivityAt));
 
-      const result = [];
-      for (const uj of userJourneyList) {
-        const journeyData = await this.getJourneyWithChapters(uj.journeyId);
-        if (journeyData) {
-          const completedCount = (uj.completedChapters as CompletedChapter[])?.length || 0;
-          const totalChapters = journeyData.chapters.length;
-          const progress = totalChapters > 0 ? (completedCount / totalChapters) * 100 : 0;
+      if (userJourneyWithJourney.length === 0) return [];
 
-          result.push({
-            userJourney: uj,
-            journey: journeyData.journey,
-            chapters: journeyData.chapters,
-            progress: Math.round(progress)
-          });
-        }
+      // Get all journey IDs to fetch chapters in a single query
+      const journeyIds = userJourneyWithJourney.map(r => r.journey.id);
+
+      // Fetch all chapters for all journeys in one query
+      const allChapters = await db
+        .select()
+        .from(chapters)
+        .where(sql`${chapters.journeyId} IN (${sql.join(journeyIds, sql`, `)})`)
+        .orderBy(chapters.chapterNumber);
+
+      // Group chapters by journey ID
+      const chaptersByJourney = new Map<number, Chapter[]>();
+      for (const chapter of allChapters) {
+        const existing = chaptersByJourney.get(chapter.journeyId) || [];
+        existing.push(chapter);
+        chaptersByJourney.set(chapter.journeyId, existing);
       }
+
+      // Build result with progress calculation
+      const result = userJourneyWithJourney.map(({ userJourney, journey }) => {
+        const journeyChapters = chaptersByJourney.get(journey.id) || [];
+        const completedCount = (userJourney.completedChapters as CompletedChapter[])?.length || 0;
+        const totalChapters = journeyChapters.length;
+        const progress = totalChapters > 0 ? (completedCount / totalChapters) * 100 : 0;
+
+        return {
+          userJourney,
+          journey,
+          chapters: journeyChapters,
+          progress: Math.round(progress)
+        };
+      });
 
       return result;
     } catch (error) {
@@ -5796,22 +5853,101 @@ export class DatabaseStorage implements IStorage {
 
     return chapter;
   }
-}
 
-// Initialize OpenAI client (optional)
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+  // ============================================
+  // SPRINT 5: ADDITIONAL JOURNEY/CHAPTER CRUD
+  // ============================================
+
+  async getChapterById(chapterId: number): Promise<Chapter | null> {
+    const chapter = await db.query.chapters.findFirst({
+      where: eq(chapters.id, chapterId)
+    });
+    return chapter || null;
+  }
+
+  async updateJourney(journeyId: number, updates: Partial<InsertJourney>): Promise<Journey | null> {
+    const [updated] = await db
+      .update(journeys)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(journeys.id, journeyId))
+      .returning();
+    return updated || null;
+  }
+
+  async deleteJourney(journeyId: number): Promise<void> {
+    // Chapters will be cascade deleted due to foreign key constraint
+    await db.delete(journeys).where(eq(journeys.id, journeyId));
+  }
+
+  async updateChapter(chapterId: number, updates: Partial<InsertChapter>): Promise<Chapter | null> {
+    const [updated] = await db
+      .update(chapters)
+      .set(updates)
+      .where(eq(chapters.id, chapterId))
+      .returning();
+    return updated || null;
+  }
+
+  async deleteChapter(chapterId: number): Promise<void> {
+    // Get the chapter first to update journey's total count
+    const chapter = await this.getChapterById(chapterId);
+    if (chapter) {
+      await db.delete(chapters).where(eq(chapters.id, chapterId));
+
+      // Decrement journey's total chapters count
+      await db
+        .update(journeys)
+        .set({
+          totalChapters: sql`GREATEST(${journeys.totalChapters} - 1, 0)`,
+          updatedAt: new Date()
+        })
+        .where(eq(journeys.id, chapter.journeyId));
+    }
+  }
+
+  async getAllJourneys(): Promise<Journey[]> {
+    // Returns all journeys (including unpublished) for admin view
+    return await db.query.journeys.findMany({
+      orderBy: [desc(journeys.createdAt)]
+    });
+  }
+
+  async getAllJourneysWithChapters(): Promise<Array<Journey & { chapters: Chapter[] }>> {
+    // Returns all journeys with their chapters for admin view
+    const allJourneys = await db.query.journeys.findMany({
+      orderBy: [desc(journeys.createdAt)]
+    });
+
+    const result = await Promise.all(
+      allJourneys.map(async (journey) => {
+        const journeyChapters = await db.query.chapters.findMany({
+          where: eq(chapters.journeyId, journey.id),
+          orderBy: [asc(chapters.chapterNumber)]
+        });
+        return { ...journey, chapters: journeyChapters };
+      })
+    );
+
+    return result;
+  }
+}
 
 // LLM Integration Function for Sommelier Tips
 export async function generateSommelierTips(email: string): Promise<SommelierTips> {
   try {
     console.log(`🍷 Generating sommelier tips for: ${email}`);
-    
+
     // 1. Get user's wine preferences from their responses
     const userDashboardData = await storage.getUserDashboardData(email);
     const userWineScores = await storage.getUserWineScores(email);
-    
+
+    // Get user's tasting level for personalized insights
+    const user = await storage.getUserByEmail(email);
+    const userLevel = user?.tastingLevel || 'intro';
+
     // 2. Get sommelier feedback from previous tasting sessions
     const sommelierFeedback = await storage.getUserSommelierFeedback(email);
     
@@ -5867,6 +6003,7 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
       // Step 2: Replace placeholders with user data
       const MAX_TOKENS = 128000; // gpt-4o → 128k tokens max
       let prompt = templateContent
+        .replace('{userLevel}', userLevel)
         .replace('{totalWines}', totalWines.toString())
         .replace('{avgRating}', avgRating.toFixed(1))
         .replace('{topRegion}', topRegion)
@@ -5905,24 +6042,32 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
         messages: [
           {
             role: "system",
-            content: `
-              You are an expert wine sommelier. Do not include any text outside the JSON response.
-              Write in second person (you/your) addressing the user directly.
-              {
-                "preferenceProfile": "overall summary",
-                "redDescription": "red wine preferences",
-                "whiteDescription": "white wine preferences",
-                "questions": ["question1", "question2", "question3", "question4"],
-                "priceGuidance": "price guidance"
-              }
-              `
+            content: `You are a friendly sommelier helping someone feel confident about wine. Your job is to give them memorable things they can say that make them sound knowledgeable to friends - not to experts, just to normal people.
+
+Give them:
+- A wine identity they can claim ("I'm a bold red person")
+- ONE grape for red, ONE grape for white they can call "theirs"
+- Simple phrases they can actually say at a wine shop or restaurant
+- Practical price guidance
+
+Write in second person (you/your). Sound like a knowledgeable friend, not a lecturer.
+Make every insight feel like a revelation, even if they've only done one tasting.
+Never hedge with "limited data" or "need more tastings" - treat their choices as meaningful signals.
+
+Respond ONLY with JSON in this exact format:
+{
+  "preferenceProfile": "2-3 sentences describing their palate like a wine-savvy friend would",
+  "redDescription": "their red wine identity + one grape + one region + what to say",
+  "whiteDescription": "their white wine identity + one grape + one region + what to say",
+  "questions": ["natural phrase 1", "natural phrase 2", "natural phrase 3", "natural phrase 4"],
+  "priceGuidance": "simple, practical price advice"
+}`
           },
           {
             role: "user",
             content: prompt
           }
         ],
-        temperature: 0.7,
         max_completion_tokens: 600,
         response_format: { type: "json_object" }
       });

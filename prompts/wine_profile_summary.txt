@@ -1,5 +1,50 @@
-Red Wine:
-Using the user's red wine preferences listed below, please craft a concise 3-4 sentence summary that clearly reflects their taste. Focus on the distinctive traits of the wines they enjoy, such as flavor profiles, body, and aromas, while ensuring that your statements are solely based on the provided data. This summary should empower the user to confidently order in a restaurant, select a bottle at a wine shop, or share their wine preferences with others. The output should be in the second person, using the word you as if you're talking to the user.  Here are the user's preferences: {red_preferences}
+You are creating a wine profile that helps someone confidently describe their taste and know what to look for next.
 
-White Wine:
-Using the user's white wine preferences listed below, please craft a concise 3-4 sentence summary that clearly reflects their taste. Focus on the distinctive traits of the wines they enjoy, such as flavor profiles, body, and aromas, while ensuring that your statements are solely based on the provided data. This summary should empower the user to confidently order in a restaurant, select a bottle at a wine shop, or share their wine preferences with others. The output should be in the second person, using the word you as if you're talking to the user. Here are the user's preferences: {white_preferences}
+**User Level: {userLevel}**
+- "intro": Keep it simple and memorable. Give them a wine identity they can share.
+- "intermediate": More nuanced - connect preferences to regions and grape families.
+- "advanced": Sophisticated - discuss styles, producers, and specific appellations.
+
+**Data Context - Wines Tasted: {totalWines}**
+
+Frame insights confidently regardless of data amount:
+- 1-2 tastings: "Your picks reveal..." / "You gravitated toward..." - treat choices as meaningful signals
+- 3-5 tastings: "You're drawn to..." / "A pattern is emerging..." - celebrate what's forming
+- 6+ tastings: "You clearly prefer..." / "Your palate favors..." - speak with full confidence
+
+Never hedge or mention needing more data. Every insight should feel like a revelation.
+
+---
+
+**RED WINE PROFILE**
+
+Preferences: {red_preferences}
+
+Write 3-4 sentences in second person ("you") that:
+1. Give them a red wine identity they can claim (e.g., "You're a bold red person" or "You lean toward elegant, earthy reds")
+2. Name ONE specific grape that's "their grape"
+3. Name ONE region they can mention casually
+4. Describe their taste in plain language someone could repeat at dinner
+
+End with something actionable: what to say, what to look for, or what to try next.
+
+Example tone: "You're drawn to bold, fruit-forward reds - the kind that make a statement. Malbec is your grape, and Argentine bottles are your sweet spot. When someone asks what you like, just say 'I like reds with some weight to them' - that's you. Next time you see a Malbec on a menu, order it with confidence."
+
+---
+
+**WHITE WINE PROFILE**
+
+Preferences: {white_preferences}
+
+Same format as red:
+1. A white wine identity
+2. ONE grape
+3. ONE region
+4. Plain-language description
+5. Something actionable
+
+Example tone: "You like whites that are crisp and refreshing, not heavy or oaky. Sauvignon Blanc is your go-to - specifically from New Zealand if you want that bright, zesty style. Tell people 'I like my whites on the lighter side' and you've nailed it. At a restaurant, anything labeled 'unoaked' or 'crisp' is probably going to work for you."
+
+---
+
+Return both profiles. Make the person feel like they just learned something true about themselves that they can use immediately.

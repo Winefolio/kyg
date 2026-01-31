@@ -135,8 +135,8 @@ function WineInsightsLoader({
         acidity: expectedCharacteristics.acidity ?? 3,
         tannins: expectedCharacteristics.tannins ?? 3,
         body: expectedCharacteristics.body ?? 3,
-        style: expectedCharacteristics.style,
-        regionCharacter: expectedCharacteristics.regionCharacter,
+        style: expectedCharacteristics.style ?? 'Unknown style',
+        regionCharacter: expectedCharacteristics.regionCharacter ?? 'Unknown region',
         source: 'cache' as const
       }
     : fetchedCharacteristics?.characteristics;

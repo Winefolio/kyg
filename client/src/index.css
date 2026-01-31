@@ -3,27 +3,27 @@
 @tailwind utilities;
 
 :root {
-  /* Primary gradients */
-  --gradient-primary: linear-gradient(135deg, #581c87 0%, #1e1b4b 50%, #000000 100%);
-  --gradient-card: linear-gradient(135deg, rgba(88, 28, 135, 0.2) 0%, rgba(30, 27, 75, 0.2) 100%);
+  /* Primary gradients - simplified for Cata rebrand */
+  --gradient-primary: linear-gradient(180deg, #0f0a1a 0%, #1a0f24 100%);
+  --gradient-card: linear-gradient(135deg, rgba(88, 28, 135, 0.15) 0%, rgba(30, 27, 75, 0.1) 100%);
   --gradient-button: linear-gradient(135deg, #7c3aed 0%, #581c87 100%);
-  
-  /* Glassmorphism */
+
+  /* Glassmorphism - reduced blur for better performance */
   --glass-bg: rgba(88, 28, 135, 0.1);
-  --glass-border: rgba(147, 51, 234, 0.2);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-  
+  --glass-border: rgba(147, 51, 234, 0.15);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.25);
+
   /* Semantic colors */
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-error: #ef4444;
   --color-info: #3b82f6;
-  
-  /* Text hierarchy */
-  --text-primary: rgba(255, 255, 255, 1);
-  --text-secondary: rgba(255, 255, 255, 0.8);
-  --text-tertiary: rgba(255, 255, 255, 0.6);
-  --text-disabled: rgba(255, 255, 255, 0.4);
+
+  /* Text hierarchy - off-white for better readability */
+  --text-primary: #E8E6ED;
+  --text-secondary: rgba(232, 230, 237, 0.8);
+  --text-tertiary: rgba(232, 230, 237, 0.6);
+  --text-disabled: rgba(232, 230, 237, 0.4);
 
   /* Dark theme colors in HSL */
   --background: 240 10% 3.9%;
@@ -144,9 +144,28 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* Glassmorphism enhancements */
+/* Glassmorphism enhancements - reduced blur for better mobile performance */
 .backdrop-blur-xl {
   backdrop-filter: blur(24px);
+}
+
+/* Reduced blur on mobile for performance */
+@media (max-width: 768px) {
+  .backdrop-blur-xl {
+    backdrop-filter: blur(12px);
+  }
+  .backdrop-blur-md {
+    backdrop-filter: blur(8px);
+  }
+}
+
+/* Accessibility: respect user preferences for reduced transparency */
+@media (prefers-reduced-transparency: reduce) {
+  .backdrop-blur-xl,
+  .backdrop-blur-md {
+    backdrop-filter: none;
+    background: rgba(15, 10, 26, 0.95);
+  }
 }
 
 /* Custom animations */

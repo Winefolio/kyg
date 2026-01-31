@@ -18,17 +18,24 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // Session configuration for solo tasting auth
+// Require SESSION_SECRET in production to prevent session hijacking
+const sessionSecret = process.env.SESSION_SECRET;
+if (process.env.NODE_ENV === 'production' && !sessionSecret) {
+  console.error('FATAL: SESSION_SECRET environment variable is required in production');
+  process.exit(1);
+}
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'kyg-solo-tasting-secret-change-in-production',
+  secret: sessionSecret || 'cata-dev-secret-not-for-production',
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
+    sameSite: 'strict' // CSRF protection - always strict
   },
-  name: 'kyg.sid' // Custom session cookie name
+  name: 'cata.sid' // Custom session cookie name
 }));
 
 // Check database migration status on startup
@@ -89,7 +96,7 @@ app.use(session({
 // Configure CORS
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://knowyourgrape.com', 'https://www.knowyourgrape.com'] // Update with your production domain
+    ? ['https://cata.wine', 'https://www.cata.wine', 'https://cata-production.up.railway.app'] // Production domains
     : true, // Allow all origins in development
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

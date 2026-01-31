@@ -22,3 +22,6 @@ const sql = postgres(connectionString as string, {
   max_lifetime: 60 * 30 // Max connection lifetime: 30 minutes
 });
 export const db = drizzle(sql, { schema });
+
+// Export sql client for raw queries and transactions
+export { sql };

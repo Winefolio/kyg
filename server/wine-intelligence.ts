@@ -1,12 +1,8 @@
-import OpenAI from 'openai';
 import { db } from './db';
 import { wineCharacteristicsCache, tastings, type WineCharacteristicsData } from '@shared/schema';
 import { eq } from 'drizzle-orm';
-
-// Initialize OpenAI client
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+import { openai } from './lib/openai';
+import { sanitizeForPrompt } from './lib/sanitize';
 
 /**
  * Normalize wine information into a consistent cache key
@@ -101,12 +97,18 @@ async function fetchWineCharacteristicsFromGPT(
   if (!openai) return null;
 
   try {
+    // P1-004: Sanitize all user-controlled input before prompt interpolation
+    const sanitizedName = sanitizeForPrompt(wineName, 150);
+    const sanitizedRegion = sanitizeForPrompt(wineRegion, 100);
+    const sanitizedGrape = sanitizeForPrompt(grapeVariety, 100);
+    const sanitizedType = sanitizeForPrompt(wineType, 50);
+
     const prompt = `You are a sommelier. For the following wine, provide the TYPICAL characteristics on a 1-5 scale. This is not about a specific bottle but about what is generally expected from this wine style.
 
-Wine: ${wineName}
-${wineRegion ? `Region: ${wineRegion}` : ''}
-${grapeVariety ? `Grape: ${grapeVariety}` : ''}
-${wineType ? `Type: ${wineType}` : ''}
+Wine: ${sanitizedName}
+${sanitizedRegion ? `Region: ${sanitizedRegion}` : ''}
+${sanitizedGrape ? `Grape: ${sanitizedGrape}` : ''}
+${sanitizedType ? `Type: ${sanitizedType}` : ''}
 
 Provide your response as JSON with these fields:
 - sweetness: 1-5 (1=bone dry, 5=very sweet)
@@ -129,20 +131,18 @@ Response format (JSON only):
 }`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5-mini', // Using GPT-5 mini - same low hallucination as GPT-5, but faster and cheaper
+      model: 'gpt-5.2', // Using GPT-5.2 for wine intelligence
       messages: [
         {
           role: 'system',
-          content: 'You are an expert sommelier providing wine characteristic assessments. Always respond with valid JSON only.'
+          content: 'You are an expert sommelier providing wine characteristic assessments. Always respond with valid JSON only, no markdown formatting.'
         },
         {
           role: 'user',
           content: prompt
         }
       ],
-      max_completion_tokens: 300,
-      temperature: 0.3,
-      response_format: { type: 'json_object' }
+      max_completion_tokens: 300
     });
 
     const response = completion.choices[0].message.content;

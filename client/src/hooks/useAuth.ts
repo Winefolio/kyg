@@ -21,10 +21,10 @@ export function useAuth() {
         if (response.ok) {
           const data = await response.json();
           setUser(data.user);
-          localStorage.setItem("kyg_user_email", data.user.email);
+          localStorage.setItem("cata_user_email", data.user.email);
         } else {
           // No server session - check localStorage and try to establish session
-          const storedEmail = localStorage.getItem("kyg_user_email");
+          const storedEmail = localStorage.getItem("cata_user_email");
           if (storedEmail) {
             // Try to establish server session with stored email
             const authResponse = await fetch("/api/auth", {
@@ -39,14 +39,14 @@ export function useAuth() {
               setUser(data.user);
             } else {
               // Auth failed - clear localStorage
-              localStorage.removeItem("kyg_user_email");
+              localStorage.removeItem("cata_user_email");
             }
           }
         }
       } catch (error) {
         console.error("Auth check failed:", error);
         // Fall back to localStorage only
-        const storedEmail = localStorage.getItem("kyg_user_email");
+        const storedEmail = localStorage.getItem("cata_user_email");
         if (storedEmail) {
           setUser({ email: storedEmail });
         }
@@ -69,7 +69,7 @@ export function useAuth() {
 
       if (response.ok) {
         const data = await response.json();
-        localStorage.setItem("kyg_user_email", email);
+        localStorage.setItem("cata_user_email", email);
         setUser(data.user);
         return { success: true };
       } else {
@@ -79,7 +79,7 @@ export function useAuth() {
     } catch (error) {
       console.error("Login failed:", error);
       // Fallback to localStorage only
-      localStorage.setItem("kyg_user_email", email);
+      localStorage.setItem("cata_user_email", email);
       setUser({ email });
       return { success: true };
     }
@@ -94,7 +94,7 @@ export function useAuth() {
     } catch (error) {
       console.error("Logout failed:", error);
     }
-    localStorage.removeItem("kyg_user_email");
+    localStorage.removeItem("cata_user_email");
     setUser(null);
   }, []);
 
