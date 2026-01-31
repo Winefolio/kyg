@@ -102,7 +102,7 @@ All question types in `client/src/components/questions/`:
 ## Deployment
 
 - **Platform**: Railway
-- **Production URL**: https://cata-production.up.railway.app (or https://cata.wine when DNS configured)
+- **Production URL**: https://knowyourgrape-production.up.railway.app
 - **Deploy trigger**: Push to `main` branch auto-deploys
 - **Config**: `railway.json` in repo root
 
