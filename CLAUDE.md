@@ -116,6 +116,22 @@ Optional:
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE` - For media uploads
 - `SESSION_SECRET` - For production session encryption
 
+## Product Roadmap
+
+**Current Sprint:** Sprint 5 - AI Question Generation & Journey Polish
+
+**Completed (Sprint 4.1):** Unified User Dashboard
+- Unified dashboard at `/dashboard/:email` with preference bars
+- BottomNav links directly to unified dashboard
+- See `plans/feat-unified-dashboard.md` for implementation details
+
+**Active Work (Sprint 5):** AI Question Generation
+- AI-generated contextual questions based on wine + chapter context
+- Wine validation for chapter requirements
+- Admin tooling for journey/chapter editors
+
+**Important:** KYG has TWO coexisting experiences (group + solo). We are NOT pivoting away from group tastings.
+
 ## Planning & Documentation
 
 - `PRODUCT_ROADMAP.md` - Prioritized future features
