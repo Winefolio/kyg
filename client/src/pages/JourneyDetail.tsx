@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { WineOptionsList } from "@/components/WineOptionCard";
+import type { WineOption } from "@shared/schema";
 
 interface Chapter {
   id: number;
@@ -49,6 +51,8 @@ interface Chapter {
   priceRange: { min: number; max: number; currency?: string } | null;
   alternatives: Array<{ name: string; criteria?: { wineType?: string; region?: string; grapeVariety?: string } }> | null;
   askFor: string | null;
+  // Wine options for flexible pricing (Sprint 5)
+  wineOptions: WineOption[] | null;
 }
 
 interface Journey {
@@ -475,8 +479,15 @@ export default function JourneyDetail() {
                         </div>
                       )}
 
-                      {/* Shopping Guide - shown for current chapter */}
-                      {isCurrent && (chapter.shoppingTips || chapter.askFor || chapter.priceRange || chapter.alternatives) && (
+                      {/* Wine Options - Multiple price points (Sprint 5) */}
+                      {isCurrent && chapter.wineOptions && chapter.wineOptions.length > 0 && (
+                        <div className="mb-3">
+                          <WineOptionsList options={chapter.wineOptions} />
+                        </div>
+                      )}
+
+                      {/* Shopping Guide - shown for current chapter (fallback when no wine options) */}
+                      {isCurrent && !chapter.wineOptions?.length && (chapter.shoppingTips || chapter.askFor || chapter.priceRange || chapter.alternatives) && (
                         <div className="bg-gradient-to-br from-purple-900/30 to-pink-900/20 rounded-lg p-3 mb-3 border border-purple-500/20">
                           <div className="flex items-center gap-1.5 text-xs text-purple-400 font-medium mb-2">
                             <ShoppingBag className="w-3.5 h-3.5" />

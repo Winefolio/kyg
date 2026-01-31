@@ -50,6 +50,7 @@ interface TastingDetailData {
   sommelierObservations: string[];
   userNotes: string;
   overallRating: number;
+  userParticipant?: { sommelier_feedback?: string };
 }
 
 export default function TastingDetailView() {

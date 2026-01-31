@@ -70,7 +70,7 @@ export default function JourneyBrowser() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <button
-              onClick={() => setLocation("/")}
+              onClick={() => setLocation("/home")}
               className="flex items-center gap-2 text-purple-300 hover:text-white transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
