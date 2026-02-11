@@ -346,6 +346,28 @@ export function registerDashboardRoutes(app: Express) {
     }
   });
 
+  // Phase 2: Get explore recommendations ("You liked X → Try Y")
+  // Returns region or grape recommendations with explanations
+  app.get("/api/dashboard/:email/explore-recommendations", async (req, res) => {
+    const { email } = req.params;
+    const { type = 'region' } = req.query;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email parameter is required" });
+    }
+
+    // Validate type parameter
+    const recommendationType = type === 'grape' ? 'grape' : 'region';
+
+    try {
+      const recommendations = await storage.getExploreRecommendations(email, recommendationType);
+      res.json(recommendations);
+    } catch (error) {
+      console.error("Error fetching explore recommendations:", error);
+      res.status(500).json({ message: "Internal server error", error: String(error) });
+    }
+  });
+
   // Get AI-generated sommelier conversation starters
   app.get("/api/dashboard/:email/sommelier-tips", async (req, res) => {
     const { email } = req.params;

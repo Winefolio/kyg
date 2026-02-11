@@ -19,6 +19,8 @@ import {
   type InsertGlossaryTerm,
   type SommelierTips,
   type ConversationStarters,
+  type LikedWine,
+  type ExploreRecommendation,
   type User,
   type Tasting,
   type Journey,
@@ -6084,6 +6086,168 @@ export class DatabaseStorage implements IStorage {
     }
 
     return parts.join(' ');
+  }
+
+  // ============================================
+  // Phase 2: Explore Recommendations ("You Liked → Try Next")
+  // ============================================
+  async getExploreRecommendations(email: string, type: 'region' | 'grape' = 'region'): Promise<ExploreRecommendation[]> {
+    // Import recommendation service dynamically to avoid circular deps
+    const {
+      getAllRegionRecommendations,
+      getAllGrapeRecommendations,
+      generateGPTRecommendation
+    } = await import('./services/wineRecommendations');
+
+    // Get wine scores for analysis
+    const wineScoresData = await this.getUserWineScores(email);
+    const wines = wineScoresData?.scores || [];
+
+    if (wines.length === 0) {
+      return [];
+    }
+
+    if (type === 'region') {
+      return this.getRegionExploreRecommendations(wines, getAllRegionRecommendations, generateGPTRecommendation);
+    } else {
+      return this.getGrapeExploreRecommendations(wines, getAllGrapeRecommendations, generateGPTRecommendation);
+    }
+  }
+
+  private async getRegionExploreRecommendations(
+    wines: any[],
+    getAllRegionRecommendations: any,
+    generateGPTRecommendation: any
+  ): Promise<ExploreRecommendation[]> {
+    // Group wines by region and calculate stats
+    const regionStats = new Map<string, {
+      count: number;
+      totalScore: number;
+      descriptors: Set<string>;
+    }>();
+
+    wines.forEach((wine: any) => {
+      if (!wine.region) return;
+
+      const stats = regionStats.get(wine.region) || {
+        count: 0,
+        totalScore: 0,
+        descriptors: new Set<string>()
+      };
+
+      stats.count++;
+      stats.totalScore += wine.averageScore || 0;
+
+      // Collect descriptors from grape varietals
+      if (wine.grapeVarietals && Array.isArray(wine.grapeVarietals)) {
+        wine.grapeVarietals.forEach((g: string) => stats.descriptors.add(g));
+      }
+
+      regionStats.set(wine.region, stats);
+    });
+
+    // Convert to LikedWine array, sorted by avg rating
+    const likedRegions: LikedWine[] = Array.from(regionStats.entries())
+      .map(([region, stats]) => ({
+        name: region,
+        region,
+        avgRating: Math.round((stats.totalScore / stats.count) * 10) / 10,
+        descriptors: Array.from(stats.descriptors).slice(0, 3),
+        wineCount: stats.count
+      }))
+      .filter(r => r.avgRating >= 3.5) // Only recommend based on wines they liked
+      .sort((a, b) => b.avgRating - a.avgRating)
+      .slice(0, 3); // Top 3 regions
+
+    // Get static recommendations
+    const recommendations = getAllRegionRecommendations(likedRegions);
+
+    // For regions without static mappings, try GPT
+    const missingRecommendations = likedRegions.filter(
+      liked => !recommendations.some((r: ExploreRecommendation) => r.likedWine.region === liked.region)
+    );
+
+    for (const liked of missingRecommendations.slice(0, 2)) { // Limit GPT calls
+      const gptRec = await generateGPTRecommendation(liked, 'region');
+      if (gptRec) {
+        recommendations.push({
+          likedWine: liked,
+          tryNext: gptRec,
+          type: 'region' as const
+        });
+      }
+    }
+
+    return recommendations.slice(0, 3); // Return top 3
+  }
+
+  private async getGrapeExploreRecommendations(
+    wines: any[],
+    getAllGrapeRecommendations: any,
+    generateGPTRecommendation: any
+  ): Promise<ExploreRecommendation[]> {
+    // Group wines by grape and calculate stats
+    const grapeStats = new Map<string, {
+      count: number;
+      totalScore: number;
+      descriptors: Set<string>;
+    }>();
+
+    wines.forEach((wine: any) => {
+      if (!wine.grapeVarietals || !Array.isArray(wine.grapeVarietals)) return;
+
+      wine.grapeVarietals.forEach((grape: string) => {
+        const stats = grapeStats.get(grape) || {
+          count: 0,
+          totalScore: 0,
+          descriptors: new Set<string>()
+        };
+
+        stats.count++;
+        stats.totalScore += wine.averageScore || 0;
+
+        // Add region as descriptor
+        if (wine.region) {
+          stats.descriptors.add(wine.region);
+        }
+
+        grapeStats.set(grape, stats);
+      });
+    });
+
+    // Convert to LikedWine array, sorted by avg rating
+    const likedGrapes: LikedWine[] = Array.from(grapeStats.entries())
+      .map(([grape, stats]) => ({
+        name: grape,
+        grape,
+        avgRating: Math.round((stats.totalScore / stats.count) * 10) / 10,
+        descriptors: Array.from(stats.descriptors).slice(0, 3),
+        wineCount: stats.count
+      }))
+      .filter(g => g.avgRating >= 3.5) // Only recommend based on wines they liked
+      .sort((a, b) => b.avgRating - a.avgRating)
+      .slice(0, 3); // Top 3 grapes
+
+    // Get static recommendations
+    const recommendations = getAllGrapeRecommendations(likedGrapes);
+
+    // For grapes without static mappings, try GPT
+    const missingRecommendations = likedGrapes.filter(
+      liked => !recommendations.some((r: ExploreRecommendation) => r.likedWine.grape === liked.grape)
+    );
+
+    for (const liked of missingRecommendations.slice(0, 2)) { // Limit GPT calls
+      const gptRec = await generateGPTRecommendation(liked, 'grape');
+      if (gptRec) {
+        recommendations.push({
+          likedWine: liked,
+          tryNext: gptRec,
+          type: 'grape' as const
+        });
+      }
+    }
+
+    return recommendations.slice(0, 3); // Return top 3
   }
 }
 

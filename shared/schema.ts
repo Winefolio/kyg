@@ -574,6 +574,29 @@ export interface ConversationStarters {
   };
 }
 
+// Phase 2: Explore recommendations - "You liked X → Try Y"
+export interface LikedWine {
+  name: string;
+  region?: string;
+  grape?: string;
+  avgRating: number;
+  descriptors: string[];
+  wineCount: number;
+}
+
+export interface WineRecommendation {
+  name: string;
+  region?: string;
+  whyYoullLikeIt: string;
+  deeperExplanation: string;
+}
+
+export interface ExploreRecommendation {
+  likedWine: LikedWine;
+  tryNext: WineRecommendation;
+  type: 'region' | 'grape';
+}
+
 // ============================================
 // SOLO TASTING TABLES (Product Pivot - Sprint 1)
 // ============================================
