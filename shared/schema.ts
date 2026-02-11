@@ -530,11 +530,48 @@ export interface ValidationRules {
 }
 
 export interface SommelierTips {
+  wineArchetype?: string; // Phase 1: Wine identity (e.g., "Bold Explorer")
   preferenceProfile: string;
   redDescription: string;
   whiteDescription: string;
   questions: string[];
   priceGuidance: string;
+}
+
+// Phase 1: Always-available conversation starters from database
+// These render immediately without waiting for GPT
+export interface ConversationStarters {
+  favoriteRegion: {
+    region: string;
+    wines: number;
+    avgRating: number;
+    suggestion: string;
+  } | null;
+  favoriteGrape: {
+    grape: string;
+    wines: number;
+    avgRating: number;
+    suggestion: string;
+  } | null;
+  signatureWines: {
+    red: {
+      name: string;
+      region: string;
+      rating: number;
+      description: string;
+    } | null;
+    white: {
+      name: string;
+      region: string;
+      rating: number;
+      description: string;
+    } | null;
+  };
+  quickFacts: {
+    totalWines: number;
+    avgRating: number;
+    preferredStyle: string;
+  };
 }
 
 // ============================================
@@ -549,7 +586,9 @@ export const users = pgTable("users", {
   // Tasting level progression
   tastingLevel: varchar("tasting_level", { length: 20 }).default('intro').notNull(), // 'intro', 'intermediate', 'advanced'
   tastingsCompleted: integer("tastings_completed").default(0).notNull(),
-  levelUpPromptEligible: boolean("level_up_prompt_eligible").default(false).notNull()
+  levelUpPromptEligible: boolean("level_up_prompt_eligible").default(false).notNull(),
+  // Phase 1: Wine archetype for identity (e.g., "Bold Explorer", "Elegant Traditionalist")
+  wineArchetype: varchar("wine_archetype", { length: 100 })
 }, (table) => ({
   emailIdx: index("idx_users_email").on(table.email)
 }));

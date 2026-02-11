@@ -328,6 +328,24 @@ export function registerDashboardRoutes(app: Express) {
     }
   });
 
+  // Phase 1: Get always-available conversation starters from database
+  // This endpoint returns immediately without waiting for GPT
+  app.get("/api/dashboard/:email/conversation-starters", async (req, res) => {
+    const { email } = req.params;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email parameter is required" });
+    }
+
+    try {
+      const starters = await storage.getConversationStarters(email);
+      res.json(starters);
+    } catch (error) {
+      console.error("Error fetching conversation starters:", error);
+      res.status(500).json({ message: "Internal server error", error: String(error) });
+    }
+  });
+
   // Get AI-generated sommelier conversation starters
   app.get("/api/dashboard/:email/sommelier-tips", async (req, res) => {
     const { email } = req.params;

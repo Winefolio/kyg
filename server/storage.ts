@@ -18,6 +18,7 @@ import {
   type GlossaryTerm,
   type InsertGlossaryTerm,
   type SommelierTips,
+  type ConversationStarters,
   type User,
   type Tasting,
   type Journey,
@@ -5933,6 +5934,157 @@ export class DatabaseStorage implements IStorage {
 
     return result;
   }
+
+  // ============================================
+  // Phase 1: Conversation Starters (Always Available from DB)
+  // ============================================
+  async getConversationStarters(email: string): Promise<ConversationStarters> {
+    // Get wine scores for analysis
+    const wineScoresData = await this.getUserWineScores(email);
+    const wines = wineScoresData?.scores || [];
+
+    // Quick facts
+    const totalWines = wines.length;
+    const avgRating = totalWines > 0
+      ? wines.reduce((sum: number, w: any) => sum + (w.averageScore || 0), 0) / totalWines
+      : 0;
+
+    // Determine preferred style based on ratings
+    const redWines = wines.filter((w: any) => w.wineType === 'red');
+    const whiteWines = wines.filter((w: any) => w.wineType === 'white');
+    const avgRedRating = redWines.length > 0
+      ? redWines.reduce((sum: number, w: any) => sum + (w.averageScore || 0), 0) / redWines.length
+      : 0;
+    const avgWhiteRating = whiteWines.length > 0
+      ? whiteWines.reduce((sum: number, w: any) => sum + (w.averageScore || 0), 0) / whiteWines.length
+      : 0;
+
+    let preferredStyle = "Exploring";
+    if (avgRedRating > avgWhiteRating + 0.3) preferredStyle = "Bold reds";
+    else if (avgWhiteRating > avgRedRating + 0.3) preferredStyle = "Crisp whites";
+    else if (totalWines > 0) preferredStyle = "Well-balanced";
+
+    // Calculate favorite region with scores
+    const regionStats = new Map<string, { count: number; totalScore: number }>();
+    wines.forEach((wine: any) => {
+      if (wine.region) {
+        const stats = regionStats.get(wine.region) || { count: 0, totalScore: 0 };
+        stats.count++;
+        stats.totalScore += wine.averageScore || 0;
+        regionStats.set(wine.region, stats);
+      }
+    });
+
+    let favoriteRegion: ConversationStarters['favoriteRegion'] = null;
+    if (regionStats.size > 0) {
+      // Sort by avg rating first, then by count
+      const sortedRegions = Array.from(regionStats.entries())
+        .map(([region, stats]) => ({
+          region,
+          count: stats.count,
+          avgRating: stats.totalScore / stats.count
+        }))
+        .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count);
+
+      const top = sortedRegions[0];
+      favoriteRegion = {
+        region: top.region,
+        wines: top.count,
+        avgRating: Math.round(top.avgRating * 10) / 10,
+        suggestion: `I've been exploring ${top.region} wines lately`
+      };
+    }
+
+    // Calculate favorite grape with scores
+    const grapeStats = new Map<string, { count: number; totalScore: number }>();
+    wines.forEach((wine: any) => {
+      if (wine.grapeVarietals && Array.isArray(wine.grapeVarietals)) {
+        wine.grapeVarietals.forEach((grape: string) => {
+          const stats = grapeStats.get(grape) || { count: 0, totalScore: 0 };
+          stats.count++;
+          stats.totalScore += wine.averageScore || 0;
+          grapeStats.set(grape, stats);
+        });
+      }
+    });
+
+    let favoriteGrape: ConversationStarters['favoriteGrape'] = null;
+    if (grapeStats.size > 0) {
+      const sortedGrapes = Array.from(grapeStats.entries())
+        .map(([grape, stats]) => ({
+          grape,
+          count: stats.count,
+          avgRating: stats.totalScore / stats.count
+        }))
+        .sort((a, b) => b.avgRating - a.avgRating || b.count - a.count);
+
+      const top = sortedGrapes[0];
+      favoriteGrape = {
+        grape: top.grape,
+        wines: top.count,
+        avgRating: Math.round(top.avgRating * 10) / 10,
+        suggestion: `I'm really into ${top.grape} right now`
+      };
+    }
+
+    // Find signature wines (top-rated red and white)
+    const topRed = redWines
+      .filter((w: any) => w.averageScore > 0)
+      .sort((a: any, b: any) => (b.averageScore || 0) - (a.averageScore || 0))[0];
+
+    const topWhite = whiteWines
+      .filter((w: any) => w.averageScore > 0)
+      .sort((a: any, b: any) => (b.averageScore || 0) - (a.averageScore || 0))[0];
+
+    const signatureWines: ConversationStarters['signatureWines'] = {
+      red: topRed ? {
+        name: topRed.wineName,
+        region: topRed.region || 'Unknown region',
+        rating: Math.round((topRed.averageScore || 0) * 10) / 10,
+        description: this.generateWineDescription(topRed)
+      } : null,
+      white: topWhite ? {
+        name: topWhite.wineName,
+        region: topWhite.region || 'Unknown region',
+        rating: Math.round((topWhite.averageScore || 0) * 10) / 10,
+        description: this.generateWineDescription(topWhite)
+      } : null
+    };
+
+    return {
+      favoriteRegion,
+      favoriteGrape,
+      signatureWines,
+      quickFacts: {
+        totalWines,
+        avgRating: Math.round(avgRating * 10) / 10,
+        preferredStyle
+      }
+    };
+  }
+
+  // Helper to generate a brief wine description
+  private generateWineDescription(wine: any): string {
+    const parts: string[] = [];
+
+    if (wine.grapeVarietals && wine.grapeVarietals.length > 0) {
+      parts.push(wine.grapeVarietals[0]);
+    }
+
+    if (wine.region) {
+      parts.push(`from ${wine.region}`);
+    }
+
+    if (wine.vintage) {
+      parts.push(`(${wine.vintage})`);
+    }
+
+    if (parts.length === 0) {
+      return "A wine you rated highly";
+    }
+
+    return parts.join(' ');
+  }
 }
 
 // LLM Integration Function for Sommelier Tips
@@ -6056,6 +6208,7 @@ Never hedge with "limited data" or "need more tastings" - treat their choices as
 
 Respond ONLY with JSON in this exact format:
 {
+  "wineArchetype": "2-3 word memorable identity (e.g., Bold Explorer, Elegant Traditionalist)",
   "preferenceProfile": "2-3 sentences describing their palate like a wine-savvy friend would",
   "redDescription": "their red wine identity + one grape + one region + what to say",
   "whiteDescription": "their white wine identity + one grape + one region + what to say",
@@ -6127,7 +6280,18 @@ Respond ONLY with JSON in this exact format:
 
 // Validate and sanitize JSON response from OpenAI
 function validateAndSanitizeSommelierTips(jsonResponse: any, context: any): SommelierTips {
+  // Generate fallback archetype based on preferences
+  let fallbackArchetype = "Wine Explorer";
+  if (context.redWines > context.whiteWines * 2) {
+    fallbackArchetype = "Bold Enthusiast";
+  } else if (context.whiteWines > context.redWines * 2) {
+    fallbackArchetype = "Crisp Connoisseur";
+  } else if (context.totalWines > 10) {
+    fallbackArchetype = "Curious Wanderer";
+  }
+
   return {
+    wineArchetype: jsonResponse.wineArchetype || fallbackArchetype,
     preferenceProfile: jsonResponse.preferenceProfile || `I enjoy wines from ${context.topRegion}, particularly ${context.topGrape}. My average rating is ${context.avgRating.toFixed(1)}/5.`,
     redDescription: jsonResponse.redDescription || "I'm interested in exploring red wines and understanding their characteristics.",
     whiteDescription: jsonResponse.whiteDescription || "I'd like to explore white wines and discover my preferences.",
@@ -6144,6 +6308,7 @@ function validateAndSanitizeSommelierTips(jsonResponse: any, context: any): Somm
 // Fallback function if OpenAI is unavailable
 function generateFallbackTips(email: string): SommelierTips {
   return {
+    wineArchetype: "Wine Explorer",
     preferenceProfile: "I'm developing my wine palate and enjoy exploring different styles and regions to understand my preferences better.",
     redDescription: "I'm interested in red wines with good balance and approachable tannins.",
     whiteDescription: "I enjoy white wines that are crisp and refreshing with good acidity.",
