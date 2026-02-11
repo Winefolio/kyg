@@ -21,6 +21,8 @@ import {
   type ConversationStarters,
   type LikedWine,
   type ExploreRecommendation,
+  type JourneyRecommendationsResponse,
+  type JourneyMatch,
   type User,
   type Tasting,
   type Journey,
@@ -6248,6 +6250,163 @@ export class DatabaseStorage implements IStorage {
     }
 
     return recommendations.slice(0, 3); // Return top 3
+  }
+
+  // ============================================
+  // Phase 4: Journey Recommendations
+  // ============================================
+  async getJourneyRecommendations(email: string): Promise<JourneyRecommendationsResponse> {
+    // 1. Get user's taste preferences
+    const userWineScores = await this.getUserWineScores(email);
+    const user = await this.getUserByEmail(email);
+    const tastingLevel = user?.tastingLevel || 'intro';
+
+    // Aggregate preferences from wine scores
+    const regionCounts = new Map<string, { count: number; totalScore: number }>();
+    const grapeCounts = new Map<string, { count: number; totalScore: number }>();
+    let redCount = 0, whiteCount = 0, redTotalScore = 0, whiteTotalScore = 0;
+
+    for (const wine of userWineScores.scores || []) {
+      const score = wine.averageScore || 0;
+
+      // Track wine type preference
+      if (wine.wineType === 'red') {
+        redCount++;
+        redTotalScore += score;
+      } else if (wine.wineType === 'white') {
+        whiteCount++;
+        whiteTotalScore += score;
+      }
+
+      // Track region preferences
+      if (wine.region) {
+        const existing = regionCounts.get(wine.region) || { count: 0, totalScore: 0 };
+        existing.count++;
+        existing.totalScore += score;
+        regionCounts.set(wine.region, existing);
+      }
+
+      // Track grape preferences
+      const grapes = wine.grapeVarietals as string[] || [];
+      for (const grape of grapes) {
+        const existing = grapeCounts.get(grape) || { count: 0, totalScore: 0 };
+        existing.count++;
+        existing.totalScore += score;
+        grapeCounts.set(grape, existing);
+      }
+    }
+
+    // Determine wine type preference
+    const redAvg = redCount > 0 ? redTotalScore / redCount : 0;
+    const whiteAvg = whiteCount > 0 ? whiteTotalScore / whiteCount : 0;
+    let preferredWineType: 'red' | 'white' | 'balanced' = 'balanced';
+    if (redAvg > whiteAvg + 0.5) preferredWineType = 'red';
+    else if (whiteAvg > redAvg + 0.5) preferredWineType = 'white';
+
+    // Get top regions and grapes (sorted by avg score, minimum 2 tastings)
+    const topRegions = Array.from(regionCounts.entries())
+      .filter(([_, stats]) => stats.count >= 2)
+      .map(([name, stats]) => ({ name, avgScore: stats.totalScore / stats.count }))
+      .sort((a, b) => b.avgScore - a.avgScore)
+      .slice(0, 3)
+      .map(r => r.name);
+
+    const topGrapes = Array.from(grapeCounts.entries())
+      .filter(([_, stats]) => stats.count >= 2)
+      .map(([name, stats]) => ({ name, avgScore: stats.totalScore / stats.count }))
+      .sort((a, b) => b.avgScore - a.avgScore)
+      .slice(0, 3)
+      .map(g => g.name);
+
+    // 2. Get all published journeys
+    const allJourneys = await this.getPublishedJourneys();
+
+    // 3. Get user's journeys (to exclude completed ones)
+    const userJourneysList = user ? await db
+      .select()
+      .from(userJourneys)
+      .where(eq(userJourneys.userId, user.id)) : [];
+
+    const completedJourneyIds = new Set(
+      userJourneysList
+        .filter(uj => uj.completedAt !== null)
+        .map(uj => uj.journeyId)
+    );
+    const inProgressJourneyIds = new Set(
+      userJourneysList
+        .filter(uj => uj.completedAt === null)
+        .map(uj => uj.journeyId)
+    );
+
+    // 4. Score each journey
+    const scoredJourneys: JourneyMatch[] = allJourneys
+      .filter(journey => !completedJourneyIds.has(journey.id)) // Exclude completed
+      .map(journey => {
+        let matchScore = 50; // Base score
+        const matchReasons: string[] = [];
+
+        // Wine type alignment (+20 points for match)
+        if (journey.wineType) {
+          if (journey.wineType === preferredWineType) {
+            matchScore += 20;
+            matchReasons.push(`Matches your love of ${preferredWineType} wines`);
+          } else if (journey.wineType === 'mixed') {
+            matchScore += 10;
+            matchReasons.push('Explore both red and white wines');
+          }
+        }
+
+        // Difficulty alignment (+15 points for match)
+        const difficultyMap: Record<string, number> = { beginner: 1, intermediate: 2, advanced: 3 };
+        const levelMap: Record<string, number> = { intro: 1, intermediate: 2, advanced: 3 };
+        const journeyDiff = difficultyMap[journey.difficultyLevel] || 1;
+        const userLevel = levelMap[tastingLevel] || 1;
+
+        if (journeyDiff === userLevel) {
+          matchScore += 15;
+          matchReasons.push('Perfect for your current level');
+        } else if (journeyDiff === userLevel + 1) {
+          matchScore += 10;
+          matchReasons.push('A great next step in your journey');
+        } else if (journeyDiff > userLevel + 1) {
+          matchScore -= 10;
+        }
+
+        // In-progress journeys get priority
+        if (inProgressJourneyIds.has(journey.id)) {
+          matchScore += 25;
+          matchReasons.unshift('Continue where you left off');
+        }
+
+        // Add a reason if no specific matches found
+        if (matchReasons.length === 0) {
+          matchReasons.push('Discover something new');
+        }
+
+        return {
+          journeyId: journey.id,
+          title: journey.title,
+          description: journey.description,
+          difficultyLevel: journey.difficultyLevel,
+          wineType: journey.wineType,
+          totalChapters: journey.totalChapters,
+          coverImageUrl: journey.coverImageUrl,
+          matchScore: Math.min(100, Math.max(0, matchScore)),
+          matchReasons
+        };
+      })
+      .sort((a, b) => b.matchScore - a.matchScore)
+      .slice(0, 5); // Top 5 recommendations
+
+    return {
+      recommendations: scoredJourneys,
+      userPreferences: {
+        preferredWineType,
+        topRegions,
+        topGrapes,
+        tastingLevel
+      }
+    };
   }
 }
 
