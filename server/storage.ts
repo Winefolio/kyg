@@ -6513,7 +6513,7 @@ export async function generateSommelierTips(email: string): Promise<SommelierTip
 
       console.log(`🤖 Calling OpenAI API...`);
       const completion = await openai.chat.completions.create({
-        model: "gpt-5-mini", // Upgraded from gpt-4o - better accuracy, lower cost
+        model: "gpt-5.2", // Using GPT-5.2 for quality sommelier tips
         messages: [
           {
             role: "system",
