@@ -392,6 +392,24 @@ export function registerDashboardRoutes(app: Express) {
     }
   });
 
+  // Phase 4: Get recommended journeys based on taste preferences
+  // Returns journeys scored by alignment with user's wine preferences
+  app.get("/api/dashboard/:email/recommended-journeys", async (req, res) => {
+    const { email } = req.params;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email parameter is required" });
+    }
+
+    try {
+      const recommendations = await storage.getJourneyRecommendations(email);
+      res.json(recommendations);
+    } catch (error) {
+      console.error("Error fetching journey recommendations:", error);
+      res.status(500).json({ message: "Internal server error", error: String(error) });
+    }
+  });
+
   // Get AI-generated sommelier conversation starters
   app.get("/api/dashboard/:email/sommelier-tips", async (req, res) => {
     const { email } = req.params;

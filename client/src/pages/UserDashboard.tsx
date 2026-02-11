@@ -26,6 +26,7 @@ import { ConversationStarters } from "@/components/dashboard/ConversationStarter
 import { WineIdentityCard } from "@/components/dashboard/WineIdentityCard";
 import { ExploreRecommendations } from "@/components/dashboard/ExploreRecommendations";
 import { ProducerRecommendations } from "@/components/dashboard/ProducerRecommendations";
+import { JourneyRecommendations } from "@/components/dashboard/JourneyRecommendations";
 import type { WineCharacteristicsData } from "@shared/schema";
 
 interface UserDashboardData {
@@ -978,6 +979,9 @@ export default function UserDashboard() {
 
             {/* Phase 3: Producer Recommendations - Specific wines to buy */}
             <ProducerRecommendations email={email || ''} />
+
+            {/* Phase 4: Journey Recommendations - Learning paths based on taste */}
+            <JourneyRecommendations email={email || ''} />
           </TabsContent>
 
           {/* Wine Collection Tab */}

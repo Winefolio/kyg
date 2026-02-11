@@ -616,6 +616,29 @@ export interface ProducerRecommendationsResponse {
   generatedAt: string;
 }
 
+// Phase 4: Journey recommendations based on taste preferences
+export interface JourneyMatch {
+  journeyId: number;
+  title: string;
+  description: string | null;
+  difficultyLevel: string;
+  wineType: string | null;
+  totalChapters: number;
+  coverImageUrl: string | null;
+  matchScore: number; // 0-100
+  matchReasons: string[]; // Why this journey fits the user
+}
+
+export interface JourneyRecommendationsResponse {
+  recommendations: JourneyMatch[];
+  userPreferences: {
+    preferredWineType: 'red' | 'white' | 'balanced';
+    topRegions: string[];
+    topGrapes: string[];
+    tastingLevel: string;
+  };
+}
+
 // ============================================
 // SOLO TASTING TABLES (Product Pivot - Sprint 1)
 // ============================================
