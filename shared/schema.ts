@@ -597,6 +597,25 @@ export interface ExploreRecommendation {
   type: 'region' | 'grape';
 }
 
+// Phase 3: Producer recommendations by price tier (LLM-powered)
+export interface ProducerRecommendation {
+  producerName: string;
+  wineName: string;
+  estimatedPrice: string;
+  grapeVariety: string;
+  region: string;
+  whyForYou: string;
+  whereToBuy: string[];
+  tastingNotes: string;
+}
+
+export interface ProducerRecommendationsResponse {
+  recommendations: ProducerRecommendation[];
+  priceDisclaimer: string;
+  priceTier: 'budget' | 'mid' | 'premium';
+  generatedAt: string;
+}
+
 // ============================================
 // SOLO TASTING TABLES (Product Pivot - Sprint 1)
 // ============================================
