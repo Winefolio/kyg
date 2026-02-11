@@ -15,13 +15,17 @@ import {
   Wine, BarChart3, Clock, Star, MapPin, Filter,
   ArrowLeft, Search, Calendar, Trophy, TrendingUp,
   Heart, Eye, Share2, Download, MoreHorizontal,
-  Globe, Users, Mic, Map, Menu, AlertCircle, RefreshCcw, Wifi, WifiOff, LogOut,
+  Globe, Users, Map, Menu, AlertCircle, RefreshCcw, Wifi, WifiOff, LogOut,
   User, Users2, GraduationCap
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import WineMap from "@/components/WineMap";
 import { WineInsights } from "@/components/WineInsights";
+import { ConversationStarters } from "@/components/dashboard/ConversationStarters";
+import { WineIdentityCard } from "@/components/dashboard/WineIdentityCard";
+import { ExploreRecommendations } from "@/components/dashboard/ExploreRecommendations";
+import { ProducerRecommendations } from "@/components/dashboard/ProducerRecommendations";
 import type { WineCharacteristicsData } from "@shared/schema";
 
 interface UserDashboardData {
@@ -157,14 +161,6 @@ interface TasteProfile {
     topRegion: { name: string; count: number; percentage: number };
     topGrape: { name: string; count: number; percentage: number };
   };
-}
-
-interface SommelierTips {
-  preferenceProfile: string;
-  redDescription: string;
-  whiteDescription: string;
-  questions: string[];
-  priceGuidance: string;
 }
 
 export default function UserDashboard() {
@@ -357,29 +353,19 @@ export default function UserDashboard() {
     enabled: !!email,
   });
 
-  // Fetch sommelier feedback first
+  // Fetch sommelier feedback to check if user has received feedback
+  // (used to enable GPT-enhanced tips in ConversationStarters component)
   const { data: sommelierFeedback } = useQuery<string[]>({
     queryKey: [`/api/dashboard/${email}/sommelier-feedback`],
     enabled: !!email,
   });
 
-  // Only fetch sommelier tips if we don't have feedback
-  const { data: sommelierTips, isLoading: tipsLoading, error: tipsError, refetch: refetchTips } = useQuery<SommelierTips>({
-    queryKey: [`/api/dashboard/${email}/sommelier-tips`],
-    enabled: !!email && !!sommelierFeedback && sommelierFeedback.length > 0,
-    retry: false, // Don't retry 404 errors
-  });
-
-  // Use sommelier tips directly
-  const finalSommelierTips = sommelierTips;
-
   // Comprehensive error checking
   const hasServerError = dashboardError && !dashboardError.message?.includes('404');
-  const hasNetworkError = dashboardError?.message?.includes('Network') || 
+  const hasNetworkError = dashboardError?.message?.includes('Network') ||
                           scoresError?.message?.includes('Network') ||
                           historyError?.message?.includes('Network') ||
-                          profileError?.message?.includes('Network') ||
-                          tipsError?.message?.includes('Network');
+                          profileError?.message?.includes('Network');
 
   // Show loading state
   if (dashboardLoading) {
@@ -814,18 +800,17 @@ export default function UserDashboard() {
             )}
 
             {/* Error states for overview data */}
-            {(scoresError || historyError || tipsError) && (
+            {(scoresError || historyError) && (
               <ErrorCard
                 title="Unable to Load Dashboard Data"
                 message={
-                  !isOnline 
+                  !isOnline
                     ? "You're offline. Please check your internet connection and try again."
                     : "There was an error loading your dashboard data. Please try again."
                 }
                 onRetry={() => {
                   refetchScores();
                   refetchHistory();
-                  refetchTips();
                 }}
               />
             )}
@@ -841,7 +826,7 @@ export default function UserDashboard() {
             )}
 
             {/* Only show content when main data is loaded */}
-            {!scoresLoading && !historyLoading && !dashboardLoading && !profileLoading && !(scoresError || historyError || tipsError) && (
+            {!scoresLoading && !historyLoading && !dashboardLoading && !profileLoading && !(scoresError || historyError) && (
               <>
             {/* Stats Overview - Only visible on Taste Profile tab */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -975,57 +960,24 @@ export default function UserDashboard() {
               </>
             )}
 
-            {/* Sommelier Conversation Starters - Always visible with independent loading */}
-            <Card className="bg-white/10 backdrop-blur-xl border-white/20">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center space-x-2">
-                  <Mic className="w-5 h-5" />
-                  <span>What to Say to the Sommelier at the Restaurant</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {sommelierFeedback?.length === 0 ? (
-                  <div className="text-center py-8 text-purple-200">
-                    <p className="text-lg font-medium mb-2">Awaiting feedback from Sommelier...</p>
-                    <p className="text-sm text-purple-200/70">Your personalized tips will appear here after receiving your first sommelier feedback.</p>
-                  </div>
-                ) : tipsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-300 mx-auto mb-4"></div>
-                      <p className="text-purple-200">Loading sommelier tips...</p>
-                    </div>
-                  </div>
-                ) : finalSommelierTips ? (
-                  <>
-                    <div className="space-y-4">
-                      <h4 className="text-white font-medium">Your Preference Profile</h4>
-                      <div className="space-y-2 text-purple-200">
-                        <p>{finalSommelierTips.preferenceProfile}</p>
-                        {finalSommelierTips.redDescription && <p>{finalSommelierTips.redDescription}</p>}
-                        {finalSommelierTips.whiteDescription && <p>{finalSommelierTips.whiteDescription}</p>}
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <h4 className="text-white font-medium">Questions to Ask</h4>
-                      <ul className="space-y-2 text-purple-200">
-                        {finalSommelierTips.questions.map((question, index) => (
-                          <li key={index} className="flex items-start space-x-2">
-                            <span className="text-white mt-1">•</span>
-                            <span>{question}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center py-8 text-purple-200">
-                    <p>No sommelier tips available at the moment.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Phase 1: Wine Identity Card - Shows archetype and preference breakdown */}
+            <WineIdentityCard
+              email={email || ''}
+              preferences={unifiedPreferences}
+              hasSommelierFeedback={Boolean(sommelierFeedback && sommelierFeedback.length > 0)}
+            />
+
+            {/* Phase 1: Conversation Starters - Always renders from DB, GPT tips as enhancement */}
+            <ConversationStarters
+              email={email || ''}
+              hasSommelierFeedback={Boolean(sommelierFeedback && sommelierFeedback.length > 0)}
+            />
+
+            {/* Phase 2: Explore Recommendations - "You liked X → Try Y" */}
+            <ExploreRecommendations email={email || ''} />
+
+            {/* Phase 3: Producer Recommendations - Specific wines to buy */}
+            <ProducerRecommendations email={email || ''} />
           </TabsContent>
 
           {/* Wine Collection Tab */}
