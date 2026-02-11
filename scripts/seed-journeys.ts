@@ -9,9 +9,10 @@ if (!connectionString) {
 }
 
 const sql = postgres(connectionString, {
-  ssl: false,
+  ssl: process.env.NODE_ENV === 'production' ? 'require' : false,
   max: 1,
-  connect_timeout: 30
+  connect_timeout: 30,
+  idle_timeout: 30
 });
 
 // Helper to create wine options
@@ -1151,7 +1152,6 @@ async function seedJourneys() {
             "Recognize stone fruit and citrus",
             "Appreciate the coastal influence"
           ])},
-          ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify([
             { question: "Do you taste any salinity?", category: "taste" },
             { question: "What fruits come through?", category: "taste" },
