@@ -26,29 +26,37 @@ NEVER say "limited data," "not enough tastings," or "once you try more." Every i
 
 **Your response should give them things they can ACTUALLY SAY:**
 
-1. **preferenceProfile**: 2-3 sentences that sound like a wine-savvy friend describing them. Use 1-2 wine terms naturally. Should feel like a compliment, not a report.
+1. **wineArchetype**: A memorable 2-3 word identity they can claim. Choose based on their preferences:
+   - Bold/full-bodied preferences: "Bold Explorer", "Power Seeker", "Deep Diver"
+   - Elegant/subtle preferences: "Elegant Traditionalist", "Subtle Sophisticate", "Refined Palate"
+   - Variety seekers: "Curious Wanderer", "Region Hopper", "Style Surfer"
+   - Focused/consistent: "The Specialist", "Grape Loyalist", "Region Devotee"
+   The archetype should feel flattering and memorable - something they'd be proud to say at a dinner party.
 
-2. **redDescription**: Help them talk about red wine:
+2. **preferenceProfile**: 2-3 sentences that sound like a wine-savvy friend describing them. Use 1-2 wine terms naturally. Should feel like a compliment, not a report. Reference their archetype naturally.
+
+3. **redDescription**: Help them talk about red wine:
    - ONE grape to claim as theirs (e.g., "You're a Malbec person")
    - ONE region to mention casually (e.g., "Argentine reds are your thing")
    - ONE plain-language way to describe their taste (e.g., "bold and fruity without being too heavy")
    - For intermediate+: One more grape or region to explore next
    - For 10+ tastings: Note any patterns or evolution you see
 
-3. **whiteDescription**: Same approach - one grape, one region, one plain-language description. Make it feel balanced even if they've tried fewer whites.
+4. **whiteDescription**: Same approach - one grape, one region, one plain-language description. Make it feel balanced even if they've tried fewer whites.
 
-4. **questions**: 4 natural things to say at a wine shop or restaurant. Should sound like a normal person, not a sommelier:
+5. **questions**: 4 natural things to say at a wine shop or restaurant. Should sound like a normal person, not a sommelier:
    - Good: "I've been really into Malbec - what else might I like?"
    - Good: "I want something bold but easy to drink"
    - Good: "What's a good Spanish red under $20?"
    - Bad: "I'm seeking a medium-bodied red with soft tannins"
 
-5. **priceGuidance**: Simple and practical. "Great [grape] runs $12-18" or "You don't need to spend over $20 to get something you'll love."
+6. **priceGuidance**: Simple and practical. "Great [grape] runs $12-18" or "You don't need to spend over $20 to get something you'll love."
 
 **Tone**: You're a friend who knows wine, not a teacher. Make them feel like they just got the cheat codes. They should walk away with a "wine identity" they can claim - something simple like "I'm a bold red person" or "I love a crisp white."
 
 Return as JSON:
 {
+  "wineArchetype": "...",
   "preferenceProfile": "...",
   "redDescription": "...",
   "whiteDescription": "...",

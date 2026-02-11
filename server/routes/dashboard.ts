@@ -328,6 +328,70 @@ export function registerDashboardRoutes(app: Express) {
     }
   });
 
+  // Phase 1: Get always-available conversation starters from database
+  // This endpoint returns immediately without waiting for GPT
+  app.get("/api/dashboard/:email/conversation-starters", async (req, res) => {
+    const { email } = req.params;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email parameter is required" });
+    }
+
+    try {
+      const starters = await storage.getConversationStarters(email);
+      res.json(starters);
+    } catch (error) {
+      console.error("Error fetching conversation starters:", error);
+      res.status(500).json({ message: "Internal server error", error: String(error) });
+    }
+  });
+
+  // Phase 2: Get explore recommendations ("You liked X → Try Y")
+  // Returns region or grape recommendations with explanations
+  app.get("/api/dashboard/:email/explore-recommendations", async (req, res) => {
+    const { email } = req.params;
+    const { type = 'region' } = req.query;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email parameter is required" });
+    }
+
+    // Validate type parameter
+    const recommendationType = type === 'grape' ? 'grape' : 'region';
+
+    try {
+      const recommendations = await storage.getExploreRecommendations(email, recommendationType);
+      res.json(recommendations);
+    } catch (error) {
+      console.error("Error fetching explore recommendations:", error);
+      res.status(500).json({ message: "Internal server error", error: String(error) });
+    }
+  });
+
+  // Phase 3: Get producer recommendations by price tier (LLM-powered)
+  // Returns specific wines to buy based on user preferences and budget
+  app.get("/api/dashboard/:email/producer-recommendations", async (req, res) => {
+    const { email } = req.params;
+    const { tier = 'budget' } = req.query;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email parameter is required" });
+    }
+
+    // Validate tier parameter
+    const priceTier = ['budget', 'mid', 'premium'].includes(tier as string)
+      ? (tier as 'budget' | 'mid' | 'premium')
+      : 'budget';
+
+    try {
+      const recommendations = await generateProducerRecommendations(email, priceTier);
+      res.json(recommendations);
+    } catch (error) {
+      console.error("Error generating producer recommendations:", error);
+      res.status(500).json({ message: "Internal server error", error: String(error) });
+    }
+  });
+
   // Get AI-generated sommelier conversation starters
   app.get("/api/dashboard/:email/sommelier-tips", async (req, res) => {
     const { email } = req.params;
@@ -921,4 +985,120 @@ async function generateWineProfileSummaries(
     console.error('Error generating wine profile summaries:', error);
     throw error;
   }
+}
+
+// Phase 3: Generate producer recommendations using LLM
+async function generateProducerRecommendations(
+  email: string,
+  priceTier: 'budget' | 'mid' | 'premium'
+): Promise<{
+  recommendations: Array<{
+    producerName: string;
+    wineName: string;
+    estimatedPrice: string;
+    grapeVariety: string;
+    region: string;
+    whyForYou: string;
+    whereToBuy: string[];
+    tastingNotes: string;
+  }>;
+  priceDisclaimer: string;
+  priceTier: string;
+  generatedAt: string;
+}> {
+  if (!openai || !process.env.OPENAI_API_KEY) {
+    throw new Error("OpenAI not configured");
+  }
+
+  // Get user's taste profile data
+  const dashboardData = await storage.getUserDashboardData(email);
+  const wineScores = await storage.getUserWineScores(email);
+  const conversationStarters = await storage.getConversationStarters(email);
+
+  if (!dashboardData || !wineScores) {
+    throw new Error("No user data available");
+  }
+
+  // Build user profile context
+  const favoriteRegions = conversationStarters.favoriteRegion
+    ? [conversationStarters.favoriteRegion.region]
+    : [];
+  const favoriteGrapes = conversationStarters.favoriteGrape
+    ? [conversationStarters.favoriteGrape.grape]
+    : [];
+
+  // Determine preferred style
+  const redWines = wineScores.scores.filter((w: any) => w.wineType === 'red');
+  const whiteWines = wineScores.scores.filter((w: any) => w.wineType === 'white');
+  const avgRedRating = redWines.length > 0
+    ? redWines.reduce((sum: number, w: any) => sum + (w.averageScore || 0), 0) / redWines.length
+    : 0;
+  const avgWhiteRating = whiteWines.length > 0
+    ? whiteWines.reduce((sum: number, w: any) => sum + (w.averageScore || 0), 0) / whiteWines.length
+    : 0;
+
+  let preferredStyle = "balanced between reds and whites";
+  if (avgRedRating > avgWhiteRating + 0.5) preferredStyle = "bold red wines";
+  else if (avgWhiteRating > avgRedRating + 0.5) preferredStyle = "crisp white wines";
+
+  // Load prompt template
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const promptPath = path.join(process.cwd(), 'prompts', 'producer_recommendations.txt');
+
+  let promptTemplate: string;
+  try {
+    promptTemplate = await fs.readFile(promptPath, 'utf-8');
+  } catch (error) {
+    console.error('Failed to read producer recommendations prompt:', error);
+    throw new Error('Prompt template not found');
+  }
+
+  // Fill in the template
+  const prompt = promptTemplate
+    .replace('{favoriteRegions}', favoriteRegions.length > 0 ? favoriteRegions.join(', ') : 'exploring various regions')
+    .replace('{favoriteGrapes}', favoriteGrapes.length > 0 ? favoriteGrapes.join(', ') : 'exploring various grapes')
+    .replace('{avgRating}', (dashboardData.stats.averageScore || 0).toFixed(1))
+    .replace('{preferredStyle}', preferredStyle)
+    .replace('{bodyPreference}', 'medium to full-bodied') // Could be enhanced with actual preference data
+    .replace('{totalWines}', String(wineScores.scores.length))
+    .replace('{priceTier}', priceTier);
+
+  // Call GPT
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini", // Using mini for cost efficiency on structured output
+    messages: [
+      {
+        role: "system",
+        content: "You are a knowledgeable sommelier. Always recommend REAL wines from REAL producers with accurate pricing. Respond in valid JSON format only."
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    max_completion_tokens: 1000,
+    temperature: 0.7,
+    response_format: { type: "json_object" }
+  });
+
+  const responseContent = completion.choices[0]?.message?.content;
+  if (!responseContent) {
+    throw new Error('No response from OpenAI');
+  }
+
+  let result: { recommendations: any[]; priceDisclaimer?: string };
+  try {
+    result = JSON.parse(responseContent);
+  } catch (parseError) {
+    console.error('Failed to parse producer recommendations:', responseContent);
+    throw new Error('Invalid JSON response from OpenAI');
+  }
+
+  return {
+    recommendations: result.recommendations || [],
+    priceDisclaimer: result.priceDisclaimer || "Prices are approximate and may vary by location.",
+    priceTier,
+    generatedAt: new Date().toISOString()
+  };
 }
