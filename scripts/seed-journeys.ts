@@ -737,6 +737,571 @@ async function seedJourneys() {
       `;
     }
 
+    // ========================================
+    // Journey 6: Spanish Wine Essentials
+    // ========================================
+    const [journey6] = await sql`
+      INSERT INTO journeys (title, description, difficulty_level, estimated_duration, wine_type, is_published, total_chapters)
+      VALUES (
+        'Spanish Wine Essentials',
+        'Discover Spain''s incredible wine diversity, from the elegant Tempranillo of Rioja to the powerful reds of Ribera del Duero and Priorat.',
+        'beginner',
+        '4 wines',
+        'red',
+        true,
+        4
+      )
+      ON CONFLICT DO NOTHING
+      RETURNING id
+    `;
+
+    if (journey6?.id) {
+      console.log("Created Journey 6 (Spanish Wine Essentials):", journey6.id);
+
+      // Chapter 1: Rioja
+      const riojaOptions = createWineOptions(
+        { desc: "Rioja Crianza", askFor: "Ask for a Rioja Crianza under $18", min: 12, max: 18, producers: ["Marqués de Cáceres", "CVNE", "Bodegas Muga"] },
+        { desc: "Rioja Reserva", askFor: "Ask for a Rioja Reserva, $20-35", min: 20, max: 35, producers: ["La Rioja Alta", "López de Heredia", "Marqués de Riscal"] },
+        { desc: "Rioja Gran Reserva", askFor: "Ask for a Rioja Gran Reserva for something special", min: 40, max: 70, producers: ["López de Heredia (Viña Tondonia)", "CVNE (Imperial)"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey6.id},
+          1,
+          'Rioja: Spain''s Classic Red',
+          'Begin with Spain''s most famous wine region. Learn how Tempranillo expresses itself with traditional oak aging.',
+          ${JSON.stringify({ region: "Rioja", grapeVariety: "Tempranillo" })},
+          ${JSON.stringify([
+            "Understand Crianza, Reserva, Gran Reserva aging levels",
+            "Identify Tempranillo's cherry and leather notes",
+            "Recognize American vs French oak influence"
+          ])},
+          ${JSON.stringify([
+            { question: "What fruits do you taste?", category: "taste" },
+            { question: "Do you notice vanilla or coconut (American oak)?", category: "aroma" },
+            { question: "Is there leather or tobacco?", category: "aroma" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(riojaOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
+      // Chapter 2: Ribera del Duero
+      const riberaOptions = createWineOptions(
+        { desc: "Ribera del Duero Roble/Joven", askFor: "Ask for a young Ribera del Duero under $20", min: 14, max: 20, producers: ["Protos", "Pesquera", "Condado de Haza"] },
+        { desc: "Ribera del Duero Crianza", askFor: "Ask for a Ribera del Duero Crianza, $25-45", min: 25, max: 45, producers: ["Pago de Carraovejas", "Emilio Moro"] },
+        { desc: "Premium Ribera", askFor: "Ask for a premium Ribera del Duero like Pingus or Vega Sicilia", min: 60, max: 150, producers: ["Vega Sicilia (Valbuena)", "Dominio de Pingus (Flor de Pingus)"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey6.id},
+          2,
+          'Ribera del Duero: Power and Elegance',
+          'Discover Tempranillo''s more powerful expression. Higher altitude and continental climate create bolder wines.',
+          ${JSON.stringify({ region: "Ribera del Duero", grapeVariety: "Tempranillo" })},
+          ${JSON.stringify([
+            "Compare Ribera style to Rioja",
+            "Understand altitude's impact on wine",
+            "Identify darker fruit and more tannin"
+          ])},
+          ${JSON.stringify([
+            { question: "How does this compare to Rioja?", category: "overall" },
+            { question: "Are the tannins stronger?", category: "structure" },
+            { question: "What dark fruits do you taste?", category: "taste" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(riberaOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
+      // Chapter 3: Priorat
+      const prioratOptions = createWineOptions(
+        { desc: "Entry Priorat", askFor: "Ask for an entry-level Priorat or Vi de Vila, $20-30", min: 20, max: 30, producers: ["Clos Mogador (Manyetes)", "Torres (Salmos)", "Alvaro Palacios (Camins)"] },
+        { desc: "Priorat DOQ", askFor: "Ask for a Priorat DOQ, $35-55", min: 35, max: 55, producers: ["Clos Figueras", "Mas Doix", "Terroir al Limit"] },
+        { desc: "Premium Priorat", askFor: "Ask for L'Ermita, Clos Mogador, or similar", min: 70, max: 200, producers: ["Alvaro Palacios (L'Ermita)", "Clos Mogador", "Clos Erasmus"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey6.id},
+          3,
+          'Priorat: Mineral-Rich Power',
+          'Experience Spain''s most prestigious region. Llicorella slate soils create wines of incredible intensity and minerality.',
+          ${JSON.stringify({ region: "Priorat" })},
+          ${JSON.stringify([
+            "Understand Garnacha and Cariñena blends",
+            "Identify mineral/slate character",
+            "Appreciate old vine concentration"
+          ])},
+          ${JSON.stringify([
+            { question: "Do you taste any minerality?", category: "taste" },
+            { question: "How intense is the wine?", category: "structure" },
+            { question: "What spices do you detect?", category: "aroma" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(prioratOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
+      // Chapter 4: Garnacha
+      const garnachaOptions = createWineOptions(
+        { desc: "Campo de Borja or Calatayud Garnacha", askFor: "Ask for a Garnacha from Aragon under $15", min: 10, max: 15, producers: ["Borsao", "El Escocés Volante", "Corona de Aragón"] },
+        { desc: "Old Vine Garnacha", askFor: "Ask for an old vine Garnacha, $18-30", min: 18, max: 30, producers: ["Alto Moncayo", "Bodegas San Alejandro (Las Rocas)"] },
+        { desc: "Premium Garnacha", askFor: "Ask for a premium single vineyard Garnacha", min: 35, max: 60, producers: ["Comando G", "4 Monos"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey6.id},
+          4,
+          'Garnacha: Spain''s Hidden Gem',
+          'Complete your Spanish journey with Garnacha (Grenache). Old vines in Aragon produce amazing value wines.',
+          ${JSON.stringify({ grapeVariety: "Garnacha" })},
+          ${JSON.stringify([
+            "Recognize Garnacha's red fruit and spice",
+            "Understand old vine value",
+            "Compare Spanish vs French Grenache"
+          ])},
+          ${JSON.stringify([
+            { question: "What red fruits do you taste?", category: "taste" },
+            { question: "Is there any spice or herbs?", category: "aroma" },
+            { question: "How does this compare to Priorat?", category: "overall" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(garnachaOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+    }
+
+    // ========================================
+    // Journey 7: Bold Reds of the World
+    // ========================================
+    const [journey7] = await sql`
+      INSERT INTO journeys (title, description, difficulty_level, estimated_duration, wine_type, is_published, total_chapters)
+      VALUES (
+        'Bold Reds of the World',
+        'For lovers of big, powerful red wines. Explore Malbec, Shiraz, Zinfandel, and Petite Sirah - wines that make a statement.',
+        'beginner',
+        '4 wines',
+        'red',
+        true,
+        4
+      )
+      ON CONFLICT DO NOTHING
+      RETURNING id
+    `;
+
+    if (journey7?.id) {
+      console.log("Created Journey 7 (Bold Reds of the World):", journey7.id);
+
+      // Chapter 1: Argentine Malbec
+      const malbecOptions = createWineOptions(
+        { desc: "Mendoza Malbec under $15", askFor: "Ask for a Mendoza Malbec under $15", min: 10, max: 15, producers: ["Alamos", "Trivento", "Trapiche"] },
+        { desc: "High Altitude Malbec", askFor: "Ask for a high altitude Malbec from Uco Valley, $20-35", min: 20, max: 35, producers: ["Catena", "Zuccardi", "Achaval Ferrer"] },
+        { desc: "Premium Argentine Malbec", askFor: "Ask for a premium single vineyard Malbec", min: 45, max: 80, producers: ["Catena Zapata (Adrianna)", "Cobos", "Cheval des Andes"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey7.id},
+          1,
+          'Argentine Malbec: Plush and Powerful',
+          'Start with the world''s most popular bold red. Argentina''s high altitude vineyards produce incredibly rich, fruit-forward Malbec.',
+          ${JSON.stringify({ region: "Argentina", grapeVariety: "Malbec" })},
+          ${JSON.stringify([
+            "Identify Malbec's signature plum and violet notes",
+            "Understand high altitude winemaking",
+            "Recognize soft, velvety tannins"
+          ])},
+          ${JSON.stringify([
+            { question: "What dark fruits do you taste?", category: "taste" },
+            { question: "Do you detect any violet or floral notes?", category: "aroma" },
+            { question: "How would you describe the tannins?", category: "structure" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(malbecOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
+      // Chapter 2: Australian Shiraz
+      const shirazOptions = createWineOptions(
+        { desc: "Australian Shiraz under $18", askFor: "Ask for an Australian Shiraz under $18", min: 12, max: 18, producers: ["Penfolds Koonunga Hill", "Jacob's Creek", "19 Crimes"] },
+        { desc: "Barossa or McLaren Vale Shiraz", askFor: "Ask for a Barossa Valley or McLaren Vale Shiraz, $25-45", min: 25, max: 45, producers: ["d'Arenberg", "Torbreck", "Two Hands"] },
+        { desc: "Premium Australian Shiraz", askFor: "Ask for a premium Australian Shiraz if you want to splurge", min: 50, max: 100, producers: ["Penfolds (Bin 389, Bin 150)", "Henschke", "Clarendon Hills"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey7.id},
+          2,
+          'Australian Shiraz: Bold Down Under',
+          'Experience the rich, jammy style of Australian Shiraz. Warm climate regions produce wines with incredible fruit intensity.',
+          ${JSON.stringify({ region: "Australia", grapeVariety: "Shiraz" })},
+          ${JSON.stringify([
+            "Compare Shiraz style to Malbec",
+            "Identify black pepper and meat notes",
+            "Recognize eucalyptus/mint character"
+          ])},
+          ${JSON.stringify([
+            { question: "Do you taste black pepper?", category: "taste" },
+            { question: "Is there any eucalyptus or mint?", category: "aroma" },
+            { question: "How does the fruit compare to Malbec?", category: "overall" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(shirazOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
+      // Chapter 3: California Zinfandel
+      const zinfandelOptions = createWineOptions(
+        { desc: "California Zinfandel under $18", askFor: "Ask for a California Zinfandel under $18", min: 12, max: 18, producers: ["Ravenswood", "Seghesio", "Bogle Old Vine"] },
+        { desc: "Sonoma or Lodi Old Vine Zin", askFor: "Ask for an old vine Zinfandel from Sonoma or Lodi, $22-40", min: 22, max: 40, producers: ["Ridge", "Turley", "Robert Biale"] },
+        { desc: "Premium Single Vineyard Zin", askFor: "Ask for a single vineyard old vine Zinfandel", min: 45, max: 75, producers: ["Ridge (Geyserville, Lytton Springs)", "Turley (single vineyard)"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey7.id},
+          3,
+          'California Zinfandel: America''s Grape',
+          'Discover California''s signature bold red. Old vine Zinfandel delivers jammy fruit, spice, and impressive alcohol.',
+          ${JSON.stringify({ region: "California", grapeVariety: "Zinfandel" })},
+          ${JSON.stringify([
+            "Identify bramble fruit and jam notes",
+            "Recognize baking spice character",
+            "Understand old vine concentration"
+          ])},
+          ${JSON.stringify([
+            { question: "What jammy fruits do you taste?", category: "taste" },
+            { question: "Is there cinnamon or clove?", category: "aroma" },
+            { question: "How does the alcohol feel?", category: "structure" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(zinfandelOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
+      // Chapter 4: Petite Sirah
+      const petiteSirahOptions = createWineOptions(
+        { desc: "California Petite Sirah under $20", askFor: "Ask for a California Petite Sirah under $20", min: 14, max: 20, producers: ["Bogle", "Concannon", "Michael David"] },
+        { desc: "Lodi or Paso Robles PS", askFor: "Ask for a Lodi or Paso Robles Petite Sirah, $25-40", min: 25, max: 40, producers: ["Turley", "Stags' Leap Winery"] },
+        { desc: "Premium Petite Sirah", askFor: "Ask for a premium or old vine Petite Sirah", min: 45, max: 70, producers: ["Turley (Hayne, Pesenti)", "Foppiano"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey7.id},
+          4,
+          'Petite Sirah: The Inky Giant',
+          'Complete your bold reds journey with the darkest, most tannic variety. Petite Sirah is not for the faint of heart.',
+          ${JSON.stringify({ grapeVariety: "Petite Sirah" })},
+          ${JSON.stringify([
+            "Appreciate intense color and tannins",
+            "Identify blueberry and dark chocolate",
+            "Understand why it's a cult favorite"
+          ])},
+          ${JSON.stringify([
+            { question: "How dark is the color?", category: "appearance" },
+            { question: "Do you taste blueberry or blackberry?", category: "taste" },
+            { question: "How intense are the tannins?", category: "structure" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(petiteSirahOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+    }
+
+    // ========================================
+    // Journey 8: White Wine Mastery
+    // ========================================
+    const [journey8] = await sql`
+      INSERT INTO journeys (title, description, difficulty_level, estimated_duration, wine_type, is_published, total_chapters)
+      VALUES (
+        'White Wine Mastery',
+        'Go beyond Chardonnay and Sauvignon Blanc. Discover Riesling, Grüner Veltliner, Chenin Blanc, and Albariño.',
+        'intermediate',
+        '4 wines',
+        'white',
+        true,
+        4
+      )
+      ON CONFLICT DO NOTHING
+      RETURNING id
+    `;
+
+    if (journey8?.id) {
+      console.log("Created Journey 8 (White Wine Mastery):", journey8.id);
+
+      // Chapter 1: Riesling
+      const rieslingOptions = createWineOptions(
+        { desc: "German Kabinett Riesling", askFor: "Ask for a German Kabinett Riesling under $20", min: 14, max: 20, producers: ["Dr. Loosen", "Selbach-Oster", "Joh. Jos. Prüm"] },
+        { desc: "Alsace or German Spätlese", askFor: "Ask for an Alsace Riesling or German Spätlese, $22-40", min: 22, max: 40, producers: ["Trimbach", "Domaine Weinbach", "Fritz Haag"] },
+        { desc: "Grand Cru Riesling", askFor: "Ask for an Alsace Grand Cru or German GG Riesling", min: 45, max: 80, producers: ["Trimbach (Clos Ste Hune)", "Dönnhoff (GG)", "Keller"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey8.id},
+          1,
+          'Riesling: The Noble White',
+          'Discover why sommeliers love Riesling. From bone-dry to lusciously sweet, no grape offers more versatility.',
+          ${JSON.stringify({ grapeVariety: "Riesling" })},
+          ${JSON.stringify([
+            "Identify petrol/kerosene notes (aged Riesling)",
+            "Understand German Prädikat system",
+            "Appreciate high acidity with sweetness balance"
+          ])},
+          ${JSON.stringify([
+            { question: "Is this dry, off-dry, or sweet?", category: "taste" },
+            { question: "What citrus fruits do you taste?", category: "taste" },
+            { question: "Is there any petrol or mineral character?", category: "aroma" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(rieslingOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
+      // Chapter 2: Grüner Veltliner
+      const grunerOptions = createWineOptions(
+        { desc: "Austrian Grüner Veltliner under $18", askFor: "Ask for an Austrian Grüner Veltliner under $18", min: 12, max: 18, producers: ["Laurenz V", "Hugl", "Loimer"] },
+        { desc: "Wachau or Kremstal Grüner", askFor: "Ask for a Wachau or Kremstal Grüner, $22-38", min: 22, max: 38, producers: ["F.X. Pichler", "Hirtzberger", "Nikolaihof"] },
+        { desc: "Premium Smaragd Grüner", askFor: "Ask for a Smaragd or Reserve Grüner Veltliner", min: 40, max: 70, producers: ["Knoll", "Prager", "Rudi Pichler"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey8.id},
+          2,
+          'Grüner Veltliner: Austria''s Pride',
+          'Meet Austria''s signature white grape. Peppery, herbal, and incredibly food-friendly.',
+          ${JSON.stringify({ region: "Austria", grapeVariety: "Grüner Veltliner" })},
+          ${JSON.stringify([
+            "Identify white pepper signature note",
+            "Recognize green herb and citrus",
+            "Understand Austrian wine classification"
+          ])},
+          ${JSON.stringify([
+            { question: "Do you taste white pepper?", category: "taste" },
+            { question: "What herbs or green notes are present?", category: "aroma" },
+            { question: "How does the acidity compare to Riesling?", category: "structure" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(grunerOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
+      // Chapter 3: Chenin Blanc
+      const cheninOptions = createWineOptions(
+        { desc: "South African Chenin Blanc under $15", askFor: "Ask for a South African Chenin Blanc under $15", min: 10, max: 15, producers: ["Ken Forrester", "Spier", "Mullineux"] },
+        { desc: "Loire Vouvray or SA Premium", askFor: "Ask for a Vouvray or premium South African Chenin, $20-35", min: 20, max: 35, producers: ["Domaine Huet", "Champalou", "Raats"] },
+        { desc: "Premium Loire Chenin", askFor: "Ask for a top Loire Chenin (Savennières, aged Vouvray)", min: 40, max: 70, producers: ["Nicolas Joly", "Domaine des Baumard", "François Chidaine"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey8.id},
+          3,
+          'Chenin Blanc: The Chameleon',
+          'From bone-dry to honeyed dessert wines, Chenin Blanc does it all. Compare Loire elegance to South African value.',
+          ${JSON.stringify({ grapeVariety: "Chenin Blanc" })},
+          ${JSON.stringify([
+            "Understand Chenin's range of styles",
+            "Identify quince, apple, and honey notes",
+            "Compare Loire vs South African styles"
+          ])},
+          ${JSON.stringify([
+            { question: "What fruits do you taste?", category: "taste" },
+            { question: "Is there any honey or lanolin?", category: "aroma" },
+            { question: "Where do you think this is from?", category: "overall" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(cheninOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
+      // Chapter 4: Albariño
+      const albarinoOptions = createWineOptions(
+        { desc: "Rías Baixas Albariño under $18", askFor: "Ask for a Rías Baixas Albariño under $18", min: 12, max: 18, producers: ["Martín Códax", "Burgáns", "Pazo de Señoráns"] },
+        { desc: "Premium Rías Baixas", askFor: "Ask for a premium or single vineyard Albariño, $22-35", min: 22, max: 35, producers: ["Do Ferreiro", "Zárate", "Forjas del Salnés"] },
+        { desc: "Top Producer Albariño", askFor: "Ask for a top producer aged or special cuvée Albariño", min: 38, max: 60, producers: ["Raúl Pérez (Sketch)", "Zárate (El Palomar)"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey8.id},
+          4,
+          'Albariño: Spain''s Coastal White',
+          'Complete your white wine mastery with this Atlantic-influenced Spanish gem. Perfect with seafood.',
+          ${JSON.stringify({ region: "Rías Baixas", grapeVariety: "Albariño" })},
+          ${JSON.stringify([
+            "Identify saline, mineral character",
+            "Recognize stone fruit and citrus",
+            "Appreciate the coastal influence"
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify([
+            { question: "Do you taste any salinity?", category: "taste" },
+            { question: "What fruits come through?", category: "taste" },
+            { question: "Would this pair well with seafood?", category: "overall" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(albarinoOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+    }
+
+    // ========================================
+    // Journey 9: Food & Wine Pairing Basics
+    // ========================================
+    const [journey9] = await sql`
+      INSERT INTO journeys (title, description, difficulty_level, estimated_duration, wine_type, is_published, total_chapters)
+      VALUES (
+        'Food & Wine Pairing Basics',
+        'Learn the practical art of matching wine with food. Four hands-on lessons with real pairings you can try at home.',
+        'beginner',
+        '4 wines',
+        'mixed',
+        true,
+        4
+      )
+      ON CONFLICT DO NOTHING
+      RETURNING id
+    `;
+
+    if (journey9?.id) {
+      console.log("Created Journey 9 (Food & Wine Pairing Basics):", journey9.id);
+
+      // Chapter 1: Match Weight with Weight
+      const weightOptions = createWineOptions(
+        { desc: "Light white or rosé", askFor: "Ask for a Pinot Grigio, Vinho Verde, or dry rosé under $15", min: 10, max: 15, producers: ["Santa Margherita", "Casal Garcia", "Whispering Angel"] },
+        { desc: "Medium-bodied option", askFor: "Ask for a Chablis, unoaked Chardonnay, or Côtes du Rhône", min: 18, max: 30, producers: ["Louis Latour (Chablis)", "E. Guigal (CdR)"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey9.id},
+          1,
+          'Match Weight with Weight',
+          'The first rule of pairing: match the body of wine to the richness of food. Light wines for light dishes, full wines for hearty meals.',
+          ${JSON.stringify({ anyWine: true })},
+          ${JSON.stringify([
+            "Understand wine body/weight",
+            "Learn to assess dish richness",
+            "Practice matching principle"
+          ])},
+          ${JSON.stringify([
+            { question: "How would you rate this wine's body? (light/medium/full)", category: "structure" },
+            { question: "What light dish would pair well?", category: "overall" },
+            { question: "What rich dish would pair well?", category: "overall" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(weightOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
+      // Chapter 2: Acid Cuts Fat
+      const acidOptions = createWineOptions(
+        { desc: "High-acid white", askFor: "Ask for a Sancerre, Muscadet, or Cava under $20", min: 12, max: 20, producers: ["Henri Bourgeois", "Muscadet Sèvre et Maine", "Freixenet"] },
+        { desc: "High-acid red", askFor: "Ask for a Chianti, Barbera, or Pinot Noir", min: 15, max: 30, producers: ["Antinori", "Michele Chiarlo (Barbera)", "La Crema"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey9.id},
+          2,
+          'Acid Cuts Through Fat',
+          'High-acid wines are perfect partners for rich, fatty foods. Try this with cheese, fried foods, or creamy sauces.',
+          ${JSON.stringify({ anyWine: true })},
+          ${JSON.stringify([
+            "Recognize high acidity in wine",
+            "Understand why acid cuts fat",
+            "Try the principle with real food"
+          ])},
+          ${JSON.stringify([
+            { question: "How acidic is this wine?", category: "structure" },
+            { question: "Try it with cheese - what happens?", category: "overall" },
+            { question: "Does the wine taste different with food?", category: "taste" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(acidOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
+      // Chapter 3: Tannins and Protein
+      const tanninOptions = createWineOptions(
+        { desc: "Tannic red wine", askFor: "Ask for a Cabernet Sauvignon, Malbec, or Barolo under $25", min: 15, max: 25, producers: ["Robert Mondavi", "Catena", "Pio Cesare (Langhe)"] },
+        { desc: "Premium tannic red", askFor: "Ask for a Napa Cabernet or Barolo", min: 30, max: 55, producers: ["Caymus", "Silver Oak", "Fontanafredda"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey9.id},
+          3,
+          'Tannins Love Protein',
+          'Tannic red wines and red meat are a classic pairing. Learn why protein softens tannins and makes both taste better.',
+          ${JSON.stringify({ wineType: "red" })},
+          ${JSON.stringify([
+            "Feel tannins without food",
+            "Notice how protein changes tannins",
+            "Understand the chemical reaction"
+          ])},
+          ${JSON.stringify([
+            { question: "How tannic is this wine alone?", category: "structure" },
+            { question: "Try it with steak or cheese - how do the tannins change?", category: "overall" },
+            { question: "Which protein worked best?", category: "overall" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(tanninOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+
+      // Chapter 4: Sweet with Spicy
+      const sweetOptions = createWineOptions(
+        { desc: "Off-dry wine", askFor: "Ask for an off-dry Riesling, Gewürztraminer, or Moscato under $18", min: 10, max: 18, producers: ["Dr. Loosen", "Hugel (Gentil)", "La Spinetta (Moscato d'Asti)"] },
+        { desc: "Premium off-dry", askFor: "Ask for a Spätlese Riesling or Alsace Gewürztraminer", min: 20, max: 35, producers: ["Selbach-Oster", "Trimbach (Gewürz)"] }
+      );
+      await sql`
+        INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
+        VALUES (
+          ${journey9.id},
+          4,
+          'Sweet Tames Spicy',
+          'Complete your pairing education with the classic sweet-spicy combination. A touch of sweetness cools the heat.',
+          ${JSON.stringify({ wineType: "white" })},
+          ${JSON.stringify([
+            "Understand residual sugar",
+            "Learn why sweetness balances heat",
+            "Try with spicy Asian cuisine"
+          ])},
+          ${JSON.stringify([
+            { question: "Is this wine dry or off-dry?", category: "taste" },
+            { question: "Try it with spicy food - what happens to the heat?", category: "overall" },
+            { question: "Would a dry wine work as well?", category: "overall" }
+          ])},
+          ${JSON.stringify({ requirePhoto: true })},
+          ${JSON.stringify(sweetOptions)}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+    }
+
     console.log("All journeys with wine options seeded successfully!");
   } catch (error) {
     console.error("Error seeding journeys:", error);
