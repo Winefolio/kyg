@@ -32,6 +32,10 @@ import {
   type UserJourney,
   type InsertUserJourney,
   type CompletedChapter,
+  type SommelierChat,
+  type InsertSommelierChat,
+  type SommelierMessage,
+  type InsertSommelierMessage,
   packages,
   packageWines,
   slides,
@@ -48,6 +52,8 @@ import {
   journeys,
   chapters,
   userJourneys,
+  sommelierChats,
+  sommelierMessages,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull, isNotNull } from "drizzle-orm";
@@ -222,6 +228,16 @@ export interface IStorage {
 
   // Score calculation
   calculateAverageScore(userResponses: Response[]): number;
+
+  // Sommelier Chat
+  getActiveSommelierChat(userId: number): Promise<SommelierChat | undefined>;
+  createSommelierChat(chat: InsertSommelierChat): Promise<SommelierChat>;
+  getSommelierChatMessages(chatId: number, limit?: number): Promise<SommelierMessage[]>;
+  createSommelierMessage(message: InsertSommelierMessage): Promise<SommelierMessage>;
+  updateSommelierChat(chatId: number, data: Partial<{ title: string; summary: string; lastSummaryAt: Date; messageCount: number; updatedAt: Date }>): Promise<void>;
+  archiveSommelierChat(chatId: number): Promise<void>;
+  getUncompactedMessages(chatId: number, keepRecent: number): Promise<SommelierMessage[]>;
+  markMessagesCompacted(messageIds: number[]): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -6407,6 +6423,85 @@ export class DatabaseStorage implements IStorage {
         tastingLevel
       }
     };
+  }
+
+  // ============================================
+  // SOMMELIER CHAT METHODS
+  // ============================================
+
+  async getActiveSommelierChat(userId: number): Promise<SommelierChat | undefined> {
+    const chat = await db.query.sommelierChats.findFirst({
+      where: eq(sommelierChats.userId, userId),
+      orderBy: [desc(sommelierChats.updatedAt)]
+    });
+    return chat;
+  }
+
+  async createSommelierChat(chat: InsertSommelierChat): Promise<SommelierChat> {
+    const [newChat] = await db.insert(sommelierChats).values(chat).returning();
+    return newChat;
+  }
+
+  async getSommelierChatMessages(chatId: number, limit: number = 20): Promise<SommelierMessage[]> {
+    const messages = await db
+      .select()
+      .from(sommelierMessages)
+      .where(eq(sommelierMessages.chatId, chatId))
+      .orderBy(desc(sommelierMessages.createdAt))
+      .limit(limit);
+    return messages.reverse();
+  }
+
+  async createSommelierMessage(message: InsertSommelierMessage): Promise<SommelierMessage> {
+    const [newMessage] = await db.insert(sommelierMessages).values(message).returning();
+    await db
+      .update(sommelierChats)
+      .set({
+        messageCount: sql`${sommelierChats.messageCount} + 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(sommelierChats.id, message.chatId));
+    return newMessage;
+  }
+
+  async updateSommelierChat(chatId: number, data: Partial<{ title: string; summary: string; lastSummaryAt: Date; messageCount: number; updatedAt: Date }>): Promise<void> {
+    await db
+      .update(sommelierChats)
+      .set(data)
+      .where(eq(sommelierChats.id, chatId));
+  }
+
+  async archiveSommelierChat(chatId: number): Promise<void> {
+    await db
+      .update(sommelierChats)
+      .set({ updatedAt: new Date() })
+      .where(eq(sommelierChats.id, chatId));
+  }
+
+  async getUncompactedMessages(chatId: number, keepRecent: number = 10): Promise<SommelierMessage[]> {
+    const allMessages = await db
+      .select()
+      .from(sommelierMessages)
+      .where(eq(sommelierMessages.chatId, chatId))
+      .orderBy(asc(sommelierMessages.createdAt));
+
+    const uncompacted = allMessages.filter(m => {
+      const meta = m.metadata as any;
+      return !meta?.compacted;
+    });
+
+    if (uncompacted.length <= keepRecent) return [];
+    return uncompacted.slice(0, uncompacted.length - keepRecent);
+  }
+
+  async markMessagesCompacted(messageIds: number[]): Promise<void> {
+    if (messageIds.length === 0) return;
+    await db
+      .update(sommelierMessages)
+      .set({
+        metadata: sql`COALESCE(${sommelierMessages.metadata}, '{}'::jsonb) || '{"compacted": true}'::jsonb`
+      })
+      .where(inArray(sommelierMessages.id, messageIds));
   }
 }
 
