@@ -36,32 +36,37 @@ async function resolveChat(userId: number, chatId?: number): Promise<SommelierCh
 
 /**
  * Generate a short chat title from the first user message using GPT-5-mini.
- * Runs async (fire-and-forget) so it doesn't block the message flow.
+ * Awaited so the title is set before the chat list is refetched.
  */
-function generateChatTitle(chatId: number, userMessage: string): void {
-  const client = getOpenAIClient();
-  if (!client) return;
-
-  client.chat.completions.create({
-    model: "gpt-5-mini",
-    messages: [
-      {
-        role: "system",
-        content: "Generate a very short title (3-6 words max) for a wine chat conversation. No quotes, no punctuation at end. Just the topic.",
-      },
-      { role: "user", content: userMessage.slice(0, 200) },
-    ],
-    max_completion_tokens: 20,
-  }).then(completion => {
-    const title = completion.choices[0]?.message?.content?.trim();
-    if (title) {
-      storage.updateSommelierChat(chatId, { title: title.slice(0, 100) });
+export async function generateChatTitle(chatId: number, userMessage: string): Promise<void> {
+  try {
+    console.log(`[SommelierChat] Generating title for chat ${chatId}...`);
+    const client = getOpenAIClient();
+    if (!client) {
+      console.log(`[SommelierChat] No OpenAI client, using fallback title`);
+      await storage.updateSommelierChat(chatId, { title: userMessage.slice(0, 50) });
+      return;
     }
-  }).catch(err => {
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "Generate a very short title (3-6 words max) for a wine chat conversation. No quotes, no punctuation at end. Just the topic.",
+        },
+        { role: "user", content: userMessage.slice(0, 200) },
+      ],
+      max_completion_tokens: 20,
+    });
+
+    const title = completion.choices[0]?.message?.content?.trim();
+    console.log(`[SommelierChat] Generated title for chat ${chatId}: "${title}"`);
+    await storage.updateSommelierChat(chatId, { title: (title || userMessage).slice(0, 100) });
+  } catch (err: any) {
     console.error("[SommelierChat] Title generation failed, using fallback:", err.message);
-    // Fallback: use truncated message
-    storage.updateSommelierChat(chatId, { title: userMessage.slice(0, 50) });
-  });
+    await storage.updateSommelierChat(chatId, { title: userMessage.slice(0, 50) });
+  }
 }
 
 /**
@@ -143,9 +148,9 @@ export async function streamChatResponse(
     metadata: imageBase64 ? { hasImage: true } : null,
   });
 
-  // Auto-title on first message of a new chat (async, non-blocking)
+  // Auto-title on first message of a new chat — awaited so title is set before chat list refetch
   if (isNewChat || !chat.title) {
-    generateChatTitle(chat.id, sanitizedMessage);
+    await generateChatTitle(chat.id, sanitizedMessage);
   }
 
   const ctx: ChatContext = { chat, userEmail };
@@ -221,9 +226,9 @@ export async function sendChatMessage(
     metadata: imageBase64 ? { hasImage: true } : null,
   });
 
-  // Auto-title on first message of a new chat (async, non-blocking)
+  // Auto-title on first message of a new chat — awaited so title is set before chat list refetch
   if (isNewChat || !chat.title) {
-    generateChatTitle(chat.id, sanitizedMessage);
+    await generateChatTitle(chat.id, sanitizedMessage);
   }
 
   const ctx: ChatContext = { chat, userEmail };
