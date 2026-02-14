@@ -161,8 +161,7 @@ export function useSommelierChat(isOpen: boolean) {
     } catch (err: any) {
       if (err.name === "AbortError") return;
       setError(err.message || "Something went wrong. Try again.");
-      // Remove optimistic message on error
-      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id && m.id !== -1));
     } finally {
       setIsStreaming(false);
       abortControllerRef.current = null;
@@ -210,7 +209,7 @@ export function useSommelierChat(isOpen: boolean) {
     } catch (err: any) {
       if (err.name === "AbortError") return;
       setError(err.message || "Something went wrong. Try again.");
-      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id && m.id !== -1));
     } finally {
       setIsStreaming(false);
       abortControllerRef.current = null;
