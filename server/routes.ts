@@ -21,6 +21,7 @@ import { registerTastingsRoutes } from './routes/tastings';
 import { registerWinesRoutes } from './routes/wines';
 import { registerJourneyRoutes } from './routes/journeys';
 import { registerTranscriptionRoutes } from './routes/transcription';
+import { registerSommelierChatRoutes } from './routes/sommelier-chat';
 
 // Configure multer for file uploads with comprehensive image support
 const upload = multer({
@@ -2241,6 +2242,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register audio transcription routes
   registerTranscriptionRoutes(app);
+
+  // Register sommelier chat routes
+  registerSommelierChatRoutes(app);
 
   // Register media proxy routes
   registerMediaProxyRoutes(app);
