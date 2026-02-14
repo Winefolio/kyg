@@ -11,40 +11,48 @@ export interface ChatMessage {
   isStreaming?: boolean;
 }
 
-interface SommelierChat {
+export interface SommelierChatSummary {
   id: number;
   userId: number;
   title: string | null;
   summary: string | null;
   messageCount: number;
+  updatedAt: string;
+  createdAt: string;
 }
 
 export function useSommelierChat(isOpen: boolean) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [activeChatId, setActiveChatId] = useState<number | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const queryClient = useQueryClient();
 
-  // Load active chat + messages when sheet opens
-  const { data: chatData, isLoading } = useQuery({
-    queryKey: ["/api/sommelier-chat/active"],
+  // Chat list for sidebar (only chats with messages, newest first)
+  const { data: chatListData, isLoading: isLoadingChatList } = useQuery({
+    queryKey: ["/api/sommelier-chat/list"],
     queryFn: async () => {
-      const res = await fetch("/api/sommelier-chat/active", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load chat");
-      return res.json() as Promise<{ chat: SommelierChat; messages: ChatMessage[] }>;
+      const res = await fetch("/api/sommelier-chat/list", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load chat list");
+      return res.json() as Promise<{ chats: SommelierChatSummary[] }>;
     },
     enabled: isOpen,
-    staleTime: 30000,
+    staleTime: 10000,
   });
 
-  // Sync server messages with local state
+  const chatList = chatListData?.chats ?? [];
+
+  // Reset to fresh state when Pierre opens (ChatGPT behavior: always new chat)
   useEffect(() => {
-    if (chatData?.messages && !isStreaming) {
-      setMessages(chatData.messages);
+    if (isOpen) {
+      setMessages([]);
+      setActiveChatId(null);
+      setError(null);
     }
-  }, [chatData?.messages, isStreaming]);
+  }, [isOpen]);
 
   const parseSSEStream = useCallback(async (
     response: Response,
@@ -84,7 +92,10 @@ export function useSommelierChat(isOpen: boolean) {
 
           try {
             const event = JSON.parse(data);
-            if (event.type === "token") {
+            if (event.type === "start" && event.chatId) {
+              // Track the chatId from the server (for new chats)
+              setActiveChatId(event.chatId);
+            } else if (event.type === "token") {
               fullContent += event.content;
               setStreamingContent(fullContent);
               setMessages(prev => {
@@ -147,7 +158,7 @@ export function useSommelierChat(isOpen: boolean) {
       const res = await fetch("/api/sommelier-chat/message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text.trim() }),
+        body: JSON.stringify({ message: text.trim(), chatId: activeChatId }),
         credentials: "include",
         signal: controller.signal,
       });
@@ -158,6 +169,9 @@ export function useSommelierChat(isOpen: boolean) {
       }
 
       await parseSSEStream(res, optimisticMsg);
+
+      // Refresh chat list so new chat shows up in sidebar
+      queryClient.invalidateQueries({ queryKey: ["/api/sommelier-chat/list"] });
     } catch (err: any) {
       if (err.name === "AbortError") return;
       setError(err.message || "Something went wrong. Try again.");
@@ -166,7 +180,7 @@ export function useSommelierChat(isOpen: boolean) {
       setIsStreaming(false);
       abortControllerRef.current = null;
     }
-  }, [isStreaming, parseSSEStream]);
+  }, [isStreaming, activeChatId, parseSSEStream, queryClient]);
 
   const sendMessageWithImage = useCallback(async (text: string, imageFile: File) => {
     if (isStreaming) return;
@@ -192,6 +206,9 @@ export function useSommelierChat(isOpen: boolean) {
       const formData = new FormData();
       formData.append("message", text.trim() || "What can you tell me about these wines?");
       formData.append("image", imageFile);
+      if (activeChatId) {
+        formData.append("chatId", String(activeChatId));
+      }
 
       const res = await fetch("/api/sommelier-chat/message-with-image", {
         method: "POST",
@@ -206,6 +223,9 @@ export function useSommelierChat(isOpen: boolean) {
       }
 
       await parseSSEStream(res, optimisticMsg);
+
+      // Refresh chat list
+      queryClient.invalidateQueries({ queryKey: ["/api/sommelier-chat/list"] });
     } catch (err: any) {
       if (err.name === "AbortError") return;
       setError(err.message || "Something went wrong. Try again.");
@@ -214,23 +234,50 @@ export function useSommelierChat(isOpen: boolean) {
       setIsStreaming(false);
       abortControllerRef.current = null;
     }
-  }, [isStreaming, parseSSEStream]);
+  }, [isStreaming, activeChatId, parseSSEStream, queryClient]);
 
-  const startNewChat = useCallback(async () => {
+  // Load a specific chat from history
+  const loadChat = useCallback(async (chatId: number) => {
+    setIsLoadingChat(true);
+    setError(null);
     try {
-      const res = await fetch("/api/sommelier-chat/new", {
-        method: "POST",
+      const res = await fetch(`/api/sommelier-chat/${chatId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load chat");
+      const data = await res.json();
+      setMessages(data.messages);
+      setActiveChatId(chatId);
+    } catch (err: any) {
+      setError(err.message || "Failed to load chat");
+    } finally {
+      setIsLoadingChat(false);
+    }
+  }, []);
+
+  // Delete a chat
+  const deleteChat = useCallback(async (chatId: number) => {
+    try {
+      await fetch(`/api/sommelier-chat/${chatId}`, {
+        method: "DELETE",
         credentials: "include",
       });
-      if (res.ok) {
+      queryClient.invalidateQueries({ queryKey: ["/api/sommelier-chat/list"] });
+
+      // If we deleted the active chat, reset to fresh state
+      if (chatId === activeChatId) {
         setMessages([]);
-        setError(null);
-        queryClient.invalidateQueries({ queryKey: ["/api/sommelier-chat/active"] });
+        setActiveChatId(null);
       }
     } catch {
-      setError("Failed to start new chat");
+      setError("Failed to delete chat");
     }
-  }, [queryClient]);
+  }, [activeChatId, queryClient]);
+
+  // Start a new chat (just resets local state)
+  const startNewChat = useCallback(() => {
+    setMessages([]);
+    setActiveChatId(null);
+    setError(null);
+  }, []);
 
   const cancelStream = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -241,11 +288,17 @@ export function useSommelierChat(isOpen: boolean) {
 
   return {
     messages,
-    isLoading,
+    activeChatId,
+    chatList,
+    isLoading: false, // No initial load needed — always starts fresh
+    isLoadingChat,
+    isLoadingChatList,
     isStreaming,
     error,
     sendMessage,
     sendMessageWithImage,
+    loadChat,
+    deleteChat,
     startNewChat,
     cancelStream,
     clearError,
