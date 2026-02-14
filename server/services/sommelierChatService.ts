@@ -4,7 +4,7 @@
  * Supports lazy chat creation (chat created on first message, not on open).
  */
 
-import { requireOpenAI } from "../lib/openai";
+import { requireOpenAI, getOpenAIClient } from "../lib/openai";
 import { storage } from "../storage";
 import { sanitizeForPrompt } from "../lib/sanitize";
 import { buildSystemPrompt } from "./sommelierContextBuilder";
@@ -31,6 +31,36 @@ async function resolveChat(userId: number, chatId?: number): Promise<SommelierCh
     title: null,
     summary: null,
     messageCount: 0,
+  });
+}
+
+/**
+ * Generate a short chat title from the first user message using GPT-5-mini.
+ * Runs async (fire-and-forget) so it doesn't block the message flow.
+ */
+function generateChatTitle(chatId: number, userMessage: string): void {
+  const client = getOpenAIClient();
+  if (!client) return;
+
+  client.chat.completions.create({
+    model: "gpt-5-mini",
+    messages: [
+      {
+        role: "system",
+        content: "Generate a very short title (3-6 words max) for a wine chat conversation. No quotes, no punctuation at end. Just the topic.",
+      },
+      { role: "user", content: userMessage.slice(0, 200) },
+    ],
+    max_completion_tokens: 20,
+  }).then(completion => {
+    const title = completion.choices[0]?.message?.content?.trim();
+    if (title) {
+      storage.updateSommelierChat(chatId, { title: title.slice(0, 100) });
+    }
+  }).catch(err => {
+    console.error("[SommelierChat] Title generation failed, using fallback:", err.message);
+    // Fallback: use truncated message
+    storage.updateSommelierChat(chatId, { title: userMessage.slice(0, 50) });
   });
 }
 
@@ -113,10 +143,9 @@ export async function streamChatResponse(
     metadata: imageBase64 ? { hasImage: true } : null,
   });
 
-  // Auto-title on first message of a new chat
+  // Auto-title on first message of a new chat (async, non-blocking)
   if (isNewChat || !chat.title) {
-    const title = sanitizedMessage.slice(0, 50);
-    await storage.updateSommelierChat(chat.id, { title });
+    generateChatTitle(chat.id, sanitizedMessage);
   }
 
   const ctx: ChatContext = { chat, userEmail };
@@ -192,10 +221,9 @@ export async function sendChatMessage(
     metadata: imageBase64 ? { hasImage: true } : null,
   });
 
-  // Auto-title on first message of a new chat
+  // Auto-title on first message of a new chat (async, non-blocking)
   if (isNewChat || !chat.title) {
-    const title = sanitizedMessage.slice(0, 50);
-    await storage.updateSommelierChat(chat.id, { title });
+    generateChatTitle(chat.id, sanitizedMessage);
   }
 
   const ctx: ChatContext = { chat, userEmail };
