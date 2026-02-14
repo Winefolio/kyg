@@ -1105,3 +1105,66 @@ export type ChapterCompletion = typeof chapterCompletions.$inferSelect;
 export type InsertChapterCompletion = z.infer<typeof insertChapterCompletionSchema>;
 export type GeneratedQuestionsRecord = typeof generatedQuestions.$inferSelect;
 export type InsertGeneratedQuestions = z.infer<typeof insertGeneratedQuestionsSchema>;
+
+// ============================================
+// AI SOMMELIER CHAT
+// ============================================
+
+// Chat conversations
+export const sommelierChats = pgTable("sommelier_chats", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 200 }),
+  summary: text("summary"),
+  lastSummaryAt: timestamp("last_summary_at"),
+  messageCount: integer("message_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => ({
+  userIdx: index("idx_sommelier_chats_user").on(table.userId),
+  updatedAtIdx: index("idx_sommelier_chats_updated").on(table.updatedAt)
+}));
+
+// Chat messages
+export const sommelierMessages = pgTable("sommelier_messages", {
+  id: serial("id").primaryKey(),
+  chatId: integer("chat_id").notNull().references(() => sommelierChats.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 20 }).notNull(),
+  content: text("content").notNull(),
+  imageDescription: text("image_description"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+}, (table) => ({
+  chatIdx: index("idx_sommelier_messages_chat").on(table.chatId),
+  chatCreatedIdx: index("idx_sommelier_messages_chat_created").on(table.chatId, table.createdAt)
+}));
+
+// Insert schemas for sommelier chat
+export const insertSommelierChatSchema = createInsertSchema(sommelierChats, {
+  userId: z.number().int().positive(),
+  title: z.string().max(200).nullable().optional(),
+  summary: z.string().nullable().optional(),
+  messageCount: z.number().int().default(0)
+}).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastSummaryAt: true
+});
+
+export const insertSommelierMessageSchema = createInsertSchema(sommelierMessages, {
+  chatId: z.number().int().positive(),
+  role: z.enum(['user', 'assistant']),
+  content: z.string().min(1),
+  imageDescription: z.string().nullable().optional(),
+  metadata: z.any().nullable().optional()
+}).omit({
+  id: true,
+  createdAt: true
+});
+
+// Types for sommelier chat
+export type SommelierChat = typeof sommelierChats.$inferSelect;
+export type InsertSommelierChat = z.infer<typeof insertSommelierChatSchema>;
+export type SommelierMessage = typeof sommelierMessages.$inferSelect;
+export type InsertSommelierMessage = z.infer<typeof insertSommelierMessageSchema>;

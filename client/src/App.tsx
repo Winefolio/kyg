@@ -30,6 +30,7 @@ import HomeV2 from "@/pages/HomeV2";
 
 import Profile from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
+import { SommelierFAB } from "@/components/sommelier/SommelierFAB";
 
 function Router() {
   return (
@@ -100,6 +101,7 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <Router />
+            <SommelierFAB />
           </TooltipProvider>
         </GlossaryProvider>
       </QueryClientProvider>
