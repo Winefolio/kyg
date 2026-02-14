@@ -9,7 +9,7 @@ import multer from "multer";
 import { requireAuth } from "./auth";
 import { apiRateLimit, createRateLimit } from "../middleware/rateLimiter";
 import { storage } from "../storage";
-import { streamChatResponse } from "../services/sommelierChatService";
+import { streamChatResponse, generateChatTitle } from "../services/sommelierChatService";
 
 // Rate limit for chat messages: 15/min
 const sommelierChatRateLimit = createRateLimit({
@@ -105,6 +105,33 @@ export function registerSommelierChatRoutes(app: Express): void {
     } catch (error) {
       console.error("[SommelierChat] Error deleting chat:", error);
       return res.status(500).json({ error: "Failed to delete chat" });
+    }
+  });
+
+  /**
+   * POST /api/sommelier-chat/backfill-titles
+   * One-time: generate titles for all untitled chats using their first message.
+   */
+  app.post("/api/sommelier-chat/backfill-titles", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const chats = await storage.getUserSommelierChats(userId);
+      const untitled = chats.filter((c) => !c.title);
+
+      let updated = 0;
+      for (const chat of untitled) {
+        const messages = await storage.getSommelierChatMessages(chat.id, 50);
+        const firstUserMsg = messages.find((m) => m.role === "user");
+        if (firstUserMsg) {
+          await generateChatTitle(chat.id, firstUserMsg.content);
+          updated++;
+        }
+      }
+
+      return res.json({ updated, total: untitled.length });
+    } catch (error) {
+      console.error("[SommelierChat] Backfill error:", error);
+      return res.status(500).json({ error: "Failed to backfill titles" });
     }
   });
 

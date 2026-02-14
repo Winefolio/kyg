@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { SommelierChatSheet } from "./SommelierChatSheet";
 import { useHaptics } from "@/hooks/useHaptics";
-import { useAuth } from "@/hooks/useAuth";
 
 // Routes where the FAB should be hidden (active experiences)
 const HIDDEN_ROUTE_PATTERNS = [
@@ -56,13 +56,27 @@ export function SommelierFAB() {
   const [isOpen, setIsOpen] = useState(false);
   const [location] = useLocation();
   const { triggerHaptic } = useHaptics();
-  const { user } = useAuth();
+
+  // Use the same auth query as HomeV2 so they share cache state.
+  // When HomeV2 shows the login form (query failed), FAB also hides.
+  const { data: authData } = useQuery<{ user: { id: number; email: string } }>({
+    queryKey: ["/api/auth/me"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me", { credentials: "include" });
+      if (!res.ok) throw new Error("Not authenticated");
+      return res.json();
+    },
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const isAuthenticated = !!authData?.user;
 
   // Determine visibility — require auth + allowed route
   const isHidden = HIDDEN_ROUTE_PATTERNS.some((p) => p.test(location));
   const isShown = SHOWN_ROUTE_PATTERNS.some((p) => p.test(location));
 
-  if (!user || isHidden || !isShown) return null;
+  if (!isAuthenticated || isHidden || !isShown) return null;
 
   // If chat sheet is open, hide FAB
   if (isOpen) {
