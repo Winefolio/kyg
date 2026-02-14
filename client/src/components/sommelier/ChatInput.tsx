@@ -165,7 +165,7 @@ export function ChatInput({ onSendMessage, onSendMessageWithImage, isStreaming }
           value={text}
           onChange={handleTextChange}
           onKeyDown={handleKeyDown}
-          placeholder="Ask your sommelier..."
+          placeholder="Ask Pierre..."
           disabled={isStreaming}
           rows={1}
           className="flex-1 resize-none bg-zinc-800 text-white text-sm rounded-xl px-4 py-2.5 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50 disabled:opacity-50"

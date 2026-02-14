@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Wine } from "lucide-react";
 import { SommelierChatSheet } from "./SommelierChatSheet";
 import { useHaptics } from "@/hooks/useHaptics";
 
@@ -22,6 +21,35 @@ const SHOWN_ROUTE_PATTERNS = [
   /^\/editor\//,
   /^\/dashboard\//,
 ];
+
+/** Minimal line-drawing icon: a figure swirling a wine glass */
+function PierreIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 28 28"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {/* Head */}
+      <circle cx="11" cy="6" r="2.8" />
+      {/* Shoulder line */}
+      <path d="M8 9 C6.5 10 6 12 6 14" />
+      <path d="M14 9 C15 10 16 10.5 17.5 10.5" />
+      {/* Wine glass */}
+      <path d="M17 6.5 L18 9" />
+      <path d="M21 6.5 L20 9" />
+      <path d="M18 9 L20 9" />
+      <line x1="19" y1="9" x2="19" y2="11" />
+      <line x1="17.5" y1="11" x2="20.5" y2="11" />
+      {/* Swirl arc */}
+      <path d="M16.5 5.5 C17.5 3.5 20.5 4 21.5 5.5" opacity="0.6" />
+    </svg>
+  );
+}
 
 export function SommelierFAB() {
   const [isOpen, setIsOpen] = useState(false);
@@ -46,16 +74,17 @@ export function SommelierFAB() {
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0, opacity: 0 }}
-          whileTap={{ scale: 0.9 }}
+          whileTap={{ scale: 0.95 }}
           transition={{ type: "spring", stiffness: 400, damping: 20 }}
           onClick={() => {
             triggerHaptic("selection");
             setIsOpen(true);
           }}
-          className="fixed right-4 bottom-24 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 shadow-lg shadow-purple-900/40 flex items-center justify-center active:shadow-md"
-          aria-label="Open sommelier chat"
+          className="fixed right-4 bottom-24 z-40 flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 shadow-lg shadow-purple-900/40 active:shadow-md"
+          aria-label="Chat with Pierre, your AI sommelier"
         >
-          <Wine className="w-6 h-6 text-white" />
+          <PierreIcon className="w-6 h-6 text-white" />
+          <span className="text-sm font-medium text-white">Pierre</span>
         </motion.button>
       </AnimatePresence>
 

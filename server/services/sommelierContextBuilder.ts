@@ -10,7 +10,10 @@ import path from "path";
 let cachedPersonalityPrompt: string | null = null;
 
 async function getPersonalityPrompt(): Promise<string> {
-  if (cachedPersonalityPrompt) return cachedPersonalityPrompt;
+  // Re-read in dev mode so prompt edits take effect without restart
+  if (cachedPersonalityPrompt && process.env.NODE_ENV !== "development") {
+    return cachedPersonalityPrompt;
+  }
   const promptPath = path.join(process.cwd(), "prompts", "sommelier_chat.txt");
   cachedPersonalityPrompt = await fs.readFile(promptPath, "utf-8");
   return cachedPersonalityPrompt;

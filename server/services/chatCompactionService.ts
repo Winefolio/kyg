@@ -39,7 +39,7 @@ async function runCompaction(chatId: number): Promise<void> {
 
   const messagesText = messagesToCompact
     .map((m) => {
-      const prefix = m.role === "user" ? "User" : "Sommelier";
+      const prefix = m.role === "user" ? "User" : "Pierre";
       const imageNote = (m.metadata as any)?.hasImage ? " [sent a wine photo]" : "";
       return `${prefix}${imageNote}: ${m.content}`;
     })
@@ -55,7 +55,7 @@ NEW MESSAGES TO INCORPORATE:
 ${messagesText}
 
 Updated summary:`
-    : `Summarize this conversation between a wine taster and their AI sommelier. Keep under ${MAX_SUMMARY_WORDS} words. Capture: wine preferences discussed, specific wines mentioned, recommendations made, photos analyzed.
+    : `Summarize this conversation between a wine taster and Pierre, their AI sommelier. Keep under ${MAX_SUMMARY_WORDS} words. Capture: wine preferences discussed, specific wines mentioned, recommendations made, photos analyzed.
 
 MESSAGES:
 ${messagesText}
@@ -69,7 +69,7 @@ Summary:`;
       messages: [
         {
           role: "system",
-          content: "You produce concise, factual conversation summaries for an AI sommelier chat. Preserve specific wine names, user preferences, and recommendations. No commentary.",
+          content: "You produce concise, factual conversation summaries for Pierre, an AI sommelier. Preserve specific wine names, user preferences, and recommendations. No commentary.",
         },
         { role: "user", content: prompt },
       ],

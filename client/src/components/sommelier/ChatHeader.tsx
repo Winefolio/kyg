@@ -17,7 +17,7 @@ export function ChatHeader({ onClose, onNewChat }: ChatHeaderProps) {
       >
         <X className="w-5 h-5" />
       </Button>
-      <h2 className="text-sm font-semibold text-white">Your Sommelier</h2>
+      <h2 className="text-sm font-semibold text-white">Pierre</h2>
       <Button
         variant="ghost"
         size="icon"
