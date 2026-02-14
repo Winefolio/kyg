@@ -1,6 +1,7 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { ChatHeader } from "./ChatHeader";
+import { ChatHistorySidebar } from "./ChatHistorySidebar";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 import { useSommelierChat } from "@/hooks/useSommelierChat";
@@ -88,30 +89,46 @@ function WelcomeState({
 /** Shared chat content used by both mobile drawer and desktop panel */
 function ChatContent({
   onClose,
-  onNewChat,
   messages,
   isLoading,
+  isLoadingChat,
   isStreaming,
   error,
   sendMessage,
   sendMessageWithImage,
   clearError,
+  sidebarOpen,
+  onToggleSidebar,
+  chatList,
+  activeChatId,
+  isLoadingChatList,
+  onSelectChat,
+  onNewChat,
+  onDeleteChat,
 }: {
   onClose: () => void;
-  onNewChat: () => void;
   messages: any[];
   isLoading: boolean;
+  isLoadingChat: boolean;
   isStreaming: boolean;
   error: string | null;
   sendMessage: (text: string) => void;
   sendMessageWithImage: (text: string, file: File) => void;
   clearError: () => void;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
+  chatList: any[];
+  activeChatId: number | null;
+  isLoadingChatList: boolean;
+  onSelectChat: (chatId: number) => void;
+  onNewChat: () => void;
+  onDeleteChat: (chatId: number) => void;
 }) {
-  const showWelcome = !isLoading && messages.length === 0;
+  const showWelcome = !isLoading && !isLoadingChat && messages.length === 0;
 
   return (
-    <>
-      <ChatHeader onClose={onClose} onNewChat={onNewChat} />
+    <div className="relative flex flex-col flex-1 overflow-hidden">
+      <ChatHeader onClose={onClose} onToggleSidebar={onToggleSidebar} />
 
       {error && (
         <div className="px-4 py-2 bg-red-900/30 border-b border-red-800/50 flex items-center justify-between">
@@ -122,7 +139,7 @@ function ChatContent({
         </div>
       )}
 
-      {isLoading ? (
+      {isLoading || isLoadingChat ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
         </div>
@@ -137,38 +154,72 @@ function ChatContent({
         onSendMessageWithImage={sendMessageWithImage}
         isStreaming={isStreaming}
       />
-    </>
+
+      {/* Sidebar overlay */}
+      <ChatHistorySidebar
+        open={sidebarOpen}
+        onClose={onToggleSidebar}
+        chatList={chatList}
+        activeChatId={activeChatId}
+        isLoading={isLoadingChatList}
+        onSelectChat={onSelectChat}
+        onNewChat={onNewChat}
+        onDeleteChat={onDeleteChat}
+      />
+    </div>
   );
 }
 
 export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetProps) {
   const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const {
     messages,
+    activeChatId,
+    chatList,
     isLoading,
+    isLoadingChat,
+    isLoadingChatList,
     isStreaming,
     error,
     sendMessage,
     sendMessageWithImage,
+    loadChat,
+    deleteChat,
     startNewChat,
     clearError,
   } = useSommelierChat(open);
 
   const handleClose = () => onOpenChange(false);
+  const toggleSidebar = () => setSidebarOpen(prev => !prev);
 
   const chatProps = {
     onClose: handleClose,
-    onNewChat: startNewChat,
     messages,
     isLoading,
+    isLoadingChat,
     isStreaming,
     error,
     sendMessage,
     sendMessageWithImage,
     clearError,
+    sidebarOpen,
+    onToggleSidebar: toggleSidebar,
+    chatList,
+    activeChatId,
+    isLoadingChatList,
+    onSelectChat: (chatId: number) => {
+      loadChat(chatId);
+      setSidebarOpen(false);
+    },
+    onNewChat: () => {
+      startNewChat();
+      setSidebarOpen(false);
+    },
+    onDeleteChat: deleteChat,
   };
 
-  // Mobile: bottom drawer — uses full available height for comfortable touch targets
+  // Mobile: bottom drawer
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
