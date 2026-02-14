@@ -238,6 +238,9 @@ export interface IStorage {
   archiveSommelierChat(chatId: number): Promise<void>;
   getUncompactedMessages(chatId: number, keepRecent: number): Promise<SommelierMessage[]>;
   markMessagesCompacted(messageIds: number[]): Promise<void>;
+  getUserSommelierChats(userId: number): Promise<SommelierChat[]>;
+  getSommelierChatById(chatId: number, userId: number): Promise<SommelierChat | undefined>;
+  deleteSommelierChat(chatId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -6502,6 +6505,30 @@ export class DatabaseStorage implements IStorage {
         metadata: sql`COALESCE(${sommelierMessages.metadata}, '{}'::jsonb) || '{"compacted": true}'::jsonb`
       })
       .where(inArray(sommelierMessages.id, messageIds));
+  }
+
+  async getUserSommelierChats(userId: number): Promise<SommelierChat[]> {
+    return db
+      .select()
+      .from(sommelierChats)
+      .where(and(
+        eq(sommelierChats.userId, userId),
+        gt(sommelierChats.messageCount, 0)
+      ))
+      .orderBy(desc(sommelierChats.updatedAt));
+  }
+
+  async getSommelierChatById(chatId: number, userId: number): Promise<SommelierChat | undefined> {
+    return db.query.sommelierChats.findFirst({
+      where: and(
+        eq(sommelierChats.id, chatId),
+        eq(sommelierChats.userId, userId)
+      )
+    });
+  }
+
+  async deleteSommelierChat(chatId: number): Promise<void> {
+    await db.delete(sommelierChats).where(eq(sommelierChats.id, chatId));
   }
 }
 

@@ -1,6 +1,7 @@
 /**
  * Sommelier Chat Service
  * Core logic for AI sommelier chat: message handling, streaming, context assembly.
+ * Supports lazy chat creation (chat created on first message, not on open).
  */
 
 import { requireOpenAI } from "../lib/openai";
@@ -16,11 +17,14 @@ interface ChatContext {
 }
 
 /**
- * Get or create the active chat for a user
+ * Get an existing chat or create a new one.
+ * If chatId is provided, looks up that chat. Otherwise creates a new chat.
  */
-export async function getOrCreateActiveChat(userId: number): Promise<SommelierChat> {
-  const existing = await storage.getActiveSommelierChat(userId);
-  if (existing) return existing;
+async function resolveChat(userId: number, chatId?: number): Promise<SommelierChat> {
+  if (chatId) {
+    const existing = await storage.getSommelierChatById(chatId, userId);
+    if (existing) return existing;
+  }
 
   return storage.createSommelierChat({
     userId,
@@ -82,20 +86,23 @@ async function buildMessagesForAPI(
 /**
  * Send a message and get a streaming response.
  * Returns an async iterable of SSE events.
+ * If no chatId provided, creates a new chat and auto-titles it from the first message.
  */
 export async function streamChatResponse(
   userId: number,
   userEmail: string,
   messageText: string,
   imageBase64?: string,
-  imageMimeType?: string
+  imageMimeType?: string,
+  chatId?: number
 ): Promise<{
   userMessageId: number;
   stream: AsyncIterable<string>;
   onComplete: (fullContent: string) => Promise<number>;
 }> {
   const openai = requireOpenAI();
-  const chat = await getOrCreateActiveChat(userId);
+  const chat = await resolveChat(userId, chatId);
+  const isNewChat = !chatId;
   const sanitizedMessage = sanitizeForPrompt(messageText, 2000);
 
   // Save user message
@@ -105,6 +112,12 @@ export async function streamChatResponse(
     content: sanitizedMessage,
     metadata: imageBase64 ? { hasImage: true } : null,
   });
+
+  // Auto-title on first message of a new chat
+  if (isNewChat || !chat.title) {
+    const title = sanitizedMessage.slice(0, 50);
+    await storage.updateSommelierChat(chat.id, { title });
+  }
 
   const ctx: ChatContext = { chat, userEmail };
   const apiMessages = await buildMessagesForAPI(ctx, sanitizedMessage, imageBase64, imageMimeType);
@@ -118,7 +131,8 @@ export async function streamChatResponse(
 
   // Create async iterable that yields SSE-formatted strings
   async function* generateSSE(): AsyncIterable<string> {
-    yield `data: ${JSON.stringify({ type: "start", messageId: userMsg.id })}\n\n`;
+    // Include chatId in start event so frontend can track which chat this belongs to
+    yield `data: ${JSON.stringify({ type: "start", messageId: userMsg.id, chatId: chat.id })}\n\n`;
 
     let fullContent = "";
     for await (const chunk of completion) {
@@ -162,10 +176,12 @@ export async function sendChatMessage(
   userEmail: string,
   messageText: string,
   imageBase64?: string,
-  imageMimeType?: string
+  imageMimeType?: string,
+  chatId?: number
 ): Promise<{ userMessage: SommelierMessage; assistantMessage: SommelierMessage }> {
   const openai = requireOpenAI();
-  const chat = await getOrCreateActiveChat(userId);
+  const chat = await resolveChat(userId, chatId);
+  const isNewChat = !chatId;
   const sanitizedMessage = sanitizeForPrompt(messageText, 2000);
 
   // Save user message
@@ -175,6 +191,12 @@ export async function sendChatMessage(
     content: sanitizedMessage,
     metadata: imageBase64 ? { hasImage: true } : null,
   });
+
+  // Auto-title on first message of a new chat
+  if (isNewChat || !chat.title) {
+    const title = sanitizedMessage.slice(0, 50);
+    await storage.updateSommelierChat(chat.id, { title });
+  }
 
   const ctx: ChatContext = { chat, userEmail };
   const apiMessages = await buildMessagesForAPI(ctx, sanitizedMessage, imageBase64, imageMimeType);

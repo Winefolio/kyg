@@ -1,6 +1,7 @@
 /**
  * Sommelier Chat Routes
  * API endpoints for AI sommelier chat with SSE streaming and vision support.
+ * ChatGPT-style: always open to a fresh chat, sidebar shows history.
  */
 
 import type { Express, Request, Response } from "express";
@@ -8,7 +9,7 @@ import multer from "multer";
 import { requireAuth } from "./auth";
 import { apiRateLimit, createRateLimit } from "../middleware/rateLimiter";
 import { storage } from "../storage";
-import { getOrCreateActiveChat, streamChatResponse } from "../services/sommelierChatService";
+import { streamChatResponse } from "../services/sommelierChatService";
 
 // Rate limit for chat messages: 15/min
 const sommelierChatRateLimit = createRateLimit({
@@ -33,30 +34,91 @@ const upload = multer({
 export function registerSommelierChatRoutes(app: Express): void {
   /**
    * GET /api/sommelier-chat/active
-   * Get or create the active chat + last 20 messages
+   * Returns empty state for a fresh chat (no eager DB creation).
+   * The chat record is only created when the first message is sent.
    */
-  app.get("/api/sommelier-chat/active", requireAuth, apiRateLimit, async (req: Request, res: Response) => {
+  app.get("/api/sommelier-chat/active", requireAuth, apiRateLimit, async (_req: Request, res: Response) => {
+    return res.json({ chat: null, messages: [] });
+  });
+
+  /**
+   * GET /api/sommelier-chat/list
+   * Get all user chats with messages (newest first)
+   */
+  app.get("/api/sommelier-chat/list", requireAuth, apiRateLimit, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
-      const chat = await getOrCreateActiveChat(userId);
-      const messages = await storage.getSommelierChatMessages(chat.id, 20);
+      const chats = await storage.getUserSommelierChats(userId);
+      return res.json({ chats });
+    } catch (error) {
+      console.error("[SommelierChat] Error listing chats:", error);
+      return res.status(500).json({ error: "Failed to list chats" });
+    }
+  });
 
+  /**
+   * GET /api/sommelier-chat/:chatId
+   * Load a specific chat + last 50 messages. Validates ownership.
+   */
+  app.get("/api/sommelier-chat/:chatId", requireAuth, apiRateLimit, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const chatId = parseInt(req.params.chatId, 10);
+
+      if (isNaN(chatId)) {
+        return res.status(400).json({ error: "Invalid chat ID" });
+      }
+
+      const chat = await storage.getSommelierChatById(chatId, userId);
+      if (!chat) {
+        return res.status(404).json({ error: "Chat not found" });
+      }
+
+      const messages = await storage.getSommelierChatMessages(chatId, 50);
       return res.json({ chat, messages });
     } catch (error) {
-      console.error("[SommelierChat] Error getting active chat:", error);
+      console.error("[SommelierChat] Error getting chat:", error);
       return res.status(500).json({ error: "Failed to load chat" });
     }
   });
 
   /**
+   * DELETE /api/sommelier-chat/:chatId
+   * Hard-delete a chat and its messages (cascade). Validates ownership.
+   */
+  app.delete("/api/sommelier-chat/:chatId", requireAuth, apiRateLimit, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const chatId = parseInt(req.params.chatId, 10);
+
+      if (isNaN(chatId)) {
+        return res.status(400).json({ error: "Invalid chat ID" });
+      }
+
+      const chat = await storage.getSommelierChatById(chatId, userId);
+      if (!chat) {
+        return res.status(404).json({ error: "Chat not found" });
+      }
+
+      await storage.deleteSommelierChat(chatId);
+      return res.status(204).send();
+    } catch (error) {
+      console.error("[SommelierChat] Error deleting chat:", error);
+      return res.status(500).json({ error: "Failed to delete chat" });
+    }
+  });
+
+  /**
    * POST /api/sommelier-chat/message
-   * Send a text message, returns SSE stream
+   * Send a text message, returns SSE stream.
+   * Accepts optional chatId — if not provided, creates a new chat.
+   * Auto-sets title from first user message (truncated to 50 chars).
    */
   app.post("/api/sommelier-chat/message", requireAuth, sommelierChatRateLimit, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
       const userEmail = req.session.userEmail!;
-      const { message } = req.body;
+      const { message, chatId } = req.body;
 
       if (!message || typeof message !== "string" || message.trim().length === 0) {
         return res.status(400).json({ error: "Message is required" });
@@ -72,7 +134,7 @@ export function registerSommelierChatRoutes(app: Express): void {
       res.setHeader("Connection", "keep-alive");
       res.setHeader("X-Accel-Buffering", "no");
 
-      const { stream } = await streamChatResponse(userId, userEmail, message.trim());
+      const { stream } = await streamChatResponse(userId, userEmail, message.trim(), undefined, undefined, chatId || undefined);
 
       for await (const event of stream) {
         res.write(event);
@@ -81,7 +143,6 @@ export function registerSommelierChatRoutes(app: Express): void {
       res.end();
     } catch (error) {
       console.error("[SommelierChat] Error sending message:", error);
-      // If headers already sent, send error via SSE
       if (res.headersSent) {
         res.write(`data: ${JSON.stringify({ type: "error", message: "Something went wrong. Try again." })}\n\n`);
         res.end();
@@ -100,6 +161,7 @@ export function registerSommelierChatRoutes(app: Express): void {
       const userId = req.session.userId!;
       const userEmail = req.session.userEmail!;
       const message = req.body.message || "What can you tell me about these wines?";
+      const chatId = req.body.chatId ? parseInt(req.body.chatId, 10) : undefined;
 
       if (!req.file) {
         return res.status(400).json({ error: "Image is required" });
@@ -119,7 +181,8 @@ export function registerSommelierChatRoutes(app: Express): void {
         userEmail,
         message.trim(),
         imageBase64,
-        imageMimeType
+        imageMimeType,
+        chatId
       );
 
       for await (const event of stream) {
@@ -135,35 +198,6 @@ export function registerSommelierChatRoutes(app: Express): void {
       } else {
         return res.status(500).json({ error: "Failed to send message" });
       }
-    }
-  });
-
-  /**
-   * POST /api/sommelier-chat/new
-   * Archive current chat, start a new one
-   */
-  app.post("/api/sommelier-chat/new", requireAuth, apiRateLimit, async (req: Request, res: Response) => {
-    try {
-      const userId = req.session.userId!;
-
-      // Archive existing chat if any
-      const existing = await storage.getActiveSommelierChat(userId);
-      if (existing) {
-        await storage.archiveSommelierChat(existing.id);
-      }
-
-      // Create new chat
-      const newChat = await storage.createSommelierChat({
-        userId,
-        title: null,
-        summary: null,
-        messageCount: 0,
-      });
-
-      return res.json({ chat: newChat, messages: [] });
-    } catch (error) {
-      console.error("[SommelierChat] Error creating new chat:", error);
-      return res.status(500).json({ error: "Failed to create new chat" });
     }
   });
 }
