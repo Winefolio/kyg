@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { SommelierChatSheet } from "./SommelierChatSheet";
 import { useHaptics } from "@/hooks/useHaptics";
+import { useAuth } from "@/hooks/useAuth";
 
 // Routes where the FAB should be hidden (active experiences)
 const HIDDEN_ROUTE_PATTERNS = [
@@ -55,12 +56,13 @@ export function SommelierFAB() {
   const [isOpen, setIsOpen] = useState(false);
   const [location] = useLocation();
   const { triggerHaptic } = useHaptics();
+  const { user } = useAuth();
 
-  // Determine visibility
+  // Determine visibility — require auth + allowed route
   const isHidden = HIDDEN_ROUTE_PATTERNS.some((p) => p.test(location));
   const isShown = SHOWN_ROUTE_PATTERNS.some((p) => p.test(location));
 
-  if (isHidden || !isShown) return null;
+  if (!user || isHidden || !isShown) return null;
 
   // If chat sheet is open, hide FAB
   if (isOpen) {
