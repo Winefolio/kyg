@@ -188,13 +188,11 @@ function SidebarContent({
 
   const handleSelect = useCallback((chatId: number) => {
     onSelectChat(chatId);
-    onClose();
-  }, [onSelectChat, onClose]);
+  }, [onSelectChat]);
 
   const handleNewChat = useCallback(() => {
     onNewChat();
-    onClose();
-  }, [onNewChat, onClose]);
+  }, [onNewChat]);
 
   const handleDelete = useCallback((chatId: number) => {
     setDeletingId(chatId);

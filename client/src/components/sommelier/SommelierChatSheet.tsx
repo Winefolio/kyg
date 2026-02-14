@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { ChatHeader } from "./ChatHeader";
 import { ChatHistorySidebar } from "./ChatHistorySidebar";
@@ -86,6 +86,35 @@ function WelcomeState({
   );
 }
 
+/** Hook for swipe-from-left-edge gesture to open sidebar (ChatGPT-style) */
+function useEdgeSwipe(onSwipeRight: () => void) {
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    // Only track touches starting within 30px of the left edge
+    if (touch.clientX <= 30) {
+      touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+    }
+  }, []);
+
+  const onTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = Math.abs(touch.clientY - touchStartRef.current.y);
+    const elapsed = Date.now() - touchStartRef.current.time;
+    touchStartRef.current = null;
+
+    // Swipe right: moved >60px horizontally, <80px vertically, within 500ms
+    if (dx > 60 && dy < 80 && elapsed < 500) {
+      onSwipeRight();
+    }
+  }, [onSwipeRight]);
+
+  return { onTouchStart, onTouchEnd };
+}
+
 /** Shared chat content used by both mobile drawer and desktop panel */
 function ChatContent({
   onClose,
@@ -98,7 +127,8 @@ function ChatContent({
   sendMessageWithImage,
   clearError,
   sidebarOpen,
-  onToggleSidebar,
+  onOpenSidebar,
+  onCloseSidebar,
   chatList,
   activeChatId,
   isLoadingChatList,
@@ -116,7 +146,8 @@ function ChatContent({
   sendMessageWithImage: (text: string, file: File) => void;
   clearError: () => void;
   sidebarOpen: boolean;
-  onToggleSidebar: () => void;
+  onOpenSidebar: () => void;
+  onCloseSidebar: () => void;
   chatList: any[];
   activeChatId: number | null;
   isLoadingChatList: boolean;
@@ -125,10 +156,14 @@ function ChatContent({
   onDeleteChat: (chatId: number) => void;
 }) {
   const showWelcome = !isLoading && !isLoadingChat && messages.length === 0;
+  const swipeHandlers = useEdgeSwipe(onOpenSidebar);
 
   return (
-    <div className="relative flex flex-col flex-1 overflow-hidden">
-      <ChatHeader onClose={onClose} onToggleSidebar={onToggleSidebar} />
+    <div
+      className="relative flex flex-col flex-1 overflow-hidden"
+      {...swipeHandlers}
+    >
+      <ChatHeader onClose={onClose} onToggleSidebar={onOpenSidebar} />
 
       {error && (
         <div className="px-4 py-2 bg-red-900/30 border-b border-red-800/50 flex items-center justify-between">
@@ -158,7 +193,7 @@ function ChatContent({
       {/* Sidebar overlay */}
       <ChatHistorySidebar
         open={sidebarOpen}
-        onClose={onToggleSidebar}
+        onClose={onCloseSidebar}
         chatList={chatList}
         activeChatId={activeChatId}
         isLoading={isLoadingChatList}
@@ -191,7 +226,8 @@ export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetPro
   } = useSommelierChat(open);
 
   const handleClose = () => onOpenChange(false);
-  const toggleSidebar = () => setSidebarOpen(prev => !prev);
+  const openSidebar = useCallback(() => setSidebarOpen(true), []);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
   const chatProps = {
     onClose: handleClose,
@@ -204,7 +240,8 @@ export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetPro
     sendMessageWithImage,
     clearError,
     sidebarOpen,
-    onToggleSidebar: toggleSidebar,
+    onOpenSidebar: openSidebar,
+    onCloseSidebar: closeSidebar,
     chatList,
     activeChatId,
     isLoadingChatList,
