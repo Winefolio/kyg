@@ -1203,7 +1203,7 @@ export class DatabaseStorage implements IStorage {
       .update(sessions)
       .set({
         status,
-        updatedAt: new Date(),
+        updatedAt: sql`now()`,
       })
       .where(eq(sessions.id, sessionId))
       .returning();
@@ -1317,7 +1317,7 @@ export class DatabaseStorage implements IStorage {
       .update(participants)
       .set({
         progressPtr: progress,
-        lastActive: new Date(),
+        lastActive: sql`now()`,
       })
       .where(eq(participants.id, participantId));
   }
@@ -1330,7 +1330,7 @@ export class DatabaseStorage implements IStorage {
       .update(participants)
       .set({
         displayName,
-        lastActive: new Date(),
+        lastActive: sql`now()`,
       })
       .where(eq(participants.id, participantId));
   }
@@ -1400,7 +1400,7 @@ export class DatabaseStorage implements IStorage {
         target: [responses.participantId, responses.slideId],
         set: {
           answerJson,
-          answeredAt: new Date(),
+          answeredAt: sql`now()`,
         },
       })
       .returning();
@@ -4225,7 +4225,7 @@ export class DatabaseStorage implements IStorage {
   async updateMediaLastAccessed(id: string): Promise<void> {
     await db
       .update(media)
-      .set({ lastAccessedAt: new Date() })
+      .set({ lastAccessedAt: sql`now()` })
       .where(eq(media.id, id));
   }
 
@@ -5782,8 +5782,8 @@ export class DatabaseStorage implements IStorage {
         .set({
           completedChapters: completedChaptersArray,
           currentChapter: isComplete ? chapter.chapterNumber : chapter.chapterNumber + 1,
-          lastActivityAt: new Date(),
-          completedAt: isComplete ? new Date() : null
+          lastActivityAt: sql`now()`,
+          completedAt: isComplete ? sql`now()` : null
         })
         .where(eq(userJourneys.id, userJourney.id))
         .returning();
@@ -5871,7 +5871,7 @@ export class DatabaseStorage implements IStorage {
       .update(journeys)
       .set({
         totalChapters: sql`${journeys.totalChapters} + 1`,
-        updatedAt: new Date()
+        updatedAt: sql`now()`
       })
       .where(eq(journeys.id, data.journeyId));
 
@@ -5894,7 +5894,7 @@ export class DatabaseStorage implements IStorage {
       .update(journeys)
       .set({
         ...updates,
-        updatedAt: new Date()
+        updatedAt: sql`now()`
       })
       .where(eq(journeys.id, journeyId))
       .returning();
@@ -5926,7 +5926,7 @@ export class DatabaseStorage implements IStorage {
         .update(journeys)
         .set({
           totalChapters: sql`GREATEST(${journeys.totalChapters} - 1, 0)`,
-          updatedAt: new Date()
+          updatedAt: sql`now()`
         })
         .where(eq(journeys.id, chapter.journeyId));
     }
@@ -6461,23 +6461,26 @@ export class DatabaseStorage implements IStorage {
       .update(sommelierChats)
       .set({
         messageCount: sql`${sommelierChats.messageCount} + 1`,
-        updatedAt: new Date()
+        updatedAt: sql`now()`
       })
       .where(eq(sommelierChats.id, message.chatId));
     return newMessage;
   }
 
-  async updateSommelierChat(chatId: number, data: Partial<{ title: string; summary: string; lastSummaryAt: Date; messageCount: number; updatedAt: Date }>): Promise<void> {
+  async updateSommelierChat(chatId: number, data: Partial<{ title: string; summary: string; lastSummaryAt: Date | string; messageCount: number; updatedAt: Date | string }>): Promise<void> {
+    const setData: Record<string, any> = { ...data };
+    if (setData.lastSummaryAt instanceof Date) setData.lastSummaryAt = setData.lastSummaryAt.toISOString();
+    if (setData.updatedAt instanceof Date) setData.updatedAt = setData.updatedAt.toISOString();
     await db
       .update(sommelierChats)
-      .set(data)
+      .set(setData)
       .where(eq(sommelierChats.id, chatId));
   }
 
   async archiveSommelierChat(chatId: number): Promise<void> {
     await db
       .update(sommelierChats)
-      .set({ updatedAt: new Date() })
+      .set({ updatedAt: sql`now()` })
       .where(eq(sommelierChats.id, chatId));
   }
 
