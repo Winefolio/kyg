@@ -167,12 +167,14 @@ export function registerSommelierChatRoutes(app: Express): void {
 
       const { stream } = await streamChatResponse(userId, userEmail, message.trim(), undefined, undefined, chatId || undefined);
 
+      // Don't break on disconnect -- let generator complete so assistant message is saved
       for await (const event of stream) {
-        if (clientDisconnected) break;
-        res.write(event);
+        if (!clientDisconnected) {
+          try { res.write(event); } catch { /* response already closed */ }
+        }
       }
 
-      res.end();
+      if (!clientDisconnected) res.end();
     } catch (error) {
       console.error("[SommelierChat] Error sending message:", error);
       if (res.headersSent) {
@@ -221,12 +223,14 @@ export function registerSommelierChatRoutes(app: Express): void {
         chatId
       );
 
+      // Don't break on disconnect -- let generator complete so assistant message is saved
       for await (const event of stream) {
-        if (clientDisconnected) break;
-        res.write(event);
+        if (!clientDisconnected) {
+          try { res.write(event); } catch { /* response already closed */ }
+        }
       }
 
-      res.end();
+      if (!clientDisconnected) res.end();
     } catch (error) {
       console.error("[SommelierChat] Error sending message with image:", error);
       if (res.headersSent) {

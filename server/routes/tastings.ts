@@ -94,10 +94,22 @@ async function incrementTastingCount(userId: number): Promise<void> {
 async function getUserPreferences(userId: number): Promise<UserPreferences> {
   const result = await db.execute(sql`
     SELECT
-      AVG((responses->'taste'->>'sweetness')::numeric) as sweetness,
-      AVG((responses->'taste'->>'acidity')::numeric) as acidity,
-      AVG((responses->'taste'->>'tannins')::numeric) as tannins,
-      AVG((responses->'taste'->>'body')::numeric) as body,
+      AVG(COALESCE(
+        (responses->'taste'->>'sweetness')::numeric,
+        (responses->'structure'->>'sweetness')::numeric
+      )) as sweetness,
+      AVG(COALESCE(
+        (responses->'taste'->>'acidity')::numeric,
+        (responses->'structure'->>'acidity')::numeric
+      )) as acidity,
+      AVG(COALESCE(
+        (responses->'taste'->>'tannins')::numeric,
+        (responses->'structure'->>'tannins')::numeric
+      )) as tannins,
+      AVG(COALESCE(
+        (responses->'taste'->>'body')::numeric,
+        (responses->'structure'->>'body')::numeric
+      )) as body,
       COUNT(*) as tasting_count
     FROM tastings
     WHERE user_id = ${userId}
