@@ -27,13 +27,13 @@ import { registerSommelierChatRoutes } from './routes/sommelier-chat';
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: Infinity, // No file size limit for videos
+    fileSize: 200 * 1024 * 1024, // 200MB limit
   },
   fileFilter: (req, file, cb) => {
     // Support all major media formats
     const allowedImageTypes = [
       'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif',
-      'image/bmp', 'image/tiff', 'image/svg+xml', 'image/avif', 'image/heic', 'image/heif'
+      'image/bmp', 'image/tiff', 'image/avif', 'image/heic', 'image/heif'
     ];
     const allowedAudioTypes = [
       'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave',
@@ -123,7 +123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(pkg);
     } catch (error) {
       console.error("Error fetching package:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -295,7 +295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error creating session:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -1420,35 +1420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Profile endpoints
-  app.get("/api/profile", async (req, res) => {
-    try {
-      // For now, return mock profile data - in production this would use authentication
-      const mockProfile = {
-        id: "user-123",
-        email: "wine.lover@example.com",
-        displayName: "Wine Enthusiast",
-        tastingSessions: [],
-        totalSessions: 0,
-        completedSessions: 0
-      };
-      
-      res.json(mockProfile);
-    } catch (error) {
-      console.error("Error fetching profile:", error);
-      res.status(500).json({ message: "Failed to fetch profile" });
-    }
-  });
-
-  app.get("/api/profile/recent-session", async (req, res) => {
-    try {
-      // Return the most recent completed session if any
-      res.json(null); // No recent session for now
-    } catch (error) {
-      console.error("Error fetching recent session:", error);
-      res.status(500).json({ message: "Failed to fetch recent session" });
-    }
-  });
+  // Mock profile endpoints removed -- no client references, returned hardcoded data
 
   // Slide templates endpoint
   app.get("/api/slide-templates", async (req, res) => {
@@ -1562,17 +1534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Wine management endpoints for packages
-  app.get("/api/packages/:packageId/wines", async (req, res) => {
-    try {
-      const { packageId } = req.params;
-      const wines = await storage.getPackageWines(packageId);
-      res.json(wines);
-    } catch (error) {
-      console.error("Error fetching wines:", error);
-      res.status(500).json({ message: "Failed to fetch wines" });
-    }
-  });
+  // Duplicate GET /api/packages/:packageId/wines removed -- already registered at line 566
 
   app.post("/api/packages/:packageId/wines", async (req, res) => {
     try {
@@ -1750,7 +1712,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.status(500).json({ 
         message: "Failed to update slide position",
-        error: error.message || 'Internal server error'
+        error: 'Internal server error'
       });
     }
   });
@@ -1797,7 +1759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false,
         message: "Position recovery failed", 
-        error: error.message || 'Unknown error'
+        error: 'Internal server error'
       });
     }
   });
@@ -1823,7 +1785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false,
         message: "Smart swap failed", 
-        error: error.message || 'Unknown error'
+        error: 'Internal server error'
       });
     }
   });
@@ -1849,7 +1811,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false,
         message: "Position assignment failed", 
-        error: error.message || 'Unknown error'
+        error: 'Internal server error'
       });
     }
   });
@@ -1885,21 +1847,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false,
         message: "Batch position update failed", 
-        error: error.message || 'Unknown error'
+        error: 'Internal server error'
       });
     }
   });
 
-  // UPDATED: Use new function to include wines  
-  app.get("/api/packages-with-wines", async (req, res) => {
-    try {
-      const packages = await storage.getAllPackagesWithWines();
-      res.json(packages);
-    } catch (error) {
-      console.error("Error fetching packages with wines:", error);
-      res.status(500).json({ error: "Failed to fetch packages" });
-    }
-  });
+  // /api/packages-with-wines removed -- duplicate of /api/packages
 
   // Modern wine management endpoints
   app.post("/api/wines", async (req, res) => {
@@ -1935,103 +1888,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Legacy wine management endpoints for backward compatibility
-  app.post("/api/package-wines", async (req, res) => {
-    try {
-      const wineData = req.body;
-      const newWine = await storage.createPackageWineFromDashboard(wineData);
-      res.json(newWine);
-    } catch (error) {
-      console.error("Error creating wine:", error);
-      res.status(500).json({ message: "Failed to create wine" });
-    }
-  });
+  // Legacy /api/package-wines endpoints removed -- use /api/wines instead
 
-  app.patch("/api/package-wines/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const updateData = req.body;
-      const updatedWine = await storage.updatePackageWine(id, updateData);
-      res.json(updatedWine);
-    } catch (error) {
-      console.error("Error updating wine:", error);
-      res.status(500).json({ message: "Failed to update wine" });
-    }
-  });
-
-  app.delete("/api/package-wines/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      await storage.deletePackageWine(id);
-      res.json({ message: "Wine deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting wine:", error);
-      res.status(500).json({ message: "Failed to delete wine" });
-    }
-  });
-
-  // Enhanced analytics endpoint
-  app.get("/api/analytics/overview", async (req, res) => {
-    try {
-      const packages = await storage.getAllPackages();
-      const sessions = await storage.getAllSessions();
-      
-      // Calculate comprehensive analytics
-      const totalPackages = packages.length;
-      const activePackages = packages.filter(p => p.isActive).length;
-      const totalSessions = sessions.length;
-      const activeSessions = sessions.filter(s => s.status === 'active').length;
-      
-      // Get total participants across all sessions
-      let totalParticipants = 0;
-      for (const session of sessions) {
-        const participants = await storage.getParticipantsBySessionId(session.id);
-        totalParticipants += participants.length;
-      }
-
-      // Package usage analytics
-      const packageUsage = await Promise.all(
-        packages.map(async (pkg) => {
-          const packageSessions = sessions.filter(s => s.packageId === pkg.id);
-          let packageParticipants = 0;
-          for (const session of packageSessions) {
-            const participants = await storage.getParticipantsBySessionId(session.id);
-            packageParticipants += participants.length;
-          }
-          return {
-            packageId: pkg.id,
-            packageName: pkg.name,
-            packageCode: pkg.code,
-            sessionsCount: packageSessions.length,
-            participantsCount: packageParticipants,
-            isActive: pkg.isActive
-          };
-        })
-      );
-
-      const analytics = {
-        overview: {
-          totalPackages,
-          activePackages,
-          totalSessions,
-          activeSessions,
-          totalParticipants
-        },
-        packageUsage,
-        recentActivity: sessions.slice(-5).map(s => ({
-          sessionId: s.id,
-          packageCode: packages.find(p => p.id === s.packageId)?.code || '',
-          status: s.status,
-          createdAt: s.startedAt || new Date()
-        }))
-      };
-
-      res.json(analytics);
-    } catch (error) {
-      console.error("Error fetching analytics:", error);
-      res.status(500).json({ message: "Failed to fetch analytics" });
-    }
-  });
+  // Analytics overview endpoint removed -- was never called by any client code
+  // and had N+1 query issues (200+ queries at 100 sessions)
 
   // Comprehensive media upload endpoint supporting all image formats up to 10MB
   console.log("📁 Registering comprehensive media upload endpoints...");
