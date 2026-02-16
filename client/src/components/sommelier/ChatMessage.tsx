@@ -1,13 +1,14 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessage as ChatMessageType } from "@/hooks/useSommelierChat";
-import { Camera } from "lucide-react";
+import { Camera, RotateCcw } from "lucide-react";
 
 interface ChatMessageProps {
   message: ChatMessageType;
+  onRetry?: (messageId: number) => void;
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, onRetry }: ChatMessageProps) {
   const isUser = message.role === "user";
   const hasImage = (message.metadata as any)?.hasImage;
 
@@ -16,7 +17,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
       <div
         className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${
           isUser
-            ? "bg-purple-600 text-white rounded-br-sm"
+            ? message.failed
+              ? "bg-red-900/60 text-white rounded-br-sm border border-red-700/50"
+              : "bg-purple-600 text-white rounded-br-sm"
             : "bg-zinc-800 text-zinc-100 rounded-bl-sm"
         }`}
       >
@@ -34,6 +37,15 @@ export function ChatMessage({ message }: ChatMessageProps) {
               {message.content}
             </ReactMarkdown>
           </div>
+        )}
+        {message.failed && onRetry && (
+          <button
+            onClick={() => onRetry(message.id)}
+            className="flex items-center gap-1.5 mt-1.5 text-xs text-red-300 hover:text-white transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Tap to retry
+          </button>
         )}
       </div>
     </div>
