@@ -180,7 +180,15 @@ export function registerAuthRoutes(app: Express): void {
         user = newUser;
       }
 
-      // Set session
+      // Regenerate session to prevent session fixation attacks
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      // Set session data on the fresh session
       req.session.userId = user.id;
       req.session.userEmail = user.email;
 

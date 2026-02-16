@@ -291,7 +291,7 @@ export default function SommelierDashboard() {
   const createWineMutation = useMutation({
     mutationFn: (data: any) => {
       console.log("Mutation function called with:", data);
-      return apiRequest("POST", "/api/package-wines", data);
+      return apiRequest("POST", "/api/wines", data);
     },
     onSuccess: (result) => {
       console.log("Wine creation successful:", result);
@@ -315,7 +315,7 @@ export default function SommelierDashboard() {
   // Update wine mutation
   const updateWineMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: WineForm }) =>
-      apiRequest("PATCH", `/api/package-wines/${id}`, data),
+      apiRequest("PATCH", `/api/wines/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
       setWineModalOpen(false);
@@ -335,7 +335,7 @@ export default function SommelierDashboard() {
 
   // Delete wine mutation
   const deleteWineMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/package-wines/${id}`),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/wines/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/packages"] });
       toast({

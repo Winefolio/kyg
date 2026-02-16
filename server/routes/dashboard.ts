@@ -29,7 +29,7 @@ export function registerDashboardRoutes(app: Express) {
       res.json({ participants });
     } catch (error) {
       console.error("Error finding participant by email:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -60,7 +60,7 @@ export function registerDashboardRoutes(app: Express) {
       res.json(dashboardData);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -77,7 +77,7 @@ export function registerDashboardRoutes(app: Express) {
       res.json(scores);
     } catch (error) {
       console.error("Error fetching user scores:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -99,7 +99,7 @@ export function registerDashboardRoutes(app: Express) {
       res.json(history);
     } catch (error) {
       console.error("Error fetching user history:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -131,7 +131,7 @@ export function registerDashboardRoutes(app: Express) {
       res.json(tasteProfile);
     } catch (error) {
       console.error("Error generating taste profile:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -196,7 +196,7 @@ export function registerDashboardRoutes(app: Express) {
       });
     } catch (error) {
       console.error("Error fetching unified preferences:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -218,7 +218,7 @@ export function registerDashboardRoutes(app: Express) {
       res.json(feedback);
     } catch (error) {
       console.error("Error fetching sommelier feedback:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -324,7 +324,7 @@ export function registerDashboardRoutes(app: Express) {
       });
     } catch (error) {
       console.error("Error fetching wine collection:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -342,7 +342,7 @@ export function registerDashboardRoutes(app: Express) {
       res.json(starters);
     } catch (error) {
       console.error("Error fetching conversation starters:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -364,7 +364,7 @@ export function registerDashboardRoutes(app: Express) {
       res.json(recommendations);
     } catch (error) {
       console.error("Error fetching explore recommendations:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -388,7 +388,7 @@ export function registerDashboardRoutes(app: Express) {
       res.json(recommendations);
     } catch (error) {
       console.error("Error generating producer recommendations:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -406,7 +406,7 @@ export function registerDashboardRoutes(app: Express) {
       res.json(recommendations);
     } catch (error) {
       console.error("Error fetching journey recommendations:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -583,7 +583,7 @@ export function registerDashboardRoutes(app: Express) {
       res.json(tastingDetailData);
     } catch (error) {
       console.error("Error getting session details:", error);
-      res.status(500).json({ message: "Internal server error", error: String(error) });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 

@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import helmet from "helmet";
 import cors from "cors";
 import session from "express-session";
 import pgSession from "connect-pg-simple";
@@ -14,6 +15,11 @@ const app = express();
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
+
+// Security headers (clickjacking, MIME sniffing, etc.)
+app.use(helmet({
+  contentSecurityPolicy: false, // Vite dev server needs inline scripts
+}));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
@@ -193,18 +199,15 @@ app.use((req, res, next) => {
       });
       console.error(`${'='.repeat(80)}\n`);
       
-      // Include error ID in response for tracking
-      res.status(status).json({ 
+      // Include error ID in response for tracking (don't leak internal details)
+      res.status(status).json({
         message,
         errorId,
-        errorCode: err.code,
         timestamp: new Date().toISOString()
       });
     } else {
       res.status(status).json({ message });
     }
-    
-    throw err;
   });
 
   // importantly only setup vite in development and after
