@@ -9,6 +9,7 @@ export interface ChatMessage {
   metadata?: any;
   createdAt: string;
   isStreaming?: boolean;
+  failed?: boolean;
 }
 
 export interface SommelierChatSummary {
@@ -29,6 +30,7 @@ export function useSommelierChat(isOpen: boolean) {
   const [streamingContent, setStreamingContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const pendingImageFiles = useRef<Map<number, File>>(new Map());
   const queryClient = useQueryClient();
 
   // Chat list for sidebar (only chats with messages, newest first)
@@ -45,12 +47,12 @@ export function useSommelierChat(isOpen: boolean) {
 
   const chatList = chatListData?.chats ?? [];
 
-  // Reset to fresh state when Pierre opens (ChatGPT behavior: always new chat)
+  // Abort any active stream when Pierre closes
   useEffect(() => {
-    if (isOpen) {
-      setMessages([]);
-      setActiveChatId(null);
-      setError(null);
+    if (!isOpen) {
+      abortControllerRef.current?.abort();
+      setIsStreaming(false);
+      abortControllerRef.current = null;
     }
   }, [isOpen]);
 
@@ -175,7 +177,11 @@ export function useSommelierChat(isOpen: boolean) {
     } catch (err: any) {
       if (err.name === "AbortError") return;
       setError(err.message || "Something went wrong. Try again.");
-      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id && m.id !== -1));
+      // Keep the user's message but mark it as failed; remove streaming placeholder
+      setMessages(prev => prev
+        .filter(m => m.id !== -1)
+        .map(m => m.id === optimisticMsg.id ? { ...m, failed: true } : m)
+      );
     } finally {
       setIsStreaming(false);
       abortControllerRef.current = null;
@@ -198,6 +204,7 @@ export function useSommelierChat(isOpen: boolean) {
     };
 
     setMessages(prev => [...prev, optimisticMsg]);
+    pendingImageFiles.current.set(optimisticMsg.id, imageFile);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -224,12 +231,19 @@ export function useSommelierChat(isOpen: boolean) {
 
       await parseSSEStream(res, optimisticMsg);
 
+      // Image sent successfully — no longer needed for retry
+      pendingImageFiles.current.delete(optimisticMsg.id);
+
       // Refresh chat list
       queryClient.invalidateQueries({ queryKey: ["/api/sommelier-chat/list"] });
     } catch (err: any) {
       if (err.name === "AbortError") return;
       setError(err.message || "Something went wrong. Try again.");
-      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id && m.id !== -1));
+      // Keep the user's message but mark it as failed; remove streaming placeholder
+      setMessages(prev => prev
+        .filter(m => m.id !== -1)
+        .map(m => m.id === optimisticMsg.id ? { ...m, failed: true } : m)
+      );
     } finally {
       setIsStreaming(false);
       abortControllerRef.current = null;
@@ -279,6 +293,21 @@ export function useSommelierChat(isOpen: boolean) {
     setError(null);
   }, []);
 
+  // Retry a failed message (supports both text-only and image messages)
+  const retryMessage = useCallback((messageId: number) => {
+    const failedMsg = messages.find(m => m.id === messageId && m.failed);
+    if (!failedMsg) return;
+    // Remove the failed message and resend
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+    const pendingImage = pendingImageFiles.current.get(messageId);
+    if (pendingImage) {
+      pendingImageFiles.current.delete(messageId);
+      sendMessageWithImage(failedMsg.content, pendingImage);
+    } else {
+      sendMessage(failedMsg.content);
+    }
+  }, [messages, sendMessage, sendMessageWithImage]);
+
   const cancelStream = useCallback(() => {
     abortControllerRef.current?.abort();
     setIsStreaming(false);
@@ -301,6 +330,7 @@ export function useSommelierChat(isOpen: boolean) {
     deleteChat,
     startNewChat,
     cancelStream,
+    retryMessage,
     clearError,
   };
 }
