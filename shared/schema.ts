@@ -1168,3 +1168,22 @@ export type SommelierChat = typeof sommelierChats.$inferSelect;
 export type InsertSommelierChat = z.infer<typeof insertSommelierChatSchema>;
 export type SommelierMessage = typeof sommelierMessages.$inferSelect;
 export type InsertSommelierMessage = z.infer<typeof insertSommelierMessageSchema>;
+
+// ============================================
+// AI RESPONSE CACHE (Performance Optimization)
+// ============================================
+
+export const aiResponseCache = pgTable("ai_response_cache", {
+  id: serial("id").primaryKey(),
+  userEmail: text("user_email").notNull(),
+  cacheKey: text("cache_key").notNull(),
+  fingerprint: text("fingerprint").notNull(),
+  responseData: jsonb("response_data").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull()
+}, (table) => ({
+  uniqueUserCacheKey: unique().on(table.userEmail, table.cacheKey),
+  userEmailIdx: index("idx_ai_response_cache_email").on(table.userEmail)
+}));
+
+export type AiResponseCache = typeof aiResponseCache.$inferSelect;

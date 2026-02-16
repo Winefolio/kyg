@@ -6,6 +6,37 @@ import { db } from "../db";
 import { users, tastings } from "@shared/schema";
 import { eq, desc, sql } from "drizzle-orm";
 
+// Helper: check AI response cache, return cached data or compute fresh
+async function withAiCache<T>(
+  email: string,
+  cacheKey: string,
+  compute: () => Promise<T>
+): Promise<T> {
+  try {
+    const fingerprint = await storage.getTastingFingerprint(email);
+    const cached = await storage.getAiResponseCache(email, cacheKey);
+
+    if (cached && cached.fingerprint === fingerprint) {
+      console.log(`[AI Cache] HIT for ${cacheKey} (${email})`);
+      return cached.responseData as T;
+    }
+
+    console.log(`[AI Cache] MISS for ${cacheKey} (${email}) — computing fresh`);
+    const result = await compute();
+
+    // Store in cache (fire-and-forget)
+    storage.setAiResponseCache(email, cacheKey, fingerprint, result).catch(err =>
+      console.error(`[AI Cache] Failed to write cache for ${cacheKey}:`, err)
+    );
+
+    return result;
+  } catch (cacheError) {
+    // If cache logic fails, fall through to live computation
+    console.error(`[AI Cache] Error for ${cacheKey}, falling through:`, cacheError);
+    return compute();
+  }
+}
+
 
 export function registerDashboardRoutes(app: Express) {
   console.log("👤 Registering user dashboard endpoints...");
@@ -125,8 +156,10 @@ export function registerDashboardRoutes(app: Express) {
       const { scores, dashboardData } = profileData;
       const totalWines = scores?.length || 0;
 
-      // Generate taste profile analysis with the efficiently fetched data
-      const tasteProfile = await generateTasteProfileAnalysis(scores, dashboardData, userLevel, totalWines);
+      // Generate taste profile analysis with cache
+      const tasteProfile = await withAiCache(email, "wine_profiles", () =>
+        generateTasteProfileAnalysis(scores, dashboardData, userLevel, totalWines)
+      );
 
       res.json(tasteProfile);
     } catch (error) {
@@ -384,7 +417,9 @@ export function registerDashboardRoutes(app: Express) {
       : 'budget';
 
     try {
-      const recommendations = await generateProducerRecommendations(email, priceTier);
+      const recommendations = await withAiCache(email, `producer_recs_${priceTier}`, () =>
+        generateProducerRecommendations(email, priceTier)
+      );
       res.json(recommendations);
     } catch (error) {
       console.error("Error generating producer recommendations:", error);
@@ -419,9 +454,11 @@ export function registerDashboardRoutes(app: Express) {
     }
 
     try {
-      // Step 6: Add Error Handling - Use the new LLM-powered function with try/catch
-      const sommelierTips = await generateSommelierTips(email);
-      
+      // Use cache: only recompute when tasting data changes
+      const sommelierTips = await withAiCache(email, "sommelier_tips", () =>
+        generateSommelierTips(email)
+      );
+
       res.json(sommelierTips);
     } catch (error) {
       console.error("Error generating AI sommelier tips:", error);
@@ -766,6 +803,8 @@ async function generateTasteProfileAnalysis(wines: any[], dashboardData: any, us
   let redSommelierSummary: string | undefined;
   let whiteSommelierSummary: string | undefined;
   try {
+    // Note: taste-profile doesn't have email in scope here, so we compute directly.
+    // The cache wrapping happens at the endpoint level instead.
     const summaries = await generateWineProfileSummaries(redWineData, whiteWineData, userLevel, totalWines);
     redSommelierSummary = summaries.redSummary;
     whiteSommelierSummary = summaries.whiteSummary;
