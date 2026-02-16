@@ -58,7 +58,7 @@ export function SommelierFAB() {
   const { triggerHaptic } = useHaptics();
 
   // Use the same auth query as HomeV2 so they share cache state.
-  // When HomeV2 shows the login form (query failed), FAB also hides.
+  // retry:1 + placeholderData prevents chat death on tab-switch refetch failures.
   const { data: authData } = useQuery<{ user: { id: number; email: string } }>({
     queryKey: ["/api/auth/me"],
     queryFn: async () => {
@@ -66,8 +66,9 @@ export function SommelierFAB() {
       if (!res.ok) throw new Error("Not authenticated");
       return res.json();
     },
-    retry: false,
+    retry: 1,
     staleTime: 5 * 60 * 1000,
+    placeholderData: (prev) => prev,
   });
 
   const isAuthenticated = !!authData?.user;
@@ -76,35 +77,38 @@ export function SommelierFAB() {
   const isHidden = HIDDEN_ROUTE_PATTERNS.some((p) => p.test(location));
   const isShown = SHOWN_ROUTE_PATTERNS.some((p) => p.test(location));
 
-  if (!isAuthenticated || isHidden || !isShown) return null;
+  // FAB button only shows on allowed routes when not chatting
+  const showFABButton = isAuthenticated && !isHidden && isShown && !isOpen;
 
-  // If chat sheet is open, hide FAB
-  if (isOpen) {
-    return <SommelierChatSheet open={isOpen} onOpenChange={setIsOpen} />;
-  }
+  // Chat sheet stays mounted while open, regardless of route
+  const showChatSheet = isAuthenticated && isOpen;
 
   return (
     <>
       <AnimatePresence>
-        <motion.button
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0, opacity: 0 }}
-          whileTap={{ scale: 0.95 }}
-          transition={{ type: "spring", stiffness: 400, damping: 20 }}
-          onClick={() => {
-            triggerHaptic("selection");
-            setIsOpen(true);
-          }}
-          className="fixed right-4 bottom-24 z-40 flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 shadow-lg shadow-purple-900/40 active:shadow-md"
-          aria-label="Chat with Pierre, your AI sommelier"
-        >
-          <PierreIcon className="w-6 h-6 text-white" />
-          <span className="text-sm font-medium text-white">Pierre</span>
-        </motion.button>
+        {showFABButton && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+            onClick={() => {
+              triggerHaptic("selection");
+              setIsOpen(true);
+            }}
+            className="fixed right-4 bottom-24 z-40 flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 shadow-lg shadow-purple-900/40 active:shadow-md"
+            aria-label="Chat with Pierre, your AI sommelier"
+          >
+            <PierreIcon className="w-6 h-6 text-white" />
+            <span className="text-sm font-medium text-white">Pierre</span>
+          </motion.button>
+        )}
       </AnimatePresence>
 
-      <SommelierChatSheet open={isOpen} onOpenChange={setIsOpen} />
+      {showChatSheet && (
+        <SommelierChatSheet open={isOpen} onOpenChange={setIsOpen} />
+      )}
     </>
   );
 }

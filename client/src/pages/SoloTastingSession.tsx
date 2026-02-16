@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -307,6 +307,41 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedTastingId, setSavedTastingId] = useState<number | undefined>();
 
+  // localStorage auto-save for crash protection
+  const STORAGE_KEY = `cata-tasting-draft-${wine?.wineName || 'unknown'}`;
+  const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+  // Restore draft on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Date.now() - (parsed.timestamp || 0) < DRAFT_MAX_AGE_MS) {
+          setAnswers(parsed.answers || {});
+          setCurrentQuestionIndex(parsed.questionIndex || 0);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+    } catch { /* ignore corrupt localStorage */ }
+  }, []);
+
+  // Auto-save draft on change (debounced 500ms)
+  useEffect(() => {
+    if (Object.keys(answers).length === 0) return;
+    const timeout = setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          answers,
+          questionIndex: currentQuestionIndex,
+          timestamp: Date.now()
+        }));
+      } catch { /* localStorage full or unavailable */ }
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [answers, currentQuestionIndex]);
+
   // Build the full question list: AI questions (if available) or standard questions + chapter prompts
   const allQuestions = useMemo(() => {
     // If we have AI-generated questions, use them instead of defaults
@@ -385,8 +420,55 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
       responses.chapterPrompts = chapterAnswers;
     }
 
+    // Ensure canonical fields the backend expects are populated,
+    // even when AI-generated questions use non-standard field names
+    normalizeCanonicalFields(responses, allQuestions, answers);
+
     return responses;
   };
+
+  /**
+   * Map AI-generated question answers to the canonical field paths the backend expects.
+   * AI questions have arbitrary IDs producing unpredictable field names, but the backend
+   * reads hardcoded paths like taste.sweetness, taste.acidity, etc.
+   */
+  function normalizeCanonicalFields(
+    responses: TastingResponses,
+    questions: TastingQuestion[],
+    allAnswers: Record<string, any>
+  ) {
+    const canonicalFields = [
+      { section: 'taste' as keyof TastingResponses, field: 'sweetness', keywords: ['sweetness', 'sweet', 'residual_sugar'] },
+      { section: 'taste' as keyof TastingResponses, field: 'acidity', keywords: ['acidity', 'acid', 'tartness', 'crisp'] },
+      { section: 'taste' as keyof TastingResponses, field: 'tannins', keywords: ['tannin', 'tannins', 'tannic', 'astringent'] },
+      { section: 'taste' as keyof TastingResponses, field: 'body', keywords: ['body', 'weight', 'fullness', 'mouthfeel'] },
+      { section: 'overall' as keyof TastingResponses, field: 'rating', keywords: ['rating', 'overall', 'score'] },
+    ];
+
+    for (const { section, field, keywords } of canonicalFields) {
+      const target = responses[section] as Record<string, any> | undefined;
+      if (!target || target[field] !== undefined) continue;
+
+      // Also check the structure section (AI body/acidity questions map there)
+      const structureTarget = responses.structure as Record<string, any> | undefined;
+      if (structureTarget?.[field] !== undefined) {
+        target[field] = structureTarget[field];
+        continue;
+      }
+
+      // Search AI questions for semantic match
+      for (const q of questions) {
+        const answer = allAnswers[q.id];
+        if (answer === undefined) continue;
+        const idLower = q.id.toLowerCase();
+        const titleLower = (q.config?.title || '').toLowerCase();
+        if (keywords.some(kw => idLower.includes(kw) || titleLower.includes(kw))) {
+          target[field] = answer;
+          break;
+        }
+      }
+    }
+  }
 
   // Save tasting mutation
   const saveTastingMutation = useMutation({
@@ -406,9 +488,16 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
       return response.json();
     },
     onSuccess: (data) => {
+      localStorage.removeItem(STORAGE_KEY);
       queryClient.invalidateQueries({ queryKey: ['/api/solo/tastings'] });
       queryClient.invalidateQueries({ queryKey: ['/api/solo/preferences'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
+      // Also invalidate URL-embedded dashboard queries (e.g. ['/api/dashboard/email@...'])
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === 'string' &&
+          (query.queryKey[0] as string).startsWith('/api/dashboard')
+      });
       setSaveError(null);
       setSavedTastingId(data?.tasting?.id);
       setIsComplete(true);
