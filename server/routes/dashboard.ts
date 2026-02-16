@@ -1123,7 +1123,7 @@ async function generateProducerRecommendations(
 
   // Call GPT
   const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini", // Using mini for cost efficiency on structured output
+    model: "gpt-5-mini", // Using mini for cost efficiency on structured output
     messages: [
       {
         role: "system",
