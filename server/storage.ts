@@ -3371,19 +3371,18 @@ export class DatabaseStorage implements IStorage {
   // Package management methods for sommelier dashboard
   async getAllPackages(): Promise<Package[]> {
     const packagesData = await db.select().from(packages).orderBy(packages.createdAt);
+    if (packagesData.length === 0) return [];
 
-    // For each package, fetch its wines
-    const packagesWithWines = await Promise.all(
-      packagesData.map(async (pkg) => {
-        const wines = await this.getPackageWines(pkg.id);
-        return {
-          ...pkg,
-          wines
-        };
-      })
-    );
+    // Bulk fetch all wines for all packages (2 queries instead of N+1)
+    const packageIds = packagesData.map(p => p.id);
+    const allWines = await db.select().from(packageWines)
+      .where(inArray(packageWines.packageId, packageIds))
+      .orderBy(packageWines.position);
 
-    return packagesWithWines;
+    return packagesData.map(pkg => ({
+      ...pkg,
+      wines: allWines.filter(wine => wine.packageId === pkg.id),
+    }));
   }
 
   async updatePackage(id: string, data: Partial<InsertPackage>): Promise<Package> {
@@ -3400,7 +3399,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllSessions(): Promise<Session[]> {
-    // Enhanced query to include package details and participant count
+    // Single query with correlated subquery for participant count (1 query instead of N+1)
     const result = await db
       .select({
         id: sessions.id,
@@ -3414,23 +3413,14 @@ export class DatabaseStorage implements IStorage {
         // Include package information
         packageName: packages.name,
         packageCode: packages.code,
+        // Participant count via correlated subquery
+        participantCount: sql<number>`(SELECT count(*)::int FROM participants WHERE participants.session_id = ${sessions.id})`,
       })
       .from(sessions)
       .leftJoin(packages, eq(sessions.packageId, packages.id))
       .orderBy(desc(sessions.updatedAt)); // Most recent first
 
-    // Get participant counts for each session
-    const sessionsWithCounts = await Promise.all(
-      result.map(async (session) => {
-        const participants = await this.getParticipantsBySessionId(session.id);
-        return {
-          ...session,
-          participantCount: participants.length,
-        } as any;
-      })
-    );
-
-    return sessionsWithCounts;
+    return result as any;
   }
 
   // Wine management methods for sommelier dashboard
@@ -5404,21 +5394,55 @@ export class DatabaseStorage implements IStorage {
         .where(inArray(sessions.id, sessionIds))
         .orderBy(desc(sessions.startedAt));
 
-      const groupHistory = await Promise.all(
-        sessionsWithPackages.map(async ({ session, package: pkg }) => {
+      // Bulk fetch all participants for all sessions (1 query instead of S)
+      const allParticipants = await db.select().from(participants)
+        .where(inArray(participants.sessionId, sessionIds));
+
+      // Group participants by sessionId
+      const participantsBySession = new Map<string, typeof allParticipants>();
+      for (const p of allParticipants) {
+        const key = p.sessionId!;
+        if (!participantsBySession.has(key)) participantsBySession.set(key, []);
+        participantsBySession.get(key)!.push(p);
+      }
+
+      // Bulk fetch all responses for all participants (1 query instead of S*P)
+      const allParticipantIds = allParticipants.map(p => p.id);
+      let responsesByParticipant = new Map<string, (Response & { package_wine_id: string })[]>();
+      if (allParticipantIds.length > 0) {
+        const allResponsesRaw = await db
+          .select({
+            response: responses,
+            packageWineId: slides.packageWineId,
+          })
+          .from(responses)
+          .leftJoin(slides, eq(responses.slideId, slides.id))
+          .where(inArray(responses.participantId, allParticipantIds));
+
+        for (const r of allResponsesRaw) {
+          const key = r.response.participantId!;
+          if (!responsesByParticipant.has(key)) responsesByParticipant.set(key, []);
+          responsesByParticipant.get(key)!.push({
+            ...r.response,
+            package_wine_id: r.packageWineId || '',
+          });
+        }
+      }
+
+      // Synchronous map — no more per-session queries
+      const groupHistory = sessionsWithPackages.map(({ session, package: pkg }) => {
         const sommelier = this.getPlaceholderSommelier(session.id);
         const winesTasted = Math.floor(Math.random() * 8) + 4; // 4-11 wines
         let userScore = 0;
         let groupScore = 0;
-        const participants = await storage.getParticipantsBySessionId(session.id);
-        const userParticipant = participants.find(p => p.email === email);
+        const sessionParticipants = participantsBySession.get(session.id) || [];
+        const userParticipant = sessionParticipants.find(p => p.email === email);
         if (userParticipant) {
-          const userResponses = await storage.getResponsesByParticipantId(userParticipant.id);
-          const allParticipantResponses: any[] = [];
-
-          for (const participant of participants) {
-            const responses = await storage.getResponsesByParticipantId(participant.id);
-            allParticipantResponses.push(...responses);
+          const userResponses = responsesByParticipant.get(userParticipant.id) || [];
+          const allParticipantResponses: (Response & { package_wine_id: string })[] = [];
+          for (const participant of sessionParticipants) {
+            const pResponses = responsesByParticipant.get(participant.id) || [];
+            allParticipantResponses.push(...pResponses);
           }
           userScore = storage.calculateAverageScore(userResponses);
           groupScore = storage.calculateAverageScore(allParticipantResponses);
@@ -5440,7 +5464,7 @@ export class DatabaseStorage implements IStorage {
           location: this.getPlaceholderLocation(),
           source: 'group' // Track source for UI
         };
-      }));
+      });
 
       allHistory.push(...groupHistory);
     }

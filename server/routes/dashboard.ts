@@ -3,8 +3,8 @@ import { storage, generateSommelierTips } from "../storage";
 import { openai } from "../lib/openai";
 import { requireAuth } from "./auth";
 import { db } from "../db";
-import { users, tastings } from "@shared/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { users, tastings, responses, slides } from "@shared/schema";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 
 // Helper: check AI response cache, return cached data or compute fresh
 async function withAiCache<T>(
@@ -528,13 +528,22 @@ export function registerDashboardRoutes(app: Express) {
       
       console.log(`[DEBUG] User has ${userWineScores.scores.length} total wine scores in their history`);
 
-      const userResponses = await storage.getResponsesByParticipantId(userParticipant.id);
-      const allParticipantResponses: any[] = [];
+      // Bulk fetch all responses for all participants (1 query instead of P+1)
+      const participantIds = participants.map(p => p.id);
+      const allResponsesRaw = await db
+        .select({
+          response: responses,
+          packageWineId: slides.packageWineId,
+        })
+        .from(responses)
+        .leftJoin(slides, eq(responses.slideId, slides.id))
+        .where(inArray(responses.participantId, participantIds));
 
-      for (const participant of participants) {
-        const responses = await storage.getResponsesByParticipantId(participant.id);
-        allParticipantResponses.push(...responses);
-      }
+      const allParticipantResponses = allResponsesRaw.map(r => ({
+        ...r.response,
+        package_wine_id: r.packageWineId || '',
+      }));
+      const userResponses = allParticipantResponses.filter(r => r.participantId === userParticipant.id);
 
       // Generate realistic wine scores based on user's history and session data
       const wineScores = wines.map((wine, index) => {
