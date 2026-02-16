@@ -166,3 +166,5 @@ await generateChatTitle(chat.id, sanitizedMessage);
 - [AI Chat UX Patterns](../best-practices/ai-chat-ux-patterns-SommelierChat-20260213.md) — Documents the fire-and-forget compaction pattern
 - [P1-005: Fire-and-forget jobs](../../todos/P1-005-fire-and-forget-jobs-no-tracking.md) — Same pattern in tasting routes
 - [P2-001: Race condition in level-up](../../todos/P2-001-race-condition-level-up.md) — Related async race condition
+- [Silent data loss in solo tasting saves](../logic-errors/silent-data-loss-solo-tasting-saves-20260215.md) — Further fix for useAuth localStorage fallback creating ghost sessions
+- [State loss in Pierre chat](../ui-bugs/state-loss-accidental-dismiss-pierre-chat-20260215.md) — Further Pierre stability fixes (accidental dismiss, state persistence)

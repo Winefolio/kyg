@@ -228,4 +228,5 @@ When building AI chat features in Cata or similar apps:
 
 ## Related Issues
 
-No related issues documented yet.
+- See also: [State loss and accidental dismiss in Pierre chat](../ui-bugs/state-loss-accidental-dismiss-pierre-chat-20260215.md) — Fixes for Vaul drawer dismiss, state persistence, and failed message recovery
+- See also: [Auth state desync + chat title race condition](../integration-issues/auth-chat-state-sync-race-condition-20260214.md) — Auth desync and fire-and-forget title generation bugs
