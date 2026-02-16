@@ -475,7 +475,7 @@ Return as JSON:
 }`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini",
       messages: [{ role: "user", content: prompt }],
       max_completion_tokens: 300,
       response_format: { type: "json_object" }
