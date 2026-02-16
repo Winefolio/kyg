@@ -148,9 +148,11 @@ export async function streamChatResponse(
     metadata: imageBase64 ? { hasImage: true } : null,
   });
 
-  // Auto-title on first message of a new chat — awaited so title is set before chat list refetch
+  // Fire title generation without blocking the stream start
   if (isNewChat || !chat.title) {
-    await generateChatTitle(chat.id, sanitizedMessage);
+    generateChatTitle(chat.id, sanitizedMessage).catch(err => {
+      console.error("[SommelierChat] Title generation failed:", err);
+    });
   }
 
   const ctx: ChatContext = { chat, userEmail };
@@ -226,9 +228,11 @@ export async function sendChatMessage(
     metadata: imageBase64 ? { hasImage: true } : null,
   });
 
-  // Auto-title on first message of a new chat — awaited so title is set before chat list refetch
+  // Fire title generation without blocking the response
   if (isNewChat || !chat.title) {
-    await generateChatTitle(chat.id, sanitizedMessage);
+    generateChatTitle(chat.id, sanitizedMessage).catch(err => {
+      console.error("[SommelierChat] Title generation failed:", err);
+    });
   }
 
   const ctx: ChatContext = { chat, userEmail };
