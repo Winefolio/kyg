@@ -30,6 +30,7 @@ export function useSommelierChat(isOpen: boolean) {
   const [streamingContent, setStreamingContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const pendingImageFiles = useRef<Map<number, File>>(new Map());
   const queryClient = useQueryClient();
 
   // Chat list for sidebar (only chats with messages, newest first)
@@ -203,6 +204,7 @@ export function useSommelierChat(isOpen: boolean) {
     };
 
     setMessages(prev => [...prev, optimisticMsg]);
+    pendingImageFiles.current.set(optimisticMsg.id, imageFile);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -228,6 +230,9 @@ export function useSommelierChat(isOpen: boolean) {
       }
 
       await parseSSEStream(res, optimisticMsg);
+
+      // Image sent successfully — no longer needed for retry
+      pendingImageFiles.current.delete(optimisticMsg.id);
 
       // Refresh chat list
       queryClient.invalidateQueries({ queryKey: ["/api/sommelier-chat/list"] });
@@ -288,14 +293,20 @@ export function useSommelierChat(isOpen: boolean) {
     setError(null);
   }, []);
 
-  // Retry a failed message
+  // Retry a failed message (supports both text-only and image messages)
   const retryMessage = useCallback((messageId: number) => {
     const failedMsg = messages.find(m => m.id === messageId && m.failed);
     if (!failedMsg) return;
     // Remove the failed message and resend
     setMessages(prev => prev.filter(m => m.id !== messageId));
-    sendMessage(failedMsg.content);
-  }, [messages, sendMessage]);
+    const pendingImage = pendingImageFiles.current.get(messageId);
+    if (pendingImage) {
+      pendingImageFiles.current.delete(messageId);
+      sendMessageWithImage(failedMsg.content, pendingImage);
+    } else {
+      sendMessage(failedMsg.content);
+    }
+  }, [messages, sendMessage, sendMessageWithImage]);
 
   const cancelStream = useCallback(() => {
     abortControllerRef.current?.abort();
