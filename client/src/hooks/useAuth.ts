@@ -45,11 +45,8 @@ export function useAuth() {
         }
       } catch (error) {
         console.error("Auth check failed:", error);
-        // Fall back to localStorage only
-        const storedEmail = localStorage.getItem("cata_user_email");
-        if (storedEmail) {
-          setUser({ email: storedEmail });
-        }
+        // Network error -- do not set user from localStorage alone
+        // (a user without a server session will fail on all API calls)
       }
       setIsLoading(false);
     };
@@ -78,10 +75,7 @@ export function useAuth() {
       }
     } catch (error) {
       console.error("Login failed:", error);
-      // Fallback to localStorage only
-      localStorage.setItem("cata_user_email", email);
-      setUser({ email });
-      return { success: true };
+      return { success: false, error: "Network error. Please check your connection." };
     }
   }, []);
 

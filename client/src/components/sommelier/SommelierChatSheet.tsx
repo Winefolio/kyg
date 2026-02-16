@@ -135,6 +135,7 @@ function ChatContent({
   onSelectChat,
   onNewChat,
   onDeleteChat,
+  onRetryMessage,
 }: {
   onClose: () => void;
   messages: any[];
@@ -154,6 +155,7 @@ function ChatContent({
   onSelectChat: (chatId: number) => void;
   onNewChat: () => void;
   onDeleteChat: (chatId: number) => void;
+  onRetryMessage?: (messageId: number) => void;
 }) {
   const showWelcome = !isLoading && !isLoadingChat && messages.length === 0;
   const swipeHandlers = useEdgeSwipe(onOpenSidebar);
@@ -181,7 +183,7 @@ function ChatContent({
       ) : showWelcome ? (
         <WelcomeState onSelectPrompt={sendMessage} onSendWithImage={sendMessageWithImage} />
       ) : (
-        <MessageList messages={messages} isStreaming={isStreaming} />
+        <MessageList messages={messages} isStreaming={isStreaming} onRetryMessage={onRetryMessage} />
       )}
 
       <ChatInput
@@ -222,6 +224,7 @@ export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetPro
     loadChat,
     deleteChat,
     startNewChat,
+    retryMessage,
     clearError,
   } = useSommelierChat(open);
 
@@ -254,12 +257,13 @@ export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetPro
       setSidebarOpen(false);
     },
     onDeleteChat: deleteChat,
+    onRetryMessage: retryMessage,
   };
 
-  // Mobile: bottom drawer
+  // Mobile: bottom drawer (handleOnly prevents scroll-triggered dismiss)
   if (isMobile) {
     return (
-      <Drawer open={open} onOpenChange={onOpenChange}>
+      <Drawer open={open} onOpenChange={onOpenChange} handleOnly>
         <DrawerContent className="h-[92vh] bg-zinc-950 border-zinc-800 flex flex-col">
           <ChatContent {...chatProps} />
         </DrawerContent>
@@ -272,16 +276,7 @@ export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetPro
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop - click to close */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={handleClose}
-            className="fixed inset-0 z-40"
-          />
-
-          {/* Panel */}
+          {/* Panel - no backdrop, close via header X button only */}
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}

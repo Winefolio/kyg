@@ -6456,15 +6456,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSommelierMessage(message: InsertSommelierMessage): Promise<SommelierMessage> {
-    const [newMessage] = await db.insert(sommelierMessages).values(message).returning();
-    await db
-      .update(sommelierChats)
-      .set({
-        messageCount: sql`${sommelierChats.messageCount} + 1`,
-        updatedAt: sql`now()`
-      })
-      .where(eq(sommelierChats.id, message.chatId));
-    return newMessage;
+    return db.transaction(async (tx) => {
+      const [newMessage] = await tx.insert(sommelierMessages).values(message).returning();
+      await tx
+        .update(sommelierChats)
+        .set({
+          messageCount: sql`${sommelierChats.messageCount} + 1`,
+          updatedAt: sql`now()`
+        })
+        .where(eq(sommelierChats.id, message.chatId));
+      return newMessage;
+    });
   }
 
   async updateSommelierChat(chatId: number, data: Partial<{ title: string; summary: string; lastSummaryAt: Date | string; messageCount: number; updatedAt: Date | string }>): Promise<void> {
