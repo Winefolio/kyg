@@ -56,7 +56,7 @@ interface AIQuestion {
 
 interface SoloTastingSessionProps {
   wine: WineInfo;
-  onComplete: () => void;
+  onComplete: (tastingId?: number) => void;
   onCancel: () => void;
   chapterContext?: ChapterContext;
   aiQuestions?: AIQuestion[];
@@ -305,6 +305,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
   const [isComplete, setIsComplete] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedTastingId, setSavedTastingId] = useState<number | undefined>();
 
   // Build the full question list: AI questions (if available) or standard questions + chapter prompts
   const allQuestions = useMemo(() => {
@@ -404,11 +405,12 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
       const response = await apiRequest('POST', '/api/solo/tastings', payload);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/solo/tastings'] });
       queryClient.invalidateQueries({ queryKey: ['/api/solo/preferences'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
       setSaveError(null);
+      setSavedTastingId(data?.tasting?.id);
       setIsComplete(true);
       setIsSaving(false);
     },
@@ -580,7 +582,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
             Your tasting notes for <span className="text-white font-medium">{wine.wineName}</span> have been saved.
           </p>
           <Button
-            onClick={onComplete}
+            onClick={() => onComplete(savedTastingId)}
             className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-3 rounded-xl"
           >
             Back to Dashboard

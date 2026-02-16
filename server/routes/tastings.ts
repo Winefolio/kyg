@@ -3,7 +3,6 @@ import { db, sql as pgClient } from "../db";
 import { tastings, users, insertTastingSchema, type TastingLevel, type TastingResponses } from "@shared/schema";
 import { eq, desc, sql, and, ilike } from "drizzle-orm";
 import { requireAuth } from "./auth";
-import { aiRateLimit } from "../middleware/rateLimiter";
 import { attachCharacteristicsToTasting } from "../wine-intelligence";
 import { generateNextBottleRecommendations } from "../openai-client";
 import { wineIntelQueue } from "../lib/background-queue";
@@ -276,8 +275,8 @@ function generateRecommendations(prefs: UserPreferences): WineRecommendation[] {
  */
 export function registerTastingsRoutes(app: Express): void {
   // Create a new tasting (authenticated)
-  // Rate limited because it triggers AI (wine characteristics + recommendations)
-  app.post("/api/solo/tastings", requireAuth, aiRateLimit, async (req: Request, res: Response) => {
+  // No rate limit on save itself - AI jobs run in background
+  app.post("/api/solo/tastings", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId;
       if (!userId) {

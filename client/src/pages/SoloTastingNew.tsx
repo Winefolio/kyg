@@ -284,14 +284,10 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
     }
   };
 
-  const handleTastingComplete = async () => {
-    // The tasting has been saved - now mark chapter complete
-    // For now, we'll use a placeholder tastingId since the actual saving
-    // happens in SoloTastingSession. In production, we'd get the ID back.
-    if (journeyId && chapterId) {
+  const handleTastingComplete = async (tastingId?: number) => {
+    if (journeyId && chapterId && tastingId) {
       try {
-        // Mark chapter complete (using a temp ID - the actual ID would come from tasting save)
-        await completeChapterMutation.mutateAsync(Date.now());
+        await completeChapterMutation.mutateAsync(tastingId);
       } catch (error) {
         console.error("Failed to mark chapter complete:", error);
       }
