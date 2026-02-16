@@ -54,6 +54,8 @@ import {
   userJourneys,
   sommelierChats,
   sommelierMessages,
+  aiResponseCache,
+  type AiResponseCache,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull, isNotNull } from "drizzle-orm";
@@ -241,11 +243,20 @@ export interface IStorage {
   getUserSommelierChats(userId: number): Promise<SommelierChat[]>;
   getSommelierChatById(chatId: number, userId: number): Promise<SommelierChat | undefined>;
   deleteSommelierChat(chatId: number): Promise<void>;
+
+  // AI Response Cache
+  getTastingFingerprint(email: string): Promise<string>;
+  getAiResponseCache(email: string, cacheKey: string): Promise<AiResponseCache | undefined>;
+  setAiResponseCache(email: string, cacheKey: string, fingerprint: string, responseData: any): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
   // In-memory storage for sentiment analysis results
   private sentimentAnalysisResults: Map<string, any[]> = new Map();
+
+  // 5-second memo cache for getAllParticipantsByEmail (dedup repeated queries)
+  private participantMemo: Map<string, { data: Participant[]; timestamp: number }> = new Map();
+  private static PARTICIPANT_MEMO_TTL_MS = 5000;
   
   constructor() {
     this.initializeWineTastingData();
@@ -2612,6 +2623,14 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
+    // Cap at 200 entries — evict oldest (FIFO via Map insertion order)
+    if (this.sentimentAnalysisResults.size >= 200) {
+      const oldestKey = this.sentimentAnalysisResults.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.sentimentAnalysisResults.delete(oldestKey);
+      }
+    }
+
     this.sentimentAnalysisResults.set(key, sentimentData);
 
     console.log(`✅ Saved ${sentimentData.length} sentiment analysis results for wine ${wineId} in session ${sessionId}`);
@@ -4734,10 +4753,19 @@ export class DatabaseStorage implements IStorage {
 
   // User Dashboard
   async getAllParticipantsByEmail(email: string): Promise<Participant[]> {
-    return await db
+    // Check memo cache (5s TTL)
+    const cached = this.participantMemo.get(email);
+    if (cached && (Date.now() - cached.timestamp) < DatabaseStorage.PARTICIPANT_MEMO_TTL_MS) {
+      return cached.data;
+    }
+
+    const result = await db
       .select()
       .from(participants)
       .where(eq(participants.email, email));
+
+    this.participantMemo.set(email, { data: result, timestamp: Date.now() });
+    return result;
   }
 
   // Sprint 2.5: Unified Tasting Data (Solo + Group)
@@ -6534,6 +6562,62 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSommelierChat(chatId: number): Promise<void> {
     await db.delete(sommelierChats).where(eq(sommelierChats.id, chatId));
+  }
+
+  // AI Response Cache methods
+  async getTastingFingerprint(email: string): Promise<string> {
+    // Solo tasting stats
+    const user = await this.getUserByEmail(email);
+    let soloCount = 0;
+    let soloLatest = '';
+    if (user) {
+      const soloStats = await db.select({
+        count: sql<number>`count(*)`,
+        latest: sql<string>`coalesce(max(${tastings.tastedAt})::text, '')`
+      }).from(tastings).where(eq(tastings.userId, user.id));
+      soloCount = Number(soloStats[0]?.count ?? 0);
+      soloLatest = soloStats[0]?.latest ?? '';
+    }
+
+    // Group tasting stats
+    const groupStats = await db.select({
+      count: sql<number>`count(*)`,
+      latest: sql<string>`coalesce(max(${participants.createdAt})::text, '')`
+    }).from(participants).where(eq(participants.email, email));
+    const groupCount = Number(groupStats[0]?.count ?? 0);
+    const groupLatest = groupStats[0]?.latest ?? '';
+
+    return `${soloCount}-${soloLatest}-${groupCount}-${groupLatest}`;
+  }
+
+  async getAiResponseCache(email: string, cacheKey: string): Promise<AiResponseCache | undefined> {
+    const result = await db.query.aiResponseCache.findFirst({
+      where: and(
+        eq(aiResponseCache.userEmail, email),
+        eq(aiResponseCache.cacheKey, cacheKey)
+      )
+    });
+    return result ?? undefined;
+  }
+
+  async setAiResponseCache(email: string, cacheKey: string, fingerprint: string, responseData: any): Promise<void> {
+    await db
+      .insert(aiResponseCache)
+      .values({
+        userEmail: email,
+        cacheKey,
+        fingerprint,
+        responseData,
+        updatedAt: new Date()
+      })
+      .onConflictDoUpdate({
+        target: [aiResponseCache.userEmail, aiResponseCache.cacheKey],
+        set: {
+          fingerprint,
+          responseData,
+          updatedAt: new Date()
+        }
+      });
   }
 }
 

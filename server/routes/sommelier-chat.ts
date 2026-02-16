@@ -161,9 +161,14 @@ export function registerSommelierChatRoutes(app: Express): void {
       res.setHeader("Connection", "keep-alive");
       res.setHeader("X-Accel-Buffering", "no");
 
+      // Detect client disconnect to stop streaming early
+      let clientDisconnected = false;
+      req.on("close", () => { clientDisconnected = true; });
+
       const { stream } = await streamChatResponse(userId, userEmail, message.trim(), undefined, undefined, chatId || undefined);
 
       for await (const event of stream) {
+        if (clientDisconnected) break;
         res.write(event);
       }
 
@@ -203,6 +208,10 @@ export function registerSommelierChatRoutes(app: Express): void {
       res.setHeader("Connection", "keep-alive");
       res.setHeader("X-Accel-Buffering", "no");
 
+      // Detect client disconnect to stop streaming early
+      let clientDisconnected = false;
+      req.on("close", () => { clientDisconnected = true; });
+
       const { stream } = await streamChatResponse(
         userId,
         userEmail,
@@ -213,6 +222,7 @@ export function registerSommelierChatRoutes(app: Express): void {
       );
 
       for await (const event of stream) {
+        if (clientDisconnected) break;
         res.write(event);
       }
 
