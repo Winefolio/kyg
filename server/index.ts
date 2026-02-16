@@ -2,6 +2,7 @@ import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import session from "express-session";
+import pgSession from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { db } from "./db";
@@ -25,7 +26,14 @@ if (process.env.NODE_ENV === 'production' && !sessionSecret) {
   process.exit(1);
 }
 
+const PgStore = pgSession(session);
+
 app.use(session({
+  store: new PgStore({
+    conString: process.env.DATABASE_URL,
+    tableName: 'user_sessions',
+    createTableIfMissing: true,
+  }),
   secret: sessionSecret || 'cata-dev-secret-not-for-production',
   resave: false,
   saveUninitialized: false,

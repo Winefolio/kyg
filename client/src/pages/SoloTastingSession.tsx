@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { MultipleChoiceQuestion } from "@/components/questions/MultipleChoiceQuestion";
@@ -16,7 +16,9 @@ import {
   Droplets,
   Grape,
   Star,
-  CheckCircle
+  CheckCircle,
+  AlertCircle,
+  RotateCcw
 } from "lucide-react";
 import type { TastingResponses } from "@shared/schema";
 
@@ -63,7 +65,7 @@ interface SoloTastingSessionProps {
 // Question definition type - supports both legacy and 5 core components
 interface TastingQuestion {
   id: string;
-  section: 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall' | 'aroma' | 'taste' | 'chapter';
+  section: 'visual' | 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall' | 'aroma' | 'taste' | 'structure' | 'chapter';
   type: 'scale' | 'multiple_choice' | 'text' | 'boolean';
   config: {
     title: string;
@@ -252,21 +254,19 @@ function convertChapterPrompts(prompts: Array<{ question: string; category?: str
 
 // Convert AI-generated questions to TastingQuestion format
 function convertAIQuestions(questions: AIQuestion[]): TastingQuestion[] {
-  // Map AI category to section - now using 5 core components
-  type SectionType = 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall' | 'aroma' | 'taste' | 'chapter';
-  const categoryToSection: Record<string, SectionType> = {
-    // New 5 core components (direct mapping)
+  // Map AI category to section for display purposes
+  const categoryToSection: Record<string, TastingQuestion['section']> = {
     'fruit': 'fruit',
     'secondary': 'secondary',
     'tertiary': 'tertiary',
     'body': 'body',
     'acidity': 'acidity',
     'overall': 'overall',
-    // Legacy categories (for backwards compatibility)
-    'appearance': 'aroma',
+    'appearance': 'visual',
     'aroma': 'aroma',
     'taste': 'taste',
-    'structure': 'body'
+    'structure': 'structure',
+    'visual': 'visual',
   };
 
   return questions
@@ -299,10 +299,12 @@ function convertAIQuestions(questions: AIQuestion[]): TastingQuestion[] {
 
 export default function SoloTastingSession({ wine, onComplete, onCancel, chapterContext, aiQuestions }: SoloTastingSessionProps) {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [isComplete, setIsComplete] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Build the full question list: AI questions (if available) or standard questions + chapter prompts
   const allQuestions = useMemo(() => {
@@ -342,6 +344,20 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
       overall: {}
     };
 
+    // Map display sections to TastingResponses keys for save
+    const sectionToResponseKey: Record<string, keyof TastingResponses> = {
+      visual: 'visual',
+      aroma: 'aroma',
+      taste: 'taste',
+      structure: 'structure',
+      overall: 'overall',
+      fruit: 'aroma',
+      secondary: 'aroma',
+      tertiary: 'aroma',
+      body: 'structure',
+      acidity: 'structure',
+    };
+
     // Collect chapter prompt answers separately
     const chapterAnswers: Record<string, string> = {};
 
@@ -352,7 +368,8 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
           // Store chapter prompt answers with the question text as key
           chapterAnswers[q.config.title] = answer;
         } else {
-          const section = responses[q.section as keyof TastingResponses];
+          const responseKey = sectionToResponseKey[q.section] || 'taste';
+          const section = responses[responseKey];
           if (section) {
             // Map question ID to response field
             const fieldName = q.id.split('_').slice(1).join('_') || q.id;
@@ -388,14 +405,17 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/solo/tastings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/solo/preferences'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
+      setSaveError(null);
       setIsComplete(true);
       setIsSaving(false);
     },
     onError: (error) => {
       console.error('Failed to save tasting:', error);
       setIsSaving(false);
-      // Still mark as complete so user isn't stuck
-      setIsComplete(true);
+      setSaveError(error instanceof Error ? error.message : 'Failed to save tasting. Please try again.');
     }
   });
 
@@ -501,6 +521,47 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
         return null;
     }
   };
+
+  // Save error screen - show retry option
+  if (saveError) {
+    return (
+      <div className="min-h-screen bg-gradient-primary flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 shadow-2xl text-center max-w-md"
+        >
+          <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center">
+            <AlertCircle className="w-10 h-10 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Save Failed</h2>
+          <p className="text-white/70 mb-6">
+            Your tasting notes couldn't be saved. Don't worry — your answers are still here.
+          </p>
+          <div className="space-y-3">
+            <Button
+              onClick={() => {
+                setSaveError(null);
+                setIsSaving(true);
+                saveTastingMutation.mutate();
+              }}
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white py-3 rounded-xl flex items-center justify-center gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Try Again
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={onCancel}
+              className="w-full text-white/60 hover:text-white hover:bg-white/10 py-3 rounded-xl"
+            >
+              Exit Without Saving
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   // Completion screen
   if (isComplete) {
