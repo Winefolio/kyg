@@ -2624,7 +2624,7 @@ export class DatabaseStorage implements IStorage {
     });
 
     // Cap at 200 entries — evict oldest (FIFO via Map insertion order)
-    if (this.sentimentAnalysisResults.size >= 200) {
+    if (this.sentimentAnalysisResults.size >= 200 && !this.sentimentAnalysisResults.has(key)) {
       const oldestKey = this.sentimentAnalysisResults.keys().next().value;
       if (oldestKey !== undefined) {
         this.sentimentAnalysisResults.delete(oldestKey);
@@ -4763,6 +4763,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(participants)
       .where(eq(participants.email, email));
+
+    // Cap at 200 entries — evict oldest (FIFO via Map insertion order)
+    if (this.participantMemo.size >= 200 && !this.participantMemo.has(email)) {
+      const oldestKey = this.participantMemo.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.participantMemo.delete(oldestKey);
+      }
+    }
 
     this.participantMemo.set(email, { data: result, timestamp: Date.now() });
     return result;
