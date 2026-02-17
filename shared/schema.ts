@@ -653,7 +653,10 @@ export const users = pgTable("users", {
   tastingsCompleted: integer("tastings_completed").default(0).notNull(),
   levelUpPromptEligible: boolean("level_up_prompt_eligible").default(false).notNull(),
   // Phase 1: Wine archetype for identity (e.g., "Bold Explorer", "Elegant Traditionalist")
-  wineArchetype: varchar("wine_archetype", { length: 100 })
+  wineArchetype: varchar("wine_archetype", { length: 100 }),
+  // Onboarding quiz
+  onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
+  onboardingData: jsonb("onboarding_data"), // OnboardingData blob
 }, (table) => ({
   emailIdx: index("idx_users_email").on(table.email)
 }));
@@ -718,6 +721,14 @@ export const insertTastingSchema = createInsertSchema(tastings, {
   id: true,
   tastedAt: true
 });
+
+// Onboarding quiz answers
+export interface OnboardingData {
+  knowledgeLevel: 'beginner' | 'casual' | 'enthusiast' | 'nerd';
+  wineVibe: 'bold' | 'light' | 'sweet' | 'adventurous';
+  foodPreferences: string[];
+  completedAt: string;
+}
 
 // Types for solo tasting
 export type User = typeof users.$inferSelect;

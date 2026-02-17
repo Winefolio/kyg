@@ -192,6 +192,17 @@ export default function HomeV2() {
   const isAuthenticated = !!authData?.user;
   const user = authData?.user;
 
+  // Redirect new users (0 tastings, onboarding not done) to onboarding quiz
+  useEffect(() => {
+    if (
+      user &&
+      !user.onboardingCompleted &&
+      (user.tastingsCompleted ?? 0) === 0
+    ) {
+      setLocation("/onboarding");
+    }
+  }, [user, setLocation]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;

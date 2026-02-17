@@ -4,6 +4,7 @@
  */
 
 import { storage } from "../storage";
+import type { OnboardingData } from "@shared/schema";
 import fs from "fs/promises";
 import path from "path";
 
@@ -54,6 +55,28 @@ async function buildUserContext(email: string): Promise<string> {
     // Basic info
     lines.push(`Level: ${user.tastingLevel || "intro"} (${user.tastingsCompleted || 0} tastings)`);
     if (user.wineArchetype) lines.push(`Wine Archetype: ${user.wineArchetype}`);
+
+    // Onboarding profile (if completed)
+    if (user.onboardingData) {
+      const ob = user.onboardingData as OnboardingData;
+      const vibeMap: Record<string, string> = {
+        bold: "bold, full-bodied wines",
+        light: "light, crisp wines",
+        sweet: "sweet, fruit-forward wines",
+        adventurous: "trying new and unusual wines",
+      };
+      const knowledgeMap: Record<string, string> = {
+        beginner: "brand new to wine",
+        casual: "drinks wine casually, knows what they like",
+        enthusiast: "actively learning about wine",
+        nerd: "serious wine knowledge",
+      };
+      if (ob.knowledgeLevel) lines.push(`Self-described: ${knowledgeMap[ob.knowledgeLevel] || ob.knowledgeLevel}`);
+      if (ob.wineVibe) lines.push(`Style preference: ${vibeMap[ob.wineVibe] || ob.wineVibe}`);
+      if (ob.foodPreferences?.length > 0) {
+        lines.push(`Favorite foods: ${ob.foodPreferences.join(", ")}`);
+      }
+    }
 
     // Favorites from conversation starters
     if (starters) {

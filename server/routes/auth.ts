@@ -251,7 +251,8 @@ export function registerAuthRoutes(app: Express): void {
           // Agent-native: include tasting level info for automated workflows
           tastingLevel: user.tastingLevel,
           tastingsCompleted: user.tastingsCompleted,
-          levelUpPromptEligible: user.levelUpPromptEligible
+          levelUpPromptEligible: user.levelUpPromptEligible,
+          onboardingCompleted: user.onboardingCompleted
         }
       });
     } catch (error) {

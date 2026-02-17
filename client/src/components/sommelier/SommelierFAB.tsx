@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,6 +7,7 @@ import { useHaptics } from "@/hooks/useHaptics";
 
 // Routes where the FAB should be hidden (active experiences)
 const HIDDEN_ROUTE_PATTERNS = [
+  /^\/onboarding$/,
   /^\/tasting\/[^/]+\/[^/]+$/, // /tasting/:sessionId/:participantId
   /^\/tasting\/new$/,
   /^\/solo\/new$/,
@@ -56,6 +57,14 @@ export function SommelierFAB() {
   const [isOpen, setIsOpen] = useState(false);
   const [location] = useLocation();
   const { triggerHaptic } = useHaptics();
+
+  // Auto-open Pierre after onboarding completion
+  useEffect(() => {
+    if (location.includes("pierre=welcome")) {
+      const timer = setTimeout(() => setIsOpen(true), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [location]);
 
   // Use the same auth query as HomeV2 so they share cache state.
   // retry:1 + placeholderData prevents chat death on tab-switch refetch failures.
