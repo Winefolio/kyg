@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -6,30 +7,33 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { GlossaryProvider } from "@/contexts/GlossaryContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useDynamicViewportHeight } from "@/hooks/useDynamicViewportHeight";
-import Gateway from "@/pages/Gateway";
-import Landing from "@/pages/Landing";
-import SessionJoin from "@/pages/SessionJoin";
-import TastingSession from "@/pages/TastingSession";
-import TastingCompletion from "@/pages/TastingCompletion";
-import HostDashboard from "@/pages/HostDashboard";
-import SommelierDashboard from "@/pages/SommelierDashboard";
-import PackageEditor from "@/pages/PackageEditor";
-import UserDashboard from "@/pages/UserDashboard";
-import TastingDetailView from "@/pages/TastingDetailView";
-import Login from "@/pages/Login";
-import SoloDashboard from "@/pages/SoloDashboard";
-import SoloTastingDetail from "@/pages/SoloTastingDetail";
-import SoloTastingNew from "@/pages/SoloTastingNew";
-import SoloProfile from "@/pages/SoloProfile";
-import SoloLogin from "@/pages/SoloLogin";
-import JourneyBrowser from "@/pages/JourneyBrowser";
-import JourneyDetail from "@/pages/JourneyDetail";
-import JourneyAdmin from "@/pages/JourneyAdmin";
-// New unified home experience - Three Pillars (Solo, Group, Dashboard)
-import HomeV2 from "@/pages/HomeV2";
 
-import Profile from "@/pages/Profile";
+// Static imports — always needed on first load
+import Landing from "@/pages/Landing";
 import NotFound from "@/pages/not-found";
+
+// Lazy-loaded page components
+const Gateway = lazy(() => import("@/pages/Gateway"));
+const HomeV2 = lazy(() => import("@/pages/HomeV2"));
+const Login = lazy(() => import("@/pages/Login"));
+const SoloLogin = lazy(() => import("@/pages/SoloLogin"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const SoloProfile = lazy(() => import("@/pages/SoloProfile"));
+const SoloTastingNew = lazy(() => import("@/pages/SoloTastingNew"));
+const SoloTastingDetail = lazy(() => import("@/pages/SoloTastingDetail"));
+const SoloDashboard = lazy(() => import("@/pages/SoloDashboard"));
+const JourneyBrowser = lazy(() => import("@/pages/JourneyBrowser"));
+const JourneyDetail = lazy(() => import("@/pages/JourneyDetail"));
+const JourneyAdmin = lazy(() => import("@/pages/JourneyAdmin"));
+const SommelierDashboard = lazy(() => import("@/pages/SommelierDashboard"));
+const PackageEditor = lazy(() => import("@/pages/PackageEditor"));
+const UserDashboard = lazy(() => import("@/pages/UserDashboard"));
+const TastingDetailView = lazy(() => import("@/pages/TastingDetailView"));
+const SessionJoin = lazy(() => import("@/pages/SessionJoin"));
+const TastingSession = lazy(() => import("@/pages/TastingSession"));
+const TastingCompletion = lazy(() => import("@/pages/TastingCompletion"));
+const HostDashboard = lazy(() => import("@/pages/HostDashboard"));
+
 import { SommelierFAB } from "@/components/sommelier/SommelierFAB";
 
 function Router() {
@@ -100,7 +104,9 @@ function App() {
         <GlossaryProvider>
           <TooltipProvider>
             <Toaster />
-            <Router />
+            <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" /></div>}>
+              <Router />
+            </Suspense>
             <SommelierFAB />
           </TooltipProvider>
         </GlossaryProvider>
