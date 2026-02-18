@@ -42,6 +42,33 @@ export function registerSommelierChatRoutes(app: Express): void {
   });
 
   /**
+   * POST /api/sommelier-chat/welcome
+   * Persist a welcome message as a new chat (called after onboarding).
+   */
+  app.post("/api/sommelier-chat/welcome", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { content } = req.body;
+
+      if (!content || typeof content !== "string") {
+        return res.status(400).json({ error: "Content is required" });
+      }
+
+      const chat = await storage.createSommelierChat({ userId, title: "Welcome to Cata", messageCount: 0 });
+      const message = await storage.createSommelierMessage({
+        chatId: chat.id,
+        role: "assistant",
+        content,
+      });
+
+      return res.json({ chatId: chat.id, message });
+    } catch (error) {
+      console.error("[SommelierChat] Welcome message error:", error);
+      return res.status(500).json({ error: "Failed to save welcome message" });
+    }
+  });
+
+  /**
    * GET /api/sommelier-chat/list
    * Get all user chats with messages (newest first)
    */

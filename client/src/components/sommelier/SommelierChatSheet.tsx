@@ -294,7 +294,7 @@ export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetPro
     deleteChat,
     startNewChat,
     retryMessage,
-    injectMessage,
+    setWelcomeState,
     clearError,
   } = useSommelierChat(open);
 
@@ -306,7 +306,7 @@ export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetPro
     staleTime: 5 * 60 * 1000,
   });
 
-  // Inject personalized welcome message when opened via ?pierre=welcome
+  // Persist personalized welcome message when opened via ?pierre=welcome
   const welcomeInjected = useRef(false);
   useEffect(() => {
     if (
@@ -317,14 +317,40 @@ export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetPro
     ) {
       welcomeInjected.current = true;
       const onboardingData = authData?.user?.onboardingData;
-      injectMessage(buildWelcomeMessage(onboardingData));
+      const content = buildWelcomeMessage(onboardingData);
+
+      // Save to server so it appears in chat history
+      fetch("/api/sommelier-chat/welcome", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+        credentials: "include",
+      })
+        .then((res) => res.json())
+        .then(({ chatId, message }) => {
+          setWelcomeState(chatId, {
+            id: message.id,
+            role: message.role,
+            content: message.content,
+            createdAt: message.createdAt,
+          });
+        })
+        .catch(() => {
+          // Fallback: show locally even if save fails
+          setWelcomeState(0, {
+            id: -2,
+            role: "assistant",
+            content,
+            createdAt: new Date().toISOString(),
+          });
+        });
 
       // Clean up URL param
       const url = new URL(window.location.href);
       url.searchParams.delete("pierre");
       window.history.replaceState({}, "", url.pathname + url.search);
     }
-  }, [open, messages.length, authData, injectMessage]);
+  }, [open, messages.length, authData, setWelcomeState]);
 
   const handleClose = () => onOpenChange(false);
   const openSidebar = useCallback(() => setSidebarOpen(true), []);

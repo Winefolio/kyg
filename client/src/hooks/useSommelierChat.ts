@@ -313,15 +313,12 @@ export function useSommelierChat(isOpen: boolean) {
     setIsStreaming(false);
   }, []);
 
-  // Inject a synthetic assistant message (for welcome message)
-  const injectMessage = useCallback((content: string) => {
-    setMessages([{
-      id: -2,
-      role: "assistant",
-      content,
-      createdAt: new Date().toISOString(),
-    }]);
-  }, []);
+  // Set a persisted welcome message (from POST /api/sommelier-chat/welcome)
+  const setWelcomeState = useCallback((chatId: number, msg: ChatMessage) => {
+    setActiveChatId(chatId);
+    setMessages([msg]);
+    queryClient.invalidateQueries({ queryKey: ["/api/sommelier-chat/list"] });
+  }, [queryClient]);
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -341,7 +338,7 @@ export function useSommelierChat(isOpen: boolean) {
     startNewChat,
     cancelStream,
     retryMessage,
-    injectMessage,
+    setWelcomeState,
     clearError,
   };
 }
