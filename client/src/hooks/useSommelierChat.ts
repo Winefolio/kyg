@@ -313,6 +313,16 @@ export function useSommelierChat(isOpen: boolean) {
     setIsStreaming(false);
   }, []);
 
+  // Inject a synthetic assistant message (for welcome message)
+  const injectMessage = useCallback((content: string) => {
+    setMessages([{
+      id: -2,
+      role: "assistant",
+      content,
+      createdAt: new Date().toISOString(),
+    }]);
+  }, []);
+
   const clearError = useCallback(() => setError(null), []);
 
   return {
@@ -331,6 +341,7 @@ export function useSommelierChat(isOpen: boolean) {
     startNewChat,
     cancelStream,
     retryMessage,
+    injectMessage,
     clearError,
   };
 }

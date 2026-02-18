@@ -7,9 +7,10 @@ interface MessageListProps {
   messages: ChatMessageType[];
   isStreaming: boolean;
   onRetryMessage?: (messageId: number) => void;
+  onNavigate?: () => void;
 }
 
-export function MessageList({ messages, isStreaming, onRetryMessage }: MessageListProps) {
+export function MessageList({ messages, isStreaming, onRetryMessage, onNavigate }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -37,7 +38,7 @@ export function MessageList({ messages, isStreaming, onRetryMessage }: MessageLi
       onScroll={handleScroll}
     >
       {messages.map((message) => (
-        <ChatMessage key={message.id} message={message} onRetry={onRetryMessage} />
+        <ChatMessage key={message.id} message={message} onRetry={onRetryMessage} onNavigate={onNavigate} />
       ))}
       {isStreaming && !messages[messages.length - 1]?.isStreaming && (
         <TypingIndicator />

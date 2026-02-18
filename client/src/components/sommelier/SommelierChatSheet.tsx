@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { ChatHeader } from "./ChatHeader";
 import { ChatHistorySidebar } from "./ChatHistorySidebar";
@@ -6,13 +6,80 @@ import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
 import { useSommelierChat } from "@/hooks/useSommelierChat";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useQuery } from "@tanstack/react-query";
 import { Camera, Sparkles, Wine } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import type { OnboardingData } from "@shared/schema";
 
 const SUGGESTED_PROMPTS = [
   { icon: Sparkles, text: "What's a wine I'd love but haven't tried yet?" },
   { icon: Wine, text: "I'm cooking tonight \u2014 what should I open?" },
 ];
+
+function buildWelcomeMessage(data?: OnboardingData | null): string {
+  const allNotSure =
+    !data ||
+    (data.knowledgeLevel === "not_sure" &&
+      data.wineVibe === "not_sure" &&
+      (!data.foodPreferences || data.foodPreferences.length === 0) &&
+      (!data.drinkPreferences || data.drinkPreferences.length === 0) &&
+      data.occasion === "not_sure");
+
+  // --- Personalized opening ---
+  let opening: string;
+  if (allNotSure) {
+    opening =
+      "Hey! I'm Pierre, your personal wine guide. Not sure what you like yet? That's literally what Cata is for.";
+  } else {
+    const vibeOpeners: Record<string, string> = {
+      bold: "You like bold, full-bodied wines?",
+      light: "You appreciate lighter, crisp wines?",
+      sweet: "You're drawn to sweeter wines?",
+      adventurous: "Love that you're adventurous with wine —",
+    };
+    const vibe = data?.wineVibe && data.wineVibe !== "not_sure"
+      ? vibeOpeners[data.wineVibe] || ""
+      : "";
+    opening = vibe
+      ? `Hey! I'm Pierre, your personal wine guide. ${vibe} We're going to get along.`
+      : "Hey! I'm Pierre, your personal wine guide. Let's figure out what you love.";
+  }
+
+  // --- Feature links (always the same) ---
+  const features = [
+    "**[Taste a wine](/tasting/new)** — snap any bottle, answer a few fun questions, and our system starts learning what you love (and what you don't)",
+    "**[Learning Journeys](/journeys)** — guided tastings with sommelier-designed questions that build your palate step by step",
+    "**[Group tastings](/home/group)** — host a tasting night with friends, pick a curated wine set, and compare notes live",
+    "**[Your taste profile](/home/dashboard)** — watch your palate evolve as you taste more",
+  ];
+
+  // --- Recommendation based on occasion ---
+  const occasionRecommendations: Record<string, string> = {
+    learning:
+      "Since you're here to learn, I'd start by **[tasting whatever you're drinking right now](/tasting/new)** — even if it's just Tuesday night wine. That's how I start learning what clicks for you.",
+    go_to_bottle:
+      "Since you want to find a go-to bottle, I'd start by **[tasting whatever you're drinking right now](/tasting/new)** — that's how we zero in on your perfect everyday pick.",
+    impress:
+      "Want to level up your wine game? Start by **[tasting a wine you already like](/tasting/new)** — I'll teach you why you like it, so you can talk about it confidently.",
+    date_night:
+      "Looking for that perfect bottle? **[Taste what you know first](/tasting/new)** — I'll use that to find special-occasion wines you'll both love.",
+  };
+
+  const recommendation =
+    data?.occasion && data.occasion !== "not_sure"
+      ? occasionRecommendations[data.occasion]
+      : "The best place to start? **[Taste whatever you're drinking right now](/tasting/new)** — even if it's just Tuesday night wine. That's how I start learning your palate.";
+
+  return `${opening}
+
+Cata isn't a wine textbook — it's about discovering what **you** like. Here's how:
+
+- ${features.join("\n- ")}
+
+${recommendation}
+
+Or just ask me anything — what sounds good?`;
+}
 
 interface SommelierChatSheetProps {
   open: boolean;
@@ -136,6 +203,7 @@ function ChatContent({
   onNewChat,
   onDeleteChat,
   onRetryMessage,
+  onNavigate,
 }: {
   onClose: () => void;
   messages: any[];
@@ -156,6 +224,7 @@ function ChatContent({
   onNewChat: () => void;
   onDeleteChat: (chatId: number) => void;
   onRetryMessage?: (messageId: number) => void;
+  onNavigate?: () => void;
 }) {
   const showWelcome = !isLoading && !isLoadingChat && messages.length === 0;
   const swipeHandlers = useEdgeSwipe(onOpenSidebar);
@@ -183,7 +252,7 @@ function ChatContent({
       ) : showWelcome ? (
         <WelcomeState onSelectPrompt={sendMessage} onSendWithImage={sendMessageWithImage} />
       ) : (
-        <MessageList messages={messages} isStreaming={isStreaming} onRetryMessage={onRetryMessage} />
+        <MessageList messages={messages} isStreaming={isStreaming} onRetryMessage={onRetryMessage} onNavigate={onNavigate} />
       )}
 
       <ChatInput
@@ -225,8 +294,37 @@ export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetPro
     deleteChat,
     startNewChat,
     retryMessage,
+    injectMessage,
     clearError,
   } = useSommelierChat(open);
+
+  // Get onboarding data for welcome message personalization
+  const { data: authData } = useQuery<{
+    user: { onboardingCompleted: boolean; onboardingData?: OnboardingData };
+  }>({
+    queryKey: ["/api/auth/me"],
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Inject personalized welcome message when opened via ?pierre=welcome
+  const welcomeInjected = useRef(false);
+  useEffect(() => {
+    if (
+      open &&
+      !welcomeInjected.current &&
+      window.location.search.includes("pierre=welcome") &&
+      messages.length === 0
+    ) {
+      welcomeInjected.current = true;
+      const onboardingData = authData?.user?.onboardingData;
+      injectMessage(buildWelcomeMessage(onboardingData));
+
+      // Clean up URL param
+      const url = new URL(window.location.href);
+      url.searchParams.delete("pierre");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+  }, [open, messages.length, authData, injectMessage]);
 
   const handleClose = () => onOpenChange(false);
   const openSidebar = useCallback(() => setSidebarOpen(true), []);
@@ -258,6 +356,7 @@ export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetPro
     },
     onDeleteChat: deleteChat,
     onRetryMessage: retryMessage,
+    onNavigate: handleClose,
   };
 
   // Mobile: bottom drawer (handleOnly prevents scroll-triggered dismiss)

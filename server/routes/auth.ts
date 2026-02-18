@@ -252,7 +252,8 @@ export function registerAuthRoutes(app: Express): void {
           tastingLevel: user.tastingLevel,
           tastingsCompleted: user.tastingsCompleted,
           levelUpPromptEligible: user.levelUpPromptEligible,
-          onboardingCompleted: user.onboardingCompleted
+          onboardingCompleted: user.onboardingCompleted,
+          onboardingData: user.onboardingData
         }
       });
     } catch (error) {

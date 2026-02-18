@@ -71,10 +71,41 @@ async function buildUserContext(email: string): Promise<string> {
         enthusiast: "actively learning about wine",
         nerd: "serious wine knowledge",
       };
-      if (ob.knowledgeLevel) lines.push(`Self-described: ${knowledgeMap[ob.knowledgeLevel] || ob.knowledgeLevel}`);
-      if (ob.wineVibe) lines.push(`Style preference: ${vibeMap[ob.wineVibe] || ob.wineVibe}`);
+      const drinkPalateMap: Record<string, string> = {
+        black_coffee: "tolerates bitterness — tannic reds",
+        iced_latte: "likes creamy, smooth textures — oaked Chardonnay",
+        tea: "appreciates delicate flavors — lighter wines, Pinot Noir",
+        sparkling_water: "enjoys acidity and fizz — sparkling wines, Sauvignon Blanc",
+        apple_juice: "prefers sweetness — Moscato, off-dry Riesling",
+        lemonade: "likes tart + sweet balance — crisp whites, Vinho Verde",
+        cola: "sweet + bold — fruit-forward Zinfandel, Malbec",
+        kombucha: "open to funky/sour — natural wines, orange wines",
+      };
+      const occasionMap: Record<string, string> = {
+        learning: "here to learn about wine for fun",
+        go_to_bottle: "looking for a reliable everyday bottle",
+        impress: "wants to sound knowledgeable at restaurants and dinners",
+        date_night: "looking for wines for special occasions",
+      };
+      if (ob.knowledgeLevel && ob.knowledgeLevel !== "not_sure") {
+        lines.push(`Self-described: ${knowledgeMap[ob.knowledgeLevel] || ob.knowledgeLevel}`);
+      }
+      if (ob.wineVibe && ob.wineVibe !== "not_sure") {
+        lines.push(`Style preference: ${vibeMap[ob.wineVibe] || ob.wineVibe}`);
+      }
       if (ob.foodPreferences?.length > 0) {
         lines.push(`Favorite foods: ${ob.foodPreferences.join(", ")}`);
+      }
+      if (ob.drinkPreferences?.length > 0) {
+        const palateSignals = ob.drinkPreferences
+          .map((d) => drinkPalateMap[d])
+          .filter(Boolean);
+        if (palateSignals.length > 0) {
+          lines.push(`Palate signals from non-wine drinks: ${palateSignals.join("; ")}`);
+        }
+      }
+      if (ob.occasion && ob.occasion !== "not_sure") {
+        lines.push(`Goal: ${occasionMap[ob.occasion] || ob.occasion}`);
       }
     }
 

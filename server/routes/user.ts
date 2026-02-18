@@ -7,9 +7,11 @@ import { z } from "zod";
 import { validationError, internalError } from "../lib/api-error";
 
 const onboardingSchema = z.object({
-  knowledgeLevel: z.enum(['beginner', 'casual', 'enthusiast', 'nerd']),
-  wineVibe: z.enum(['bold', 'light', 'sweet', 'adventurous']),
-  foodPreferences: z.array(z.string()).min(1).max(10),
+  knowledgeLevel: z.enum(['beginner', 'casual', 'enthusiast', 'nerd', 'not_sure']),
+  wineVibe: z.enum(['bold', 'light', 'sweet', 'adventurous', 'not_sure']),
+  foodPreferences: z.array(z.string()).max(15),
+  drinkPreferences: z.array(z.string()).max(10),
+  occasion: z.enum(['learning', 'go_to_bottle', 'impress', 'date_night', 'not_sure']),
 });
 
 // Also accept skip requests (no data)
@@ -49,12 +51,14 @@ export function registerUserRoutes(app: Express): void {
         return validationError(res, "Invalid onboarding data");
       }
 
-      const { knowledgeLevel, wineVibe, foodPreferences } = parsed.data;
+      const { knowledgeLevel, wineVibe, foodPreferences, drinkPreferences, occasion } = parsed.data;
 
       const onboardingData: OnboardingData = {
         knowledgeLevel,
         wineVibe,
         foodPreferences,
+        drinkPreferences,
+        occasion,
         completedAt: new Date().toISOString(),
       };
 

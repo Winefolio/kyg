@@ -11,12 +11,14 @@ import type { User } from "@shared/schema";
 // TYPES
 // ============================================================================
 
-type QuizStep = "knowledge" | "vibe" | "food";
+type QuizStep = "knowledge" | "vibe" | "food" | "drinks" | "occasion";
 
 interface QuizAnswers {
   knowledgeLevel: string | null;
   wineVibe: string | null;
   foodPreferences: string[];
+  drinkPreferences: string[];
+  occasion: string | null;
 }
 
 interface OptionCard {
@@ -55,6 +57,12 @@ const KNOWLEDGE_OPTIONS: OptionCard[] = [
     title: "Full wine nerd",
     description: "I could talk terroir all day",
   },
+  {
+    value: "not_sure",
+    emoji: "\u{1F937}",
+    title: "Not sure yet",
+    description: "I'm still figuring it out",
+  },
 ];
 
 const VIBE_OPTIONS: OptionCard[] = [
@@ -82,6 +90,12 @@ const VIBE_OPTIONS: OptionCard[] = [
     title: "Surprise me",
     description: "I'll try anything once",
   },
+  {
+    value: "not_sure",
+    emoji: "\u{1F937}",
+    title: "Not sure yet",
+    description: "I'm still figuring it out",
+  },
 ];
 
 const FOOD_OPTIONS: OptionCard[] = [
@@ -93,6 +107,53 @@ const FOOD_OPTIONS: OptionCard[] = [
   { value: "seafood", emoji: "\u{1F990}", title: "Seafood", description: "" },
   { value: "steak", emoji: "\u{1F969}", title: "Steak", description: "" },
   { value: "veggie", emoji: "\u{1F957}", title: "Veggie", description: "" },
+  { value: "chocolate", emoji: "\u{1F36B}", title: "Chocolate", description: "" },
+  { value: "salads", emoji: "\u{1F96C}", title: "Fresh Salads", description: "" },
+  { value: "comfort", emoji: "\u{1F35F}", title: "Comfort Food", description: "" },
+];
+
+const DRINK_OPTIONS: OptionCard[] = [
+  { value: "black_coffee", emoji: "\u2615", title: "Black Coffee", description: "" },
+  { value: "iced_latte", emoji: "\u{1F9CB}", title: "Iced Latte", description: "" },
+  { value: "tea", emoji: "\u{1FAD6}", title: "Tea", description: "" },
+  { value: "sparkling_water", emoji: "\u{1F4A7}", title: "Sparkling Water", description: "" },
+  { value: "apple_juice", emoji: "\u{1F34E}", title: "Apple Juice", description: "" },
+  { value: "lemonade", emoji: "\u{1F34B}", title: "Lemonade", description: "" },
+  { value: "cola", emoji: "\u{1F964}", title: "Cola", description: "" },
+  { value: "kombucha", emoji: "\u{1FAD9}", title: "Kombucha", description: "" },
+];
+
+const OCCASION_OPTIONS: OptionCard[] = [
+  {
+    value: "learning",
+    emoji: "\u{1F4A1}",
+    title: "Learning for fun",
+    description: "I just want to know more about wine",
+  },
+  {
+    value: "go_to_bottle",
+    emoji: "\u{1F3AF}",
+    title: "Finding my go-to bottle",
+    description: "I want a reliable everyday pick",
+  },
+  {
+    value: "impress",
+    emoji: "\u2728",
+    title: "Impressing at dinners",
+    description: "I want to sound smart at restaurants",
+  },
+  {
+    value: "date_night",
+    emoji: "\u{1F496}",
+    title: "Date night picks",
+    description: "I need wine for special occasions",
+  },
+  {
+    value: "not_sure",
+    emoji: "\u{1F937}",
+    title: "Not sure yet",
+    description: "I'm just exploring",
+  },
 ];
 
 // ============================================================================
@@ -213,9 +274,11 @@ function SingleSelectStep({
                 <span className="text-white font-medium block">
                   {option.title}
                 </span>
-                <span className="text-white/40 text-sm">
-                  {option.description}
-                </span>
+                {option.description && (
+                  <span className="text-white/40 text-sm">
+                    {option.description}
+                  </span>
+                )}
               </div>
               {selected === option.value && (
                 <Check className="w-5 h-5 text-purple-400 ml-auto" />
@@ -293,6 +356,8 @@ export default function OnboardingQuiz() {
     knowledgeLevel: null,
     wineVibe: null,
     foodPreferences: [],
+    drinkPreferences: [],
+    occasion: null,
   });
   const [saveError, setSaveError] = useState<string | null>(null);
   const [, setLocation] = useLocation();
@@ -341,7 +406,7 @@ export default function OnboardingQuiz() {
   });
 
   // Step navigation
-  const steps: QuizStep[] = ["knowledge", "vibe", "food"];
+  const steps: QuizStep[] = ["knowledge", "vibe", "food", "drinks", "occasion"];
   const currentStepIndex = steps.indexOf(step);
 
   const goNext = () => {
@@ -379,6 +444,15 @@ export default function OnboardingQuiz() {
     }));
   };
 
+  const toggleDrink = (value: string) => {
+    setAnswers((prev) => ({
+      ...prev,
+      drinkPreferences: prev.drinkPreferences.includes(value)
+        ? prev.drinkPreferences.filter((d) => d !== value)
+        : [...prev.drinkPreferences, value],
+    }));
+  };
+
   // Loading state
   if (authLoading) {
     return (
@@ -397,7 +471,7 @@ export default function OnboardingQuiz() {
           onBack={currentStepIndex > 0 ? goBack : undefined}
         />
 
-        <div className="flex-1 relative overflow-hidden">
+        <div className="flex-1 relative overflow-y-auto overflow-x-hidden">
           <AnimatePresence mode="wait" custom={direction}>
             {step === "knowledge" && (
               <motion.div
@@ -419,7 +493,6 @@ export default function OnboardingQuiz() {
                       ...prev,
                       knowledgeLevel: value,
                     }));
-                    // Auto-advance after selection with a small delay
                     setTimeout(() => {
                       setDirection(1);
                       setStep("vibe");
@@ -446,7 +519,6 @@ export default function OnboardingQuiz() {
                   selected={answers.wineVibe}
                   onSelect={(value) => {
                     setAnswers((prev) => ({ ...prev, wineVibe: value }));
-                    // Auto-advance after selection
                     setTimeout(() => {
                       setDirection(1);
                       setStep("food");
@@ -467,31 +539,86 @@ export default function OnboardingQuiz() {
                 transition={{ duration: 0.25, ease: "easeInOut" }}
               >
                 <MultiSelectStep
-                  title="What do you love to eat?"
-                  subtitle="Pick all that apply — helps us pair wines for you"
+                  title="What flavors do you reach for?"
+                  subtitle="Your food taste tells us a lot about wines you'll love"
                   options={FOOD_OPTIONS}
                   selected={answers.foodPreferences}
                   onToggle={toggleFood}
                 />
 
-                {/* Complete button */}
                 <motion.button
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
-                  onClick={handleComplete}
-                  disabled={
-                    saveMutation.isPending ||
-                    answers.foodPreferences.length === 0
-                  }
-                  className="w-full mt-8 py-4 rounded-2xl font-semibold text-white transition-all duration-200 disabled:opacity-40 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 active:scale-[0.98]"
+                  onClick={goNext}
+                  className="w-full mt-8 py-4 rounded-2xl font-semibold text-white transition-all duration-200 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 active:scale-[0.98]"
                 >
-                  {saveMutation.isPending ? (
-                    <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-                  ) : (
-                    "Let's go!"
-                  )}
+                  Continue
                 </motion.button>
+              </motion.div>
+            )}
+
+            {step === "drinks" && (
+              <motion.div
+                key="drinks"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+              >
+                <MultiSelectStep
+                  title="What do you usually drink?"
+                  subtitle="This tells us more about your palate than you'd think"
+                  options={DRINK_OPTIONS}
+                  selected={answers.drinkPreferences}
+                  onToggle={toggleDrink}
+                />
+
+                <motion.button
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  onClick={goNext}
+                  className="w-full mt-8 py-4 rounded-2xl font-semibold text-white transition-all duration-200 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 active:scale-[0.98]"
+                >
+                  Continue
+                </motion.button>
+              </motion.div>
+            )}
+
+            {step === "occasion" && (
+              <motion.div
+                key="occasion"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+              >
+                <SingleSelectStep
+                  title="What brings you here?"
+                  subtitle="Helps Pierre give you the right kind of advice"
+                  options={OCCASION_OPTIONS}
+                  selected={answers.occasion}
+                  onSelect={(value) => {
+                    const updated = { ...answers, occasion: value };
+                    setAnswers(updated);
+                    // Final step — submit after selection
+                    setTimeout(() => {
+                      setSaveError(null);
+                      saveMutation.mutate(updated);
+                    }, 300);
+                  }}
+                />
+
+                {saveMutation.isPending && (
+                  <div className="flex justify-center mt-8">
+                    <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

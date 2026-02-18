@@ -724,9 +724,11 @@ export const insertTastingSchema = createInsertSchema(tastings, {
 
 // Onboarding quiz answers
 export interface OnboardingData {
-  knowledgeLevel: 'beginner' | 'casual' | 'enthusiast' | 'nerd';
-  wineVibe: 'bold' | 'light' | 'sweet' | 'adventurous';
+  knowledgeLevel: 'beginner' | 'casual' | 'enthusiast' | 'nerd' | 'not_sure';
+  wineVibe: 'bold' | 'light' | 'sweet' | 'adventurous' | 'not_sure';
   foodPreferences: string[];
+  drinkPreferences: string[];
+  occasion: 'learning' | 'go_to_bottle' | 'impress' | 'date_night' | 'not_sure';
   completedAt: string;
 }
 
