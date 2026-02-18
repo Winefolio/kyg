@@ -59,8 +59,9 @@ export function SommelierFAB() {
   const { triggerHaptic } = useHaptics();
 
   // Auto-open Pierre after onboarding completion
+  // Note: wouter's useLocation returns only pathname, not search params
   useEffect(() => {
-    if (location.includes("pierre=welcome")) {
+    if (window.location.search.includes("pierre=welcome")) {
       const timer = setTimeout(() => setIsOpen(true), 600);
       return () => clearTimeout(timer);
     }
