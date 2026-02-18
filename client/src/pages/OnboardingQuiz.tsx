@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -360,6 +360,7 @@ export default function OnboardingQuiz() {
     occasion: null,
   });
   const [saveError, setSaveError] = useState<string | null>(null);
+  const justSaved = useRef(false);
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
@@ -378,7 +379,10 @@ export default function OnboardingQuiz() {
   });
 
   useEffect(() => {
-    if (authData?.user?.onboardingCompleted) {
+    // Redirect users who already completed onboarding away from quiz.
+    // Skip if we just saved — our onSuccess navigates to /home?pierre=welcome
+    // and we don't want this guard to override that with /home.
+    if (authData?.user?.onboardingCompleted && !justSaved.current) {
       setLocation("/home");
     }
   }, [authData, setLocation]);
@@ -397,6 +401,7 @@ export default function OnboardingQuiz() {
       return res.json();
     },
     onSuccess: () => {
+      justSaved.current = true;
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       setLocation("/home?pierre=welcome");
     },
