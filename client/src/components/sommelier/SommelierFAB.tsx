@@ -55,13 +55,19 @@ function PierreIcon({ className }: { className?: string }) {
 
 export function SommelierFAB() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isWelcome, setIsWelcome] = useState(false);
   const [location] = useLocation();
   const { triggerHaptic } = useHaptics();
 
   // Auto-open Pierre after onboarding completion
-  // Note: wouter's useLocation returns only pathname, not search params
   useEffect(() => {
     if (window.location.search.includes("pierre=welcome")) {
+      setIsWelcome(true);
+      // Clean URL param immediately
+      const url = new URL(window.location.href);
+      url.searchParams.delete("pierre");
+      window.history.replaceState({}, "", url.pathname + url.search);
+
       const timer = setTimeout(() => setIsOpen(true), 600);
       return () => clearTimeout(timer);
     }
@@ -117,7 +123,7 @@ export function SommelierFAB() {
       </AnimatePresence>
 
       {showChatSheet && (
-        <SommelierChatSheet open={isOpen} onOpenChange={setIsOpen} />
+        <SommelierChatSheet open={isOpen} onOpenChange={setIsOpen} isWelcome={isWelcome} />
       )}
     </>
   );

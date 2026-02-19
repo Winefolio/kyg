@@ -84,6 +84,7 @@ Or just ask me anything — what sounds good?`;
 interface SommelierChatSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  isWelcome?: boolean;
 }
 
 function WelcomeState({
@@ -276,7 +277,7 @@ function ChatContent({
   );
 }
 
-export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetProps) {
+export function SommelierChatSheet({ open, onOpenChange, isWelcome }: SommelierChatSheetProps) {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const {
@@ -306,13 +307,13 @@ export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetPro
     staleTime: 5 * 60 * 1000,
   });
 
-  // Persist personalized welcome message when opened via ?pierre=welcome
+  // Persist personalized welcome message when opened via isWelcome prop
   const welcomeInjected = useRef(false);
   useEffect(() => {
     if (
       open &&
+      isWelcome &&
       !welcomeInjected.current &&
-      window.location.search.includes("pierre=welcome") &&
       messages.length === 0
     ) {
       welcomeInjected.current = true;
@@ -344,13 +345,8 @@ export function SommelierChatSheet({ open, onOpenChange }: SommelierChatSheetPro
             createdAt: new Date().toISOString(),
           });
         });
-
-      // Clean up URL param
-      const url = new URL(window.location.href);
-      url.searchParams.delete("pierre");
-      window.history.replaceState({}, "", url.pathname + url.search);
     }
-  }, [open, messages.length, authData, setWelcomeState]);
+  }, [open, isWelcome, messages.length, authData, setWelcomeState]);
 
   const handleClose = () => onOpenChange(false);
   const openSidebar = useCallback(() => setSidebarOpen(true), []);
