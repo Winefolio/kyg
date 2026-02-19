@@ -79,25 +79,15 @@ export function SommelierFAB() {
   const isHidden = HIDDEN_ROUTE_PATTERNS.some((p) => p.test(location));
   const isShown = SHOWN_ROUTE_PATTERNS.some((p) => p.test(location));
 
-  // Detect ?pierre=welcome URL param (set once, persists across route changes)
+  // Check sessionStorage for pierre_welcome flag (survives redirects unlike URL params)
   useEffect(() => {
-    if (window.location.search.includes("pierre=welcome")) {
+    if (sessionStorage.getItem("pierre_welcome") && isAuthenticated && isShown && !isHidden) {
+      sessionStorage.removeItem("pierre_welcome");
       setIsWelcome(true);
-      // Clean URL param immediately
-      const url = new URL(window.location.href);
-      url.searchParams.delete("pierre");
-      window.history.replaceState({}, "", url.pathname + url.search);
-    }
-  }, [location]);
-
-  // Auto-open Pierre once isWelcome is set and we're on a visible route.
-  // Separate from URL detection so redirect ping-pong doesn't cancel the timeout.
-  useEffect(() => {
-    if (isWelcome && !isOpen && isAuthenticated && isShown && !isHidden) {
       const timer = setTimeout(() => setIsOpen(true), 600);
       return () => clearTimeout(timer);
     }
-  }, [isWelcome, isOpen, isAuthenticated, isShown, isHidden]);
+  }, [location, isAuthenticated, isShown, isHidden]);
 
   // FAB button only shows on allowed routes when not chatting
   const showFABButton = isAuthenticated && !isHidden && isShown && !isOpen;

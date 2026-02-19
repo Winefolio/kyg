@@ -403,8 +403,9 @@ export default function OnboardingQuiz() {
     },
     onSuccess: () => {
       justSaved.current = true;
+      sessionStorage.setItem("pierre_welcome", "true");
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      setLocation("/home?pierre=welcome");
+      setLocation("/home");
     },
     onError: () => {
       setSaveError("Something went wrong. Please try again.");
