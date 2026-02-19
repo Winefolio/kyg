@@ -79,13 +79,14 @@ export function SommelierFAB() {
   const isHidden = HIDDEN_ROUTE_PATTERNS.some((p) => p.test(location));
   const isShown = SHOWN_ROUTE_PATTERNS.some((p) => p.test(location));
 
-  // Check sessionStorage for pierre_welcome flag (survives redirects unlike URL params)
+  // Check sessionStorage for pierre_welcome flag (survives redirects unlike URL params).
+  // Opens Pierre immediately — no setTimeout because any dependency change would
+  // cancel the timeout after the flag is already consumed, with no way to retry.
   useEffect(() => {
     if (sessionStorage.getItem("pierre_welcome") && isAuthenticated && isShown && !isHidden) {
       sessionStorage.removeItem("pierre_welcome");
       setIsWelcome(true);
-      const timer = setTimeout(() => setIsOpen(true), 600);
-      return () => clearTimeout(timer);
+      setIsOpen(true);
     }
   }, [location, isAuthenticated, isShown, isHidden]);
 
