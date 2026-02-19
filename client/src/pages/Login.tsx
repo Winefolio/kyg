@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 export default function Login() {
   const [, setLocation] = useLocation();
   const search = useSearch();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { login } = useAuth();
   const [email, setEmail] = useState("");
@@ -57,6 +59,9 @@ export default function Login() {
       if (!authResult.success) {
         throw new Error(authResult.error || "Authentication failed");
       }
+
+      // Clear stale auth cache from previous user so components fetch fresh data
+      queryClient.removeQueries({ queryKey: ["/api/auth/me"] });
 
       if (response.ok) {
         // Existing user with tasting history — check if onboarding completed

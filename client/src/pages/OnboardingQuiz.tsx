@@ -376,6 +376,7 @@ export default function OnboardingQuiz() {
     },
     retry: false,
     staleTime: 5 * 60 * 1000,
+    refetchOnMount: "always",
   });
 
   useEffect(() => {
