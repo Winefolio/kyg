@@ -4,6 +4,7 @@
  */
 
 import { storage } from "../storage";
+import type { OnboardingData } from "@shared/schema";
 import fs from "fs/promises";
 import path from "path";
 
@@ -54,6 +55,59 @@ async function buildUserContext(email: string): Promise<string> {
     // Basic info
     lines.push(`Level: ${user.tastingLevel || "intro"} (${user.tastingsCompleted || 0} tastings)`);
     if (user.wineArchetype) lines.push(`Wine Archetype: ${user.wineArchetype}`);
+
+    // Onboarding profile (if completed)
+    if (user.onboardingData) {
+      const ob = user.onboardingData as OnboardingData;
+      const vibeMap: Record<string, string> = {
+        bold: "bold, full-bodied wines",
+        light: "light, crisp wines",
+        sweet: "sweet, fruit-forward wines",
+        adventurous: "trying new and unusual wines",
+      };
+      const knowledgeMap: Record<string, string> = {
+        beginner: "brand new to wine",
+        casual: "drinks wine casually, knows what they like",
+        enthusiast: "actively learning about wine",
+        nerd: "serious wine knowledge",
+      };
+      const drinkPalateMap: Record<string, string> = {
+        black_coffee: "tolerates bitterness — tannic reds",
+        iced_latte: "likes creamy, smooth textures — oaked Chardonnay",
+        tea: "appreciates delicate flavors — lighter wines, Pinot Noir",
+        sparkling_water: "enjoys acidity and fizz — sparkling wines, Sauvignon Blanc",
+        apple_juice: "prefers sweetness — Moscato, off-dry Riesling",
+        lemonade: "likes tart + sweet balance — crisp whites, Vinho Verde",
+        cola: "sweet + bold — fruit-forward Zinfandel, Malbec",
+        kombucha: "open to funky/sour — natural wines, orange wines",
+      };
+      const occasionMap: Record<string, string> = {
+        learning: "here to learn about wine for fun",
+        go_to_bottle: "looking for a reliable everyday bottle",
+        impress: "wants to sound knowledgeable at restaurants and dinners",
+        date_night: "looking for wines for special occasions",
+      };
+      if (ob.knowledgeLevel && ob.knowledgeLevel !== "not_sure") {
+        lines.push(`Self-described: ${knowledgeMap[ob.knowledgeLevel] || ob.knowledgeLevel}`);
+      }
+      if (ob.wineVibe && ob.wineVibe !== "not_sure") {
+        lines.push(`Style preference: ${vibeMap[ob.wineVibe] || ob.wineVibe}`);
+      }
+      if (ob.foodPreferences?.length > 0) {
+        lines.push(`Favorite foods: ${ob.foodPreferences.join(", ")}`);
+      }
+      if (ob.drinkPreferences?.length > 0) {
+        const palateSignals = ob.drinkPreferences
+          .map((d) => drinkPalateMap[d])
+          .filter(Boolean);
+        if (palateSignals.length > 0) {
+          lines.push(`Palate signals from non-wine drinks: ${palateSignals.join("; ")}`);
+        }
+      }
+      if (ob.occasion && ob.occasion !== "not_sure") {
+        lines.push(`Goal: ${occasionMap[ob.occasion] || ob.occasion}`);
+      }
+    }
 
     // Favorites from conversation starters
     if (starters) {

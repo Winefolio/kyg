@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,6 +7,7 @@ import { useHaptics } from "@/hooks/useHaptics";
 
 // Routes where the FAB should be hidden (active experiences)
 const HIDDEN_ROUTE_PATTERNS = [
+  /^\/onboarding$/,
   /^\/tasting\/[^/]+\/[^/]+$/, // /tasting/:sessionId/:participantId
   /^\/tasting\/new$/,
   /^\/solo\/new$/,
@@ -54,6 +55,7 @@ function PierreIcon({ className }: { className?: string }) {
 
 export function SommelierFAB() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isWelcome, setIsWelcome] = useState(false);
   const [location] = useLocation();
   const { triggerHaptic } = useHaptics();
 
@@ -76,6 +78,17 @@ export function SommelierFAB() {
   // Determine visibility — require auth + allowed route
   const isHidden = HIDDEN_ROUTE_PATTERNS.some((p) => p.test(location));
   const isShown = SHOWN_ROUTE_PATTERNS.some((p) => p.test(location));
+
+  // Check sessionStorage for pierre_welcome flag (survives redirects unlike URL params).
+  // Opens Pierre immediately — no setTimeout because any dependency change would
+  // cancel the timeout after the flag is already consumed, with no way to retry.
+  useEffect(() => {
+    if (sessionStorage.getItem("pierre_welcome") && isAuthenticated && isShown && !isHidden) {
+      sessionStorage.removeItem("pierre_welcome");
+      setIsWelcome(true);
+      setIsOpen(true);
+    }
+  }, [location, isAuthenticated, isShown, isHidden]);
 
   // FAB button only shows on allowed routes when not chatting
   const showFABButton = isAuthenticated && !isHidden && isShown && !isOpen;
@@ -107,7 +120,7 @@ export function SommelierFAB() {
       </AnimatePresence>
 
       {showChatSheet && (
-        <SommelierChatSheet open={isOpen} onOpenChange={setIsOpen} />
+        <SommelierChatSheet open={isOpen} onOpenChange={setIsOpen} isWelcome={isWelcome} />
       )}
     </>
   );

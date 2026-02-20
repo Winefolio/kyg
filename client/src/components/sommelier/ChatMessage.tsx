@@ -1,16 +1,19 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useLocation } from "wouter";
 import type { ChatMessage as ChatMessageType } from "@/hooks/useSommelierChat";
 import { Camera, RotateCcw } from "lucide-react";
 
 interface ChatMessageProps {
   message: ChatMessageType;
   onRetry?: (messageId: number) => void;
+  onNavigate?: () => void;
 }
 
-export function ChatMessage({ message, onRetry }: ChatMessageProps) {
+export function ChatMessage({ message, onRetry, onNavigate }: ChatMessageProps) {
   const isUser = message.role === "user";
   const hasImage = (message.metadata as any)?.hasImage;
+  const [, setLocation] = useLocation();
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} px-4 py-1`}>
@@ -33,7 +36,31 @@ export function ChatMessage({ message, onRetry }: ChatMessageProps) {
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
         ) : (
           <div className="text-sm prose prose-invert prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:my-2 prose-strong:text-white">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                a: ({ href, children }) => {
+                  if (href?.startsWith("/")) {
+                    return (
+                      <button
+                        onClick={() => {
+                          onNavigate?.();
+                          setLocation(href);
+                        }}
+                        className="text-purple-400 underline hover:text-purple-300 cursor-pointer inline"
+                      >
+                        {children}
+                      </button>
+                    );
+                  }
+                  return (
+                    <a href={href} target="_blank" rel="noopener noreferrer">
+                      {children}
+                    </a>
+                  );
+                },
+              }}
+            >
               {message.content}
             </ReactMarkdown>
           </div>

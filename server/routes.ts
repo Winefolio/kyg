@@ -15,6 +15,7 @@ import { z } from "zod";
 // Note: Removed problematic reorderSlidesForWineSimple function
 // Now using proven storage.batchUpdateSlidePositions instead
 import { registerMediaProxyRoutes } from './routes/media-proxy';
+import { registerUserRoutes } from './routes/user';
 import { registerDashboardRoutes } from './routes/dashboard';
 import { registerAuthRoutes } from './routes/auth';
 import { registerTastingsRoutes } from './routes/tastings';
@@ -2108,6 +2109,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register media proxy routes
   registerMediaProxyRoutes(app);
+
+  // Register user routes (onboarding)
+  registerUserRoutes(app);
 
   console.log("✅ All routes registered successfully!");
   const httpServer = createServer(app);

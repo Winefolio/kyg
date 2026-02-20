@@ -33,6 +33,7 @@ const SessionJoin = lazy(() => import("@/pages/SessionJoin"));
 const TastingSession = lazy(() => import("@/pages/TastingSession"));
 const TastingCompletion = lazy(() => import("@/pages/TastingCompletion"));
 const HostDashboard = lazy(() => import("@/pages/HostDashboard"));
+const OnboardingQuiz = lazy(() => import("@/pages/OnboardingQuiz"));
 
 import { SommelierFAB } from "@/components/sommelier/SommelierFAB";
 
@@ -40,6 +41,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Landing} />
+      <Route path="/onboarding" component={OnboardingQuiz} />
       <Route path="/gateway" component={Gateway} /> {/* Keep old gateway accessible */}
 
       {/* New unified home experience - Three Pillars (Solo, Group, Dashboard) */}

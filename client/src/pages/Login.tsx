@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 export default function Login() {
   const [, setLocation] = useLocation();
   const search = useSearch();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { login } = useAuth();
   const [email, setEmail] = useState("");
@@ -52,11 +54,24 @@ export default function Login() {
       // Check if user exists by trying to fetch their dashboard data
       const response = await fetch(`/api/dashboard/${encodeURIComponent(email.trim())}?login=true`);
 
+      // Authenticate first regardless of whether user exists
+      const authResult = await login(email.trim());
+      if (!authResult.success) {
+        throw new Error(authResult.error || "Authentication failed");
+      }
+
+      // Clear stale auth cache from previous user so components fetch fresh data
+      queryClient.removeQueries({ queryKey: ["/api/auth/me"] });
+
       if (response.ok) {
-        // Authenticate with server to establish session
-        const authResult = await login(email.trim());
-        if (!authResult.success) {
-          throw new Error(authResult.error || "Authentication failed");
+        // Existing user with tasting history — check if onboarding completed
+        const authCheck = await fetch("/api/auth/me", { credentials: "include" });
+        const authInfo = await authCheck.json();
+
+        if (!authInfo.user?.onboardingCompleted) {
+          // Has history but never did onboarding — send through it
+          setLocation("/onboarding");
+          return;
         }
 
         // Redirect to original page or unified home
@@ -67,26 +82,8 @@ export default function Login() {
           description: redirectTo ? "Continuing where you left off..." : "Redirecting to your dashboard...",
         });
       } else if (response.status === 404) {
-        // User doesn't exist - authenticate to create account
-        const authResult = await login(email.trim());
-        if (!authResult.success) {
-          throw new Error(authResult.error || "Authentication failed");
-        }
-
-        // If they came from a journey, redirect back there
-        if (redirectTo?.startsWith('/journeys')) {
-          setLocation(redirectTo);
-          toast({
-            title: "Welcome!",
-            description: "You can start exploring wine journeys.",
-          });
-        } else {
-          toast({
-            title: "No Tasting History",
-            description: "You can start with solo tastings or learning journeys to build your profile.",
-          });
-          setLocation('/home');
-        }
+        // New user — always go through onboarding
+        setLocation("/onboarding");
       } else {
         throw new Error("Failed to check account");
       }
