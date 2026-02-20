@@ -401,14 +401,16 @@ export default function OnboardingQuiz() {
       const res = await apiRequest("POST", "/api/user/onboarding", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       justSaved.current = true;
       sessionStorage.setItem("pierre_welcome", "true");
       // Update cache immediately so HomeV2 sees onboardingCompleted: true
-      // and doesn't redirect back to /onboarding (eliminates bounce delay)
+      // and doesn't redirect back to /onboarding (eliminates bounce delay).
+      // Include onboardingData so Pierre's welcome message is personalized.
+      const onboardingData = "skip" in variables ? null : variables;
       queryClient.setQueryData(["/api/auth/me"], (old: any) => {
         if (!old?.user) return old;
-        return { ...old, user: { ...old.user, onboardingCompleted: true } };
+        return { ...old, user: { ...old.user, onboardingCompleted: true, onboardingData } };
       });
       setLocation("/home");
     },
