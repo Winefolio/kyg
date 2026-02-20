@@ -68,8 +68,8 @@ export default function Login() {
         const authCheck = await fetch("/api/auth/me", { credentials: "include" });
         const authInfo = await authCheck.json();
 
-        if (!authInfo.user?.onboardingCompleted) {
-          // Has history but never did onboarding — send through it
+        if (!authInfo.user?.onboardingCompleted && (authInfo.user?.tastingsCompleted ?? 0) === 0) {
+          // New user with no tasting history — send through onboarding
           setLocation("/onboarding");
           return;
         }
