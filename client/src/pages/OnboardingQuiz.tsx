@@ -404,7 +404,12 @@ export default function OnboardingQuiz() {
     onSuccess: () => {
       justSaved.current = true;
       sessionStorage.setItem("pierre_welcome", "true");
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      // Update cache immediately so HomeV2 sees onboardingCompleted: true
+      // and doesn't redirect back to /onboarding (eliminates bounce delay)
+      queryClient.setQueryData(["/api/auth/me"], (old: any) => {
+        if (!old?.user) return old;
+        return { ...old, user: { ...old.user, onboardingCompleted: true } };
+      });
       setLocation("/home");
     },
     onError: () => {
