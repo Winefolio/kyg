@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useInView } from "framer-motion";
 import { apiRequest } from "@/lib/queryClient";
 import { BottomNav } from "@/components/home/BottomNav";
 import { JoinSessionView } from "@/components/gateway/JoinSessionView";
@@ -471,7 +471,7 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
             onClick={() => setLocation("/tasting/new")}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="bg-gradient-to-br from-rose-500 to-pink-600 rounded-2xl p-5 text-left min-h-[160px] flex flex-col focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="bg-gradient-to-br from-rose-500 to-pink-600 rounded-2xl p-5 text-left min-h-[160px] flex flex-col focus:outline-none focus-visible:ring-2 focus-visible:ring-white card-shimmer shadow-lg shadow-rose-500/25"
           >
             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3">
               <Wine className="w-6 h-6 text-white" />
@@ -485,7 +485,7 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
             onClick={() => setLocation("/journeys")}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 text-left min-h-[160px] flex flex-col focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 text-left min-h-[160px] flex flex-col focus:outline-none focus-visible:ring-2 focus-visible:ring-white card-shimmer shadow-lg shadow-indigo-500/25"
           >
             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-3">
               <GraduationCap className="w-6 h-6 text-white" />
@@ -595,7 +595,17 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.05 * index }}
                   onClick={() => setLocation(`/solo/tasting/${tasting.id}`)}
-                  className="bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10 cursor-pointer hover:bg-white/15 transition-colors"
+                  className={`bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10 cursor-pointer hover:bg-white/15 transition-colors border-l-[3px] ${
+                    tasting.wineType === "red"
+                      ? "border-l-red-500"
+                      : tasting.wineType === "white"
+                        ? "border-l-yellow-400"
+                        : tasting.wineType === "rosé" || tasting.wineType === "rose"
+                          ? "border-l-pink-400"
+                          : tasting.wineType === "sparkling"
+                            ? "border-l-amber-300"
+                            : "border-l-purple-400"
+                  }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
@@ -636,17 +646,30 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
               ))}
             </div>
           ) : (
-            <div className="text-center py-12 bg-gradient-to-br from-white/5 to-white/0 rounded-2xl border border-white/10">
-              <Wine className="w-12 h-12 text-white/30 mx-auto mb-4" />
-              <p className="text-white/60 mb-4">No solo tastings yet</p>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
+              className="text-center py-14 bg-gradient-to-br from-white/5 to-white/0 rounded-2xl border border-dashed border-white/15"
+            >
+              <motion.div
+                animate={{ y: [0, -6, 0], rotate: [0, 5, -5, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <Wine className="w-14 h-14 text-purple-400/40 mx-auto mb-4" />
+              </motion.div>
+              <p className="text-white/70 text-lg font-medium mb-2">Your journal awaits</p>
+              <p className="text-white/40 text-sm mb-6 max-w-[240px] mx-auto">
+                Taste your first wine and start building your personal palate profile
+              </p>
               <Button
                 onClick={() => setLocation("/tasting/new")}
-                variant="outline"
-                className="border-white/10 text-white hover:bg-white/10"
+                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6"
               >
-                Start Your First Tasting
+                <Plus className="w-4 h-4 mr-2" />
+                First Tasting
               </Button>
-            </div>
+            </motion.div>
           )}
         </motion.div>
       </div>
@@ -1209,7 +1232,7 @@ function DashboardTabContent({ user, onLogout }: TabContentProps) {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      <div className="container mx-auto px-4 py-8 space-y-8">
         {/* Welcome Section */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -1223,9 +1246,10 @@ function DashboardTabContent({ user, onLogout }: TabContentProps) {
 
         {/* Unified Stats */}
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
+          initial={{ opacity: 0, y: 15 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.4 }}
           className="grid grid-cols-3 gap-3"
         >
           <StatCard
@@ -1246,9 +1270,10 @@ function DashboardTabContent({ user, onLogout }: TabContentProps) {
         {/* Top Preferences */}
         {dashboardData?.topPreferences && (
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.4, delay: 0.1 }}
             className="grid grid-cols-2 gap-4"
           >
             <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/10">
@@ -1274,15 +1299,20 @@ function DashboardTabContent({ user, onLogout }: TabContentProps) {
 
         {/* Wine Profiles */}
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          initial={{ opacity: 0, y: 15 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.4 }}
           className="space-y-4"
         >
           <h2 className="text-lg font-semibold text-white">Wine Profiles</h2>
 
           {/* Red Wine Profile */}
-          <div className="bg-gradient-to-br from-red-500/10 to-white/5 backdrop-blur-xl rounded-2xl p-5 border border-red-500/20">
+          <motion.div
+            whileHover={{ scale: 1.01, y: -2 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            className="bg-gradient-to-br from-red-500/10 to-white/5 backdrop-blur-xl rounded-2xl p-5 border border-red-500/20 cursor-pointer hover:border-red-500/40 transition-colors"
+          >
             <h3 className="text-white font-medium mb-2 flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-red-500" />
               Red Wine Profile
@@ -1291,10 +1321,14 @@ function DashboardTabContent({ user, onLogout }: TabContentProps) {
               {tasteProfile?.redWineProfile?.summary ||
                 "Continue tasting red wines to build your profile"}
             </p>
-          </div>
+          </motion.div>
 
           {/* White Wine Profile */}
-          <div className="bg-gradient-to-br from-yellow-500/10 to-white/5 backdrop-blur-xl rounded-2xl p-5 border border-yellow-500/20">
+          <motion.div
+            whileHover={{ scale: 1.01, y: -2 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            className="bg-gradient-to-br from-yellow-500/10 to-white/5 backdrop-blur-xl rounded-2xl p-5 border border-yellow-500/20 cursor-pointer hover:border-yellow-500/40 transition-colors"
+          >
             <h3 className="text-white font-medium mb-2 flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-yellow-400" />
               White Wine Profile
@@ -1303,14 +1337,15 @@ function DashboardTabContent({ user, onLogout }: TabContentProps) {
               {tasteProfile?.whiteWineProfile?.summary ||
                 "Continue tasting white wines to build your profile"}
             </p>
-          </div>
+          </motion.div>
         </motion.div>
 
         {/* Sommelier Tips */}
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
+          initial={{ opacity: 0, y: 15 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.4 }}
           className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10"
         >
           <div className="flex items-center gap-2 mb-4">
@@ -1357,9 +1392,12 @@ function DashboardTabContent({ user, onLogout }: TabContentProps) {
 
         {/* View Full Dashboard Link */}
         <motion.button
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          initial={{ opacity: 0, y: 15 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          whileHover={{ scale: 1.02, y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          transition={{ duration: 0.3 }}
           onClick={() => setLocation(`/dashboard/${encodeURIComponent(user.email)}`)}
           className="w-full bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10 flex items-center justify-between group hover:bg-white/15 transition-all"
         >
@@ -1387,6 +1425,31 @@ function DashboardTabContent({ user, onLogout }: TabContentProps) {
 // SHARED COMPONENTS
 // ============================================================================
 
+function CountUp({ target, duration = 1200 }: { target: number; duration?: number }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true });
+  const hasAnimated = useRef(false);
+
+  useEffect(() => {
+    if (!inView || hasAnimated.current || target === 0) return;
+    hasAnimated.current = true;
+
+    const start = performance.now();
+    const step = (now: number) => {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.round(eased * target));
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [inView, target, duration]);
+
+  return <span ref={ref}>{count}</span>;
+}
+
 function StatCard({
   icon: Icon,
   label,
@@ -1411,7 +1474,9 @@ function StatCard({
       >
         <Icon className="w-4 h-4" />
       </div>
-      <div className="text-xl font-bold text-white">{value}</div>
+      <div className="text-xl font-bold text-white">
+        <CountUp target={value} />
+      </div>
       <div className="text-xs text-white/50">{label}</div>
     </div>
   );

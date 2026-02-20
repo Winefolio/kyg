@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { BottomNav } from "@/components/home/BottomNav";
 import WineMap from "@/components/WineMap";
 import { WineInsights } from "@/components/WineInsights";
 import { ConversationStarters } from "@/components/dashboard/ConversationStarters";
@@ -575,7 +576,7 @@ export default function UserDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-primary">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="container mx-auto px-4 py-8 pb-24 max-w-7xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
@@ -732,8 +733,9 @@ export default function UserDashboard() {
         {unifiedPreferences && unifiedPreferences.totalTastings > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.5 }}
             className="mb-6 p-5 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl rounded-2xl border border-white/10"
           >
             <div className="flex items-center gap-2 mb-4">
@@ -830,7 +832,13 @@ export default function UserDashboard() {
             {!scoresLoading && !historyLoading && !dashboardLoading && !profileLoading && !(scoresError || historyError) && (
               <>
             {/* Stats Overview - Only visible on Taste Profile tab */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5 }}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8"
+            >
               <Card className="bg-white/10 backdrop-blur-xl border-white/20">
                 <CardContent className="p-6">
                   <div className="flex items-center space-x-4">
@@ -886,10 +894,16 @@ export default function UserDashboard() {
               {/*    </div>*/}
               {/*  </CardContent>*/}
               {/*</Card>*/}
-            </div>
+            </motion.div>
 
             {/* Top Preferences - Only visible on Taste Profile tab */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8"
+            >
               <Card className="bg-white/10 backdrop-blur-xl border-white/20">
                 <CardContent className="p-6">
                   <div className="flex items-center space-x-3 mb-4">
@@ -934,9 +948,15 @@ export default function UserDashboard() {
                 </CardContent>
               </Card>
 
-            </div>
+            </motion.div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5, delay: 0.15 }}
+              className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+            >
               {wineProfiles.map(({ wineType, traits, regionsTop3, color, summary }) => {
                 return (
                   <Card key={wineType} className="bg-white/10 backdrop-blur-xl border-white/20">
@@ -957,31 +977,66 @@ export default function UserDashboard() {
                   </Card>
                 );
               })}
-            </div>
+            </motion.div>
               </>
             )}
 
             {/* Phase 1: Wine Identity Card - Shows archetype and preference breakdown */}
-            <WineIdentityCard
-              email={email || ''}
-              preferences={unifiedPreferences}
-              hasSommelierFeedback={Boolean(sommelierFeedback && sommelierFeedback.length > 0)}
-            />
+            <motion.div
+              initial={{ opacity: 0, y: 25 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5 }}
+            >
+              <WineIdentityCard
+                email={email || ''}
+                preferences={unifiedPreferences}
+                hasSommelierFeedback={Boolean(sommelierFeedback && sommelierFeedback.length > 0)}
+              />
+            </motion.div>
 
             {/* Phase 1: Conversation Starters - Always renders from DB, GPT tips as enhancement */}
-            <ConversationStarters
-              email={email || ''}
-              hasSommelierFeedback={Boolean(sommelierFeedback && sommelierFeedback.length > 0)}
-            />
+            <motion.div
+              initial={{ opacity: 0, y: 25 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5 }}
+            >
+              <ConversationStarters
+                email={email || ''}
+                hasSommelierFeedback={Boolean(sommelierFeedback && sommelierFeedback.length > 0)}
+              />
+            </motion.div>
 
             {/* Phase 2: Explore Recommendations - "You liked X → Try Y" */}
-            <ExploreRecommendations email={email || ''} />
+            <motion.div
+              initial={{ opacity: 0, y: 25 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5 }}
+            >
+              <ExploreRecommendations email={email || ''} />
+            </motion.div>
 
             {/* Phase 3: Producer Recommendations - Specific wines to buy */}
-            <ProducerRecommendations email={email || ''} />
+            <motion.div
+              initial={{ opacity: 0, y: 25 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5 }}
+            >
+              <ProducerRecommendations email={email || ''} />
+            </motion.div>
 
             {/* Phase 4: Journey Recommendations - Learning paths based on taste */}
-            <JourneyRecommendations email={email || ''} />
+            <motion.div
+              initial={{ opacity: 0, y: 25 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5 }}
+            >
+              <JourneyRecommendations email={email || ''} />
+            </motion.div>
           </TabsContent>
 
           {/* Wine Collection Tab */}
@@ -1520,6 +1575,8 @@ export default function UserDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <BottomNav activeTab="dashboard" />
     </div>
   );
 } 
