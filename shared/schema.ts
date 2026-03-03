@@ -998,14 +998,16 @@ export interface ChapterShoppingGuide {
   askFor?: string;
 }
 
-// Wine options for flexible journey pricing
+// Wine options for journey chapters — budget (under ~$25) and splurge tiers
 export interface WineOption {
   description: string; // e.g., "Any Oregon Pinot Noir"
   askFor: string; // What to tell the wine shop staff
-  priceRange: PriceRange;
+  priceRange?: PriceRange; // Optional — omit for splurge tier
   exampleProducers?: string[]; // e.g., ["Willamette Valley Vineyards", "A to Z"]
-  level: 'entry' | 'mid' | 'premium'; // Price tier
+  level: 'budget' | 'splurge'; // Two-tier pricing
   whyThisWine?: string; // Optional explanation of fit for learning objective
+  labelTips?: string; // What to look for on the label
+  substitutes?: string[]; // Acceptable alternatives if this wine isn't available
 }
 
 // AI-generated next bottle recommendations
