@@ -21,6 +21,7 @@ import { registerAuthRoutes } from './routes/auth';
 import { registerTastingsRoutes } from './routes/tastings';
 import { registerWinesRoutes } from './routes/wines';
 import { registerJourneyRoutes } from './routes/journeys';
+import { registerPlacesRoutes } from './routes/places';
 import { registerTranscriptionRoutes } from './routes/transcription';
 import { registerSommelierChatRoutes } from './routes/sommelier-chat';
 
@@ -2100,6 +2101,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register journey routes (Sprint 3)
   registerJourneyRoutes(app);
+
+  // Register places routes (nearby wine shops)
+  registerPlacesRoutes(app);
 
   // Register audio transcription routes
   registerTranscriptionRoutes(app);

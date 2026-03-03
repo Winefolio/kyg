@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { WineOptionsList } from "@/components/WineOptionCard";
+import { NearbyWineShops } from "@/components/NearbyWineShops";
 import type { WineOption } from "@shared/schema";
 
 interface Chapter {
@@ -495,6 +496,8 @@ export default function JourneyDetail() {
                             selectedLevel={selectedWineLevel}
                             onSelectOption={setSelectedWineLevel}
                           />
+                          {/* Nearby wine shops */}
+                          <NearbyWineShops />
                         </div>
                       )}
 
