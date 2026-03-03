@@ -90,6 +90,7 @@ export default function JourneyDetail() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showShoppingList, setShowShoppingList] = useState(false);
+  const [selectedWineLevel, setSelectedWineLevel] = useState<'budget' | 'splurge' | undefined>();
 
   const journeyId = parseInt(id || "0");
 
@@ -149,8 +150,15 @@ export default function JourneyDetail() {
   };
 
   const handleStartChapter = (chapter: Chapter) => {
-    // Navigate to solo tasting with journey context
-    setLocation(`/solo/new?journeyId=${journeyId}&chapterId=${chapter.id}`);
+    // Navigate to solo tasting with journey context + selected wine level
+    const params = new URLSearchParams({
+      journeyId: String(journeyId),
+      chapterId: String(chapter.id)
+    });
+    if (selectedWineLevel) {
+      params.set('wineLevel', selectedWineLevel);
+    }
+    setLocation(`/solo/new?${params.toString()}`);
   };
 
   if (isLoading) {
@@ -479,10 +487,14 @@ export default function JourneyDetail() {
                         </div>
                       )}
 
-                      {/* Wine Options - Multiple price points (Sprint 5) */}
+                      {/* Wine Options - Budget / Splurge */}
                       {isCurrent && chapter.wineOptions && chapter.wineOptions.length > 0 && (
                         <div className="mb-3">
-                          <WineOptionsList options={chapter.wineOptions} />
+                          <WineOptionsList
+                            options={chapter.wineOptions}
+                            selectedLevel={selectedWineLevel}
+                            onSelectOption={setSelectedWineLevel}
+                          />
                         </div>
                       )}
 

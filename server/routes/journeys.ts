@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { storage } from "../storage";
 import { validateWineForChapter, getValidationMessage } from "../services/wineValidation";
 import { generateQuestionsForWine, getFallbackQuestions } from "../services/questionGenerator";
+import { generateShoppingGuide } from "../services/shoppingGuideGenerator";
 import type { WineRecognitionResult, TastingLevel } from "@shared/schema";
 import { requireAuth, requireAdmin } from "./auth";
 import { aiRateLimit } from "../middleware/rateLimiter";
@@ -436,6 +437,44 @@ export function registerJourneyRoutes(app: Express) {
     } catch (error) {
       console.error("Error fetching journeys:", error);
       res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Generate AI shopping guide (budget/splurge wine options) for a chapter
+  app.post("/api/admin/chapters/:chapterId/generate-shopping-guide", requireAuth, requireAdmin, aiRateLimit, async (req, res) => {
+    try {
+      const chapterId = parseInt(req.params.chapterId);
+
+      if (isNaN(chapterId)) {
+        return res.status(400).json({ message: "Invalid chapter ID" });
+      }
+
+      const chapter = await storage.getChapterById(chapterId);
+      if (!chapter) {
+        return res.status(404).json({ message: "Chapter not found" });
+      }
+
+      const wineRequirements = (chapter as any).wineRequirements || {};
+
+      const result = await generateShoppingGuide(
+        wineRequirements,
+        chapter.title,
+        chapter.description || undefined
+      );
+
+      // Save the generated wine options to the chapter
+      await storage.updateChapter(chapterId, {
+        wineOptions: result.wineOptions
+      });
+
+      res.json({
+        success: true,
+        wineOptions: result.wineOptions,
+        message: "Shopping guide generated and saved"
+      });
+    } catch (error) {
+      console.error("Error generating shopping guide:", error);
+      res.status(500).json({ message: "Failed to generate shopping guide" });
     }
   });
 }
