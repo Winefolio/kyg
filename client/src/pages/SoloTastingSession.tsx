@@ -39,10 +39,10 @@ interface ChapterContext {
   learningObjectives: string[];
 }
 
-// AI-generated question format from Sprint 5 - 5 core components
+// AI-generated question format — 6 core components with three-beat loop
 interface AIQuestion {
   id: string;
-  category: 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall';
+  category: 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'tannins' | 'overall';
   questionType: 'multiple_choice' | 'scale' | 'text';
   title: string;
   description?: string;
@@ -52,6 +52,9 @@ interface AIQuestion {
   scaleMax?: number;
   scaleLabels?: [string, string];
   wineContext?: string;
+  beatType?: 'notice' | 'rate';
+  educationalNote?: string;
+  preferenceDirection?: 'more' | 'less';
 }
 
 interface SoloTastingSessionProps {
@@ -62,10 +65,10 @@ interface SoloTastingSessionProps {
   aiQuestions?: AIQuestion[];
 }
 
-// Question definition type - supports both legacy and 5 core components
+// Question definition type - supports both legacy and 6 core components with three-beat loop
 interface TastingQuestion {
   id: string;
-  section: 'visual' | 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall' | 'aroma' | 'taste' | 'structure' | 'chapter';
+  section: 'visual' | 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'tannins' | 'overall' | 'aroma' | 'taste' | 'structure' | 'chapter';
   type: 'scale' | 'multiple_choice' | 'text' | 'boolean';
   config: {
     title: string;
@@ -81,153 +84,215 @@ interface TastingQuestion {
     placeholder?: string;
     rows?: number;
   };
+  // Three-beat loop metadata
+  beatType?: 'notice' | 'rate';
+  educationalNote?: string;
+  preferenceDirection?: 'more' | 'less';
 }
 
-// Preference-focused tasting questions (10 questions total)
-// Goal: Learn what the user likes, not test their wine knowledge
+// Three-beat tasting questions — notice+rate pairs per trait
+// Used as fallback when AI questions aren't available
 const TASTING_QUESTIONS: TastingQuestion[] = [
-  // AROMA SECTION (2 questions) - What smells do you notice/enjoy?
+  // --- FRUIT (notice + rate) ---
   {
-    id: 'aroma_notes',
-    section: 'aroma',
+    id: 'fruit-notice',
+    section: 'fruit',
     type: 'multiple_choice',
+    beatType: 'notice',
+    educationalNote: 'Wine gets its fruit flavors from the grape itself and fermentation. Red wines often show berry and cherry notes, while whites lean toward citrus and stone fruit.',
     config: {
-      title: 'What aromas do you notice?',
-      description: 'Swirl the glass and take a sniff. Select all that apply.',
+      title: 'What fruit flavors jump out at you?',
+      description: 'Swirl the glass gently and take a sip. Don\'t overthink it — what\'s the first thing that comes to mind?',
       options: [
-        { id: 'citrus', text: 'Citrus & Fresh Fruit', value: 'citrus' },
-        { id: 'tropical', text: 'Tropical & Stone Fruit', value: 'tropical' },
-        { id: 'berry', text: 'Berries & Dark Fruit', value: 'berry' },
-        { id: 'floral', text: 'Floral & Herbal', value: 'floral' },
-        { id: 'oak', text: 'Oak, Vanilla & Spice', value: 'oak' },
-        { id: 'earth', text: 'Earthy & Mineral', value: 'earth' }
+        { id: 'red-berries', text: 'Red berries (cherry, raspberry, strawberry)', value: 'red-berries' },
+        { id: 'dark-berries', text: 'Dark berries (blackberry, blueberry, plum)', value: 'dark-berries' },
+        { id: 'citrus', text: 'Citrus (lemon, lime, grapefruit)', value: 'citrus' },
+        { id: 'stone-fruit', text: 'Stone fruit (peach, apricot, nectarine)', value: 'stone-fruit' },
+        { id: 'tropical', text: 'Tropical (pineapple, mango, passion fruit)', value: 'tropical' }
       ],
       allowMultiple: true
     }
   },
   {
-    id: 'aroma_appeal',
-    section: 'aroma',
+    id: 'fruit-rate',
+    section: 'fruit',
     type: 'scale',
+    beatType: 'rate',
+    preferenceDirection: 'more',
     config: {
-      title: 'How appealing is the aroma?',
-      description: 'Do you like what you smell?',
+      title: 'How much do you enjoy these fruit flavors?',
+      description: 'Would you want more or less fruit intensity in your next wine?',
       scaleMin: 1,
-      scaleMax: 5,
-      scaleLabels: ['Not my style', 'Love it']
+      scaleMax: 10,
+      scaleLabels: ['Not my style', 'Love them']
     }
   },
-
-  // TASTE SECTION (5 questions) - Core preference sliders
+  // --- BODY (notice + rate) ---
   {
-    id: 'taste_sweetness',
-    section: 'taste',
+    id: 'body-notice',
+    section: 'body',
     type: 'scale',
+    beatType: 'notice',
+    educationalNote: 'This weight is called "body." It comes from alcohol, sugar, and extract in the wine. Full-bodied wines feel richer and coat your mouth more.',
     config: {
-      title: 'How do you like the sweetness?',
-      description: 'Rate where this wine lands for you.',
+      title: 'How heavy does the wine feel in your mouth?',
+      description: 'Think of it like milk: skim milk is light-bodied, whole milk is medium, cream is full-bodied.',
       scaleMin: 1,
-      scaleMax: 5,
-      scaleLabels: ['Bone Dry', 'Sweet']
-    }
-  },
-  {
-    id: 'taste_acidity',
-    section: 'taste',
-    type: 'scale',
-    config: {
-      title: 'How do you like the acidity?',
-      description: 'That refreshing, mouth-watering quality.',
-      scaleMin: 1,
-      scaleMax: 5,
-      scaleLabels: ['Soft', 'Crisp & Zesty']
+      scaleMax: 10,
+      scaleLabels: ['Light and delicate', 'Full and rich']
     }
   },
   {
-    id: 'taste_tannins',
-    section: 'taste',
+    id: 'body-rate',
+    section: 'body',
     type: 'scale',
+    beatType: 'rate',
+    preferenceDirection: 'more',
     config: {
-      title: 'How do you like the tannins?',
-      description: 'The drying, grippy sensation (mainly in reds).',
+      title: 'Do you enjoy this body style?',
       scaleMin: 1,
-      scaleMax: 5,
-      scaleLabels: ['Silky Smooth', 'Bold & Grippy']
+      scaleMax: 10,
+      scaleLabels: ['Prefer lighter wines', 'Prefer fuller wines']
+    }
+  },
+  // --- ACIDITY (notice + rate) ---
+  {
+    id: 'acidity-notice',
+    section: 'acidity',
+    type: 'scale',
+    beatType: 'notice',
+    educationalNote: 'That bright, mouth-watering sensation is acidity. It\'s what makes wine feel refreshing rather than flat. Higher acidity wines pair beautifully with food.',
+    config: {
+      title: 'How much zing or crispness do you notice?',
+      description: 'Pay attention to whether your mouth waters after you swallow. More watering = more acidity.',
+      scaleMin: 1,
+      scaleMax: 10,
+      scaleLabels: ['Soft and smooth', 'Bright and zingy']
     }
   },
   {
-    id: 'taste_body',
-    section: 'taste',
+    id: 'acidity-rate',
+    section: 'acidity',
     type: 'scale',
+    beatType: 'rate',
+    preferenceDirection: 'more',
     config: {
-      title: 'How do you like the body?',
-      description: 'The weight and richness in your mouth.',
+      title: 'Do you enjoy this level of acidity?',
       scaleMin: 1,
-      scaleMax: 5,
-      scaleLabels: ['Light & Delicate', 'Full & Rich']
+      scaleMax: 10,
+      scaleLabels: ['Prefer softer wines', 'Love the zing']
+    }
+  },
+  // --- TANNINS (notice + rate) ---
+  {
+    id: 'tannins-notice',
+    section: 'tannins',
+    type: 'scale',
+    beatType: 'notice',
+    educationalNote: 'That drying feeling is called tannin — it comes from grape skins, seeds, and sometimes oak barrels. Tannins add structure and help wines age well.',
+    config: {
+      title: 'How much does this wine dry out your mouth?',
+      description: 'Focus on your gums and the sides of your tongue. Do they feel smooth, or is there a drying, slightly rough sensation — like over-steeped tea?',
+      scaleMin: 1,
+      scaleMax: 10,
+      scaleLabels: ['Silky smooth', 'Grippy and drying']
     }
   },
   {
-    id: 'taste_flavors',
-    section: 'taste',
+    id: 'tannins-rate',
+    section: 'tannins',
+    type: 'scale',
+    beatType: 'rate',
+    preferenceDirection: 'more',
+    config: {
+      title: 'Do you enjoy this level of tannin?',
+      description: 'Some people love that grippy feeling, others prefer smoother wines.',
+      scaleMin: 1,
+      scaleMax: 10,
+      scaleLabels: ['Prefer smoother', 'Love the grip']
+    }
+  },
+  // --- SECONDARY AROMAS (notice + rate) ---
+  {
+    id: 'secondary-notice',
+    section: 'secondary',
     type: 'multiple_choice',
+    beatType: 'notice',
+    educationalNote: 'These are called secondary and tertiary aromas. They come from fermentation (floral, herbal notes) and aging (vanilla, toast, leather). They\'re what make each wine unique.',
     config: {
-      title: 'What flavors stand out?',
-      description: 'Select all that you taste.',
+      title: 'Beyond the fruit, do you notice any other aromas?',
+      description: 'Give the glass another swirl and take a deeper sniff. These "secondary" aromas add complexity.',
       options: [
-        { id: 'fruit', text: 'Fruity', value: 'fruit' },
-        { id: 'spice', text: 'Spicy', value: 'spice' },
-        { id: 'oak', text: 'Oaky/Toasty', value: 'oak' },
-        { id: 'mineral', text: 'Mineral/Chalky', value: 'mineral' },
-        { id: 'herbal', text: 'Herbal/Green', value: 'herbal' },
-        { id: 'earthy', text: 'Earthy', value: 'earthy' }
+        { id: 'herbal', text: 'Herbal (mint, eucalyptus, bell pepper)', value: 'herbal' },
+        { id: 'floral', text: 'Floral (rose, violet, honeysuckle)', value: 'floral' },
+        { id: 'earthy', text: 'Earthy (mushroom, soil, forest floor)', value: 'earthy' },
+        { id: 'oaky', text: 'Oaky (vanilla, toast, baking spices)', value: 'oaky' },
+        { id: 'none', text: 'Not really noticing any', value: 'none' }
       ],
       allowMultiple: true
     }
   },
-
-  // OVERALL SECTION (3 questions) - Summary and preference
   {
-    id: 'overall_rating',
+    id: 'secondary-rate',
+    section: 'secondary',
+    type: 'scale',
+    beatType: 'rate',
+    preferenceDirection: 'more',
+    config: {
+      title: 'How do you feel about these extra aromas?',
+      description: 'Do they add to your enjoyment or distract from the fruit?',
+      scaleMin: 1,
+      scaleMax: 10,
+      scaleLabels: ['Prefer simpler wines', 'Love the complexity']
+    }
+  },
+  // --- OVERALL (no beatType — standard ending) ---
+  {
+    id: 'overall-rating',
     section: 'overall',
     type: 'scale',
     config: {
-      title: 'How would you rate this wine?',
-      description: 'Your overall impression.',
+      title: 'Overall, how much do you enjoy this wine?',
+      description: 'Think about the full experience — the smell, the taste, the aftertaste. Would you be happy if someone poured you another glass?',
       scaleMin: 1,
-      scaleMax: 5,
-      scaleLabels: ['Not for me', 'Excellent']
+      scaleMax: 10,
+      scaleLabels: ['Not for me', 'Love it!']
     }
   },
   {
-    id: 'overall_buy_again',
+    id: 'overall-buy-again',
     section: 'overall',
-    type: 'boolean',
+    type: 'multiple_choice',
     config: {
       title: 'Would you buy this wine again?',
-      description: 'Would you pick this up at the store?'
+      options: [
+        { id: 'yes', text: 'Yes, definitely!', value: 'yes' },
+        { id: 'maybe', text: 'Maybe, at the right price', value: 'maybe' },
+        { id: 'no', text: 'No, not for me', value: 'no' }
+      ]
     }
   },
   {
-    id: 'overall_notes',
+    id: 'overall-notes',
     section: 'overall',
     type: 'text',
     config: {
-      title: 'Any final thoughts?',
-      description: 'Optional: jot down what you liked or didn\'t like.',
+      title: 'Any thoughts you want to remember about this wine?',
+      description: 'What stood out? What would you tell a friend about it?',
       placeholder: 'e.g., "Great with the steak!", "Too tannic for me", "Perfect summer wine"',
       rows: 3
     }
   }
 ];
 
-// Section info for headers - 5 core components + chapter focus
+// Section info for headers - 6 core components + chapter focus
 const SECTIONS: Record<string, { name: string; icon: any; color: string }> = {
   fruit: { name: 'Fruit Flavors', icon: Grape, color: 'from-red-500 to-pink-500' },
   secondary: { name: 'Secondary Notes', icon: Droplets, color: 'from-purple-500 to-indigo-500' },
   tertiary: { name: 'Aged Character', icon: Wine, color: 'from-amber-500 to-orange-500' },
   body: { name: 'Body & Texture', icon: Wine, color: 'from-rose-500 to-red-500' },
   acidity: { name: 'Acidity', icon: Droplets, color: 'from-yellow-500 to-lime-500' },
+  tannins: { name: 'Tannins', icon: Wine, color: 'from-stone-500 to-stone-700' },
   overall: { name: 'Overall', icon: Star, color: 'from-emerald-500 to-teal-500' },
   // Legacy sections for fallback questions
   aroma: { name: 'Aroma', icon: Droplets, color: 'from-purple-500 to-pink-500' },
@@ -261,6 +326,7 @@ function convertAIQuestions(questions: AIQuestion[]): TastingQuestion[] {
     'tertiary': 'tertiary',
     'body': 'body',
     'acidity': 'acidity',
+    'tannins': 'tannins',
     'overall': 'overall',
     'appearance': 'visual',
     'aroma': 'aroma',
@@ -270,7 +336,7 @@ function convertAIQuestions(questions: AIQuestion[]): TastingQuestion[] {
   };
 
   return questions
-    .filter(q => q && q.title && q.title.trim()) // Filter out questions with empty titles
+    .filter(q => q && q.title && q.title.trim())
     .map((q) => ({
     id: q.id,
     section: categoryToSection[q.category] || 'taste',
@@ -279,21 +345,22 @@ function convertAIQuestions(questions: AIQuestion[]): TastingQuestion[] {
     config: {
       title: q.title,
       description: q.description || q.wineContext,
-      // Scale config
       scaleMin: q.scaleMin,
       scaleMax: q.scaleMax,
       scaleLabels: q.scaleLabels,
-      // Multiple choice config
       options: q.options?.map(opt => ({
         id: opt.id,
         text: opt.text,
         value: opt.id
       })),
       allowMultiple: q.allowMultiple,
-      // Text config
       placeholder: q.questionType === 'text' ? 'Share your observations...' : undefined,
       rows: q.questionType === 'text' ? 3 : undefined
-    }
+    },
+    // Pass through three-beat metadata
+    beatType: q.beatType,
+    educationalNote: q.educationalNote,
+    preferenceDirection: q.preferenceDirection,
   }));
 }
 
@@ -306,6 +373,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedTastingId, setSavedTastingId] = useState<number | undefined>();
+  const [showEducationalNote, setShowEducationalNote] = useState(false);
 
   // localStorage auto-save for crash protection
   const STORAGE_KEY = `cata-tasting-draft-${wine?.wineName || 'unknown'}`;
@@ -392,6 +460,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
       tertiary: 'aroma',
       body: 'structure',
       acidity: 'structure',
+      tannins: 'taste',
     };
 
     // Collect chapter prompt answers separately
@@ -429,35 +498,65 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
 
   /**
    * Map AI-generated question answers to the canonical field paths the backend expects.
-   * AI questions have arbitrary IDs producing unpredictable field names, but the backend
-   * reads hardcoded paths like taste.sweetness, taste.acidity, etc.
+   * Uses explicit canonical ID matching first, then falls back to keyword heuristics.
    */
   function normalizeCanonicalFields(
     responses: TastingResponses,
     questions: TastingQuestion[],
     allAnswers: Record<string, any>
   ) {
+    // Explicit canonical ID → field mapping (three-beat IDs use notice beats for observation data)
+    const explicitIdMap: Record<string, { section: keyof TastingResponses; field: string }> = {
+      'sweetness-notice': { section: 'taste', field: 'sweetness' },
+      'acidity-notice': { section: 'taste', field: 'acidity' },
+      'tannins-notice': { section: 'taste', field: 'tannins' },
+      'body-notice': { section: 'taste', field: 'body' },
+      'overall-rating': { section: 'overall', field: 'rating' },
+      'overall-buy-again': { section: 'overall', field: 'wouldBuyAgain' },
+      // Legacy fallback IDs
+      'taste_sweetness': { section: 'taste', field: 'sweetness' },
+      'taste_acidity': { section: 'taste', field: 'acidity' },
+      'taste_tannins': { section: 'taste', field: 'tannins' },
+      'taste_body': { section: 'taste', field: 'body' },
+      'overall_rating': { section: 'overall', field: 'rating' },
+      'overall_buy_again': { section: 'overall', field: 'wouldBuyAgain' },
+    };
+
+    // First pass: explicit ID matching
+    for (const q of questions) {
+      const answer = allAnswers[q.id];
+      if (answer === undefined) continue;
+      const mapping = explicitIdMap[q.id];
+      if (mapping) {
+        const target = responses[mapping.section] as Record<string, any> | undefined;
+        if (target && target[mapping.field] === undefined) {
+          target[mapping.field] = answer;
+        }
+      }
+    }
+
+    // Second pass: keyword heuristics for any remaining unmapped fields
     const canonicalFields = [
       { section: 'taste' as keyof TastingResponses, field: 'sweetness', keywords: ['sweetness', 'sweet', 'residual_sugar'] },
       { section: 'taste' as keyof TastingResponses, field: 'acidity', keywords: ['acidity', 'acid', 'tartness', 'crisp'] },
       { section: 'taste' as keyof TastingResponses, field: 'tannins', keywords: ['tannin', 'tannins', 'tannic', 'astringent'] },
       { section: 'taste' as keyof TastingResponses, field: 'body', keywords: ['body', 'weight', 'fullness', 'mouthfeel'] },
-      { section: 'overall' as keyof TastingResponses, field: 'rating', keywords: ['rating', 'overall', 'score'] },
+      { section: 'overall' as keyof TastingResponses, field: 'rating', keywords: ['rating', 'overall_rating', 'score'] },
     ];
 
     for (const { section, field, keywords } of canonicalFields) {
       const target = responses[section] as Record<string, any> | undefined;
       if (!target || target[field] !== undefined) continue;
 
-      // Also check the structure section (AI body/acidity questions map there)
       const structureTarget = responses.structure as Record<string, any> | undefined;
       if (structureTarget?.[field] !== undefined) {
         target[field] = structureTarget[field];
         continue;
       }
 
-      // Search AI questions for semantic match
       for (const q of questions) {
+        // Only map notice-beat questions (observations), not rate-beat (preferences)
+        if (q.beatType === 'rate') continue;
         const answer = allAnswers[q.id];
         if (answer === undefined) continue;
         const idLower = q.id.toLowerCase();
@@ -467,6 +566,27 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
           break;
         }
       }
+    }
+
+    // Third pass: collect preference data from rate-beat questions
+    const preferences: Record<string, { enjoyment: number; wantMore: boolean }> = {};
+    for (const q of questions) {
+      if (q.beatType !== 'rate') continue;
+      const answer = allAnswers[q.id];
+      if (answer === undefined || typeof answer !== 'number') continue;
+
+      // Extract trait name from ID (e.g., "tannins-rate" → "tannins")
+      const trait = q.id.replace(/-rate$/, '');
+      if (trait) {
+        preferences[trait] = {
+          enjoyment: answer,
+          wantMore: q.preferenceDirection === 'more' ? answer >= 6 : answer <= 4,
+        };
+      }
+    }
+
+    if (Object.keys(preferences).length > 0) {
+      responses.preferences = preferences;
     }
   }
 
@@ -518,6 +638,15 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
   };
 
   const handleNext = () => {
+    // If this is a notice-beat question with an educational note, show it first
+    if (currentQuestion?.beatType === 'notice' && currentQuestion.educationalNote && !showEducationalNote) {
+      setShowEducationalNote(true);
+      return;
+    }
+
+    // Dismiss educational note and advance
+    setShowEducationalNote(false);
+
     if (currentQuestionIndex < allQuestions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
     } else {
@@ -528,6 +657,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
   };
 
   const handlePrevious = () => {
+    setShowEducationalNote(false);
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(prev => prev - 1);
     }
@@ -723,15 +853,47 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
       {/* Question Content */}
       <main className="container mx-auto px-4 py-6 pb-32">
         <AnimatePresence mode="wait">
-          <motion.div
-            key={currentQuestion?.id}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
-          >
-            {renderQuestion()}
-          </motion.div>
+          {showEducationalNote && currentQuestion?.educationalNote ? (
+            <motion.div
+              key={`${currentQuestion.id}-edu`}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="max-w-lg mx-auto"
+            >
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-xl">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Wine className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-amber-300 mb-1">Did you know?</p>
+                    <p className="text-white/90 text-base leading-relaxed">
+                      {currentQuestion.educationalNote}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleNext}
+                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white py-3 rounded-xl mt-2"
+                >
+                  Got it — next question
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key={currentQuestion?.id}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              {renderQuestion()}
+            </motion.div>
+          )}
         </AnimatePresence>
       </main>
 

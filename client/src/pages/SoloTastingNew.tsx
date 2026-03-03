@@ -21,8 +21,12 @@ import {
   GraduationCap,
   ChevronRight,
   Sparkles,
-  ImagePlus
+  ImagePlus,
+  Tag,
+  ArrowRightLeft,
+  Store
 } from "lucide-react";
+import type { WineOption } from "@shared/schema";
 
 interface WineInfo {
   wineName: string;
@@ -51,6 +55,7 @@ interface Chapter {
   priceRange: { min: number; max: number; currency?: string } | null;
   alternatives: Array<{ name: string }> | null;
   askFor: string | null;
+  wineOptions: WineOption[] | null;
 }
 
 interface Journey {
@@ -75,6 +80,7 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
   const params = new URLSearchParams(search);
   const journeyId = params.get("journeyId");
   const chapterId = params.get("chapterId");
+  const wineLevel = params.get("wineLevel") as 'budget' | 'splurge' | null;
 
   const [view, setView] = useState<ViewState>('wine-entry');
   const [isScanning, setIsScanning] = useState(false);
@@ -423,8 +429,78 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
             </div>
           )}
 
-          {/* Shopping Guide */}
-          {chapter && (chapter.shoppingTips || chapter.askFor || chapter.priceRange) && (
+          {/* Shopping Guide — selected wine option */}
+          {chapter && wineLevel && chapter.wineOptions && (() => {
+            const selectedOption = chapter.wineOptions.find(o => o.level === wineLevel);
+            if (!selectedOption) return null;
+            return (
+              <div className="bg-gradient-to-br from-purple-900/30 to-pink-900/20 rounded-xl p-4 mb-6 border border-purple-500/20">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <ShoppingBag className="w-5 h-5 text-purple-400" />
+                    <span className="text-sm font-medium text-purple-300">Shopping Guide</span>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    wineLevel === 'budget' ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'
+                  }`}>
+                    {wineLevel === 'budget' ? 'Budget' : 'Splurge'}
+                  </span>
+                </div>
+
+                <h4 className="text-white font-medium mb-2">{selectedOption.description}</h4>
+
+                {selectedOption.priceRange && (
+                  <div className="flex items-center gap-1 text-sm text-green-400/80 mb-3">
+                    <DollarSign className="w-4 h-4" />
+                    ${selectedOption.priceRange.min} – ${selectedOption.priceRange.max}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2">
+                    <MessageCircle className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs text-purple-300/70 mb-0.5">Ask for:</p>
+                      <p className="text-sm text-white">{selectedOption.askFor}</p>
+                    </div>
+                  </div>
+
+                  {selectedOption.labelTips && (
+                    <div className="flex items-start gap-2">
+                      <Tag className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs text-purple-300/70 mb-0.5">Look for on the label:</p>
+                        <p className="text-sm text-white/90">{selectedOption.labelTips}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedOption.substitutes && selectedOption.substitutes.length > 0 && (
+                    <div className="flex items-start gap-2">
+                      <ArrowRightLeft className="w-4 h-4 text-white/40 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs text-purple-300/70 mb-0.5">Also works:</p>
+                        <p className="text-sm text-white/70">{selectedOption.substitutes.join(', ')}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedOption.exampleProducers && selectedOption.exampleProducers.length > 0 && (
+                    <div className="flex items-start gap-2">
+                      <Store className="w-4 h-4 text-white/40 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs text-purple-300/70 mb-0.5">Examples:</p>
+                        <p className="text-sm text-white/70">{selectedOption.exampleProducers.join(', ')}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Fallback shopping guide — when no wine option selected */}
+          {chapter && !wineLevel && (chapter.shoppingTips || chapter.askFor || chapter.priceRange) && (
             <div className="bg-gradient-to-br from-purple-900/30 to-pink-900/20 rounded-xl p-4 mb-6 border border-purple-500/20">
               <div className="flex items-center gap-2 mb-3">
                 <ShoppingBag className="w-5 h-5 text-purple-400" />

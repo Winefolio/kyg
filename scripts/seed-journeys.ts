@@ -1,5 +1,5 @@
 import postgres from "postgres";
-import type { WineOption, PriceRange } from "@shared/schema";
+import type { WineOption } from "@shared/schema";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -15,40 +15,26 @@ const sql = postgres(connectionString, {
   idle_timeout: 30
 });
 
-// Helper to create wine options
+// Helper to create budget + splurge wine options
 function createWineOptions(
-  entry: { desc: string; askFor: string; min: number; max: number; producers: string[] },
-  mid: { desc: string; askFor: string; min: number; max: number; producers: string[] },
-  premium?: { desc: string; askFor: string; min: number; max: number; producers: string[] }
+  budget: { desc: string; askFor: string; min: number; max: number; producers: string[] },
+  splurge: { desc: string; askFor: string; producers: string[] }
 ): WineOption[] {
-  const options: WineOption[] = [
+  return [
     {
-      description: entry.desc,
-      askFor: entry.askFor,
-      priceRange: { min: entry.min, max: entry.max, currency: 'USD' },
-      exampleProducers: entry.producers,
-      level: 'entry'
+      description: budget.desc,
+      askFor: budget.askFor,
+      priceRange: { min: budget.min, max: budget.max, currency: 'USD' },
+      exampleProducers: budget.producers,
+      level: 'budget'
     },
     {
-      description: mid.desc,
-      askFor: mid.askFor,
-      priceRange: { min: mid.min, max: mid.max, currency: 'USD' },
-      exampleProducers: mid.producers,
-      level: 'mid'
+      description: splurge.desc,
+      askFor: splurge.askFor,
+      exampleProducers: splurge.producers,
+      level: 'splurge'
     }
   ];
-
-  if (premium) {
-    options.push({
-      description: premium.desc,
-      askFor: premium.askFor,
-      priceRange: { min: premium.min, max: premium.max, currency: 'USD' },
-      exampleProducers: premium.producers,
-      level: 'premium'
-    });
-  }
-
-  return options;
 }
 
 async function seedJourneys() {
@@ -77,8 +63,7 @@ async function seedJourneys() {
       // Chapter 1: Bordeaux
       const bordeauxOptions = createWineOptions(
         { desc: "Any Bordeaux Red", askFor: "Ask for a basic Bordeaux or Bordeaux Supérieur red under $20", min: 12, max: 20, producers: ["Mouton Cadet", "Dourthe"] },
-        { desc: "Médoc or Saint-Émilion", askFor: "Ask for a Médoc or Saint-Émilion, $25-45", min: 25, max: 45, producers: ["Château Gloria", "Château Larose Trintaudon"] },
-        { desc: "Classified Growth", askFor: "Ask for a Cru Bourgeois or classified growth Bordeaux", min: 50, max: 80, producers: ["Château Lynch-Bages", "Château Sociando-Mallet"] }
+        { desc: "Médoc or Saint-Émilion", askFor: "Ask for a Médoc or Saint-Émilion — worth the step up", producers: ["Château Gloria", "Château Larose Trintaudon"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -107,8 +92,7 @@ async function seedJourneys() {
       // Chapter 2: Burgundy
       const burgundyOptions = createWineOptions(
         { desc: "Bourgogne Rouge", askFor: "Ask for a Bourgogne Rouge (basic Burgundy red) under $25", min: 18, max: 25, producers: ["Louis Jadot", "Joseph Drouhin"] },
-        { desc: "Village-level Burgundy", askFor: "Ask for a village Burgundy like Gevrey-Chambertin or Volnay, $35-55", min: 35, max: 55, producers: ["Domaine Faiveley", "Bouchard Père et Fils"] },
-        { desc: "Premier Cru Burgundy", askFor: "Ask for a Premier Cru Burgundy if you want to splurge", min: 60, max: 100, producers: ["Domaine de la Romanée-Conti (village)", "Comte de Vogüé"] }
+        { desc: "Village-level Burgundy", askFor: "Ask for a village Burgundy like Gevrey-Chambertin or Volnay", producers: ["Domaine Faiveley", "Bouchard Père et Fils"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -137,8 +121,7 @@ async function seedJourneys() {
       // Chapter 3: Loire Valley White
       const loireOptions = createWineOptions(
         { desc: "Touraine Sauvignon Blanc", askFor: "Ask for a Touraine Sauvignon Blanc under $15", min: 10, max: 15, producers: ["Domaine de la Charmoise", "Guy Allion"] },
-        { desc: "Sancerre or Pouilly-Fumé", askFor: "Ask for a Sancerre or Pouilly-Fumé, $20-35", min: 20, max: 35, producers: ["Henri Bourgeois", "Pascal Jolivet"] },
-        { desc: "Single vineyard Sancerre", askFor: "Ask for a single vineyard or producer-specific Sancerre", min: 40, max: 60, producers: ["François Cotat", "Vacheron"] }
+        { desc: "Sancerre or Pouilly-Fumé", askFor: "Ask for a Sancerre or Pouilly-Fumé — classic Loire elegance", producers: ["Henri Bourgeois", "Pascal Jolivet"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -166,9 +149,8 @@ async function seedJourneys() {
 
       // Chapter 4: Champagne
       const champagneOptions = createWineOptions(
-        { desc: "Non-vintage Brut Champagne", askFor: "Ask for a non-vintage Brut Champagne under $45", min: 35, max: 45, producers: ["Moët & Chandon", "Veuve Clicquot", "Nicolas Feuillatte"] },
-        { desc: "Grower Champagne", askFor: "Ask for a grower (RM) Champagne or premium house, $50-75", min: 50, max: 75, producers: ["Pierre Gimonnet", "Larmandier-Bernier"] },
-        { desc: "Vintage Champagne", askFor: "Ask for a vintage Champagne for something special", min: 80, max: 120, producers: ["Bollinger", "Pol Roger", "Louis Roederer"] }
+        { desc: "Non-vintage Brut Champagne", askFor: "Ask for a non-vintage Brut Champagne", min: 35, max: 45, producers: ["Moët & Chandon", "Veuve Clicquot", "Nicolas Feuillatte"] },
+        { desc: "Grower Champagne", askFor: "Ask for a grower (RM) Champagne — real Champagne craft", producers: ["Pierre Gimonnet", "Larmandier-Bernier"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -217,8 +199,7 @@ async function seedJourneys() {
       // Chapter 1: Chianti
       const chiantiOptions = createWineOptions(
         { desc: "Basic Chianti", askFor: "Ask for a Chianti under $15", min: 10, max: 15, producers: ["Antinori", "Ruffino"] },
-        { desc: "Chianti Classico", askFor: "Ask for a Chianti Classico, $18-30", min: 18, max: 30, producers: ["Felsina", "Fontodi"] },
-        { desc: "Chianti Classico Riserva", askFor: "Ask for a Chianti Classico Riserva or Gran Selezione", min: 35, max: 55, producers: ["Castello di Ama", "Isole e Olena"] }
+        { desc: "Chianti Classico", askFor: "Ask for a Chianti Classico — the real deal from Tuscany", producers: ["Felsina", "Fontodi"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -246,8 +227,7 @@ async function seedJourneys() {
       // Chapter 2: Barolo
       const baroloOptions = createWineOptions(
         { desc: "Langhe Nebbiolo", askFor: "Ask for a Langhe Nebbiolo (baby Barolo) under $25", min: 18, max: 25, producers: ["Produttori del Barbaresco", "G.D. Vajra"] },
-        { desc: "Entry Barolo", askFor: "Ask for an entry-level Barolo, $35-55", min: 35, max: 55, producers: ["Pio Cesare", "Michele Chiarlo"] },
-        { desc: "Single Vineyard Barolo", askFor: "Ask for a single vineyard (cru) Barolo if available", min: 60, max: 100, producers: ["Bruno Giacosa", "Vietti"] }
+        { desc: "Entry Barolo", askFor: "Ask for a Barolo — the King of Italian wines", producers: ["Pio Cesare", "Michele Chiarlo"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -276,8 +256,7 @@ async function seedJourneys() {
       // Chapter 3: Amarone
       const amaroneOptions = createWineOptions(
         { desc: "Valpolicella Ripasso", askFor: "Ask for a Valpolicella Ripasso (baby Amarone) under $25", min: 18, max: 25, producers: ["Zenato", "Bertani"] },
-        { desc: "Entry Amarone", askFor: "Ask for an entry-level Amarone della Valpolicella, $40-60", min: 40, max: 60, producers: ["Tommasi", "Allegrini"] },
-        { desc: "Premium Amarone", askFor: "Ask for a premium or single vineyard Amarone", min: 70, max: 120, producers: ["Dal Forno Romano", "Quintarelli"] }
+        { desc: "Amarone della Valpolicella", askFor: "Ask for an Amarone — rich, concentrated, unforgettable", producers: ["Tommasi", "Allegrini"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -304,9 +283,8 @@ async function seedJourneys() {
 
       // Chapter 4: Brunello
       const brunelloOptions = createWineOptions(
-        { desc: "Rosso di Montalcino", askFor: "Ask for a Rosso di Montalcino (baby Brunello) under $30", min: 20, max: 30, producers: ["Banfi", "Caparzo"] },
-        { desc: "Entry Brunello", askFor: "Ask for an entry-level Brunello di Montalcino, $45-70", min: 45, max: 70, producers: ["Argiano", "Col d'Orcia"] },
-        { desc: "Premium Brunello", askFor: "Ask for a Riserva or single vineyard Brunello", min: 80, max: 150, producers: ["Biondi-Santi", "Casanova di Neri"] }
+        { desc: "Rosso di Montalcino", askFor: "Ask for a Rosso di Montalcino (baby Brunello)", min: 20, max: 25, producers: ["Banfi", "Caparzo"] },
+        { desc: "Brunello di Montalcino", askFor: "Ask for a Brunello di Montalcino — pure Sangiovese power", producers: ["Argiano", "Col d'Orcia"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -334,8 +312,7 @@ async function seedJourneys() {
       // Chapter 5: Super Tuscan
       const superTuscanOptions = createWineOptions(
         { desc: "Toscana IGT Red", askFor: "Ask for a Tuscan IGT red blend under $25", min: 15, max: 25, producers: ["Antinori Tignanello Sec.", "Castello di Bossi"] },
-        { desc: "Mid-tier Super Tuscan", askFor: "Ask for a Super Tuscan like Lucente or Guado al Tasso, $35-55", min: 35, max: 55, producers: ["Luce della Vite (Lucente)", "Antinori Guado al Tasso"] },
-        { desc: "Premium Super Tuscan", askFor: "Ask for Tignanello, Sassicaia, or Ornellaia", min: 100, max: 200, producers: ["Tignanello", "Sassicaia", "Ornellaia"] }
+        { desc: "Super Tuscan Blend", askFor: "Ask for a Super Tuscan like Lucente or Guado al Tasso", producers: ["Luce della Vite (Lucente)", "Antinori Guado al Tasso"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -479,8 +456,7 @@ async function seedJourneys() {
       // Chapter 1: Cabernet Sauvignon
       const cabOptions = createWineOptions(
         { desc: "California Cabernet under $20", askFor: "Ask for a California Cabernet Sauvignon under $20", min: 12, max: 20, producers: ["Josh Cellars", "Bogle", "14 Hands"] },
-        { desc: "Napa or Sonoma Cabernet", askFor: "Ask for a Napa Valley or Sonoma Cabernet, $30-50", min: 30, max: 50, producers: ["Caymus", "Silver Oak", "Jordan"] },
-        { desc: "Premium Napa Cabernet", askFor: "Ask for a premium Napa Cabernet from a single vineyard", min: 75, max: 150, producers: ["Opus One", "Stag's Leap", "Chateau Montelena"] }
+        { desc: "Napa or Sonoma Cabernet", askFor: "Ask for a Napa Valley or Sonoma Cabernet — big and bold", producers: ["Caymus", "Silver Oak", "Jordan"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -509,8 +485,7 @@ async function seedJourneys() {
       // Chapter 2: Pinot Noir
       const pinotOptions = createWineOptions(
         { desc: "California or Oregon Pinot under $20", askFor: "Ask for a California or Oregon Pinot Noir under $20", min: 12, max: 20, producers: ["Meiomi", "A to Z", "La Crema"] },
-        { desc: "Oregon Willamette or Russian River", askFor: "Ask for an Oregon Willamette Valley or Sonoma Russian River Pinot, $25-45", min: 25, max: 45, producers: ["Domaine Drouhin Oregon", "Williams Selyem"] },
-        { desc: "Single Vineyard Pinot", askFor: "Ask for a single vineyard Pinot Noir from Oregon or California", min: 50, max: 80, producers: ["Beaux Frères", "Kosta Browne"] }
+        { desc: "Oregon Willamette or Russian River", askFor: "Ask for an Oregon Willamette or Sonoma Russian River Pinot", producers: ["Domaine Drouhin Oregon", "Williams Selyem"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -539,8 +514,7 @@ async function seedJourneys() {
       // Chapter 3: Chardonnay
       const chardOptions = createWineOptions(
         { desc: "California Chardonnay under $15", askFor: "Ask for a California Chardonnay under $15", min: 10, max: 15, producers: ["Kendall-Jackson", "La Crema", "Rombauer"] },
-        { desc: "Sonoma or Central Coast Chardonnay", askFor: "Ask for a Sonoma or Central Coast Chardonnay, $20-35", min: 20, max: 35, producers: ["Cakebread", "Mer Soleil"] },
-        { desc: "Premium California Chardonnay", askFor: "Ask for a premium California Chardonnay (Napa or Sonoma)", min: 40, max: 70, producers: ["Kistler", "Peter Michael"] }
+        { desc: "Sonoma or Central Coast Chardonnay", askFor: "Ask for a Sonoma or Central Coast Chardonnay — richer and more complex", producers: ["Cakebread", "Mer Soleil"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -569,8 +543,7 @@ async function seedJourneys() {
       // Chapter 4: Sauvignon Blanc
       const sbOptions = createWineOptions(
         { desc: "New Zealand Sauvignon Blanc under $15", askFor: "Ask for a Marlborough Sauvignon Blanc under $15", min: 10, max: 15, producers: ["Oyster Bay", "Kim Crawford", "Cloudy Bay"] },
-        { desc: "Premium NZ or California SB", askFor: "Ask for a premium NZ Sauvignon Blanc or California, $18-30", min: 18, max: 30, producers: ["Dog Point", "Cloudy Bay Te Koko"] },
-        { desc: "Single Vineyard SB", askFor: "Ask for a single vineyard Marlborough Sauvignon Blanc", min: 30, max: 50, producers: ["Clos Henri", "Greywacke"] }
+        { desc: "Premium NZ or California SB", askFor: "Ask for a premium NZ Sauvignon Blanc or California version", producers: ["Dog Point", "Cloudy Bay Te Koko"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -621,7 +594,7 @@ async function seedJourneys() {
       // Chapter 1: Entry Oregon Pinot
       const oregonEntryOptions = createWineOptions(
         { desc: "Oregon Pinot Noir under $20", askFor: "Ask for any Oregon Pinot Noir under $20", min: 15, max: 20, producers: ["A to Z", "Erath", "King Estate"] },
-        { desc: "Oregon AVA Pinot", askFor: "Ask for an Oregon Pinot with an AVA designation, $25-35", min: 25, max: 35, producers: ["Willamette Valley Vineyards", "Ponzi"] }
+        { desc: "Oregon AVA Pinot", askFor: "Ask for an Oregon Pinot with an AVA designation", producers: ["Willamette Valley Vineyards", "Ponzi"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -649,9 +622,8 @@ async function seedJourneys() {
 
       // Chapter 2: Willamette Valley
       const willametteOptions = createWineOptions(
-        { desc: "Willamette Valley Pinot", askFor: "Ask specifically for Willamette Valley Pinot Noir, $25-40", min: 25, max: 40, producers: ["Sokol Blosser", "Domaine Serene", "Rex Hill"] },
-        { desc: "Premium Willamette", askFor: "Ask for a premium Willamette Valley producer, $45-65", min: 45, max: 65, producers: ["Adelsheim", "Ken Wright"] },
-        { desc: "Top Willamette Producer", askFor: "Ask for a top Willamette producer if you want to splurge", min: 70, max: 100, producers: ["Domaine Drouhin Oregon", "Beaux Frères"] }
+        { desc: "Willamette Valley Pinot", askFor: "Ask specifically for Willamette Valley Pinot Noir under $25", min: 20, max: 25, producers: ["Sokol Blosser", "Rex Hill"] },
+        { desc: "Premium Willamette", askFor: "Ask for a premium Willamette Valley producer — world-class Pinot", producers: ["Adelsheim", "Ken Wright", "Domaine Serene"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -679,9 +651,8 @@ async function seedJourneys() {
 
       // Chapter 3: Sub-AVA (Dundee Hills, Eola-Amity, etc.)
       const subAvaOptions = createWineOptions(
-        { desc: "Named Sub-AVA Pinot", askFor: "Ask for a Pinot from Dundee Hills, Eola-Amity, or Ribbon Ridge, $35-55", min: 35, max: 55, producers: ["Archery Summit", "Evening Land", "Cristom"] },
-        { desc: "Premium Sub-AVA Pinot", askFor: "Ask for a premium sub-AVA specific Pinot, $60-85", min: 60, max: 85, producers: ["Domaine Serene (Evenstad)", "White Rose"] },
-        { desc: "Single Vineyard from Sub-AVA", askFor: "Ask for a single vineyard from a specific sub-AVA", min: 85, max: 120, producers: ["Shea Wine Cellars", "Patricia Green Cellars"] }
+        { desc: "Named Sub-AVA Pinot", askFor: "Ask for a Pinot from Dundee Hills, Eola-Amity, or Ribbon Ridge", min: 20, max: 25, producers: ["Archery Summit", "Evening Land", "Cristom"] },
+        { desc: "Premium Sub-AVA Pinot", askFor: "Ask for a premium sub-AVA specific Pinot — taste the terroir", producers: ["Domaine Serene (Evenstad)", "White Rose"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -709,9 +680,8 @@ async function seedJourneys() {
 
       // Chapter 4: Single Vineyard Premium
       const premiumOptions = createWineOptions(
-        { desc: "Single Vineyard Oregon Pinot", askFor: "Ask for a single vineyard Oregon Pinot Noir, $50-80", min: 50, max: 80, producers: ["Ken Wright Cellars (various vineyards)", "Bergström"] },
-        { desc: "Premium Single Vineyard", askFor: "Ask for a premium single vineyard from a top producer, $80-120", min: 80, max: 120, producers: ["Beaux Frères (Beaux Frères Vineyard)", "Domaine Drouhin (Louise Drouhin)"] },
-        { desc: "Collector's Oregon Pinot", askFor: "Ask for a collector-grade Oregon Pinot if available", min: 120, max: 200, producers: ["Evening Land (Seven Springs)", "Antica Terra"] }
+        { desc: "Single Vineyard Oregon Pinot", askFor: "Ask for a single vineyard Oregon Pinot Noir", min: 20, max: 25, producers: ["Ken Wright Cellars (various vineyards)", "Bergström"] },
+        { desc: "Premium Single Vineyard", askFor: "Ask for a premium single vineyard from a top producer", producers: ["Beaux Frères (Beaux Frères Vineyard)", "Domaine Drouhin (Louise Drouhin)"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -762,8 +732,7 @@ async function seedJourneys() {
       // Chapter 1: Rioja
       const riojaOptions = createWineOptions(
         { desc: "Rioja Crianza", askFor: "Ask for a Rioja Crianza under $18", min: 12, max: 18, producers: ["Marqués de Cáceres", "CVNE", "Bodegas Muga"] },
-        { desc: "Rioja Reserva", askFor: "Ask for a Rioja Reserva, $20-35", min: 20, max: 35, producers: ["La Rioja Alta", "López de Heredia", "Marqués de Riscal"] },
-        { desc: "Rioja Gran Reserva", askFor: "Ask for a Rioja Gran Reserva for something special", min: 40, max: 70, producers: ["López de Heredia (Viña Tondonia)", "CVNE (Imperial)"] }
+        { desc: "Rioja Reserva", askFor: "Ask for a Rioja Reserva — oak-aged elegance from Spain", producers: ["La Rioja Alta", "López de Heredia", "Marqués de Riscal"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -792,8 +761,7 @@ async function seedJourneys() {
       // Chapter 2: Ribera del Duero
       const riberaOptions = createWineOptions(
         { desc: "Ribera del Duero Roble/Joven", askFor: "Ask for a young Ribera del Duero under $20", min: 14, max: 20, producers: ["Protos", "Pesquera", "Condado de Haza"] },
-        { desc: "Ribera del Duero Crianza", askFor: "Ask for a Ribera del Duero Crianza, $25-45", min: 25, max: 45, producers: ["Pago de Carraovejas", "Emilio Moro"] },
-        { desc: "Premium Ribera", askFor: "Ask for a premium Ribera del Duero like Pingus or Vega Sicilia", min: 60, max: 150, producers: ["Vega Sicilia (Valbuena)", "Dominio de Pingus (Flor de Pingus)"] }
+        { desc: "Ribera del Duero Crianza", askFor: "Ask for a Ribera del Duero Crianza — power and elegance", producers: ["Pago de Carraovejas", "Emilio Moro"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -821,9 +789,8 @@ async function seedJourneys() {
 
       // Chapter 3: Priorat
       const prioratOptions = createWineOptions(
-        { desc: "Entry Priorat", askFor: "Ask for an entry-level Priorat or Vi de Vila, $20-30", min: 20, max: 30, producers: ["Clos Mogador (Manyetes)", "Torres (Salmos)", "Alvaro Palacios (Camins)"] },
-        { desc: "Priorat DOQ", askFor: "Ask for a Priorat DOQ, $35-55", min: 35, max: 55, producers: ["Clos Figueras", "Mas Doix", "Terroir al Limit"] },
-        { desc: "Premium Priorat", askFor: "Ask for L'Ermita, Clos Mogador, or similar", min: 70, max: 200, producers: ["Alvaro Palacios (L'Ermita)", "Clos Mogador", "Clos Erasmus"] }
+        { desc: "Entry Priorat", askFor: "Ask for an entry-level Priorat or Vi de Vila under $25", min: 20, max: 25, producers: ["Clos Mogador (Manyetes)", "Torres (Salmos)", "Alvaro Palacios (Camins)"] },
+        { desc: "Priorat DOQ", askFor: "Ask for a Priorat DOQ — mineral-rich and intense", producers: ["Clos Figueras", "Mas Doix", "Terroir al Limit"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -852,8 +819,7 @@ async function seedJourneys() {
       // Chapter 4: Garnacha
       const garnachaOptions = createWineOptions(
         { desc: "Campo de Borja or Calatayud Garnacha", askFor: "Ask for a Garnacha from Aragon under $15", min: 10, max: 15, producers: ["Borsao", "El Escocés Volante", "Corona de Aragón"] },
-        { desc: "Old Vine Garnacha", askFor: "Ask for an old vine Garnacha, $18-30", min: 18, max: 30, producers: ["Alto Moncayo", "Bodegas San Alejandro (Las Rocas)"] },
-        { desc: "Premium Garnacha", askFor: "Ask for a premium single vineyard Garnacha", min: 35, max: 60, producers: ["Comando G", "4 Monos"] }
+        { desc: "Old Vine Garnacha", askFor: "Ask for an old vine Garnacha — concentrated and spicy", producers: ["Alto Moncayo", "Bodegas San Alejandro (Las Rocas)"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -904,8 +870,7 @@ async function seedJourneys() {
       // Chapter 1: Argentine Malbec
       const malbecOptions = createWineOptions(
         { desc: "Mendoza Malbec under $15", askFor: "Ask for a Mendoza Malbec under $15", min: 10, max: 15, producers: ["Alamos", "Trivento", "Trapiche"] },
-        { desc: "High Altitude Malbec", askFor: "Ask for a high altitude Malbec from Uco Valley, $20-35", min: 20, max: 35, producers: ["Catena", "Zuccardi", "Achaval Ferrer"] },
-        { desc: "Premium Argentine Malbec", askFor: "Ask for a premium single vineyard Malbec", min: 45, max: 80, producers: ["Catena Zapata (Adrianna)", "Cobos", "Cheval des Andes"] }
+        { desc: "High Altitude Malbec", askFor: "Ask for a high altitude Malbec from Uco Valley", producers: ["Catena", "Zuccardi", "Achaval Ferrer"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -934,8 +899,7 @@ async function seedJourneys() {
       // Chapter 2: Australian Shiraz
       const shirazOptions = createWineOptions(
         { desc: "Australian Shiraz under $18", askFor: "Ask for an Australian Shiraz under $18", min: 12, max: 18, producers: ["Penfolds Koonunga Hill", "Jacob's Creek", "19 Crimes"] },
-        { desc: "Barossa or McLaren Vale Shiraz", askFor: "Ask for a Barossa Valley or McLaren Vale Shiraz, $25-45", min: 25, max: 45, producers: ["d'Arenberg", "Torbreck", "Two Hands"] },
-        { desc: "Premium Australian Shiraz", askFor: "Ask for a premium Australian Shiraz if you want to splurge", min: 50, max: 100, producers: ["Penfolds (Bin 389, Bin 150)", "Henschke", "Clarendon Hills"] }
+        { desc: "Barossa or McLaren Vale Shiraz", askFor: "Ask for a Barossa Valley or McLaren Vale Shiraz — bold and peppery", producers: ["d'Arenberg", "Torbreck", "Two Hands"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -964,8 +928,7 @@ async function seedJourneys() {
       // Chapter 3: California Zinfandel
       const zinfandelOptions = createWineOptions(
         { desc: "California Zinfandel under $18", askFor: "Ask for a California Zinfandel under $18", min: 12, max: 18, producers: ["Ravenswood", "Seghesio", "Bogle Old Vine"] },
-        { desc: "Sonoma or Lodi Old Vine Zin", askFor: "Ask for an old vine Zinfandel from Sonoma or Lodi, $22-40", min: 22, max: 40, producers: ["Ridge", "Turley", "Robert Biale"] },
-        { desc: "Premium Single Vineyard Zin", askFor: "Ask for a single vineyard old vine Zinfandel", min: 45, max: 75, producers: ["Ridge (Geyserville, Lytton Springs)", "Turley (single vineyard)"] }
+        { desc: "Old Vine Zinfandel", askFor: "Ask for an old vine Zinfandel from Sonoma or Lodi", producers: ["Ridge", "Turley", "Robert Biale"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -994,8 +957,7 @@ async function seedJourneys() {
       // Chapter 4: Petite Sirah
       const petiteSirahOptions = createWineOptions(
         { desc: "California Petite Sirah under $20", askFor: "Ask for a California Petite Sirah under $20", min: 14, max: 20, producers: ["Bogle", "Concannon", "Michael David"] },
-        { desc: "Lodi or Paso Robles PS", askFor: "Ask for a Lodi or Paso Robles Petite Sirah, $25-40", min: 25, max: 40, producers: ["Turley", "Stags' Leap Winery"] },
-        { desc: "Premium Petite Sirah", askFor: "Ask for a premium or old vine Petite Sirah", min: 45, max: 70, producers: ["Turley (Hayne, Pesenti)", "Foppiano"] }
+        { desc: "Lodi or Paso Robles Petite Sirah", askFor: "Ask for a Lodi or Paso Robles Petite Sirah — dark and powerful", producers: ["Turley", "Stags' Leap Winery"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -1046,8 +1008,7 @@ async function seedJourneys() {
       // Chapter 1: Riesling
       const rieslingOptions = createWineOptions(
         { desc: "German Kabinett Riesling", askFor: "Ask for a German Kabinett Riesling under $20", min: 14, max: 20, producers: ["Dr. Loosen", "Selbach-Oster", "Joh. Jos. Prüm"] },
-        { desc: "Alsace or German Spätlese", askFor: "Ask for an Alsace Riesling or German Spätlese, $22-40", min: 22, max: 40, producers: ["Trimbach", "Domaine Weinbach", "Fritz Haag"] },
-        { desc: "Grand Cru Riesling", askFor: "Ask for an Alsace Grand Cru or German GG Riesling", min: 45, max: 80, producers: ["Trimbach (Clos Ste Hune)", "Dönnhoff (GG)", "Keller"] }
+        { desc: "Alsace or German Spätlese", askFor: "Ask for an Alsace Riesling or German Spätlese — complex and age-worthy", producers: ["Trimbach", "Domaine Weinbach", "Fritz Haag"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -1076,8 +1037,7 @@ async function seedJourneys() {
       // Chapter 2: Grüner Veltliner
       const grunerOptions = createWineOptions(
         { desc: "Austrian Grüner Veltliner under $18", askFor: "Ask for an Austrian Grüner Veltliner under $18", min: 12, max: 18, producers: ["Laurenz V", "Hugl", "Loimer"] },
-        { desc: "Wachau or Kremstal Grüner", askFor: "Ask for a Wachau or Kremstal Grüner, $22-38", min: 22, max: 38, producers: ["F.X. Pichler", "Hirtzberger", "Nikolaihof"] },
-        { desc: "Premium Smaragd Grüner", askFor: "Ask for a Smaragd or Reserve Grüner Veltliner", min: 40, max: 70, producers: ["Knoll", "Prager", "Rudi Pichler"] }
+        { desc: "Wachau or Kremstal Grüner", askFor: "Ask for a Wachau or Kremstal Grüner — peppery and complex", producers: ["F.X. Pichler", "Hirtzberger", "Nikolaihof"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -1106,8 +1066,7 @@ async function seedJourneys() {
       // Chapter 3: Chenin Blanc
       const cheninOptions = createWineOptions(
         { desc: "South African Chenin Blanc under $15", askFor: "Ask for a South African Chenin Blanc under $15", min: 10, max: 15, producers: ["Ken Forrester", "Spier", "Mullineux"] },
-        { desc: "Loire Vouvray or SA Premium", askFor: "Ask for a Vouvray or premium South African Chenin, $20-35", min: 20, max: 35, producers: ["Domaine Huet", "Champalou", "Raats"] },
-        { desc: "Premium Loire Chenin", askFor: "Ask for a top Loire Chenin (Savennières, aged Vouvray)", min: 40, max: 70, producers: ["Nicolas Joly", "Domaine des Baumard", "François Chidaine"] }
+        { desc: "Loire Vouvray or SA Premium", askFor: "Ask for a Vouvray or premium South African Chenin", producers: ["Domaine Huet", "Champalou", "Raats"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -1136,8 +1095,7 @@ async function seedJourneys() {
       // Chapter 4: Albariño
       const albarinoOptions = createWineOptions(
         { desc: "Rías Baixas Albariño under $18", askFor: "Ask for a Rías Baixas Albariño under $18", min: 12, max: 18, producers: ["Martín Códax", "Burgáns", "Pazo de Señoráns"] },
-        { desc: "Premium Rías Baixas", askFor: "Ask for a premium or single vineyard Albariño, $22-35", min: 22, max: 35, producers: ["Do Ferreiro", "Zárate", "Forjas del Salnés"] },
-        { desc: "Top Producer Albariño", askFor: "Ask for a top producer aged or special cuvée Albariño", min: 38, max: 60, producers: ["Raúl Pérez (Sketch)", "Zárate (El Palomar)"] }
+        { desc: "Premium Rías Baixas Albariño", askFor: "Ask for a premium or single vineyard Albariño — coastal and saline", producers: ["Do Ferreiro", "Zárate", "Forjas del Salnés"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -1188,7 +1146,7 @@ async function seedJourneys() {
       // Chapter 1: Match Weight with Weight
       const weightOptions = createWineOptions(
         { desc: "Light white or rosé", askFor: "Ask for a Pinot Grigio, Vinho Verde, or dry rosé under $15", min: 10, max: 15, producers: ["Santa Margherita", "Casal Garcia", "Whispering Angel"] },
-        { desc: "Medium-bodied option", askFor: "Ask for a Chablis, unoaked Chardonnay, or Côtes du Rhône", min: 18, max: 30, producers: ["Louis Latour (Chablis)", "E. Guigal (CdR)"] }
+        { desc: "Medium-bodied option", askFor: "Ask for a Chablis, unoaked Chardonnay, or Côtes du Rhône", producers: ["Louis Latour (Chablis)", "E. Guigal (CdR)"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -1217,7 +1175,7 @@ async function seedJourneys() {
       // Chapter 2: Acid Cuts Fat
       const acidOptions = createWineOptions(
         { desc: "High-acid white", askFor: "Ask for a Sancerre, Muscadet, or Cava under $20", min: 12, max: 20, producers: ["Henri Bourgeois", "Muscadet Sèvre et Maine", "Freixenet"] },
-        { desc: "High-acid red", askFor: "Ask for a Chianti, Barbera, or Pinot Noir", min: 15, max: 30, producers: ["Antinori", "Michele Chiarlo (Barbera)", "La Crema"] }
+        { desc: "High-acid red", askFor: "Ask for a Chianti, Barbera, or Pinot Noir — acid cuts fat beautifully", producers: ["Antinori", "Michele Chiarlo (Barbera)", "La Crema"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -1246,7 +1204,7 @@ async function seedJourneys() {
       // Chapter 3: Tannins and Protein
       const tanninOptions = createWineOptions(
         { desc: "Tannic red wine", askFor: "Ask for a Cabernet Sauvignon, Malbec, or Barolo under $25", min: 15, max: 25, producers: ["Robert Mondavi", "Catena", "Pio Cesare (Langhe)"] },
-        { desc: "Premium tannic red", askFor: "Ask for a Napa Cabernet or Barolo", min: 30, max: 55, producers: ["Caymus", "Silver Oak", "Fontanafredda"] }
+        { desc: "Premium tannic red", askFor: "Ask for a Napa Cabernet or Barolo — tannins meet protein", producers: ["Caymus", "Silver Oak", "Fontanafredda"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)
@@ -1275,7 +1233,7 @@ async function seedJourneys() {
       // Chapter 4: Sweet with Spicy
       const sweetOptions = createWineOptions(
         { desc: "Off-dry wine", askFor: "Ask for an off-dry Riesling, Gewürztraminer, or Moscato under $18", min: 10, max: 18, producers: ["Dr. Loosen", "Hugel (Gentil)", "La Spinetta (Moscato d'Asti)"] },
-        { desc: "Premium off-dry", askFor: "Ask for a Spätlese Riesling or Alsace Gewürztraminer", min: 20, max: 35, producers: ["Selbach-Oster", "Trimbach (Gewürz)"] }
+        { desc: "Premium off-dry", askFor: "Ask for a Spätlese Riesling or Alsace Gewürztraminer — sweetness tames spice", producers: ["Selbach-Oster", "Trimbach (Gewürz)"] }
       );
       await sql`
         INSERT INTO chapters (journey_id, chapter_number, title, description, wine_requirements, learning_objectives, tasting_prompts, completion_criteria, wine_options)

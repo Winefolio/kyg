@@ -770,8 +770,15 @@ export interface TastingResponses {
   };
   overall?: {
     rating?: number;
-    wouldBuyAgain?: boolean;
+    wouldBuyAgain?: boolean | 'yes' | 'maybe' | 'no';
     notes?: string;
+  };
+  // Three-beat loop: preference signals from "rate" beats
+  preferences?: {
+    [characteristic: string]: {
+      enjoyment: number; // 1-10: how much they liked this characteristic
+      wantMore: boolean; // would they want more of this in future wines
+    };
   };
 }
 
@@ -991,14 +998,16 @@ export interface ChapterShoppingGuide {
   askFor?: string;
 }
 
-// Wine options for flexible journey pricing
+// Wine options for journey chapters — budget (under ~$25) and splurge tiers
 export interface WineOption {
   description: string; // e.g., "Any Oregon Pinot Noir"
   askFor: string; // What to tell the wine shop staff
-  priceRange: PriceRange;
+  priceRange?: PriceRange; // Optional — omit for splurge tier
   exampleProducers?: string[]; // e.g., ["Willamette Valley Vineyards", "A to Z"]
-  level: 'entry' | 'mid' | 'premium'; // Price tier
+  level: 'budget' | 'splurge'; // Two-tier pricing
   whyThisWine?: string; // Optional explanation of fit for learning objective
+  labelTips?: string; // What to look for on the label
+  substitutes?: string[]; // Acceptable alternatives if this wine isn't available
 }
 
 // AI-generated next bottle recommendations
@@ -1069,7 +1078,7 @@ export interface WineRecognitionResult {
 
 // Generated question structure (follows existing tasting flow)
 // Question categories - the 5 core components + overall
-export type QuestionCategory = 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall';
+export type QuestionCategory = 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'tannins' | 'overall';
 
 export interface GeneratedQuestion {
   id: string;
@@ -1090,6 +1099,10 @@ export interface GeneratedQuestion {
   scaleLabels?: [string, string];
   // Wine-specific context
   wineContext?: string; // e.g., "Classic Barolo characteristics include..."
+  // Three-beat loop fields
+  beatType?: 'notice' | 'rate'; // Which beat this question represents (legacy questions omit this)
+  educationalNote?: string; // Shown after user answers a 'notice' beat, before advancing to 'rate'
+  preferenceDirection?: 'more' | 'less'; // For rate beats: what "high" means for preference
 }
 
 // Insert schemas
