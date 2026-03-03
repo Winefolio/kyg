@@ -64,24 +64,18 @@ interface RawGPTQuestion {
   preferenceDirection?: 'more' | 'less';
 }
 
-// Fallback questions when AI generation fails - based on 6 core components + overall
+// Fallback questions when AI generation fails — three-beat structure (notice + rate pairs)
+// Covers 5 core traits + overall. Used when OpenAI is unavailable.
 const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
+  // --- FRUIT (notice + rate) ---
   {
-    id: 'fruit-1',
-    category: 'fruit',
-    questionType: 'scale',
-    title: 'How much do you enjoy the fruit flavors you\'re tasting?',
-    description: 'Think about berries, citrus, stone fruit, or tropical notes',
-    scaleMin: 1,
-    scaleMax: 10,
-    scaleLabels: ['Not at all', 'Love them']
-  },
-  {
-    id: 'fruit-2',
+    id: 'fruit-notice',
     category: 'fruit',
     questionType: 'multiple_choice',
-    title: 'What fruit flavors stand out to you?',
-    description: 'Select all that you notice',
+    beatType: 'notice',
+    title: 'What fruit flavors jump out at you?',
+    description: 'Swirl the glass gently and take a sip. Don\'t overthink it — what\'s the first thing that comes to mind?',
+    educationalNote: 'Wine gets its fruit flavors from the grape itself and fermentation. Red wines often show berry and cherry notes, while whites lean toward citrus and stone fruit.',
     options: [
       { id: 'red-berries', text: 'Red berries (cherry, raspberry, strawberry)' },
       { id: 'dark-berries', text: 'Dark berries (blackberry, blueberry, plum)' },
@@ -92,117 +86,127 @@ const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
     allowMultiple: true
   },
   {
-    id: 'secondary-1',
-    category: 'secondary',
-    questionType: 'multiple_choice',
-    title: 'Do you notice any herbal, floral, or earthy notes?',
-    description: 'These add complexity to the wine',
-    options: [
-      { id: 'herbal', text: 'Herbal (mint, eucalyptus, bell pepper)' },
-      { id: 'floral', text: 'Floral (rose, violet, honeysuckle)' },
-      { id: 'earthy', text: 'Earthy (mushroom, soil, forest floor)' },
-      { id: 'mineral', text: 'Mineral (wet stones, chalk, slate)' },
-      { id: 'none', text: 'Not really noticing any' }
-    ],
-    allowMultiple: true
-  },
-  {
-    id: 'secondary-2',
-    category: 'secondary',
+    id: 'fruit-rate',
+    category: 'fruit',
     questionType: 'scale',
-    title: 'How do you feel about these secondary notes?',
-    description: 'Do they add to your enjoyment or distract from it?',
+    beatType: 'rate',
+    title: 'How much do you enjoy these fruit flavors?',
+    description: 'Would you want more or less fruit intensity in your next wine?',
+    preferenceDirection: 'more',
     scaleMin: 1,
     scaleMax: 10,
-    scaleLabels: ['Dislike them', 'Really enjoy them']
+    scaleLabels: ['Not my style', 'Love them']
   },
+  // --- BODY (notice + rate) ---
   {
-    id: 'tertiary-1',
-    category: 'tertiary',
-    questionType: 'multiple_choice',
-    title: 'Do you notice any oak, vanilla, or aged characteristics?',
-    description: 'These come from winemaking and aging',
-    options: [
-      { id: 'vanilla', text: 'Vanilla' },
-      { id: 'toast', text: 'Toast or baking spices' },
-      { id: 'smoke', text: 'Smoke or char' },
-      { id: 'leather', text: 'Leather or tobacco' },
-      { id: 'none', text: 'Not noticing these' }
-    ],
-    allowMultiple: true
-  },
-  {
-    id: 'tertiary-2',
-    category: 'tertiary',
-    questionType: 'scale',
-    title: 'How do you feel about these oak/aged characteristics?',
-    scaleMin: 1,
-    scaleMax: 10,
-    scaleLabels: ['Too much', 'Love them']
-  },
-  {
-    id: 'body-1',
+    id: 'body-notice',
     category: 'body',
     questionType: 'scale',
-    title: 'How does the weight feel in your mouth?',
-    description: 'Think of it like milk — skim milk (light) to whole milk (full)',
+    beatType: 'notice',
+    title: 'How heavy does the wine feel in your mouth?',
+    description: 'Think of it like milk: skim milk is light-bodied, whole milk is medium, cream is full-bodied. Swish it around — does it feel light and watery, or thick and rich?',
+    educationalNote: 'This weight is called "body." It comes from alcohol, sugar, and extract in the wine. Full-bodied wines feel richer and coat your mouth more.',
     scaleMin: 1,
     scaleMax: 10,
-    scaleLabels: ['Light body', 'Full body']
+    scaleLabels: ['Light and delicate', 'Full and rich']
   },
   {
-    id: 'body-2',
+    id: 'body-rate',
     category: 'body',
     questionType: 'scale',
+    beatType: 'rate',
     title: 'Do you enjoy this body style?',
+    preferenceDirection: 'more',
     scaleMin: 1,
     scaleMax: 10,
-    scaleLabels: ['Prefer lighter', 'Prefer fuller']
+    scaleLabels: ['Prefer lighter wines', 'Prefer fuller wines']
   },
+  // --- ACIDITY (notice + rate) ---
   {
-    id: 'acidity-1',
+    id: 'acidity-notice',
     category: 'acidity',
     questionType: 'scale',
-    title: 'How bright or crisp does this wine taste?',
-    description: 'Does it make your mouth water?',
+    beatType: 'notice',
+    title: 'How much zing or crispness do you notice?',
+    description: 'Pay attention to whether your mouth waters after you swallow. More watering = more acidity. Think of it like lemon juice — some wines have a lot of that bright, crisp feeling.',
+    educationalNote: 'That bright, mouth-watering sensation is acidity. It\'s what makes wine feel refreshing rather than flat. Higher acidity wines pair beautifully with food.',
     scaleMin: 1,
     scaleMax: 10,
-    scaleLabels: ['Soft, mellow', 'Bright, crisp']
+    scaleLabels: ['Soft and smooth', 'Bright and zingy']
   },
   {
-    id: 'acidity-2',
+    id: 'acidity-rate',
     category: 'acidity',
     questionType: 'scale',
+    beatType: 'rate',
     title: 'Do you enjoy this level of acidity?',
+    preferenceDirection: 'more',
     scaleMin: 1,
     scaleMax: 10,
-    scaleLabels: ['Too much', 'Perfect']
+    scaleLabels: ['Prefer softer wines', 'Love the zing']
   },
+  // --- TANNINS (notice + rate) ---
   {
-    id: 'tannins-1',
+    id: 'tannins-notice',
     category: 'tannins',
     questionType: 'scale',
+    beatType: 'notice',
     title: 'How much does this wine dry out your mouth?',
-    description: 'Tannins are that drying, slightly rough feeling on your gums and tongue — like over-steeped tea. Mostly found in red wines.',
+    description: 'Focus on your gums and the sides of your tongue. Do they feel smooth, or is there a drying, slightly rough sensation — like over-steeped tea?',
+    educationalNote: 'That drying feeling is called tannin — it comes from grape skins, seeds, and sometimes oak barrels. Tannins add structure and help wines age well.',
     scaleMin: 1,
     scaleMax: 10,
     scaleLabels: ['Silky smooth', 'Grippy and drying']
   },
   {
-    id: 'tannins-2',
+    id: 'tannins-rate',
     category: 'tannins',
     questionType: 'scale',
+    beatType: 'rate',
     title: 'Do you enjoy this level of tannin?',
     description: 'Some people love that grippy feeling, others prefer smoother wines.',
+    preferenceDirection: 'more',
     scaleMin: 1,
     scaleMax: 10,
     scaleLabels: ['Prefer smoother', 'Love the grip']
   },
+  // --- AROMA (notice + rate) ---
   {
-    id: 'overall-1',
+    id: 'secondary-notice',
+    category: 'secondary',
+    questionType: 'multiple_choice',
+    beatType: 'notice',
+    title: 'Beyond the fruit, do you notice any other aromas?',
+    description: 'Give the glass another swirl and take a deeper sniff. These "secondary" aromas add complexity — they\'re what make wines interesting.',
+    educationalNote: 'These are called secondary and tertiary aromas. They come from fermentation (floral, herbal notes) and aging (vanilla, toast, leather). They\'re what make each wine unique.',
+    options: [
+      { id: 'herbal', text: 'Herbal (mint, eucalyptus, bell pepper)' },
+      { id: 'floral', text: 'Floral (rose, violet, honeysuckle)' },
+      { id: 'earthy', text: 'Earthy (mushroom, soil, forest floor)' },
+      { id: 'oaky', text: 'Oaky (vanilla, toast, baking spices)' },
+      { id: 'none', text: 'Not really noticing any' }
+    ],
+    allowMultiple: true
+  },
+  {
+    id: 'secondary-rate',
+    category: 'secondary',
+    questionType: 'scale',
+    beatType: 'rate',
+    title: 'How do you feel about these extra aromas?',
+    description: 'Do they add to your enjoyment or distract from the fruit?',
+    preferenceDirection: 'more',
+    scaleMin: 1,
+    scaleMax: 10,
+    scaleLabels: ['Prefer simpler wines', 'Love the complexity']
+  },
+  // --- OVERALL (no beatType — standard ending) ---
+  {
+    id: 'overall-rating',
     category: 'overall',
     questionType: 'scale',
     title: 'Overall, how much do you enjoy this wine?',
+    description: 'Think about the full experience — the smell, the taste, the aftertaste. Would you be happy if someone poured you another glass?',
     scaleMin: 1,
     scaleMax: 10,
     scaleLabels: ['Not for me', 'Love it!']
@@ -219,11 +223,11 @@ const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
     ]
   },
   {
-    id: 'overall-2',
+    id: 'overall-notes',
     category: 'overall',
     questionType: 'text',
-    title: 'What stood out to you most about this wine?',
-    description: 'Share what you liked or didn\'t like'
+    title: 'Any thoughts you want to remember about this wine?',
+    description: 'What stood out? What would you tell a friend about it?'
   }
 ];
 
@@ -363,47 +367,73 @@ export async function generateQuestionsForWine(
 }
 
 function getSystemPrompt(userLevel: TastingLevel): string {
-  const questionCount = userLevel === 'intro' ? '8-10' : userLevel === 'intermediate' ? '10-14' : '14-18';
+  const traitCount = userLevel === 'intro' ? 5 : userLevel === 'intermediate' ? 6 : 8;
 
   return `You are a friendly sommelier helping someone discover what they like about wine.
-Your goal is to ask questions that help THEM understand their own preferences.
+Your goal is to ask questions that help THEM understand their own preferences through a "notice → learn → rate" pattern.
 
-Focus on these 6 core components (in this order):
-1. Fruit flavors - "How much do you enjoy the fruit flavors you're tasting?"
-2. Secondary flavors - herbal, floral, earthy notes
-3. Tertiary flavors - oak, vanilla, aged characteristics
-4. Body - weight and texture in the mouth
-5. Acidity - brightness and crispness
-6. Tannins - dryness and grip in the mouth (REQUIRED for red and rosé wines, SKIP for white and sparkling wines)
-7. Overall - final rating and impressions
+## Three-Beat Question Structure
 
-Generate ${questionCount} questions total.
+For each sensory characteristic you choose, generate a PAIRED set of two questions:
 
-For ${userLevel} users:
-${userLevel === 'intro' ? `- Keep questions simple and approachable. Use everyday language.
-- Provide helpful descriptions for each option.
-- Focus on "do you like this?" rather than "what is this?"
-- Avoid wine jargon - use comparisons like "like skim milk vs whole milk" for body` : ''}
-${userLevel === 'intermediate' ? `- Can use some wine terminology.
-- Ask about specific flavor notes.
-- Include questions about why they like/dislike certain characteristics.
-- Start introducing regional characteristics.` : ''}
-${userLevel === 'advanced' ? `- Dive deeper into terroir, winemaking, vintage characteristics.
-- Include nuanced distinctions.
-- Ask about balance, complexity, and aging potential.
-- Challenge them to identify specific characteristics.` : ''}
+1. **Notice question** (beatType: "notice"): Guide the user to observe something specific.
+   - Include an "educationalNote" field: 1-2 sentences explaining what they just noticed, shown AFTER they answer.
+   - Example question: "Does this wine make your mouth feel dry or smooth?"
+   - Example educationalNote: "That dryness is called tannin — it comes from grape skins and adds structure to the wine."
 
-Make it interactive and conversational. The goal is to help them understand what they like about this wine, not test their knowledge.
+2. **Rate question** (beatType: "rate"): Ask if they enjoyed that characteristic and whether they'd want more or less.
+   - Include "preferenceDirection" field: "more" if high score means they want more of it, "less" if high means they want less.
+   - Example: "Did you enjoy that feeling? Would you want more or less tannin in your next wine?"
 
-For multiple_choice questions: provide 4-5 options specific to this wine type.
-For scale questions: ALWAYS use 1-10 scale for ALL characteristics AND overall rating.
-For text questions: use only for final impressions.
+## Trait Selection
 
-IMPORTANT: Always include a "Would you buy this wine again?" question in the overall category (multiple_choice with options: "Yes, definitely!", "Maybe, at the right price", "No, not for me").
+Pick the ${traitCount} most interesting/relevant characteristics for THIS specific wine. Choose from:
+- fruit, secondary, tertiary, body, acidity, tannins (tannins REQUIRED for red/rosé, SKIP for white/sparkling)
 
-CRITICAL: Frame questions around enjoyment and preference, not identification.
-Good: "How much do you enjoy the fruit flavors?"
-Bad: "Identify the primary fruit aromas."`;
+Each trait gets exactly 2 questions (notice + rate), so you'll generate ${traitCount * 2} trait questions.
+
+## Required Ending Questions (category: "overall", no beatType needed)
+
+After all trait pairs, ALWAYS include these 3 questions:
+1. Overall rating (scale 1-10, id: "overall-rating")
+2. "Would you buy this wine again?" (multiple_choice, id: "overall-buy-again", options: "Yes, definitely!", "Maybe, at the right price", "No, not for me")
+3. Final notes (text, id: "overall-notes")
+
+## Canonical IDs
+
+Use these exact ID patterns for reliable downstream mapping:
+- \`{trait}-notice\` and \`{trait}-rate\` for each trait (e.g., "tannins-notice", "tannins-rate", "acidity-notice", "acidity-rate")
+- \`overall-rating\`, \`overall-buy-again\`, \`overall-notes\` for ending questions
+
+## Scale Rules
+
+- ALL scale questions use 1-10 range
+- Scale labels should reflect preference, not technical measurement
+- For notice questions: labels describe the spectrum (e.g., "Silky smooth" to "Grippy and drying")
+- For rate questions: labels describe enjoyment (e.g., "Not my style" to "Love it")
+
+## Language Level: ${userLevel}
+
+${userLevel === 'intro' ? `- Use everyday language and sensory comparisons (e.g., "like skim milk vs whole milk" for body)
+- Keep educationalNotes simple and encouraging — no jargon
+- Frame everything as discovery: "Let's find out what you like"
+- Descriptions should include HOW to taste for each characteristic` : ''}
+${userLevel === 'intermediate' ? `- Can use some wine terminology, but explain it briefly
+- educationalNotes can introduce proper terms alongside everyday language
+- Ask about specific flavor notes and regional characteristics
+- Include "why" in rate questions: "Why did you enjoy/not enjoy this?"` : ''}
+${userLevel === 'advanced' ? `- Use wine terminology freely — the user knows it
+- educationalNotes can discuss terroir, winemaking techniques, vintage influence
+- Explore nuance: balance, complexity, aging potential, finish length
+- Rate questions can ask about context: "Would you pair this with food or drink it on its own?"` : ''}
+
+## Question Types
+
+- multiple_choice: provide 4-5 options specific to this wine type
+- scale: ALWAYS 1-10 range
+- text: use only for overall-notes
+
+CRITICAL: This is preference discovery, not a quiz. Never ask "identify" or "name" — always ask "do you notice" and "do you enjoy."`;
 }
 
 function getUserPrompt(wineInfo: WineRecognitionResult, chapter?: Chapter, userLevel?: TastingLevel): string {
@@ -417,16 +447,24 @@ function getUserPrompt(wineInfo: WineRecognitionResult, chapter?: Chapter, userL
   });
   const varietal = sanitized.grapeVariety;
 
-  let prompt = `Generate tasting questions for this wine:
+  // Determine wine type for tannins guidance
+  const isRed = wineInfo.grapeVarieties?.some(g => {
+    const lower = g.toLowerCase();
+    return ['cabernet', 'merlot', 'pinot noir', 'syrah', 'shiraz', 'malbec', 'sangiovese',
+            'nebbiolo', 'tempranillo', 'grenache', 'zinfandel', 'barbera', 'mourvèdre',
+            'primitivo', 'petite sirah', 'carmenere', 'tannat', 'gamay', 'pinotage'].some(r => lower.includes(r));
+  });
+
+  let prompt = `Generate three-beat tasting questions for this wine:
 
 Wine: ${sanitized.name}
 Varietal: ${varietal}
 Region: ${sanitized.region}
+Wine Type: ${isRed ? 'Red' : 'White/Other'} (${isRed ? 'include tannins trait' : 'skip tannins trait'})
 ${sanitized.vintage !== 'NV' ? `Vintage: ${sanitized.vintage}` : ''}
 ${sanitized.producer ? `Producer: ${sanitized.producer}` : ''}`;
 
   if (chapter) {
-    // Sanitize chapter content as well (could be user-generated)
     const chapterTitle = sanitizeForPrompt(chapter.title, 100);
     const chapterDesc = sanitizeForPrompt(chapter.description, 200);
     prompt += `
@@ -436,46 +474,44 @@ Chapter: ${chapterTitle}
 ${chapterDesc ? `Description: ${chapterDesc}` : ''}`;
   }
 
-  // Add varietal-specific guidance (using sanitized varietal)
+  // Add varietal-specific trait suggestions
   prompt += `
 
-Include 2-3 questions specific to ${varietal} characteristics:`;
+For ${varietal}, prioritize these traits in your notice+rate pairs:`;
 
   const varietalLower = varietal.toLowerCase();
   if (varietalLower.includes('sangiovese') || varietalLower.includes('chianti')) {
     prompt += `
-- For Sangiovese, ask about cherry notes, tomato-like acidity, and earthy characteristics.`;
+- Cherry/red fruit notes (fruit), tomato-like acidity (acidity), earthy characteristics (secondary), tannin structure (tannins)`;
   } else if (varietalLower.includes('pinot noir')) {
     prompt += `
-- For Pinot Noir, ask about red fruit vs. earth balance, mushroom/forest notes.`;
+- Red fruit vs earth balance (fruit + secondary), mushroom/forest notes (tertiary), silky tannins (tannins), acidity (acidity)`;
   } else if (varietalLower.includes('cabernet')) {
     prompt += `
-- For Cabernet, ask about dark fruit intensity, green/herbal notes, oak influence.`;
+- Dark fruit intensity (fruit), green/herbal notes (secondary), oak influence (tertiary), tannin grip (tannins), body (body)`;
   } else if (varietalLower.includes('chardonnay')) {
     prompt += `
-- For Chardonnay, ask about citrus vs. tropical fruit, oak/butter influence, minerality.`;
+- Citrus vs tropical fruit (fruit), oak/butter influence (tertiary), minerality (secondary), body (body), acidity (acidity)`;
   } else if (varietalLower.includes('sauvignon blanc')) {
     prompt += `
-- For Sauvignon Blanc, ask about citrus, grassy notes, and minerality.`;
+- Citrus and tropical notes (fruit), grassy/herbal character (secondary), minerality (secondary), acidity (acidity)`;
   } else if (varietalLower.includes('riesling')) {
     prompt += `
-- For Riesling, ask about sweetness level, petrol notes, and stone fruit.`;
+- Sweetness perception (fruit), stone fruit notes (fruit), petrol/mineral (secondary), acidity (acidity)`;
   } else {
     prompt += `
-- Ask about characteristics typical of ${varietal} from ${sanitized.region}.`;
+- Choose the most interesting characteristics of ${varietal} from ${sanitized.region}`;
   }
 
-  // Add region-specific guidance
   if (sanitized.region && sanitized.region !== 'Unknown Region') {
     prompt += `
-
-Include 1-2 questions about what makes ${sanitized.region} wines distinctive.`;
+- Include at least one trait pair that highlights what makes ${sanitized.region} wines distinctive`;
   }
 
   prompt += `
 
-Remember: Focus on what the taster ENJOYS about these characteristics, not just identification.
-Frame questions conversationally: "How do you feel about..." rather than "Identify..."`;
+Remember: Each trait gets exactly 2 questions (notice + rate) with educationalNote on the notice question.
+End with overall-rating, overall-buy-again, and overall-notes.`;
 
   return prompt;
 }
