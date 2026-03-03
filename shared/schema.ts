@@ -1069,7 +1069,7 @@ export interface WineRecognitionResult {
 
 // Generated question structure (follows existing tasting flow)
 // Question categories - the 5 core components + overall
-export type QuestionCategory = 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'overall';
+export type QuestionCategory = 'fruit' | 'secondary' | 'tertiary' | 'body' | 'acidity' | 'tannins' | 'overall';
 
 export interface GeneratedQuestion {
   id: string;

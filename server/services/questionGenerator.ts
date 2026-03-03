@@ -26,7 +26,7 @@ const QuestionOptionSchema = z.object({
 
 const GeneratedQuestionSchema = z.object({
   id: z.string(),
-  category: z.enum(['fruit', 'secondary', 'tertiary', 'body', 'acidity', 'overall']),
+  category: z.enum(['fruit', 'secondary', 'tertiary', 'body', 'acidity', 'tannins', 'overall']),
   questionType: z.enum(['multiple_choice', 'scale', 'text']),
   title: z.string(),
   description: z.string().optional(),
@@ -57,7 +57,7 @@ interface RawGPTQuestion {
   wineContext?: string;
 }
 
-// Fallback questions when AI generation fails - based on 5 core components
+// Fallback questions when AI generation fails - based on 6 core components + overall
 const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
   {
     id: 'fruit-1',
@@ -66,7 +66,7 @@ const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
     title: 'How much do you enjoy the fruit flavors you\'re tasting?',
     description: 'Think about berries, citrus, stone fruit, or tropical notes',
     scaleMin: 1,
-    scaleMax: 5,
+    scaleMax: 10,
     scaleLabels: ['Not at all', 'Love them']
   },
   {
@@ -106,7 +106,7 @@ const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
     title: 'How do you feel about these secondary notes?',
     description: 'Do they add to your enjoyment or distract from it?',
     scaleMin: 1,
-    scaleMax: 5,
+    scaleMax: 10,
     scaleLabels: ['Dislike them', 'Really enjoy them']
   },
   {
@@ -130,7 +130,7 @@ const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
     questionType: 'scale',
     title: 'How do you feel about these oak/aged characteristics?',
     scaleMin: 1,
-    scaleMax: 5,
+    scaleMax: 10,
     scaleLabels: ['Too much', 'Love them']
   },
   {
@@ -138,9 +138,9 @@ const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
     category: 'body',
     questionType: 'scale',
     title: 'How does the weight feel in your mouth?',
-    description: 'Think of it like milk - skim milk (light) to whole milk (full)',
+    description: 'Think of it like milk — skim milk (light) to whole milk (full)',
     scaleMin: 1,
-    scaleMax: 5,
+    scaleMax: 10,
     scaleLabels: ['Light body', 'Full body']
   },
   {
@@ -149,7 +149,7 @@ const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
     questionType: 'scale',
     title: 'Do you enjoy this body style?',
     scaleMin: 1,
-    scaleMax: 5,
+    scaleMax: 10,
     scaleLabels: ['Prefer lighter', 'Prefer fuller']
   },
   {
@@ -159,7 +159,7 @@ const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
     title: 'How bright or crisp does this wine taste?',
     description: 'Does it make your mouth water?',
     scaleMin: 1,
-    scaleMax: 5,
+    scaleMax: 10,
     scaleLabels: ['Soft, mellow', 'Bright, crisp']
   },
   {
@@ -168,8 +168,28 @@ const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
     questionType: 'scale',
     title: 'Do you enjoy this level of acidity?',
     scaleMin: 1,
-    scaleMax: 5,
+    scaleMax: 10,
     scaleLabels: ['Too much', 'Perfect']
+  },
+  {
+    id: 'tannins-1',
+    category: 'tannins',
+    questionType: 'scale',
+    title: 'How much does this wine dry out your mouth?',
+    description: 'Tannins are that drying, slightly rough feeling on your gums and tongue — like over-steeped tea. Mostly found in red wines.',
+    scaleMin: 1,
+    scaleMax: 10,
+    scaleLabels: ['Silky smooth', 'Grippy and drying']
+  },
+  {
+    id: 'tannins-2',
+    category: 'tannins',
+    questionType: 'scale',
+    title: 'Do you enjoy this level of tannin?',
+    description: 'Some people love that grippy feeling, others prefer smoother wines.',
+    scaleMin: 1,
+    scaleMax: 10,
+    scaleLabels: ['Prefer smoother', 'Love the grip']
   },
   {
     id: 'overall-1',
@@ -181,6 +201,17 @@ const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
     scaleLabels: ['Not for me', 'Love it!']
   },
   {
+    id: 'overall-buy-again',
+    category: 'overall',
+    questionType: 'multiple_choice',
+    title: 'Would you buy this wine again?',
+    options: [
+      { id: 'yes', text: 'Yes, definitely!' },
+      { id: 'maybe', text: 'Maybe, at the right price' },
+      { id: 'no', text: 'No, not for me' }
+    ]
+  },
+  {
     id: 'overall-2',
     category: 'overall',
     questionType: 'text',
@@ -190,7 +221,7 @@ const FALLBACK_QUESTIONS: GeneratedQuestion[] = [
 ];
 
 /**
- * Generate wine-specific tasting questions focused on 5 core components
+ * Generate wine-specific tasting questions focused on 6 core components
  *
  * @param wineInfo - Recognition result from photographed wine
  * @param chapter - Chapter context for additional guidance
@@ -235,7 +266,7 @@ export async function generateQuestionsForWine(
                   type: 'object',
                   properties: {
                     id: { type: 'string' },
-                    category: { type: 'string', enum: ['fruit', 'secondary', 'tertiary', 'body', 'acidity', 'overall'] },
+                    category: { type: 'string', enum: ['fruit', 'secondary', 'tertiary', 'body', 'acidity', 'tannins', 'overall'] },
                     questionType: { type: 'string', enum: ['multiple_choice', 'scale', 'text'] },
                     title: { type: 'string' },
                     description: { type: 'string' },
@@ -268,7 +299,7 @@ export async function generateQuestionsForWine(
           }
         }
       },
-      max_completion_tokens: 2000
+      max_completion_tokens: userLevel === 'intro' ? 3000 : userLevel === 'intermediate' ? 3500 : 4500
     });
 
     const content = completion.choices[0]?.message?.content;
@@ -295,9 +326,9 @@ export async function generateQuestionsForWine(
         : undefined
     }));
 
-    // Ensure we have all 5 core components represented
+    // Ensure we have all core components represented
     const categories = new Set(questions.map(q => q.category));
-    const requiredCategories: QuestionCategory[] = ['fruit', 'secondary', 'tertiary', 'body', 'acidity', 'overall'];
+    const requiredCategories: QuestionCategory[] = ['fruit', 'secondary', 'tertiary', 'body', 'acidity', 'tannins', 'overall'];
 
     for (const cat of requiredCategories) {
       if (!categories.has(cat)) {
@@ -309,8 +340,8 @@ export async function generateQuestionsForWine(
       }
     }
 
-    // Sort by category order (5 core components + overall)
-    const categoryOrder = { fruit: 0, secondary: 1, tertiary: 2, body: 3, acidity: 4, overall: 5 };
+    // Sort by category order (6 core components + overall)
+    const categoryOrder: Record<string, number> = { fruit: 0, secondary: 1, tertiary: 2, body: 3, acidity: 4, tannins: 5, overall: 6 };
     questions.sort((a, b) => categoryOrder[a.category] - categoryOrder[b.category]);
 
     return questions;
@@ -322,18 +353,19 @@ export async function generateQuestionsForWine(
 }
 
 function getSystemPrompt(userLevel: TastingLevel): string {
-  const questionCount = userLevel === 'intro' ? '6-8' : userLevel === 'intermediate' ? '10-12' : '12-15';
+  const questionCount = userLevel === 'intro' ? '8-10' : userLevel === 'intermediate' ? '10-14' : '14-18';
 
   return `You are a friendly sommelier helping someone discover what they like about wine.
 Your goal is to ask questions that help THEM understand their own preferences.
 
-Focus on these 5 core components (in this order):
+Focus on these 6 core components (in this order):
 1. Fruit flavors - "How much do you enjoy the fruit flavors you're tasting?"
 2. Secondary flavors - herbal, floral, earthy notes
 3. Tertiary flavors - oak, vanilla, aged characteristics
 4. Body - weight and texture in the mouth
 5. Acidity - brightness and crispness
-6. Overall - final rating and impressions
+6. Tannins - dryness and grip in the mouth (REQUIRED for red and rosé wines, SKIP for white and sparkling wines)
+7. Overall - final rating and impressions
 
 Generate ${questionCount} questions total.
 
@@ -354,8 +386,10 @@ ${userLevel === 'advanced' ? `- Dive deeper into terroir, winemaking, vintage ch
 Make it interactive and conversational. The goal is to help them understand what they like about this wine, not test their knowledge.
 
 For multiple_choice questions: provide 4-5 options specific to this wine type.
-For scale questions: use 1-5 for characteristics, 1-10 for overall rating.
+For scale questions: ALWAYS use 1-10 scale for ALL characteristics AND overall rating.
 For text questions: use only for final impressions.
+
+IMPORTANT: Always include a "Would you buy this wine again?" question in the overall category (multiple_choice with options: "Yes, definitely!", "Maybe, at the right price", "No, not for me").
 
 CRITICAL: Frame questions around enjoyment and preference, not identification.
 Good: "How much do you enjoy the fruit flavors?"
