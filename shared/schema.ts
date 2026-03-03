@@ -773,6 +773,13 @@ export interface TastingResponses {
     wouldBuyAgain?: boolean;
     notes?: string;
   };
+  // Three-beat loop: preference signals from "rate" beats
+  preferences?: {
+    [characteristic: string]: {
+      enjoyment: number; // 1-10: how much they liked this characteristic
+      wantMore: boolean; // would they want more of this in future wines
+    };
+  };
 }
 
 // Wine characteristics cache (avoid repeat GPT-4 calls)
@@ -1090,6 +1097,10 @@ export interface GeneratedQuestion {
   scaleLabels?: [string, string];
   // Wine-specific context
   wineContext?: string; // e.g., "Classic Barolo characteristics include..."
+  // Three-beat loop fields
+  beatType?: 'notice' | 'rate'; // Which beat this question represents (legacy questions omit this)
+  educationalNote?: string; // Shown after user answers a 'notice' beat, before advancing to 'rate'
+  preferenceDirection?: 'more' | 'less'; // For rate beats: what "high" means for preference
 }
 
 // Insert schemas

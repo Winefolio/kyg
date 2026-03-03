@@ -35,7 +35,11 @@ const GeneratedQuestionSchema = z.object({
   scaleMin: z.number().optional(),
   scaleMax: z.number().optional(),
   scaleLabels: z.tuple([z.string(), z.string()]).optional(),
-  wineContext: z.string().optional()
+  wineContext: z.string().optional(),
+  // Three-beat loop fields
+  beatType: z.enum(['notice', 'rate']).optional(),
+  educationalNote: z.string().optional(),
+  preferenceDirection: z.enum(['more', 'less']).optional()
 });
 
 const QuestionSetSchema = z.object({
@@ -55,6 +59,9 @@ interface RawGPTQuestion {
   scaleMax?: number;
   scaleLabels?: string[];
   wineContext?: string;
+  beatType?: 'notice' | 'rate';
+  educationalNote?: string;
+  preferenceDirection?: 'more' | 'less';
 }
 
 // Fallback questions when AI generation fails - based on 6 core components + overall
@@ -287,7 +294,10 @@ export async function generateQuestionsForWine(
                     scaleMin: { type: 'number' },
                     scaleMax: { type: 'number' },
                     scaleLabels: { type: 'array', items: { type: 'string' } },
-                    wineContext: { type: 'string' }
+                    wineContext: { type: 'string' },
+                    beatType: { type: 'string', enum: ['notice', 'rate'] },
+                    educationalNote: { type: 'string' },
+                    preferenceDirection: { type: 'string', enum: ['more', 'less'] }
                   },
                   required: ['id', 'category', 'questionType', 'title'],
                   additionalProperties: false
