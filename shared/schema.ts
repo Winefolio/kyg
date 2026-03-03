@@ -770,7 +770,7 @@ export interface TastingResponses {
   };
   overall?: {
     rating?: number;
-    wouldBuyAgain?: boolean;
+    wouldBuyAgain?: boolean | 'yes' | 'maybe' | 'no';
     notes?: string;
   };
   // Three-beat loop: preference signals from "rate" beats

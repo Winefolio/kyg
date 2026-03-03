@@ -342,13 +342,14 @@ export async function generateQuestionsForWine(
 
     // Ensure we have all core components represented
     const categories = new Set(questions.map(q => q.category));
-    const requiredCategories: QuestionCategory[] = ['fruit', 'secondary', 'tertiary', 'body', 'acidity', 'tannins', 'overall'];
+    // tannins intentionally excluded — AI decides based on wine type (reds/rosé only)
+    const requiredCategories: QuestionCategory[] = ['fruit', 'secondary', 'tertiary', 'body', 'acidity', 'overall'];
 
     for (const cat of requiredCategories) {
       if (!categories.has(cat)) {
-        // Add fallback question for missing category
-        const fallback = FALLBACK_QUESTIONS.find(q => q.category === cat);
-        if (fallback) {
+        // Add all fallback questions for missing category (notice + rate pair)
+        const fallbacks = FALLBACK_QUESTIONS.filter(q => q.category === cat);
+        for (const fallback of fallbacks) {
           questions.push(fallback);
         }
       }
