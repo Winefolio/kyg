@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { users, authAttempts } from "@shared/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
+import { trackHostSignup } from "../audos-integration";
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
@@ -178,6 +179,7 @@ export function registerAuthRoutes(app: Express): void {
           email: normalizedEmail
         }).returning();
         user = newUser;
+        trackHostSignup(normalizedEmail);
       }
 
       // Regenerate session to prevent session fixation attacks

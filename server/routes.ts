@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
+import { trackGuestJoined } from "./audos-integration";
 import { uploadMediaFile, deleteMediaFile, getMediaType, isSupabaseConfigured, verifyStorageBucket } from "./supabase-storage";
 import { 
   insertSessionSchema,
@@ -453,6 +454,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 7. Update participant count using the actual session UUID
       const updatedParticipantsList = await storage.getParticipantsBySessionId(session.id);
       await storage.updateSessionParticipantCount(session.id, updatedParticipantsList.length);
+
+      if (newParticipant.email) {
+        trackGuestJoined(newParticipant.email, newParticipant.displayName, session.short_code || undefined);
+      }
 
       res.json(newParticipant);
 

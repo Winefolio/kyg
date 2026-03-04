@@ -7,6 +7,7 @@ import { attachCharacteristicsToTasting } from "../wine-intelligence";
 import { generateNextBottleRecommendations } from "../openai-client";
 import { wineIntelQueue } from "../lib/background-queue";
 import { unauthorized, notFound, validationError, internalError, forbidden } from "../lib/api-error";
+import { trackTastingCompleted } from "../audos-integration";
 
 // User preferences derived from tasting history
 interface UserPreferences {
@@ -379,6 +380,10 @@ export function registerTastingsRoutes(app: Express): void {
       const nextLevel: TastingLevel | undefined = isEligible
         ? (currentLevel === 'intro' ? 'intermediate' : 'advanced')
         : undefined;
+
+      if (req.session.userEmail) {
+        trackTastingCompleted(req.session.userEmail);
+      }
 
       return res.status(201).json({
         tasting: newTasting,
