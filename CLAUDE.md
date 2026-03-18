@@ -72,8 +72,7 @@ Support tables: `glossaryTerms`, `wineCharacteristicsCache`, `userJourneys`
 - `requireAuth` middleware in `server/routes/auth.ts`
 
 ### OpenAI Integration
-- **Always use latest models**: `gpt-5.2` for complex reasoning (wine profiles, vision, AI question generation)
-- **Mini models for simple tasks**: `gpt-5-mini` for straightforward tasks (characteristics lookup, sentiment analysis)
+- **Always use `gpt-5.2`** for ALL tasks — we prefer the best model quality everywhere. Do not use `gpt-5-mini` for new features.
 - Use `max_completion_tokens` (not `max_tokens`) for GPT-5 models
 - Whisper API for audio transcription (`/api/transcribe`)
 

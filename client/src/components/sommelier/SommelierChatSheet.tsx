@@ -85,6 +85,7 @@ interface SommelierChatSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isWelcome?: boolean;
+  initialMessage?: string | null;
 }
 
 function WelcomeState({
@@ -277,7 +278,7 @@ function ChatContent({
   );
 }
 
-export function SommelierChatSheet({ open, onOpenChange, isWelcome }: SommelierChatSheetProps) {
+export function SommelierChatSheet({ open, onOpenChange, isWelcome, initialMessage }: SommelierChatSheetProps) {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const {
@@ -347,6 +348,30 @@ export function SommelierChatSheet({ open, onOpenChange, isWelcome }: SommelierC
         });
     }
   }, [open, isWelcome, messages.length, authData, setWelcomeState]);
+
+  // Auto-send initial message when opened via "Ask Pierre" button.
+  // Two-phase approach: phase 1 resets chat, phase 2 sends after React flushes the reset.
+  const pendingInitialMessage = useRef<string | null>(null);
+
+  // Phase 1: When opened with initialMessage, reset chat and queue the message
+  useEffect(() => {
+    if (open && initialMessage && !pendingInitialMessage.current && messages.length === 0 && !isLoading && !isLoadingChat) {
+      pendingInitialMessage.current = initialMessage;
+      startNewChat();
+    }
+    if (!open) {
+      pendingInitialMessage.current = null;
+    }
+  }, [open, initialMessage, messages.length, isLoading, isLoadingChat, startNewChat]);
+
+  // Phase 2: After startNewChat flushes (activeChatId becomes null, messages empty), send the queued message
+  useEffect(() => {
+    if (pendingInitialMessage.current && activeChatId === null && messages.length === 0 && !isStreaming) {
+      const msg = pendingInitialMessage.current;
+      pendingInitialMessage.current = null;
+      sendMessage(msg);
+    }
+  }, [activeChatId, messages.length, isStreaming, sendMessage]);
 
   const handleClose = () => onOpenChange(false);
   const openSidebar = useCallback(() => setSidebarOpen(true), []);

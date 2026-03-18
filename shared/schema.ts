@@ -686,7 +686,9 @@ export const tastings = pgTable("tastings", {
   tastedAt: timestamp("tasted_at").defaultNow().notNull(),
   responses: jsonb("responses").notNull(), // Full tasting questionnaire responses
   wineCharacteristics: jsonb("wine_characteristics"), // Baseline wine data from GPT-4
-  recommendations: jsonb("recommendations") // AI-generated next bottle recommendations
+  recommendations: jsonb("recommendations"), // AI-generated next bottle recommendations
+  tastingMode: varchar("tasting_mode", { length: 20 }).default('full').notNull(), // 'quick' or 'full'
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   userIdIdx: index("idx_tastings_user_id").on(table.userId),
   tastedAtIdx: index("idx_tastings_tasted_at").on(table.tastedAt),
@@ -716,10 +718,12 @@ export const insertTastingSchema = createInsertSchema(tastings, {
   grapeVariety: z.string().nullable().optional(),
   wineType: z.enum(['red', 'white', 'rosé', 'sparkling', 'dessert', 'fortified', 'orange']).nullable().optional(),
   photoUrl: z.string().url().nullable().optional(),
-  responses: z.record(z.any()) // JSONB object for tasting responses
+  responses: z.record(z.any()), // JSONB object for tasting responses
+  tastingMode: z.enum(['quick', 'full']).optional().default('full')
 }).omit({
   id: true,
-  tastedAt: true
+  tastedAt: true,
+  updatedAt: true,
 });
 
 // Onboarding quiz answers
@@ -1073,6 +1077,7 @@ export interface WineRecognitionResult {
   grapeVarieties: string[];
   vintage?: number;
   producer?: string;
+  wineType?: 'red' | 'white' | 'rosé' | 'sparkling' | 'dessert' | 'fortified' | 'orange';
   confidence: number;
 }
 
@@ -1213,3 +1218,57 @@ export const aiResponseCache = pgTable("ai_response_cache", {
 }));
 
 export type AiResponseCache = typeof aiResponseCache.$inferSelect;
+
+// ============================================
+// COMPOUNDING WINE PROFILE (Taste Identity)
+// ============================================
+
+// Trait names for taste profile
+export type TraitName = 'sweetness' | 'acidity' | 'tannins' | 'body';
+
+export interface TraitScore {
+  value: number;       // weighted average (1-5 scale)
+  confidence: number;  // 0-1 based on data count + source diversity
+}
+
+export interface RankedItem {
+  name: string;
+  count: number;
+  avgRating: number;
+}
+
+export interface TasteProfile {
+  // Structured (deterministic, math-based)
+  traits: Record<TraitName, TraitScore>;
+  flavorAffinities: RankedItem[];
+  wineTypeDistribution: Record<string, { count: number; avgRating: number }>;
+  topRegions: RankedItem[];
+  topGrapes: RankedItem[];
+
+  // AI-synthesized
+  styleIdentity: string;  // 2-3 sentence narrative
+
+  // Meta
+  dataSnapshot: {
+    totalTastings: number;
+    fullTastings: number;
+    quickRates: number;
+    oldestTasting: string;
+    newestTasting: string;
+  };
+  confidence: 'low' | 'medium' | 'high';
+  synthesizedAt: string;
+}
+
+// User taste profiles table -- one row per user, upsert pattern
+export const userTasteProfiles = pgTable("user_taste_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  profileData: jsonb("profile_data").$type<TasteProfile>().notNull(),
+  fingerprint: text("fingerprint").notNull(),
+  synthesizedAt: timestamp("synthesized_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueUser: unique().on(table.userId),
+}));
+
+export type UserTasteProfile = typeof userTasteProfiles.$inferSelect;

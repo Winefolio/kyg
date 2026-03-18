@@ -20,6 +20,7 @@ export interface RecognitionResult {
   wine?: RecognizedWine;
   error?: string;
   message?: string;
+  vintageNotFound?: boolean;
 }
 
 // Raw GPT response type
@@ -62,9 +63,14 @@ export async function recognizeWineFromImage(
         content: `You are an expert sommelier analyzing wine label images. Extract wine information from the label.
 
 Return a JSON object with these fields:
-- wineName: Full wine name as it appears on the label
-- producer: The winery/producer name
-- wineRegion: Region/appellation (e.g., "Napa Valley", "Bordeaux", "Barossa Valley")
+- wineName: The COMPLETE wine name including the producer/winery. For example:
+  - "Henri Bourgeois Sancerre" NOT just "Sancerre"
+  - "Cloudy Bay Sauvignon Blanc" NOT just "Sauvignon Blanc"
+  - "Opus One" (producer IS the wine name)
+  - "Domaine de la Romanée-Conti Romanée-Conti Grand Cru"
+  The format should be: "[Producer] [Wine/Cuvée Name]". Always include the producer as part of the wine name.
+- producer: The winery/producer name separately (e.g., "Henri Bourgeois", "Cloudy Bay")
+- wineRegion: Region/appellation (e.g., "Napa Valley", "Bordeaux", "Sancerre, Loire Valley")
 - grapeVariety: Primary grape variety - IMPORTANT: Even if not explicitly on the label, use your wine knowledge to infer the grape. For example:
   - Bourgogne Blanc = Chardonnay
   - Bourgogne Rouge = Pinot Noir
@@ -73,7 +79,12 @@ Return a JSON object with these fields:
   - Barolo = Nebbiolo
   - Chianti = Sangiovese
   - Rioja = Tempranillo (typically)
-- wineVintage: Year as a number (null if non-vintage or not visible)
+- wineVintage: Year as a number. IMPORTANT: Look very carefully for the vintage year on the label — it is often printed small on the neck label, capsule, front label, or bottom of the label. Common locations:
+  - Printed on the front label near the wine name
+  - On the neck/capsule of the bottle
+  - Small text below or above the main label
+  - Embossed on the glass
+  If you truly cannot find any year anywhere on the label or bottle, return null. But try hard — most wines have a vintage year somewhere.
 - wineType: One of: red, white, rosé, sparkling, dessert, fortified, orange
 - confidence: Your confidence level 0-1 (1 = very confident)
 
@@ -119,16 +130,32 @@ If you cannot read the label clearly or it's not a wine label, return:
     };
   }
 
+  // Build the wine name, ensuring producer is included
+  let wineName = parsed.wineName || 'Unknown Wine';
+  const producer = parsed.producer || undefined;
+
+  // If the GPT returned producer separately and it's not already in the wine name, prepend it
+  if (producer && wineName !== producer && !wineName.toLowerCase().includes(producer.toLowerCase())) {
+    wineName = `${producer} ${wineName}`;
+  }
+  // If wineName is missing but producer exists, use producer
+  if (wineName === 'Unknown Wine' && producer) {
+    wineName = producer;
+  }
+
+  const vintageRaw = parsed.wineVintage ? parseInt(String(parsed.wineVintage)) : undefined;
+  const vintageNotFound = !vintageRaw;
+
   // Build recognized wine object
   const wine: RecognizedWine = {
-    wineName: parsed.wineName || parsed.producer || 'Unknown Wine',
+    wineName,
     wineRegion: parsed.wineRegion || undefined,
     grapeVariety: parsed.grapeVariety || undefined,
-    wineVintage: parsed.wineVintage ? parseInt(String(parsed.wineVintage)) : undefined,
+    wineVintage: vintageRaw,
     wineType: VALID_WINE_TYPES.includes(parsed.wineType as typeof VALID_WINE_TYPES[number])
       ? (parsed.wineType as RecognizedWine['wineType'])
       : undefined,
-    producer: parsed.producer || undefined,
+    producer,
     confidence: Math.min(1, Math.max(0, parsed.confidence ?? 0.5))
   };
 
@@ -137,6 +164,7 @@ If you cannot read the label clearly or it's not a wine label, return:
   return {
     recognized: true,
     wine,
+    vintageNotFound,
     message: wine.confidence > 0.7
       ? "Wine recognized successfully"
       : "Wine recognized with low confidence - please verify details"

@@ -25,6 +25,7 @@ export function NearbyWineShops() {
       const response = await fetch(
         `/api/wine-shops/nearby?latitude=${position!.latitude}&longitude=${position!.longitude}&radius=5000`
       );
+      if (response.status === 503) throw new Error("NOT_CONFIGURED");
       if (!response.ok) throw new Error("Failed to fetch shops");
       return response.json();
     },
@@ -103,8 +104,11 @@ export function NearbyWineShops() {
     );
   }
 
-  // API error
+  // API error — hide silently if not configured, show message for real errors
   if (shopsError) {
+    if ((shopsError as Error).message === "NOT_CONFIGURED") {
+      return null; // Feature not available — hide gracefully
+    }
     return (
       <div className="mt-4 bg-white/5 rounded-lg p-3 border border-white/10">
         <p className="text-sm text-white/70">Couldn't find wine shops right now. Try again later.</p>

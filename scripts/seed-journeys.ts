@@ -17,23 +17,25 @@ const sql = postgres(connectionString, {
 
 // Helper to create budget + splurge wine options
 function createWineOptions(
-  budget: { desc: string; askFor: string; min: number; max: number; producers: string[] },
-  splurge: { desc: string; askFor: string; producers: string[] }
+  budgets: { desc: string; askFor: string; min: number; max: number; producers: string[] } | Array<{ desc: string; askFor: string; min: number; max: number; producers: string[] }>,
+  splurges: { desc: string; askFor: string; producers: string[] } | Array<{ desc: string; askFor: string; producers: string[] }>
 ): WineOption[] {
+  const budgetArr = Array.isArray(budgets) ? budgets : [budgets];
+  const splurgeArr = Array.isArray(splurges) ? splurges : [splurges];
   return [
-    {
-      description: budget.desc,
-      askFor: budget.askFor,
-      priceRange: { min: budget.min, max: budget.max, currency: 'USD' },
-      exampleProducers: budget.producers,
-      level: 'budget'
-    },
-    {
-      description: splurge.desc,
-      askFor: splurge.askFor,
-      exampleProducers: splurge.producers,
-      level: 'splurge'
-    }
+    ...budgetArr.map(b => ({
+      description: b.desc,
+      askFor: b.askFor,
+      priceRange: { min: b.min, max: b.max, currency: 'USD' as const },
+      exampleProducers: b.producers,
+      level: 'budget' as const
+    })),
+    ...splurgeArr.map(s => ({
+      description: s.desc,
+      askFor: s.askFor,
+      exampleProducers: s.producers,
+      level: 'splurge' as const
+    }))
   ];
 }
 
@@ -62,7 +64,10 @@ async function seedJourneys() {
 
       // Chapter 1: Bordeaux
       const bordeauxOptions = createWineOptions(
-        { desc: "Any Bordeaux Red", askFor: "Ask for a basic Bordeaux or Bordeaux Supérieur red under $20", min: 12, max: 20, producers: ["Mouton Cadet", "Dourthe"] },
+        [
+          { desc: "Any Bordeaux Red", askFor: "Ask for a basic Bordeaux or Bordeaux Supérieur red under $20", min: 12, max: 20, producers: ["Mouton Cadet", "Dourthe"] },
+          { desc: "Côtes de Bordeaux or Blaye", askFor: "Ask for a Côtes de Bordeaux or Blaye — great value Bordeaux", min: 10, max: 18, producers: ["Château Bel Air La Royère", "Château Haut-Rian"] }
+        ],
         { desc: "Médoc or Saint-Émilion", askFor: "Ask for a Médoc or Saint-Émilion — worth the step up", producers: ["Château Gloria", "Château Larose Trintaudon"] }
       );
       await sql`
@@ -86,12 +91,15 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true, requireAllPrompts: false })},
           ${JSON.stringify(bordeauxOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 2: Burgundy
       const burgundyOptions = createWineOptions(
-        { desc: "Bourgogne Rouge", askFor: "Ask for a Bourgogne Rouge (basic Burgundy red) under $25", min: 18, max: 25, producers: ["Louis Jadot", "Joseph Drouhin"] },
+        [
+          { desc: "Bourgogne Rouge", askFor: "Ask for a Bourgogne Rouge (basic Burgundy red) under $25", min: 18, max: 25, producers: ["Louis Jadot", "Joseph Drouhin"] },
+          { desc: "Any Pinot Noir from France or Oregon", askFor: "If no Burgundy available, any French or Oregon Pinot Noir works — similar style", min: 15, max: 25, producers: ["Meiomi", "A to Z Wineworks", "Bouchard Aîné"] }
+        ],
         { desc: "Village-level Burgundy", askFor: "Ask for a village Burgundy like Gevrey-Chambertin or Volnay", producers: ["Domaine Faiveley", "Bouchard Père et Fils"] }
       );
       await sql`
@@ -115,12 +123,15 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true, requireAllPrompts: false })},
           ${JSON.stringify(burgundyOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 3: Loire Valley White
       const loireOptions = createWineOptions(
-        { desc: "Touraine Sauvignon Blanc", askFor: "Ask for a Touraine Sauvignon Blanc under $15", min: 10, max: 15, producers: ["Domaine de la Charmoise", "Guy Allion"] },
+        [
+          { desc: "Touraine Sauvignon Blanc", askFor: "Ask for a Touraine Sauvignon Blanc under $15", min: 10, max: 15, producers: ["Domaine de la Charmoise", "Guy Allion"] },
+          { desc: "Any French Sauvignon Blanc", askFor: "If no Loire available, any French Sauvignon Blanc works — or even New Zealand SB for a comparison", min: 10, max: 18, producers: ["Les Fumées Blanches", "Kim Crawford", "Oyster Bay"] }
+        ],
         { desc: "Sancerre or Pouilly-Fumé", askFor: "Ask for a Sancerre or Pouilly-Fumé — classic Loire elegance", producers: ["Henri Bourgeois", "Pascal Jolivet"] }
       );
       await sql`
@@ -144,12 +155,15 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true, requireAllPrompts: false })},
           ${JSON.stringify(loireOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 4: Champagne
       const champagneOptions = createWineOptions(
-        { desc: "Non-vintage Brut Champagne", askFor: "Ask for a non-vintage Brut Champagne", min: 35, max: 45, producers: ["Moët & Chandon", "Veuve Clicquot", "Nicolas Feuillatte"] },
+        [
+          { desc: "Non-vintage Brut Champagne", askFor: "Ask for a non-vintage Brut Champagne", min: 35, max: 45, producers: ["Moët & Chandon", "Veuve Clicquot", "Nicolas Feuillatte"] },
+          { desc: "Any dry sparkling wine (Crémant or Cava)", askFor: "If Champagne is out of budget, try a Crémant d'Alsace or Cava — same method, great learning", min: 12, max: 22, producers: ["Lucien Albrecht Crémant", "Segura Viudas Cava", "Juvé & Camps"] }
+        ],
         { desc: "Grower Champagne", askFor: "Ask for a grower (RM) Champagne — real Champagne craft", producers: ["Pierre Gimonnet", "Larmandier-Bernier"] }
       );
       await sql`
@@ -173,7 +187,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true, requireAllPrompts: false })},
           ${JSON.stringify(champagneOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
     }
 
@@ -198,7 +212,10 @@ async function seedJourneys() {
 
       // Chapter 1: Chianti
       const chiantiOptions = createWineOptions(
-        { desc: "Basic Chianti", askFor: "Ask for a Chianti under $15", min: 10, max: 15, producers: ["Antinori", "Ruffino"] },
+        [
+          { desc: "Basic Chianti", askFor: "Ask for a Chianti under $15", min: 10, max: 15, producers: ["Antinori", "Ruffino"] },
+          { desc: "Any Sangiovese or Italian red blend", askFor: "If no Chianti, any Sangiovese-based wine works — Rosso di Montalcino is great too", min: 12, max: 20, producers: ["Banfi", "Coltibuono", "Col d'Orcia"] }
+        ],
         { desc: "Chianti Classico", askFor: "Ask for a Chianti Classico — the real deal from Tuscany", producers: ["Felsina", "Fontodi"] }
       );
       await sql`
@@ -221,12 +238,15 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(chiantiOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 2: Barolo
       const baroloOptions = createWineOptions(
-        { desc: "Langhe Nebbiolo", askFor: "Ask for a Langhe Nebbiolo (baby Barolo) under $25", min: 18, max: 25, producers: ["Produttori del Barbaresco", "G.D. Vajra"] },
+        [
+          { desc: "Langhe Nebbiolo", askFor: "Ask for a Langhe Nebbiolo (baby Barolo) under $25", min: 18, max: 25, producers: ["Produttori del Barbaresco", "G.D. Vajra"] },
+          { desc: "Barbaresco or Roero", askFor: "Barbaresco is Barolo's neighbor — same grape, similar style, sometimes easier to find", min: 20, max: 30, producers: ["Produttori del Barbaresco", "Bruno Giacosa"] }
+        ],
         { desc: "Entry Barolo", askFor: "Ask for a Barolo — the King of Italian wines", producers: ["Pio Cesare", "Michele Chiarlo"] }
       );
       await sql`
@@ -250,12 +270,15 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(baroloOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 3: Amarone
       const amaroneOptions = createWineOptions(
-        { desc: "Valpolicella Ripasso", askFor: "Ask for a Valpolicella Ripasso (baby Amarone) under $25", min: 18, max: 25, producers: ["Zenato", "Bertani"] },
+        [
+          { desc: "Valpolicella Ripasso", askFor: "Ask for a Valpolicella Ripasso (baby Amarone) under $25", min: 18, max: 25, producers: ["Zenato", "Bertani"] },
+          { desc: "Valpolicella Classico Superiore", askFor: "If no Ripasso, a Valpolicella Classico Superiore is a good stepping stone", min: 12, max: 18, producers: ["Allegrini", "Brigaldara"] }
+        ],
         { desc: "Amarone della Valpolicella", askFor: "Ask for an Amarone — rich, concentrated, unforgettable", producers: ["Tommasi", "Allegrini"] }
       );
       await sql`
@@ -278,7 +301,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(amaroneOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 4: Brunello
@@ -306,7 +329,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(brunelloOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 5: Super Tuscan
@@ -334,7 +357,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(superTuscanOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
     }
 
@@ -479,7 +502,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(cabOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 2: Pinot Noir
@@ -508,7 +531,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(pinotOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 3: Chardonnay
@@ -537,7 +560,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(chardOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 4: Sauvignon Blanc
@@ -566,7 +589,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(sbOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
     }
 
@@ -617,7 +640,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(oregonEntryOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 2: Willamette Valley
@@ -646,7 +669,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(willametteOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 3: Sub-AVA (Dundee Hills, Eola-Amity, etc.)
@@ -675,7 +698,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(subAvaOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 4: Single Vineyard Premium
@@ -704,7 +727,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(premiumOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
     }
 
@@ -755,7 +778,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(riojaOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 2: Ribera del Duero
@@ -784,7 +807,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(riberaOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 3: Priorat
@@ -813,7 +836,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(prioratOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 4: Garnacha
@@ -842,7 +865,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(garnachaOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
     }
 
@@ -893,7 +916,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(malbecOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 2: Australian Shiraz
@@ -922,7 +945,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(shirazOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 3: California Zinfandel
@@ -951,7 +974,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(zinfandelOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 4: Petite Sirah
@@ -980,7 +1003,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(petiteSirahOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
     }
 
@@ -1031,7 +1054,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(rieslingOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 2: Grüner Veltliner
@@ -1060,7 +1083,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(grunerOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 3: Chenin Blanc
@@ -1089,7 +1112,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(cheninOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 4: Albariño
@@ -1118,7 +1141,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(albarinoOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
     }
 
@@ -1169,7 +1192,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(weightOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 2: Acid Cuts Fat
@@ -1198,7 +1221,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(acidOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 3: Tannins and Protein
@@ -1227,7 +1250,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(tanninOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
 
       // Chapter 4: Sweet with Spicy
@@ -1256,7 +1279,7 @@ async function seedJourneys() {
           ${JSON.stringify({ requirePhoto: true })},
           ${JSON.stringify(sweetOptions)}
         )
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (journey_id, chapter_number) DO UPDATE SET wine_options = EXCLUDED.wine_options
       `;
     }
 

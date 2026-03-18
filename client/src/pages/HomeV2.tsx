@@ -30,8 +30,10 @@ import {
   Globe,
   LogOut,
   ChevronDown,
+  Camera,
 } from "lucide-react";
 import type { User, Tasting } from "@shared/schema";
+import { TasteIdentityCard } from "@/components/dashboard/TasteIdentityCard";
 
 type TabKey = "solo" | "group" | "dashboard";
 
@@ -477,7 +479,7 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
               <Wine className="w-6 h-6 text-white" />
             </div>
             <h3 className="text-lg font-semibold text-white mb-1">Solo Tasting</h3>
-            <p className="text-white/70 text-sm">Record your wine experience</p>
+            <p className="text-white/70 text-sm">Deep dive bottles to learn what you like</p>
           </motion.button>
 
           {/* Learning Journeys Card - EQUAL styling */}
@@ -491,9 +493,29 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
               <GraduationCap className="w-6 h-6 text-white" />
             </div>
             <h3 className="text-lg font-semibold text-white mb-1">Learning Journeys</h3>
-            <p className="text-white/70 text-sm">Structured wine education</p>
+            <p className="text-white/70 text-sm">Guided courses to build your palate</p>
           </motion.button>
         </motion.div>
+
+        {/* Quick Rate - Fast rating entry */}
+        <motion.button
+          onClick={() => setLocation("/quick-rate")}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+        >
+          <div className="w-11 h-11 bg-amber-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+            <Camera className="w-5 h-5 text-amber-400" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-base font-semibold text-white">Quick Rate</h3>
+            <p className="text-white/50 text-sm">Snap, rate, done — under 30 seconds</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-white/30" />
+        </motion.button>
 
         {/* Continue Journey Card */}
         {activeJourney && (
@@ -535,42 +557,8 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
           </motion.div>
         )}
 
-        {/* Taste Profile Summary */}
-        {preferencesData &&
-          preferencesData.tastingCount > 0 &&
-          preferencesData.summary && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
-              className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="w-5 h-5 text-purple-400" />
-                <h2 className="text-lg font-semibold text-white">
-                  Your Taste Profile
-                </h2>
-              </div>
-              <p className="text-white/80 text-sm leading-relaxed">
-                {preferencesData.summary}
-              </p>
-
-              {dashboardData?.topPreferences && (
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {dashboardData.topPreferences.topRegion?.name && (
-                    <span className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-xs">
-                      {dashboardData.topPreferences.topRegion.name}
-                    </span>
-                  )}
-                  {dashboardData.topPreferences.topGrape?.name && (
-                    <span className="px-3 py-1 bg-pink-500/20 text-pink-300 rounded-full text-xs">
-                      {dashboardData.topPreferences.topGrape.name}
-                    </span>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          )}
+        {/* Compounding Taste Profile (compact on Solo tab) */}
+        <TasteIdentityCard compact onViewFull={() => setLocation('/home/dashboard')} />
 
         {/* Recent Tastings */}
         <motion.div
@@ -1159,15 +1147,6 @@ interface UserDashboardData {
   };
 }
 
-interface TasteProfile {
-  redWineProfile: {
-    summary?: string;
-  };
-  whiteWineProfile: {
-    summary?: string;
-  };
-}
-
 interface SommelierTips {
   preferenceProfile: string;
   redDescription: string;
@@ -1188,12 +1167,6 @@ function DashboardTabContent({ user, onLogout }: TabContentProps) {
   // Fetch solo preferences
   const { data: soloPreferences } = useQuery<PreferencesData>({
     queryKey: ["/api/solo/preferences"],
-  });
-
-  // Fetch taste profile
-  const { data: tasteProfile } = useQuery<TasteProfile>({
-    queryKey: [`/api/dashboard/${user.email}/taste-profile`],
-    enabled: !!user.email,
   });
 
   // Fetch sommelier tips
@@ -1297,48 +1270,8 @@ function DashboardTabContent({ user, onLogout }: TabContentProps) {
           </motion.div>
         )}
 
-        {/* Wine Profiles */}
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-50px" }}
-          transition={{ duration: 0.4 }}
-          className="space-y-4"
-        >
-          <h2 className="text-lg font-semibold text-white">Wine Profiles</h2>
-
-          {/* Red Wine Profile */}
-          <motion.div
-            whileHover={{ scale: 1.01, y: -2 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="bg-gradient-to-br from-red-500/10 to-white/5 backdrop-blur-xl rounded-2xl p-5 border border-red-500/20 cursor-pointer hover:border-red-500/40 transition-colors"
-          >
-            <h3 className="text-white font-medium mb-2 flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500" />
-              Red Wine Profile
-            </h3>
-            <p className="text-white/70 text-sm">
-              {tasteProfile?.redWineProfile?.summary ||
-                "Continue tasting red wines to build your profile"}
-            </p>
-          </motion.div>
-
-          {/* White Wine Profile */}
-          <motion.div
-            whileHover={{ scale: 1.01, y: -2 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            className="bg-gradient-to-br from-yellow-500/10 to-white/5 backdrop-blur-xl rounded-2xl p-5 border border-yellow-500/20 cursor-pointer hover:border-yellow-500/40 transition-colors"
-          >
-            <h3 className="text-white font-medium mb-2 flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-yellow-400" />
-              White Wine Profile
-            </h3>
-            <p className="text-white/70 text-sm">
-              {tasteProfile?.whiteWineProfile?.summary ||
-                "Continue tasting white wines to build your profile"}
-            </p>
-          </motion.div>
-        </motion.div>
+        {/* Compounding Taste Profile */}
+        <TasteIdentityCard />
 
         {/* Sommelier Tips */}
         <motion.div

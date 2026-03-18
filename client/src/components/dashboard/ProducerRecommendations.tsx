@@ -132,7 +132,20 @@ export function ProducerRecommendations({ email }: ProducerRecommendationsProps)
                   transition={{ delay: index * 0.1 }}
                   className="bg-white/5 rounded-xl p-4 space-y-3"
                 >
-                  {/* Header: Wine name and price */}
+                  {/* Category tag + Header */}
+                  {(rec as any).category && (
+                    <span className={`inline-block text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full w-fit ${
+                      (rec as any).category === 'wild_card'
+                        ? 'bg-amber-500/20 text-amber-300'
+                        : (rec as any).category === 'palate_expander'
+                        ? 'bg-blue-500/20 text-blue-300'
+                        : 'bg-emerald-500/20 text-emerald-300'
+                    }`}>
+                      {(rec as any).category === 'safe_bet' ? 'Safe Bet'
+                        : (rec as any).category === 'palate_expander' ? 'Palate Expander'
+                        : 'Wild Card'}
+                    </span>
+                  )}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <h4 className="text-white font-medium truncate">

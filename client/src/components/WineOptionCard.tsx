@@ -8,24 +8,23 @@ interface WineOptionCardProps {
   isSelected?: boolean;
 }
 
-const levelStyles = {
-  budget: {
-    gradient: "from-green-500 to-emerald-600",
-    badge: "bg-green-500/20 text-green-400",
-    label: "Budget",
-    sublabel: "Under $25"
-  },
-  splurge: {
-    gradient: "from-amber-500 to-orange-600",
-    badge: "bg-amber-500/20 text-amber-400",
-    label: "Splurge",
-    sublabel: "Worth it"
-  }
+const tierColors: Record<string, string> = {
+  budget: "text-green-400",
+  entry: "text-green-400",
+  mid: "text-blue-400",
+  splurge: "text-amber-400",
+  premium: "text-amber-400",
+};
+
+const tierLabels: Record<string, string> = {
+  budget: "Entry Level",
+  entry: "Entry Level",
+  mid: "Mid Range",
+  splurge: "Worth the Splurge",
+  premium: "Premium",
 };
 
 export function WineOptionCard({ option, onSelect, isSelected }: WineOptionCardProps) {
-  const style = levelStyles[option.level];
-
   return (
     <motion.div
       className={`
@@ -33,32 +32,39 @@ export function WineOptionCard({ option, onSelect, isSelected }: WineOptionCardP
         ${isSelected ? 'border-purple-500 bg-white/10' : 'border-white/10 hover:bg-white/10'}
         transition-all duration-200
       `}
-      whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={onSelect}
     >
-      {/* Level badge */}
-      <div className="flex items-center gap-2 mb-3">
-        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${style.badge}`}>
-          <DollarSign className="w-3 h-3" />
-          {style.label}
-        </div>
-        {option.level === 'budget' && (
-          <span className="text-xs text-green-400/70">{style.sublabel}</span>
+      {/* Title + price */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <h3 className="text-white font-medium text-base">{option.description}</h3>
+        {isSelected && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center shrink-0"
+          >
+            <Wine className="w-3 h-3 text-white" />
+          </motion.div>
         )}
       </div>
 
-      {/* Description */}
-      <h3 className="text-white font-medium text-lg mb-2">{option.description}</h3>
-
-      {/* Price range — only shown for budget */}
       {option.priceRange && (
-        <div className="flex items-center gap-2 text-white/70 text-sm mb-3">
-          <span className="font-mono">
-            ${option.priceRange.min} - ${option.priceRange.max}
-          </span>
-        </div>
+        <p className="text-sm text-white/50 font-mono mb-3">
+          ${option.priceRange.min} – ${option.priceRange.max}
+        </p>
       )}
+
+      {/* What to ask for */}
+      <div className="bg-white/5 rounded-lg p-3 mb-3">
+        <div className="flex items-start gap-2">
+          <MessageCircle className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs text-white/50 mb-1">Ask for:</p>
+            <p className="text-sm text-white/90">{option.askFor}</p>
+          </div>
+        </div>
+      </div>
 
       {/* Label tips */}
       {option.labelTips && (
@@ -73,26 +79,13 @@ export function WineOptionCard({ option, onSelect, isSelected }: WineOptionCardP
         </div>
       )}
 
-      {/* What to ask for */}
-      <div className="bg-white/5 rounded-lg p-3 mb-3">
-        <div className="flex items-start gap-2">
-          <MessageCircle className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-xs text-white/50 mb-1">Ask for:</p>
-            <p className="text-sm text-white/90">{option.askFor}</p>
-          </div>
-        </div>
-      </div>
-
       {/* Substitutes */}
       {option.substitutes && option.substitutes.length > 0 && (
         <div className="flex items-start gap-2 mb-3">
           <ArrowRightLeft className="w-4 h-4 text-white/40 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-xs text-white/50 mb-1">Also works:</p>
-            <p className="text-sm text-white/70">
-              {option.substitutes.join(", ")}
-            </p>
+            <p className="text-sm text-white/70">{option.substitutes.join(", ")}</p>
           </div>
         </div>
       )}
@@ -102,30 +95,15 @@ export function WineOptionCard({ option, onSelect, isSelected }: WineOptionCardP
         <div className="flex items-start gap-2">
           <Store className="w-4 h-4 text-white/40 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-xs text-white/50 mb-1">Examples:</p>
-            <p className="text-sm text-white/70">
-              {option.exampleProducers.join(", ")}
-            </p>
+            <p className="text-xs text-white/50 mb-1">Look for:</p>
+            <p className="text-sm text-white/70">{option.exampleProducers.join(", ")}</p>
           </div>
         </div>
       )}
 
       {/* Why this wine */}
       {option.whyThisWine && (
-        <p className="text-xs text-white/50 mt-3 italic">
-          {option.whyThisWine}
-        </p>
-      )}
-
-      {/* Selected indicator */}
-      {isSelected && (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="absolute top-3 right-3 w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center"
-        >
-          <Wine className="w-3 h-3 text-white" />
-        </motion.div>
+        <p className="text-xs text-white/50 mt-3 italic">{option.whyThisWine}</p>
       )}
     </motion.div>
   );
@@ -133,37 +111,60 @@ export function WineOptionCard({ option, onSelect, isSelected }: WineOptionCardP
 
 interface WineOptionsListProps {
   options: WineOption[];
-  selectedLevel?: 'budget' | 'splurge';
-  onSelectOption?: (level: 'budget' | 'splurge') => void;
+  selectedIndex?: number;
+  onSelectOption?: (index: number) => void;
 }
 
-export function WineOptionsList({ options, selectedLevel, onSelectOption }: WineOptionsListProps) {
+export function WineOptionsList({ options, selectedIndex, onSelectOption }: WineOptionsListProps) {
   if (!options || options.length === 0) {
     return null;
   }
 
-  // Sort: budget first, splurge second
-  const sorted = [...options].sort((a, b) => (a.level === 'budget' ? -1 : 1));
+  // Group options by level, preserving original index for selection tracking
+  const indexed = options.map((option, index) => ({ option, index }));
+  const groups: { level: string; entries: typeof indexed }[] = [];
+  const seen = new Set<string>();
+  for (const entry of indexed) {
+    if (!seen.has(entry.option.level)) {
+      seen.add(entry.option.level);
+      groups.push({ level: entry.option.level, entries: indexed.filter(e => e.option.level === entry.option.level) });
+    }
+  }
 
   return (
-    <div className="space-y-3">
-      <h3 className="text-white font-medium flex items-center gap-2">
-        <Wine className="w-5 h-5 text-purple-400" />
-        Wine Options
-      </h3>
-      <p className="text-white/60 text-sm">
-        Pick whichever fits your mood — same lesson either way.
-      </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {sorted.map((option) => (
-          <WineOptionCard
-            key={option.level}
-            option={option}
-            isSelected={selectedLevel === option.level}
-            onSelect={() => onSelectOption?.(option.level)}
-          />
-        ))}
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-white font-medium flex items-center gap-2">
+          <Wine className="w-5 h-5 text-purple-400" />
+          Wine Options
+        </h3>
+        <p className="text-white/60 text-sm mt-1">
+          Pick whichever works for you — any option will work for this chapter.
+        </p>
       </div>
+
+      {groups.map(({ level, entries }) => {
+        const color = tierColors[level] || "text-purple-400";
+        const label = tierLabels[level] || level.charAt(0).toUpperCase() + level.slice(1);
+        return (
+          <div key={level} className="space-y-2">
+            <h4 className={`text-sm font-medium flex items-center gap-1.5 ${color}`}>
+              <DollarSign className="w-3.5 h-3.5" />
+              {label}
+            </h4>
+            <div className="space-y-3">
+              {entries.map(({ option, index }) => (
+                <WineOptionCard
+                  key={`${level}-${index}`}
+                  option={option}
+                  isSelected={selectedIndex === index}
+                  onSelect={() => onSelectOption?.(index)}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
