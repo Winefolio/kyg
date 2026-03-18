@@ -201,13 +201,16 @@ function buildSignalSummary(signals: Awaited<ReturnType<typeof storage.getTastin
 
   for (const t of fullTastings) {
     const resp = t.responses as any;
-    const flavors: string[] = resp?.taste?.flavors ?? [];
+    const rawFlavors = resp?.taste?.flavors;
+    const flavors: string[] = Array.isArray(rawFlavors) ? rawFlavors : [];
     for (const f of flavors) {
       flavorCounts[f] = (flavorCounts[f] || 0) + 1;
     }
+    const rawPrimary = resp?.aroma?.primaryAromas;
+    const rawSecondary = resp?.aroma?.secondaryAromas;
     const aromas: string[] = [
-      ...(resp?.aroma?.primaryAromas ?? []),
-      ...(resp?.aroma?.secondaryAromas ?? []),
+      ...(Array.isArray(rawPrimary) ? rawPrimary : []),
+      ...(Array.isArray(rawSecondary) ? rawSecondary : []),
     ];
     for (const a of aromas) {
       aromaCounts[a] = (aromaCounts[a] || 0) + 1;
@@ -303,7 +306,8 @@ function computeFlavorAffinities(
 
   for (const t of allTastings) {
     const resp = t.responses as any;
-    const flavors: string[] = resp?.taste?.flavors ?? [];
+    const rawFlavors = resp?.taste?.flavors;
+    const flavors: string[] = Array.isArray(rawFlavors) ? rawFlavors : [];
     const rating = resp?.overall?.rating;
 
     for (const f of flavors) {
