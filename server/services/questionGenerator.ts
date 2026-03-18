@@ -448,22 +448,41 @@ function getUserPrompt(wineInfo: WineRecognitionResult, chapter?: Chapter, userL
   });
   const varietal = sanitized.grapeVariety;
 
-  // Determine wine type for tannins guidance
-  const isRed = wineInfo.grapeVarieties?.some(g => {
-    const lower = g.toLowerCase();
-    return ['cabernet', 'merlot', 'pinot noir', 'syrah', 'shiraz', 'malbec', 'sangiovese',
-            'nebbiolo', 'tempranillo', 'grenache', 'zinfandel', 'barbera', 'mourvèdre',
-            'primitivo', 'petite sirah', 'carmenere', 'tannat', 'gamay', 'pinotage'].some(r => lower.includes(r));
-  });
+  // Determine wine type — use explicit wineType from recognition/user, fall back to grape heuristic
+  const RED_GRAPES = ['cabernet', 'merlot', 'pinot noir', 'syrah', 'shiraz', 'malbec', 'sangiovese',
+    'nebbiolo', 'tempranillo', 'grenache', 'zinfandel', 'barbera', 'mourvèdre',
+    'primitivo', 'petite sirah', 'carmenere', 'tannat', 'gamay', 'pinotage'];
+  const wineType: string = wineInfo.wineType
+    || (wineInfo.grapeVarieties?.some(g => RED_GRAPES.some(r => g.toLowerCase().includes(r))) ? 'red' : 'white');
+  const hasTannins = wineType === 'red' || wineType === 'rosé' || wineType === 'orange';
+
+  // Build fruit guidance per wine type
+  let fruitGuidance = '';
+  if (wineType === 'red') {
+    fruitGuidance = `Fruit options for RED wine: dark fruit (blackberry, plum, black cherry), red fruit (raspberry, strawberry, cranberry), dried fruit (fig, prune). Do NOT offer citrus, tropical, or stone fruit as primary options.`;
+  } else if (wineType === 'white') {
+    fruitGuidance = `Fruit options for WHITE wine: citrus (lemon, lime, grapefruit), stone fruit (peach, apricot, nectarine), tropical (pineapple, mango, passion fruit), green fruit (apple, pear). Do NOT offer dark fruit (blackberry, plum) or red fruit (raspberry, cherry) as primary options.`;
+  } else if (wineType === 'rosé') {
+    fruitGuidance = `Fruit options for ROSÉ: red fruit (strawberry, raspberry, watermelon), stone fruit (peach, nectarine), citrus (grapefruit). Do NOT offer dark fruit (blackberry, plum).`;
+  } else if (wineType === 'sparkling') {
+    fruitGuidance = `Fruit options for SPARKLING: citrus (lemon, lime), green apple, pear, white peach, brioche/toast notes. Do NOT offer dark fruit or heavy tropical fruit.`;
+  } else if (wineType === 'dessert' || wineType === 'fortified') {
+    fruitGuidance = `Fruit options for DESSERT/FORTIFIED: dried fruit (raisin, fig, date), candied fruit, honey, caramel, nuts. Include sweetness as a key trait.`;
+  } else if (wineType === 'orange') {
+    fruitGuidance = `Fruit options for ORANGE wine: dried apricot, tangerine peel, bruised apple, honey, tea-like tannins. Include texture as a key trait.`;
+  }
 
   let prompt = `Generate three-beat tasting questions for this wine:
 
 Wine: ${sanitized.name}
 Varietal: ${varietal}
 Region: ${sanitized.region}
-Wine Type: ${isRed ? 'Red' : 'White/Other'} (${isRed ? 'include tannins trait' : 'skip tannins trait'})
+Wine Type: ${wineType.charAt(0).toUpperCase() + wineType.slice(1)} (${hasTannins ? 'include tannins trait' : 'SKIP tannins — this wine has no significant tannins'})
 ${sanitized.vintage !== 'NV' ? `Vintage: ${sanitized.vintage}` : ''}
-${sanitized.producer ? `Producer: ${sanitized.producer}` : ''}`;
+${sanitized.producer ? `Producer: ${sanitized.producer}` : ''}
+
+IMPORTANT — Wine-type-specific guidance:
+${fruitGuidance}`;
 
   if (chapter) {
     const chapterTitle = sanitizeForPrompt(chapter.title, 100);

@@ -1077,6 +1077,7 @@ export interface WineRecognitionResult {
   grapeVarieties: string[];
   vintage?: number;
   producer?: string;
+  wineType?: 'red' | 'white' | 'rosé' | 'sparkling' | 'dessert' | 'fortified' | 'orange';
   confidence: number;
 }
 
