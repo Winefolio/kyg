@@ -334,6 +334,8 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
 
   // Show completion screen
   if (view === 'complete') {
+    const isJourneyTasting = !!(journeyId && chapterId);
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1a0a2e] via-[#16082a] to-[#0d0015] flex items-center justify-center p-4">
         <motion.div
@@ -345,43 +347,66 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
             <GraduationCap className="w-8 h-8 text-green-400" />
           </div>
 
-          <h2 className="text-2xl font-bold text-white mb-2">Chapter Complete!</h2>
-
-          {chapter && (
-            <p className="text-purple-200/80 mb-6">
-              You've finished "{chapter.title}"
-            </p>
+          {isJourneyTasting ? (
+            <>
+              <h2 className="text-2xl font-bold text-white mb-2">Chapter Complete!</h2>
+              {chapter && (
+                <p className="text-purple-200/80 mb-6">
+                  You've finished "{chapter.title}"
+                </p>
+              )}
+              {chapter?.learningObjectives && chapter.learningObjectives.length > 0 && (
+                <div className="bg-black/20 rounded-xl p-4 mb-6 text-left">
+                  <p className="text-xs text-purple-400 font-medium mb-2">What you learned:</p>
+                  <ul className="space-y-1">
+                    {chapter.learningObjectives.map((obj, i) => (
+                      <li key={i} className="text-sm text-purple-200/80 flex items-start gap-2">
+                        <ChevronRight className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                        {obj}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="space-y-3">
+                <Button
+                  onClick={() => setLocation(`/journeys/${journeyId}`)}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  Continue Journey
+                </Button>
+                <Button
+                  onClick={() => setLocation('/home/dashboard')}
+                  variant="outline"
+                  className="w-full border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
+                >
+                  Go to Dashboard
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-2xl font-bold text-white mb-2">Tasting Saved!</h2>
+              <p className="text-purple-200/80 mb-6">
+                Your notes on {wineInfo.wineName || 'this wine'} have been recorded. Your taste profile is updating.
+              </p>
+              <div className="space-y-3">
+                <Button
+                  onClick={() => setLocation('/home/dashboard')}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  View Your Dashboard
+                </Button>
+                <Button
+                  onClick={() => setLocation('/home')}
+                  variant="outline"
+                  className="w-full border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
+                >
+                  Back to Home
+                </Button>
+              </div>
+            </>
           )}
-
-          {chapter?.learningObjectives && chapter.learningObjectives.length > 0 && (
-            <div className="bg-black/20 rounded-xl p-4 mb-6 text-left">
-              <p className="text-xs text-purple-400 font-medium mb-2">What you learned:</p>
-              <ul className="space-y-1">
-                {chapter.learningObjectives.map((obj, i) => (
-                  <li key={i} className="text-sm text-purple-200/80 flex items-start gap-2">
-                    <ChevronRight className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                    {obj}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <Button
-              onClick={() => setLocation(`/journeys/${journeyId}`)}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-            >
-              Continue Journey
-            </Button>
-            <Button
-              onClick={() => setLocation(returnPath)}
-              variant="outline"
-              className="w-full border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
-            >
-              View All Tastings
-            </Button>
-          </div>
         </motion.div>
       </div>
     );
