@@ -503,7 +503,7 @@ Return as JSON:
 function normalizeRegionName(region: string): string {
   const normalized = region.trim();
 
-  // Handle common variations
+  // Handle common variations (exact match first)
   const regionMappings: Record<string, string> = {
     "napa": "Napa Valley",
     "napa valley": "Napa Valley",
@@ -521,11 +521,35 @@ function normalizeRegionName(region: string): string {
     "new zealand": "Marlborough",
     "willamette": "Oregon Willamette Valley",
     "willamette valley": "Oregon Willamette Valley",
-    "oregon": "Oregon Willamette Valley"
+    "oregon": "Oregon Willamette Valley",
+    "barolo": "Piedmont",
+    "barbaresco": "Piedmont",
+    "piedmont": "Piedmont",
+    "piemonte": "Piedmont",
+    "champagne": "Champagne",
+    "prosecco": "Prosecco",
+    "rhone": "Rhône Valley",
+    "rhône": "Rhône Valley",
+    "loire": "Loire Valley",
+    "mosel": "Mosel",
+    "alsace": "Alsace",
   };
 
   const lowerRegion = normalized.toLowerCase();
-  return regionMappings[lowerRegion] || normalized;
+
+  // 1. Exact match
+  if (regionMappings[lowerRegion]) {
+    return regionMappings[lowerRegion];
+  }
+
+  // 2. Partial match — check if any mapping key appears in the region string
+  for (const [key, value] of Object.entries(regionMappings)) {
+    if (lowerRegion.includes(key)) {
+      return value;
+    }
+  }
+
+  return normalized;
 }
 
 /**
@@ -555,5 +579,18 @@ function normalizeGrapeName(grape: string): string {
   };
 
   const lowerGrape = normalized.toLowerCase();
-  return grapeMappings[lowerGrape] || normalized;
+
+  // 1. Exact match
+  if (grapeMappings[lowerGrape]) {
+    return grapeMappings[lowerGrape];
+  }
+
+  // 2. Partial match
+  for (const [key, value] of Object.entries(grapeMappings)) {
+    if (lowerGrape.includes(key)) {
+      return value;
+    }
+  }
+
+  return normalized;
 }

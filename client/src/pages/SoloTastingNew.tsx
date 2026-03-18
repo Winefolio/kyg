@@ -81,9 +81,11 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
   const journeyId = params.get("journeyId");
   const chapterId = params.get("chapterId");
   const wineLevel = params.get("wineLevel") as 'budget' | 'splurge' | null;
+  const wineOptionIndex = params.get("wineOptionIndex") ? parseInt(params.get("wineOptionIndex")!) : null;
 
   const [view, setView] = useState<ViewState>('wine-entry');
   const [isScanning, setIsScanning] = useState(false);
+  const [vintageNudge, setVintageNudge] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [aiQuestions, setAiQuestions] = useState<any[] | null>(null);
@@ -123,6 +125,11 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
           wineVintage: data.wine.wineVintage || prev.wineVintage,
           wineType: data.wine.wineType || prev.wineType
         }));
+
+        // Show vintage nudge if scan couldn't find the year
+        if (data.vintageNotFound) {
+          setVintageNudge(true);
+        }
 
         toast({
           title: "Wine Recognized!",
@@ -258,7 +265,7 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
           body: JSON.stringify({
             wineInfo: wineRecognition,
             email: user.email,
-            userLevel: 'intro', // User's level will be fetched from their profile in production
+            userLevel: user.tastingLevel || 'intro',
             skipValidation: chapter?.wineRequirements?.anyWine || false
           }),
           credentials: 'include'
@@ -344,11 +351,19 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
             <GraduationCap className="w-8 h-8 text-green-400" />
           </div>
 
-          <h2 className="text-2xl font-bold text-white mb-2">Chapter Complete!</h2>
+          <h2 className="text-2xl font-bold text-white mb-2">
+            {journeyId ? 'Chapter Complete!' : 'Tasting Complete!'}
+          </h2>
 
           {chapter && (
             <p className="text-purple-200/80 mb-6">
               You've finished "{chapter.title}"
+            </p>
+          )}
+
+          {!journeyId && (
+            <p className="text-purple-200/80 mb-6">
+              Great job tasting {wineInfo.wineName || 'this wine'}!
             </p>
           )}
 
@@ -367,19 +382,21 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
           )}
 
           <div className="space-y-3">
-            <Button
-              onClick={() => setLocation(`/journeys/${journeyId}`)}
-              className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-            >
-              Continue Journey
-            </Button>
-            <Button
-              onClick={() => setLocation(returnPath)}
-              variant="outline"
-              className="w-full border-purple-500/30 text-purple-300 hover:bg-purple-500/10"
-            >
-              View All Tastings
-            </Button>
+            {journeyId ? (
+              <Button
+                onClick={() => setLocation(`/journeys/${journeyId}`)}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                Continue Journey
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setLocation('/home')}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                Back to Home
+              </Button>
+            )}
           </div>
         </motion.div>
       </div>
@@ -431,7 +448,9 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
 
           {/* Shopping Guide — selected wine option */}
           {chapter && wineLevel && chapter.wineOptions && (() => {
-            const selectedOption = chapter.wineOptions.find(o => o.level === wineLevel);
+            const selectedOption = wineOptionIndex !== null
+              ? chapter.wineOptions[wineOptionIndex]
+              : chapter.wineOptions.find(o => o.level === wineLevel);
             if (!selectedOption) return null;
             return (
               <div className="bg-gradient-to-br from-purple-900/30 to-pink-900/20 rounded-xl p-4 mb-6 border border-purple-500/20">
@@ -619,14 +638,24 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="vintage" className="text-purple-200">Vintage Year</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="vintage" className="text-purple-200">Vintage Year</Label>
+                    {vintageNudge && !wineInfo.wineVintage && (
+                      <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded-full animate-pulse">
+                        Please add year
+                      </span>
+                    )}
+                  </div>
                   <Input
                     id="vintage"
                     type="number"
                     placeholder="e.g., 2020"
                     value={wineInfo.wineVintage || ''}
-                    onChange={(e) => setWineInfo(prev => ({ ...prev, wineVintage: e.target.value ? parseInt(e.target.value) : undefined }))}
-                    className="mt-1 bg-white/10 border-white/20 text-white placeholder:text-purple-300/50"
+                    onChange={(e) => {
+                      setVintageNudge(false);
+                      setWineInfo(prev => ({ ...prev, wineVintage: e.target.value ? parseInt(e.target.value) : undefined }));
+                    }}
+                    className={`mt-1 bg-white/10 border-white/20 text-white placeholder:text-purple-300/50 ${vintageNudge && !wineInfo.wineVintage ? 'border-amber-500/50 ring-1 ring-amber-500/30' : ''}`}
                   />
                 </div>
                 <div>

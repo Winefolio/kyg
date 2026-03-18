@@ -557,8 +557,8 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
           </motion.div>
         )}
 
-        {/* Compounding Taste Profile */}
-        <TasteIdentityCard />
+        {/* Compounding Taste Profile (compact on Solo tab) */}
+        <TasteIdentityCard compact onViewFull={() => setLocation('/home/dashboard')} />
 
         {/* Recent Tastings */}
         <motion.div

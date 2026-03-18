@@ -6254,7 +6254,7 @@ export class DatabaseStorage implements IStorage {
         descriptors: Array.from(stats.descriptors).slice(0, 3),
         wineCount: stats.count
       }))
-      .filter(r => r.avgRating >= 3.5) // Only recommend based on wines they liked
+      .filter(r => r.avgRating > 0) // Include any rated wines
       .sort((a, b) => b.avgRating - a.avgRating)
       .slice(0, 3); // Top 3 regions
 
@@ -6323,7 +6323,7 @@ export class DatabaseStorage implements IStorage {
         descriptors: Array.from(stats.descriptors).slice(0, 3),
         wineCount: stats.count
       }))
-      .filter(g => g.avgRating >= 3.5) // Only recommend based on wines they liked
+      .filter(g => g.avgRating > 0) // Include any rated wines
       .sort((a, b) => b.avgRating - a.avgRating)
       .slice(0, 3); // Top 3 grapes
 

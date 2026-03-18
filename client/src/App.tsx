@@ -34,6 +34,7 @@ const TastingSession = lazy(() => import("@/pages/TastingSession"));
 const TastingCompletion = lazy(() => import("@/pages/TastingCompletion"));
 const HostDashboard = lazy(() => import("@/pages/HostDashboard"));
 const OnboardingQuiz = lazy(() => import("@/pages/OnboardingQuiz"));
+const QuickRate = lazy(() => import("@/pages/QuickRate"));
 
 import { SommelierFAB } from "@/components/sommelier/SommelierFAB";
 
@@ -52,6 +53,7 @@ function Router() {
       <Route path="/tasting/new">
         <SoloTastingNew returnPath="/home" />
       </Route>
+      <Route path="/quick-rate" component={QuickRate} />
 
       {/* Redirects from old routes to new unified home */}
       <Route path="/solo">

@@ -79,6 +79,7 @@ export default function WineEntryForm({ onSubmit, onCancel, initialData }: WineE
   const [showPhotoCapture, setShowPhotoCapture] = useState(false);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [recognitionMessage, setRecognitionMessage] = useState<string | null>(null);
+  const [vintageNudge, setVintageNudge] = useState(false);
 
   const [wineName, setWineName] = useState(initialData?.wineName || '');
   const [wineRegion, setWineRegion] = useState(initialData?.wineRegion || '');
@@ -114,6 +115,11 @@ export default function WineEntryForm({ onSubmit, onCancel, initialData }: WineE
         if (data.wine.wineVintage) setWineVintage(data.wine.wineVintage.toString());
         if (data.wine.grapeVariety) setGrapeVariety(data.wine.grapeVariety);
         if (data.wine.wineType) setWineType(data.wine.wineType);
+
+        // Show vintage nudge if scan couldn't find the year
+        if (data.vintageNotFound) {
+          setVintageNudge(true);
+        }
 
         setRecognitionMessage(
           data.wine.confidence > 0.7
@@ -288,11 +294,22 @@ export default function WineEntryForm({ onSubmit, onCancel, initialData }: WineE
 
             {/* Vintage */}
             <div className="space-y-2">
-              <Label htmlFor="wineVintage" className="text-white/80">
-                Vintage
-              </Label>
-              <Select value={wineVintage} onValueChange={setWineVintage}>
-                <SelectTrigger className="bg-white/10 border-white/10 text-white">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="wineVintage" className="text-white/80">
+                  Vintage
+                </Label>
+                {vintageNudge && !wineVintage && (
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full"
+                  >
+                    Couldn't read year — please select
+                  </motion.span>
+                )}
+              </div>
+              <Select value={wineVintage} onValueChange={(val) => { setWineVintage(val); setVintageNudge(false); }}>
+                <SelectTrigger className={`bg-white/10 border-white/10 text-white ${vintageNudge && !wineVintage ? 'border-amber-500/50 ring-1 ring-amber-500/30' : ''}`}>
                   <SelectValue placeholder="Select year" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[200px]">

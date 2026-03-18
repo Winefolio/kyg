@@ -549,6 +549,45 @@ export function isOpenAIConfigured(): boolean {
 }
 
 // ===========================================
+// QUICK RATE NOTE HELPER (No GPT call)
+// ===========================================
+
+/**
+ * Generate a simple personal note for quick-rated wines using templates.
+ * No GPT call — pure string template for cost savings.
+ */
+export function generateQuickRateNote(
+  wineName: string,
+  rating?: number,
+  userNote?: string
+): string | null {
+  if (!rating) return null;
+
+  const descriptions: Record<number, string> = {
+    1: "not a fan of this one",
+    2: "didn't really enjoy this one",
+    3: "this one wasn't for you",
+    4: "this was just okay",
+    5: "this was decent, nothing special",
+    6: "this was pretty good",
+    7: "you liked this one",
+    8: "you really enjoyed this one",
+    9: "this was excellent — a standout",
+    10: "absolutely loved this one — top marks"
+  };
+
+  const clampedRating = Math.min(10, Math.max(1, Math.round(rating)));
+  const desc = descriptions[clampedRating] || "you tried this one";
+  let note = `You rated ${wineName} ${rating}/10 — ${desc}.`;
+
+  if (userNote && userNote.trim()) {
+    note += ` "${userNote.trim()}"`;
+  }
+
+  return note;
+}
+
+// ===========================================
 // NEXT BOTTLE RECOMMENDATIONS (Solo Tastings)
 // ===========================================
 
@@ -775,4 +814,64 @@ function getDefaultRecommendations(wine: WineContext): TastingRecommendation[] {
       askFor: 'Ask for an Austrian Grüner Veltliner, something fresh and zippy'
     }
   ];
+}
+
+/**
+ * Generate a personal wine note summarizing what the user liked/disliked about a wine.
+ * Returns a 1-2 sentence conversational note in second person.
+ */
+export async function generatePersonalWineNote(
+  wineName: string,
+  responses: Record<string, any>
+): Promise<string | null> {
+  if (!openai) {
+    return null;
+  }
+
+  try {
+    const sanitizedName = sanitizeForPrompt(wineName, 100);
+    const rating = responses?.overall?.rating;
+    const buyAgain = responses?.overall?.wouldBuyAgain;
+    const userNotes = responses?.overall?.notes;
+    const preferences = responses?.preferences;
+
+    // Build a summary of what the user said
+    const prefSummary = preferences
+      ? Object.entries(preferences)
+          .map(([trait, pref]: [string, any]) => {
+            const enjoyed = pref.enjoyment >= 7 ? 'enjoyed' : pref.enjoyment <= 4 ? 'didn\'t love' : 'found okay';
+            return `${trait}: ${enjoyed} (${pref.enjoyment}/10, wants ${pref.wantMore ? 'more' : 'less'})`;
+          })
+          .join('; ')
+      : 'no preference data';
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-5.2',
+      messages: [
+        {
+          role: 'system',
+          content: 'You write short, personal wine tasting notes. 1-2 sentences max. Second person ("You..."). Conversational and warm — like a friend reminding you what you thought. Never use technical jargon. Reference specific things they liked or disliked.'
+        },
+        {
+          role: 'user',
+          content: `Write a personal note for ${sanitizedName}.
+
+Rating: ${rating || 'not rated'}/10
+Would buy again: ${buyAgain || 'unknown'}
+User notes: ${userNotes ? sanitizeTastingText(userNotes) : 'none'}
+Preference breakdown: ${prefSummary}`
+        }
+      ],
+      max_completion_tokens: 150
+    });
+
+    const note = completion.choices[0].message.content?.trim();
+    if (!note || note.length < 10) return null;
+
+    console.log(`[Personal Note] Generated for ${wineName}: "${note}"`);
+    return note;
+  } catch (error) {
+    console.error('[Personal Note] Generation failed:', error);
+    return null;
+  }
 }

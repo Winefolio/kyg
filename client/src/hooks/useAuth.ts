@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 interface User {
   id?: number;
   email: string;
+  tastingLevel?: string;
 }
 
 export function useAuth() {

@@ -56,6 +56,7 @@ function PierreIcon({ className }: { className?: string }) {
 export function SommelierFAB() {
   const [isOpen, setIsOpen] = useState(false);
   const [isWelcome, setIsWelcome] = useState(false);
+  const [initialMessage, setInitialMessage] = useState<string | null>(null);
   const [location] = useLocation();
   const { triggerHaptic } = useHaptics();
 
@@ -90,6 +91,21 @@ export function SommelierFAB() {
     }
   }, [location, isAuthenticated, isShown, isHidden]);
 
+  // Listen for pierre:open custom event (from "Ask Pierre" buttons)
+  useEffect(() => {
+    const handlePierreOpen = () => {
+      const msg = sessionStorage.getItem("pierre_initial_message");
+      if (msg) {
+        sessionStorage.removeItem("pierre_initial_message");
+        setInitialMessage(msg);
+      }
+      setIsWelcome(false);
+      setIsOpen(true);
+    };
+    window.addEventListener("pierre:open", handlePierreOpen);
+    return () => window.removeEventListener("pierre:open", handlePierreOpen);
+  }, []);
+
   // FAB button only shows on allowed routes when not chatting
   const showFABButton = isAuthenticated && !isHidden && isShown && !isOpen;
 
@@ -120,7 +136,18 @@ export function SommelierFAB() {
       </AnimatePresence>
 
       {showChatSheet && (
-        <SommelierChatSheet open={isOpen} onOpenChange={setIsOpen} isWelcome={isWelcome} />
+        <SommelierChatSheet
+          open={isOpen}
+          onOpenChange={(open) => {
+            setIsOpen(open);
+            if (!open) {
+              setInitialMessage(null);
+              setIsWelcome(false);
+            }
+          }}
+          isWelcome={isWelcome}
+          initialMessage={initialMessage}
+        />
       )}
     </>
   );

@@ -86,6 +86,12 @@ interface WineScore {
     acidity?: number;
     tannins?: number;
     body?: number;
+    overall?: {
+      rating?: number;
+      personalNote?: string;
+      [key: string]: any;
+    };
+    [key: string]: any;
   };
 }
 
@@ -126,6 +132,7 @@ interface TastingHistory {
   wineType?: string;
   photoUrl?: string;
   wineCharacteristics?: WineCharacteristicsData;
+  tastingMode?: 'quick' | 'full';
 }
 
 interface TasteProfile {
@@ -1197,6 +1204,13 @@ export default function UserDashboard() {
                       </div>
                       <p className="text-sm text-purple-200 mb-4 line-clamp-2">{wine.wineDescription}</p>
 
+                      {/* Personal wine note from AI */}
+                      {wine.tastingResponses?.overall?.personalNote && (
+                        <p className="text-sm text-purple-200/80 italic mb-3 line-clamp-2">
+                          "{wine.tastingResponses.overall.personalNote}"
+                        </p>
+                      )}
+
                       {/* Wine Insights - show when we have characteristics and user ratings */}
                       {wine.wineCharacteristics && wine.tastingResponses && (
                         <div className="mt-3">
@@ -1262,6 +1276,13 @@ export default function UserDashboard() {
                             <p className="text-sm text-purple-200 mb-2">{wine.grapeVarietals.join(', ')}</p>
                           )}
                           <p className="text-sm text-purple-200 line-clamp-2">{wine.wineDescription}</p>
+
+                          {/* Personal wine note from AI */}
+                          {wine.tastingResponses?.overall?.personalNote && (
+                            <p className="text-sm text-purple-200/80 italic mt-1 line-clamp-2">
+                              "{wine.tastingResponses.overall.personalNote}"
+                            </p>
+                          )}
 
                           {/* Wine Insights - show when we have characteristics and user ratings */}
                           {wine.wineCharacteristics && wine.tastingResponses && (
@@ -1491,6 +1512,14 @@ export default function UserDashboard() {
                                     <><Users2 className="w-3 h-3 mr-1" />Group</>
                                   )}
                                 </Badge>
+                                {session.tastingMode === 'quick' && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                  >
+                                    Quick Rate
+                                  </Badge>
+                                )}
                               </div>
 
                               {isSolo ? (

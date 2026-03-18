@@ -430,7 +430,7 @@ export function registerDashboardRoutes(app: Express) {
       : 'budget';
 
     try {
-      const recommendations = await withAiCache(email, `producer_recs_${priceTier}`, () =>
+      const recommendations = await withAiCache(email, `producer_recs_v2_${priceTier}`, () =>
         generateProducerRecommendations(email, priceTier)
       );
       res.json(recommendations);
@@ -1120,32 +1120,56 @@ async function generateProducerRecommendations(
   if (avgRedRating > avgWhiteRating + 0.5) preferredStyle = "bold red wines";
   else if (avgWhiteRating > avgRedRating + 0.5) preferredStyle = "crisp white wines";
 
-  // Load prompt template
-  const fs = await import('fs/promises');
-  const path = await import('path');
-  const promptPath = path.join(process.cwd(), 'prompts', 'producer_recommendations.txt');
+  // Build prompt inline (no external template file needed)
+  const regionsStr = favoriteRegions.length > 0 ? favoriteRegions.join(', ') : 'exploring various regions';
+  const grapesStr = favoriteGrapes.length > 0 ? favoriteGrapes.join(', ') : 'exploring various grapes';
+  const avgRating = (dashboardData.stats.averageScore || 0).toFixed(1);
+  const totalWines = wineScores.scores.length;
 
-  let promptTemplate: string;
-  try {
-    promptTemplate = await fs.readFile(promptPath, 'utf-8');
-  } catch (error) {
-    console.error('Failed to read producer recommendations prompt:', error);
-    throw new Error('Prompt template not found');
-  }
+  // Build list of wines they've already had to avoid repeats
+  const alreadyTried = wineScores.scores
+    .slice(0, 15)
+    .map((w: any) => `${w.wineName || ''} (${w.grapeVarietals?.join(', ') || 'unknown'}, ${w.region || 'unknown'})`)
+    .join('; ');
 
-  // Fill in the template
-  const prompt = promptTemplate
-    .replace('{favoriteRegions}', favoriteRegions.length > 0 ? favoriteRegions.join(', ') : 'exploring various regions')
-    .replace('{favoriteGrapes}', favoriteGrapes.length > 0 ? favoriteGrapes.join(', ') : 'exploring various grapes')
-    .replace('{avgRating}', (dashboardData.stats.averageScore || 0).toFixed(1))
-    .replace('{preferredStyle}', preferredStyle)
-    .replace('{bodyPreference}', 'medium to full-bodied') // Could be enhanced with actual preference data
-    .replace('{totalWines}', String(wineScores.scores.length))
-    .replace('{priceTier}', priceTier);
+  const prompt = `Based on this wine drinker's profile, recommend exactly 3 wines they should try next.
+
+CRITICAL RULES:
+- Each wine MUST be from a DIFFERENT grape variety AND a different region. No duplicates.
+- Wine #1: A "safe bet" — closely matches their known preferences.
+- Wine #2: A "palate expander" — same general style but from an unexpected region or lesser-known grape they haven't tried.
+- Wine #3: A "wild card" — something outside their comfort zone that could surprise them. Explain why it might click.
+- Do NOT recommend wines they've already had (see list below).
+
+Profile:
+- Favorite regions: ${regionsStr}
+- Favorite grapes: ${grapesStr}
+- Average rating given: ${avgRating}/10
+- Preferred style: ${preferredStyle}
+- Total wines tasted: ${totalWines}
+- Price tier: ${priceTier}
+
+Already tried (avoid these):
+${alreadyTried}
+
+For each wine, provide:
+- producerName: the winery/producer
+- wineName: the specific wine name and vintage
+- estimatedPrice: price range (e.g. "$15-20")
+- grapeVariety: the grape(s)
+- region: where it's from
+- category: "safe_bet" | "palate_expander" | "wild_card"
+- whyForYou: 1-2 sentences explaining why this pick. For wild_card, explain the stretch.
+- whereToBuy: array of 1-2 places to find it (e.g. "Wine.com", "Total Wine")
+- tastingNotes: brief tasting notes
+
+Also include a priceDisclaimer string.
+
+Respond as JSON: { "recommendations": [...], "priceDisclaimer": "..." }`;
 
   // Call GPT
   const completion = await openai.chat.completions.create({
-    model: "gpt-5-mini", // Using mini for cost efficiency on structured output
+    model: "gpt-5.2",
     messages: [
       {
         role: "system",

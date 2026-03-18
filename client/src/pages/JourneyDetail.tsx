@@ -91,7 +91,7 @@ export default function JourneyDetail() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showShoppingList, setShowShoppingList] = useState(false);
-  const [selectedWineLevel, setSelectedWineLevel] = useState<'budget' | 'splurge' | undefined>();
+  const [selectedWineIndex, setSelectedWineIndex] = useState<number | undefined>();
 
   const journeyId = parseInt(id || "0");
 
@@ -151,13 +151,15 @@ export default function JourneyDetail() {
   };
 
   const handleStartChapter = (chapter: Chapter) => {
-    // Navigate to solo tasting with journey context + selected wine level
+    // Navigate to solo tasting with journey context + selected wine option
     const params = new URLSearchParams({
       journeyId: String(journeyId),
       chapterId: String(chapter.id)
     });
-    if (selectedWineLevel) {
-      params.set('wineLevel', selectedWineLevel);
+    if (selectedWineIndex !== undefined && chapter.wineOptions?.[selectedWineIndex]) {
+      const selected = chapter.wineOptions[selectedWineIndex];
+      params.set('wineLevel', selected.level);
+      params.set('wineOptionIndex', String(selectedWineIndex));
     }
     setLocation(`/solo/new?${params.toString()}`);
   };
@@ -493,11 +495,26 @@ export default function JourneyDetail() {
                         <div className="mb-3">
                           <WineOptionsList
                             options={chapter.wineOptions}
-                            selectedLevel={selectedWineLevel}
-                            onSelectOption={setSelectedWineLevel}
+                            selectedIndex={selectedWineIndex}
+                            onSelectOption={setSelectedWineIndex}
                           />
                           {/* Nearby wine shops */}
                           <NearbyWineShops />
+
+                          {/* Ask Pierre for help finding wines */}
+                          <button
+                            onClick={() => {
+                              const wineType = chapter.wineRequirements?.wineType || 'wine';
+                              const specifics = chapter.wineRequirements?.grapeVariety || chapter.wineRequirements?.region || 'something for this chapter';
+                              const msg = `I'm working on "${chapter.title}" from the ${journey?.title || 'learning'} journey. I need a ${wineType} — specifically ${specifics}. My local shop doesn't have the suggested options. Can you help me find an alternative?`;
+                              sessionStorage.setItem("pierre_initial_message", msg);
+                              window.dispatchEvent(new CustomEvent('pierre:open'));
+                            }}
+                            className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-purple-600/15 border border-purple-500/30 text-purple-300 text-sm font-medium hover:bg-purple-600/25 transition-colors"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            Can't find these wines? Ask Pierre for help
+                          </button>
                         </div>
                       )}
 

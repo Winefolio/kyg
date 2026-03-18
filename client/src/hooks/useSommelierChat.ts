@@ -286,8 +286,11 @@ export function useSommelierChat(isOpen: boolean) {
     }
   }, [activeChatId, queryClient]);
 
-  // Start a new chat (just resets local state)
+  // Start a new chat (resets local state + aborts any active stream)
   const startNewChat = useCallback(() => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setIsStreaming(false);
     setMessages([]);
     setActiveChatId(null);
     setError(null);
