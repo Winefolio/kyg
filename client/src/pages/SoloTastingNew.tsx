@@ -249,6 +249,7 @@ export default function SoloTastingNew({ returnPath = "/solo" }: SoloTastingNewP
           region: wineInfo.wineRegion || 'Unknown',
           grapeVarieties: wineInfo.grapeVariety ? [wineInfo.grapeVariety] : [],
           vintage: wineInfo.wineVintage,
+          wineType: wineInfo.wineType,
           confidence: 0.8 // Assume high confidence since user entered/verified
         };
 
