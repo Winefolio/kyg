@@ -29,7 +29,12 @@ function getTraitDescriptor(trait: TraitName, value: number): string {
   return TRAIT_DESCRIPTORS[trait][level];
 }
 
-export function TasteIdentityCard() {
+interface TasteIdentityCardProps {
+  compact?: boolean;
+  onViewFull?: () => void;
+}
+
+export function TasteIdentityCard({ compact = false, onViewFull }: TasteIdentityCardProps) {
   const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery<TasteProfileResponse>({
@@ -90,6 +95,35 @@ export function TasteIdentityCard() {
   }
 
   const { traits, styleIdentity, confidence, flavorAffinities, wineTypeDistribution, topRegions, topGrapes, dataSnapshot } = profile;
+
+  // Compact mode: just style identity + tasting count, tappable
+  if (compact) {
+    return (
+      <Card
+        className="bg-gradient-to-br from-purple-900/40 to-indigo-900/40 backdrop-blur-xl border-white/20 cursor-pointer hover:bg-purple-900/50 transition-colors"
+        onClick={onViewFull}
+      >
+        <CardContent className="py-4 px-5">
+          <div className="flex items-start gap-3">
+            <Sparkles className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              {styleIdentity && confidence !== 'low' ? (
+                <p className="text-purple-100 text-sm leading-relaxed line-clamp-2 italic">
+                  "{styleIdentity}"
+                </p>
+              ) : (
+                <p className="text-purple-200 text-sm">Your taste profile is forming...</p>
+              )}
+              <p className="text-purple-300/60 text-xs mt-1">
+                {dataSnapshot.totalTastings} tasting{dataSnapshot.totalTastings !== 1 ? 's' : ''}
+                {onViewFull && ' · Tap to view full profile'}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="bg-gradient-to-br from-purple-900/40 to-indigo-900/40 backdrop-blur-xl border-white/20 overflow-hidden">
