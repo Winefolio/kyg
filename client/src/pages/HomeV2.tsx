@@ -557,42 +557,8 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
           </motion.div>
         )}
 
-        {/* Taste Profile Summary */}
-        {preferencesData &&
-          preferencesData.tastingCount > 0 &&
-          preferencesData.summary && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 }}
-              className="bg-white/5 backdrop-blur-md rounded-2xl p-5 border border-white/10"
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="w-5 h-5 text-purple-400" />
-                <h2 className="text-lg font-semibold text-white">
-                  Your Taste Profile
-                </h2>
-              </div>
-              <p className="text-white/80 text-sm leading-relaxed">
-                {preferencesData.summary}
-              </p>
-
-              {dashboardData?.topPreferences && (
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {dashboardData.topPreferences.topRegion?.name && (
-                    <span className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-xs">
-                      {dashboardData.topPreferences.topRegion.name}
-                    </span>
-                  )}
-                  {dashboardData.topPreferences.topGrape?.name && (
-                    <span className="px-3 py-1 bg-pink-500/20 text-pink-300 rounded-full text-xs">
-                      {dashboardData.topPreferences.topGrape.name}
-                    </span>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          )}
+        {/* Compounding Taste Profile */}
+        <TasteIdentityCard />
 
         {/* Recent Tastings */}
         <motion.div
