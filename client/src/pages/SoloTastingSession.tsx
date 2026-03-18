@@ -612,6 +612,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
       queryClient.invalidateQueries({ queryKey: ['/api/solo/tastings'] });
       queryClient.invalidateQueries({ queryKey: ['/api/solo/preferences'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/me/taste-profile'] });
       // Also invalidate URL-embedded dashboard queries (e.g. ['/api/dashboard/email@...'])
       queryClient.invalidateQueries({
         predicate: (query) =>
@@ -638,13 +639,6 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
   };
 
   const handleNext = () => {
-    // If this is a notice-beat question with an educational note, show it first
-    if (currentQuestion?.beatType === 'notice' && currentQuestion.educationalNote && !showEducationalNote) {
-      setShowEducationalNote(true);
-      return;
-    }
-
-    // Dismiss educational note and advance
     setShowEducationalNote(false);
 
     if (currentQuestionIndex < allQuestions.length - 1) {
@@ -674,13 +668,18 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
       return null;
     }
 
+    // For notice-beat questions, integrate the educational tip into the description
+    const description = currentQuestion.beatType === 'notice' && currentQuestion.educationalNote
+      ? `${config.description || ''}\n\n💡 ${currentQuestion.educationalNote}`.trim()
+      : (config.description || '');
+
     switch (type) {
       case 'scale':
         return (
           <ScaleQuestion
             question={{
               title: config.title,
-              description: config.description || '',
+              description,
               category: sectionInfo?.name || 'Question',
               scale_min: config.scaleMin || 1,
               scale_max: config.scaleMax || 5,
@@ -696,7 +695,7 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
           <MultipleChoiceQuestion
             question={{
               title: config.title,
-              description: config.description || '',
+              description,
               category: sectionInfo?.name || 'Question',
               options: config.options || [],
               allow_multiple: config.allowMultiple || false,
@@ -853,47 +852,15 @@ export default function SoloTastingSession({ wine, onComplete, onCancel, chapter
       {/* Question Content */}
       <main className="container mx-auto px-4 py-6 pb-32">
         <AnimatePresence mode="wait">
-          {showEducationalNote && currentQuestion?.educationalNote ? (
-            <motion.div
-              key={`${currentQuestion.id}-edu`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="max-w-lg mx-auto"
-            >
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-xl">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Wine className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-amber-300 mb-1">Did you know?</p>
-                    <p className="text-white/90 text-base leading-relaxed">
-                      {currentQuestion.educationalNote}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  onClick={handleNext}
-                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white py-3 rounded-xl mt-2"
-                >
-                  Got it — next question
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key={currentQuestion?.id}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              {renderQuestion()}
-            </motion.div>
-          )}
+          <motion.div
+            key={currentQuestion?.id}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            {renderQuestion()}
+          </motion.div>
         </AnimatePresence>
       </main>
 
