@@ -56,6 +56,9 @@ import {
   sommelierMessages,
   aiResponseCache,
   type AiResponseCache,
+  userTasteProfiles,
+  type UserTasteProfile,
+  type TasteProfile,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, desc, gte, lt, asc, ne, sql, gt, isNull, isNotNull } from "drizzle-orm";
@@ -4845,6 +4848,7 @@ export class DatabaseStorage implements IStorage {
         COUNT(*) as count
       FROM tastings
       WHERE user_id = ${userId}
+        AND tasting_mode = 'full'
     `);
 
     const row = Array.isArray(result) ? result[0] : (result as any).rows?.[0];
@@ -5490,6 +5494,7 @@ export class DatabaseStorage implements IStorage {
         sessionId: `solo-${tasting.id}`,
         packageId: null,
         packageName: tasting.wineName, // Use wine name as "session" name for solo tastings
+        wineName: tasting.wineName,
         status: 'completed',
         startedAt: tasting.tastedAt,
         completedAt: tasting.tastedAt,
@@ -5501,6 +5506,7 @@ export class DatabaseStorage implements IStorage {
         duration: 5, // Estimated solo tasting duration
         location: 'Solo Tasting',
         source: 'solo', // Track source for UI
+        tastingMode: tasting.tastingMode || 'full', // Quick rate vs full tasting
         wineRegion: tasting.wineRegion,
         wineVintage: tasting.wineVintage,
         wineType: tasting.wineType,
@@ -6606,6 +6612,131 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSommelierChat(chatId: number): Promise<void> {
     await db.delete(sommelierChats).where(eq(sommelierChats.id, chatId));
+  }
+
+  // ============================================
+  // TASTE PROFILE METHODS
+  // ============================================
+
+  async getLatestTasteProfile(userId: number): Promise<UserTasteProfile | undefined> {
+    const result = await db.query.userTasteProfiles.findFirst({
+      where: eq(userTasteProfiles.userId, userId),
+    });
+    return result ?? undefined;
+  }
+
+  async upsertTasteProfile(userId: number, profileData: TasteProfile, fingerprint: string): Promise<void> {
+    await db
+      .insert(userTasteProfiles)
+      .values({
+        userId,
+        profileData,
+        fingerprint,
+        synthesizedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [userTasteProfiles.userId],
+        set: {
+          profileData,
+          fingerprint,
+          synthesizedAt: new Date(),
+        },
+      });
+  }
+
+  async getProfileFingerprint(userId: number): Promise<string> {
+    // Hash tasting IDs + updatedAt for content-aware fingerprint
+    const result = await db
+      .select({
+        id: tastings.id,
+        updatedAt: tastings.updatedAt,
+      })
+      .from(tastings)
+      .where(eq(tastings.userId, userId))
+      .orderBy(tastings.id);
+
+    if (result.length === 0) return 'empty';
+
+    const content = result
+      .map(t => `${t.id}:${t.updatedAt?.getTime() ?? 0}`)
+      .join(',');
+    return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
+  }
+
+  async getTastingSignalsForProfile(userId: number): Promise<{
+    fullTastings: Array<{
+      id: number;
+      wineName: string;
+      wineRegion: string | null;
+      grapeVariety: string | null;
+      wineType: string | null;
+      responses: any;
+      tastedAt: Date;
+    }>;
+    quickRatesWithCharacteristics: Array<{
+      id: number;
+      wineName: string;
+      wineRegion: string | null;
+      grapeVariety: string | null;
+      wineType: string | null;
+      responses: any;
+      tastedAt: Date;
+      characteristics: any;
+    }>;
+    onboardingData: any;
+  }> {
+    // Full tastings (explicit signals)
+    const fullTastings = await db
+      .select({
+        id: tastings.id,
+        wineName: tastings.wineName,
+        wineRegion: tastings.wineRegion,
+        grapeVariety: tastings.grapeVariety,
+        wineType: tastings.wineType,
+        responses: tastings.responses,
+        tastedAt: tastings.tastedAt,
+      })
+      .from(tastings)
+      .where(
+        and(
+          eq(tastings.userId, userId),
+          eq(tastings.tastingMode, 'full')
+        )
+      )
+      .orderBy(desc(tastings.tastedAt));
+
+    // Quick rates -- use wineCharacteristics column (populated by background enrichment)
+    const quickRatesWithCharacteristics = await db
+      .select({
+        id: tastings.id,
+        wineName: tastings.wineName,
+        wineRegion: tastings.wineRegion,
+        grapeVariety: tastings.grapeVariety,
+        wineType: tastings.wineType,
+        responses: tastings.responses,
+        tastedAt: tastings.tastedAt,
+        characteristics: tastings.wineCharacteristics,
+      })
+      .from(tastings)
+      .where(
+        and(
+          eq(tastings.userId, userId),
+          eq(tastings.tastingMode, 'quick')
+        )
+      )
+      .orderBy(desc(tastings.tastedAt));
+
+    // User onboarding data
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { onboardingData: true },
+    });
+
+    return {
+      fullTastings,
+      quickRatesWithCharacteristics,
+      onboardingData: user?.onboardingData ?? null,
+    };
   }
 
   // AI Response Cache methods

@@ -4,7 +4,7 @@ import { tastings, users, insertTastingSchema, type TastingLevel, type TastingRe
 import { eq, desc, sql, and, ilike } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { attachCharacteristicsToTasting } from "../wine-intelligence";
-import { generateNextBottleRecommendations } from "../openai-client";
+import { generateNextBottleRecommendations, generatePersonalWineNote, generateQuickRateNote } from "../openai-client";
 import { wineIntelQueue } from "../lib/background-queue";
 import { unauthorized, notFound, validationError, internalError, forbidden } from "../lib/api-error";
 import { trackTastingCompleted } from "../audos-integration";
@@ -114,6 +114,7 @@ async function getUserPreferences(userId: number): Promise<UserPreferences> {
       COUNT(*) as tasting_count
     FROM tastings
     WHERE user_id = ${userId}
+      AND tasting_mode = 'full'
   `);
 
   const row = Array.isArray(result) ? result[0] : (result as PreferencesQueryResult).rows?.[0];
@@ -307,6 +308,7 @@ export function registerTastingsRoutes(app: Express): void {
       }
 
       const tastingData = parseResult.data;
+      const isQuickRate = tastingData.tastingMode === 'quick';
 
       // P2-006 & P2-007: Use transaction to ensure atomicity and return updated user state
       const result = await db.transaction(async (tx) => {
@@ -319,29 +321,41 @@ export function registerTastingsRoutes(app: Express): void {
           grapeVariety: tastingData.grapeVariety || null,
           wineType: tastingData.wineType || null,
           photoUrl: tastingData.photoUrl || null,
-          responses: tastingData.responses
+          responses: tastingData.responses,
+          tastingMode: tastingData.tastingMode || 'full'
         }).returning();
 
-        // Atomic update: increment count and check threshold, return updated state
-        const [updatedUser] = await tx
-          .update(users)
-          .set({
-            tastingsCompleted: sql`${users.tastingsCompleted} + 1`,
-            // Set levelUpPromptEligible if reaching threshold (atomic check)
-            levelUpPromptEligible: sql`
-              CASE
-                WHEN ${users.tastingLevel} = 'intro' AND ${users.tastingsCompleted} + 1 >= 10 THEN true
-                WHEN ${users.tastingLevel} = 'intermediate' AND ${users.tastingsCompleted} + 1 >= 25 THEN true
-                ELSE ${users.levelUpPromptEligible}
-              END
-            `
-          })
-          .where(eq(users.id, userId))
-          .returning({
-            tastingLevel: users.tastingLevel,
-            tastingsCompleted: users.tastingsCompleted,
-            levelUpPromptEligible: users.levelUpPromptEligible
+        // Only increment tasting count for full tastings (quick rates don't count toward milestones)
+        let updatedUser;
+        if (!isQuickRate) {
+          // Atomic update: increment count and check threshold, return updated state
+          [updatedUser] = await tx
+            .update(users)
+            .set({
+              tastingsCompleted: sql`${users.tastingsCompleted} + 1`,
+              // Set levelUpPromptEligible if reaching threshold (atomic check)
+              levelUpPromptEligible: sql`
+                CASE
+                  WHEN ${users.tastingLevel} = 'intro' AND ${users.tastingsCompleted} + 1 >= 10 THEN true
+                  WHEN ${users.tastingLevel} = 'intermediate' AND ${users.tastingsCompleted} + 1 >= 25 THEN true
+                  ELSE ${users.levelUpPromptEligible}
+                END
+              `
+            })
+            .where(eq(users.id, userId))
+            .returning({
+              tastingLevel: users.tastingLevel,
+              tastingsCompleted: users.tastingsCompleted,
+              levelUpPromptEligible: users.levelUpPromptEligible
+            });
+        } else {
+          // For quick rates, just read current user state without incrementing
+          const user = await tx.query.users.findFirst({
+            where: eq(users.id, userId),
+            columns: { tastingLevel: true, tastingsCompleted: true, levelUpPromptEligible: true }
           });
+          updatedUser = user;
+        }
 
         return { newTasting, updatedUser };
       });
@@ -349,34 +363,88 @@ export function registerTastingsRoutes(app: Express): void {
       const { newTasting, updatedUser } = result;
 
       // P1-005: Use background queue with retries instead of fire-and-forget
+      // Wine characteristics: always run (enriches wine card, reusable for future full tasting)
       wineIntelQueue.add(
         `wine-characteristics-${newTasting.id}`,
         () => attachCharacteristicsToTasting(newTasting.id)
       );
 
-      wineIntelQueue.add(
-        `recommendations-${newTasting.id}`,
-        async () => {
-          const recommendations = await generateNextBottleRecommendations(
-            {
-              wineName: tastingData.wineName,
-              grapeVariety: tastingData.grapeVariety || undefined,
-              wineRegion: tastingData.wineRegion || undefined,
-              wineType: tastingData.wineType || undefined
-            },
-            tastingData.responses as TastingResponses
-          );
-          await db
-            .update(tastings)
-            .set({ recommendations })
-            .where(eq(tastings.id, newTasting.id));
-          console.log(`Recommendations saved for tasting ${newTasting.id}`);
+      if (!isQuickRate) {
+        // Recommendations: only for full tastings (quick rates lack trait data)
+        wineIntelQueue.add(
+          `recommendations-${newTasting.id}`,
+          async () => {
+            const recommendations = await generateNextBottleRecommendations(
+              {
+                wineName: tastingData.wineName,
+                grapeVariety: tastingData.grapeVariety || undefined,
+                wineRegion: tastingData.wineRegion || undefined,
+                wineType: tastingData.wineType || undefined
+              },
+              tastingData.responses as TastingResponses
+            );
+            await db
+              .update(tastings)
+              .set({ recommendations })
+              .where(eq(tastings.id, newTasting.id));
+            console.log(`Recommendations saved for tasting ${newTasting.id}`);
+          }
+        );
+
+        // Generate personal wine note via GPT (async, non-blocking)
+        wineIntelQueue.add(
+          `personal-note-${newTasting.id}`,
+          async () => {
+            const note = await generatePersonalWineNote(
+              tastingData.wineName,
+              tastingData.responses as Record<string, any>
+            );
+            if (note) {
+              // Store in responses.overall.personalNote
+              const currentResponses = (newTasting.responses as Record<string, any>) || {};
+              const updatedResponses = {
+                ...currentResponses,
+                overall: {
+                  ...(currentResponses.overall || {}),
+                  personalNote: note
+                }
+              };
+              await db
+                .update(tastings)
+                .set({ responses: updatedResponses })
+                .where(eq(tastings.id, newTasting.id));
+              console.log(`Personal note saved for tasting ${newTasting.id}`);
+            }
+          }
+        );
+      } else {
+        // Quick rate: use simple template note instead of GPT (cost saving)
+        const quickNote = generateQuickRateNote(
+          tastingData.wineName,
+          (tastingData.responses as any)?.overall?.rating,
+          (tastingData.responses as any)?.overall?.notes
+        );
+        if (quickNote) {
+          const currentResponses = (newTasting.responses as Record<string, any>) || {};
+          const updatedResponses = {
+            ...currentResponses,
+            overall: {
+              ...(currentResponses.overall || {}),
+              personalNote: quickNote
+            }
+          };
+          // Fire and forget - simple DB update, no need for queue
+          db.update(tastings)
+            .set({ responses: updatedResponses })
+            .where(eq(tastings.id, newTasting.id))
+            .then(() => console.log(`Quick rate note saved for tasting ${newTasting.id}`))
+            .catch(err => console.error(`Failed to save quick rate note:`, err));
         }
-      );
+      }
 
       // P2-007: Use the RETURNED value from transaction, not a stale read
-      const currentLevel = updatedUser.tastingLevel as TastingLevel;
-      const isEligible = updatedUser.levelUpPromptEligible;
+      const currentLevel = (updatedUser?.tastingLevel || 'intro') as TastingLevel;
+      const isEligible = !isQuickRate && updatedUser?.levelUpPromptEligible;
       const nextLevel: TastingLevel | undefined = isEligible
         ? (currentLevel === 'intro' ? 'intermediate' : 'advanced')
         : undefined;
@@ -392,7 +460,7 @@ export function registerTastingsRoutes(app: Express): void {
           eligible: true,
           currentLevel,
           nextLevel,
-          tastingsCompleted: updatedUser.tastingsCompleted
+          tastingsCompleted: updatedUser?.tastingsCompleted
         } : undefined
       });
     } catch (error) {
@@ -544,6 +612,9 @@ export function registerTastingsRoutes(app: Express): void {
       if (Object.keys(allowedUpdates).length === 0) {
         return validationError(res, "No valid fields to update");
       }
+
+      // updated_at is also handled by DB trigger, but set explicitly for clarity
+      allowedUpdates.updatedAt = new Date();
 
       const [updated] = await db
         .update(tastings)

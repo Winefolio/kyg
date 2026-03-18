@@ -5,6 +5,7 @@ import { requireAuth } from "./auth";
 import { db } from "../db";
 import { users, tastings, responses, slides } from "@shared/schema";
 import { eq, desc, sql, inArray } from "drizzle-orm";
+import { getOrSynthesizeProfile } from "../services/tasteProfileService";
 
 // Helper: check AI response cache, return cached data or compute fresh
 async function withAiCache<T>(
@@ -40,7 +41,19 @@ async function withAiCache<T>(
 
 export function registerDashboardRoutes(app: Express) {
   console.log("👤 Registering user dashboard endpoints...");
-  
+
+  // Compounding taste profile (auth-protected, uses session userId)
+  app.get("/api/me/taste-profile", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const result = await getOrSynthesizeProfile(userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error getting taste profile:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Find participant by email across all sessions
   app.get("/api/participants/find-by-email", async (req, res) => {
     try {
