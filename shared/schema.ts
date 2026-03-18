@@ -722,7 +722,8 @@ export const insertTastingSchema = createInsertSchema(tastings, {
   tastingMode: z.enum(['quick', 'full']).optional().default('full')
 }).omit({
   id: true,
-  tastedAt: true
+  tastedAt: true,
+  updatedAt: true,
 });
 
 // Onboarding quiz answers
