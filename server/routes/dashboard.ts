@@ -1033,7 +1033,6 @@ async function generateWineProfileSummaries(
         }
       ],
       max_completion_tokens: 500,
-      temperature: 0.3,
       response_format: { type: "json_object" }
     });
 
@@ -1181,7 +1180,6 @@ Respond as JSON: { "recommendations": [...], "priceDisclaimer": "..." }`;
       }
     ],
     max_completion_tokens: 1000,
-    temperature: 0.7,
     response_format: { type: "json_object" }
   });
 
