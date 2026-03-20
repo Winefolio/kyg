@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Users, Wine, Map, CalendarDays, Activity, CheckCircle, User, UsersRound, ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { Users, Wine, Map, CalendarDays, Activity, CheckCircle, User, UsersRound, ChevronDown, ChevronRight, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+
+type SortKey = 'email' | 'createdAt' | 'soloTastings' | 'groupTastings'
+  | 'tastingsCompleted' | 'lastTastingDate' | 'tastingLevel' | 'onboardingCompleted';
+type SortDir = 'asc' | 'desc';
 
 interface EngagementData {
   summary: {
@@ -162,9 +166,24 @@ function UserDetailPanel({ email }: { email: string }) {
   );
 }
 
+function SortIcon({ sortKey: currentSort, sortDir, columnKey }: {
+  sortKey: SortKey;
+  sortDir: SortDir;
+  columnKey: SortKey;
+}) {
+  if (currentSort !== columnKey) return <ArrowUpDown className="h-3 w-3 ml-1 inline opacity-40" />;
+  return sortDir === 'asc'
+    ? <ArrowUp className="h-3 w-3 ml-1 inline" />
+    : <ArrowDown className="h-3 w-3 ml-1 inline" />;
+}
+
 export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>('createdAt');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [levelFilter, setLevelFilter] = useState('');
+  const [onboardedFilter, setOnboardedFilter] = useState('');
 
   const { data, isLoading, error } = useQuery<EngagementData>({
     queryKey: ['/api/admin/engagement'],
@@ -175,6 +194,68 @@ export default function AdminDashboard() {
     },
     refetchInterval: 60000,
   });
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
+
+  const sortedUsers = useMemo(() => {
+    if (!data) return [];
+
+    let users = data.recentUsers;
+
+    // Apply filters
+    if (search) {
+      users = users.filter(u => u.email.toLowerCase().includes(search.toLowerCase()));
+    }
+    if (levelFilter) {
+      users = users.filter(u => u.tastingLevel === levelFilter);
+    }
+    if (onboardedFilter) {
+      users = users.filter(u =>
+        onboardedFilter === 'yes' ? u.onboardingCompleted : !u.onboardingCompleted
+      );
+    }
+
+    // Sort
+    return [...users].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+
+      switch (sortKey) {
+        case 'email':
+          return dir * a.email.localeCompare(b.email);
+        case 'createdAt':
+          return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        case 'soloTastings':
+          return dir * (a.soloTastings - b.soloTastings);
+        case 'groupTastings':
+          return dir * (a.groupTastings - b.groupTastings);
+        case 'tastingsCompleted':
+          return dir * (a.tastingsCompleted - b.tastingsCompleted);
+        case 'lastTastingDate': {
+          const aTime = a.lastTastingDate ? new Date(a.lastTastingDate).getTime() : 0;
+          const bTime = b.lastTastingDate ? new Date(b.lastTastingDate).getTime() : 0;
+          if (!a.lastTastingDate && !b.lastTastingDate) return 0;
+          if (!a.lastTastingDate) return 1;
+          if (!b.lastTastingDate) return -1;
+          return dir * (aTime - bTime);
+        }
+        case 'tastingLevel': {
+          const order: Record<string, number> = { intro: 0, intermediate: 1, advanced: 2 };
+          return dir * ((order[a.tastingLevel] ?? -1) - (order[b.tastingLevel] ?? -1));
+        }
+        case 'onboardingCompleted':
+          return dir * (Number(a.onboardingCompleted) - Number(b.onboardingCompleted));
+        default:
+          return 0;
+      }
+    });
+  }, [data, search, levelFilter, onboardedFilter, sortKey, sortDir]);
 
   if (isLoading) {
     return (
@@ -192,11 +273,9 @@ export default function AdminDashboard() {
     );
   }
 
-  const { summary, recentUsers, journeys, sessions } = data;
+  const { summary, journeys, sessions } = data;
 
-  const filteredUsers = search
-    ? recentUsers.filter(u => u.email.toLowerCase().includes(search.toLowerCase()))
-    : recentUsers;
+  const thClass = "pb-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors";
 
   return (
     <div className="min-h-screen bg-background p-6 max-w-7xl mx-auto">
@@ -256,16 +335,37 @@ export default function AdminDashboard() {
 
       {/* Users Table */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Users ({filteredUsers.length})</CardTitle>
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Filter by email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8"
-            />
+        <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+          <CardTitle>Users ({sortedUsers.length})</CardTitle>
+          <div className="flex items-center gap-3">
+            <select
+              value={levelFilter}
+              onChange={(e) => setLevelFilter(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">All levels</option>
+              <option value="intro">Intro</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="advanced">Advanced</option>
+            </select>
+            <select
+              value={onboardedFilter}
+              onChange={(e) => setOnboardedFilter(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">All users</option>
+              <option value="yes">Onboarded</option>
+              <option value="no">Not onboarded</option>
+            </select>
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filter by email..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -273,55 +373,69 @@ export default function AdminDashboard() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left">
-                  <th className="pb-3 w-6"></th>
-                  <th className="pb-3 font-medium text-muted-foreground">Email</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Signed Up</th>
-                  <th className="pb-3 font-medium text-muted-foreground text-center">
+                  <th className="pb-3 w-8"></th>
+                  <th className={thClass} onClick={() => handleSort('email')}>
+                    Email <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="email" />
+                  </th>
+                  <th className={thClass} onClick={() => handleSort('createdAt')}>
+                    Signed Up <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="createdAt" />
+                  </th>
+                  <th className={`${thClass} text-center`} onClick={() => handleSort('soloTastings')}>
                     <User className="h-3.5 w-3.5 inline" /> Solo
+                    <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="soloTastings" />
                   </th>
-                  <th className="pb-3 font-medium text-muted-foreground text-center">
+                  <th className={`${thClass} text-center`} onClick={() => handleSort('groupTastings')}>
                     <UsersRound className="h-3.5 w-3.5 inline" /> Group
+                    <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="groupTastings" />
                   </th>
-                  <th className="pb-3 font-medium text-muted-foreground text-center">Total</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Last Active</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Level</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Onboarded</th>
+                  <th className={`${thClass} text-center`} onClick={() => handleSort('tastingsCompleted')}>
+                    Total <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="tastingsCompleted" />
+                  </th>
+                  <th className={thClass} onClick={() => handleSort('lastTastingDate')}>
+                    Last Active <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="lastTastingDate" />
+                  </th>
+                  <th className={thClass} onClick={() => handleSort('tastingLevel')}>
+                    Level <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="tastingLevel" />
+                  </th>
+                  <th className={thClass} onClick={() => handleSort('onboardingCompleted')}>
+                    Onboarded <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="onboardingCompleted" />
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((user) => {
+                {sortedUsers.map((user) => {
                   const isExpanded = expandedEmail === user.email;
                   return (
-                    <tr key={user.email} className="border-b last:border-0 group">
-                      <td colSpan={9} className="p-0">
-                        <div
-                          className="flex items-center cursor-pointer hover:bg-muted/50 transition-colors"
-                          onClick={() => setExpandedEmail(isExpanded ? null : user.email)}
-                        >
-                          <div className="py-3 pl-2 w-6">
-                            {isExpanded
-                              ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                              : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                            }
-                          </div>
-                          <div className="py-3 flex-1 font-mono text-xs">{user.email}</div>
-                          <div className="py-3 w-32">{formatDate(user.createdAt)}</div>
-                          <div className="py-3 w-16 text-center">{user.soloTastings}</div>
-                          <div className="py-3 w-16 text-center">{user.groupTastings}</div>
-                          <div className="py-3 w-16 text-center font-semibold">{user.tastingsCompleted}</div>
-                          <div className="py-3 w-32">{formatDate(user.lastTastingDate)}</div>
-                          <div className="py-3 w-24">
-                            <Badge variant={levelColor(user.tastingLevel)}>{user.tastingLevel}</Badge>
-                          </div>
-                          <div className="py-3 w-20 pr-2">{user.onboardingCompleted ? 'Yes' : 'No'}</div>
-                        </div>
-                        {isExpanded && (
-                          <div className="border-t bg-muted/30">
+                    <React.Fragment key={user.email}>
+                      <tr
+                        className="border-b last:border-0 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => setExpandedEmail(isExpanded ? null : user.email)}
+                      >
+                        <td className="py-3 pl-2 w-8">
+                          {isExpanded
+                            ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                          }
+                        </td>
+                        <td className="py-3 font-mono text-xs">{user.email}</td>
+                        <td className="py-3">{formatDate(user.createdAt)}</td>
+                        <td className="py-3 text-center">{user.soloTastings}</td>
+                        <td className="py-3 text-center">{user.groupTastings}</td>
+                        <td className="py-3 text-center font-semibold">{user.tastingsCompleted}</td>
+                        <td className="py-3">{formatDate(user.lastTastingDate)}</td>
+                        <td className="py-3">
+                          <Badge variant={levelColor(user.tastingLevel)}>{user.tastingLevel}</Badge>
+                        </td>
+                        <td className="py-3">{user.onboardingCompleted ? 'Yes' : 'No'}</td>
+                      </tr>
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={9} className="bg-muted/30 p-0 border-b">
                             <UserDetailPanel email={user.email} />
-                          </div>
-                        )}
-                      </td>
-                    </tr>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>

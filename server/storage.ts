@@ -4746,8 +4746,9 @@ export class DatabaseStorage implements IStorage {
 
   // User Dashboard
   async getAllParticipantsByEmail(email: string): Promise<Participant[]> {
+    const normalizedEmail = email.toLowerCase();
     // Check memo cache (5s TTL)
-    const cached = this.participantMemo.get(email);
+    const cached = this.participantMemo.get(normalizedEmail);
     if (cached && (Date.now() - cached.timestamp) < DatabaseStorage.PARTICIPANT_MEMO_TTL_MS) {
       return cached.data;
     }
@@ -4755,17 +4756,17 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select()
       .from(participants)
-      .where(eq(participants.email, email));
+      .where(sql`LOWER(${participants.email}) = ${normalizedEmail}`);
 
     // Cap at 200 entries — evict oldest (FIFO via Map insertion order)
-    if (this.participantMemo.size >= 200 && !this.participantMemo.has(email)) {
+    if (this.participantMemo.size >= 200 && !this.participantMemo.has(normalizedEmail)) {
       const oldestKey = this.participantMemo.keys().next().value;
       if (oldestKey !== undefined) {
         this.participantMemo.delete(oldestKey);
       }
     }
 
-    this.participantMemo.set(email, { data: result, timestamp: Date.now() });
+    this.participantMemo.set(normalizedEmail, { data: result, timestamp: Date.now() });
     return result;
   }
 
@@ -4862,6 +4863,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Sprint 4.1: Get group tasting preferences for unified dashboard
+  // Fixed: JOIN through slides to read payloadJson.category + answerJson.selectedScore
   async getGroupTastingPreferences(email: string): Promise<{
     sweetness: number | null;
     acidity: number | null;
@@ -4869,7 +4871,6 @@ export class DatabaseStorage implements IStorage {
     body: number | null;
     count: number;
   }> {
-    // Get all participant records for this email
     const userParticipants = await this.getAllParticipantsByEmail(email);
 
     if (userParticipants.length === 0) {
@@ -4878,59 +4879,59 @@ export class DatabaseStorage implements IStorage {
 
     const participantIds = userParticipants.map(p => p.id);
 
-    // Query responses using drizzle's inArray for proper array handling
-    const responseRows = await db
+    // Query scale responses by JOINing through slides for category + score
+    const scaleRows = await db
       .select({
-        sweetness: sql<string>`answer_json->>'sweetness'`,
-        acidity: sql<string>`answer_json->>'acidity'`,
-        tannins: sql<string>`answer_json->>'tannins'`,
-        body: sql<string>`answer_json->>'body'`,
+        category: sql<string>`${slides.payloadJson}->>'category'`,
+        scaleMax: sql<string>`${slides.payloadJson}->>'scale_max'`,
+        score: sql<string>`${responses.answerJson}->>'selectedScore'`,
       })
       .from(responses)
-      .where(inArray(responses.participantId, participantIds));
+      .innerJoin(slides, eq(responses.slideId, slides.id))
+      .where(
+        and(
+          inArray(responses.participantId, participantIds),
+          sql`${slides.payloadJson}->>'question_type' = 'scale'`,
+          isNotNull(sql`${responses.answerJson}->>'selectedScore'`),
+        )
+      );
 
-    // Calculate averages manually
-    let sweetnessSum = 0, sweetnessCount = 0;
-    let aciditySum = 0, acidityCount = 0;
-    let tanninsSum = 0, tanninsCount = 0;
-    let bodySum = 0, bodyCount = 0;
+    // Map categories to traits and normalize scales
+    const CATEGORY_TO_TRAIT: Record<string, string> = {
+      body: 'body', tannins: 'tannins', acidity: 'acidity', sweetness: 'sweetness',
+    };
 
-    for (const row of responseRows) {
-      if (row.sweetness) { sweetnessSum += Number(row.sweetness); sweetnessCount++; }
-      if (row.acidity) { aciditySum += Number(row.acidity); acidityCount++; }
-      if (row.tannins) { tanninsSum += Number(row.tannins); tanninsCount++; }
-      if (row.body) { bodySum += Number(row.body); bodyCount++; }
+    const traitAccum: Record<string, number[]> = {
+      sweetness: [], acidity: [], tannins: [], body: [],
+    };
+
+    for (const row of scaleRows) {
+      const category = (row.category || '').toLowerCase();
+      const trait = CATEGORY_TO_TRAIT[category];
+      if (!trait) continue;
+
+      const score = Number(row.score);
+      const scaleMax = Number(row.scaleMax) || 10;
+      if (isNaN(score) || score < 1) continue;
+
+      // Normalize to 1-5 scale
+      const clamped = Math.max(1, Math.min(score, scaleMax));
+      const normalized = scaleMax <= 1 ? 3 : scaleMax === 5 ? clamped : 1 + ((clamped - 1) / (scaleMax - 1)) * 4;
+      traitAccum[trait].push(normalized);
     }
 
-    const result = [{
-      sweetness: sweetnessCount > 0 ? sweetnessSum / sweetnessCount : null,
-      acidity: acidityCount > 0 ? aciditySum / acidityCount : null,
-      tannins: tanninsCount > 0 ? tanninsSum / tanninsCount : null,
-      body: bodyCount > 0 ? bodySum / bodyCount : null,
-      count: Math.max(sweetnessCount, acidityCount, tanninsCount, bodyCount)
-    }];
-
-    const row = Array.isArray(result) ? result[0] : (result as any).rows?.[0];
-
-    // If no explicit taste data, try alternative field paths
-    if (!row?.sweetness && !row?.acidity && !row?.tannins && !row?.body) {
-      // Fallback: count unique sessions as tastings
-      const uniqueSessions = new Set(userParticipants.map(p => p.sessionId).filter(Boolean));
-      return {
-        sweetness: null,
-        acidity: null,
-        tannins: null,
-        body: null,
-        count: uniqueSessions.size
-      };
-    }
+    const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+    const totalResponses = Math.max(
+      traitAccum.sweetness.length, traitAccum.acidity.length,
+      traitAccum.tannins.length, traitAccum.body.length,
+    );
 
     return {
-      sweetness: row?.sweetness ? Number(row.sweetness) : null,
-      acidity: row?.acidity ? Number(row.acidity) : null,
-      tannins: row?.tannins ? Number(row.tannins) : null,
-      body: row?.body ? Number(row.body) : null,
-      count: row?.count ? Number(row.count) : 0
+      sweetness: avg(traitAccum.sweetness),
+      acidity: avg(traitAccum.acidity),
+      tannins: avg(traitAccum.tannins),
+      body: avg(traitAccum.body),
+      count: totalResponses > 0 ? totalResponses : new Set(userParticipants.map(p => p.sessionId).filter(Boolean)).size,
     };
   }
 
