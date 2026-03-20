@@ -1256,6 +1256,7 @@ export interface TasteProfile {
     totalTastings: number;
     fullTastings: number;
     quickRates: number;
+    groupTastings?: number;
     oldestTasting: string;
     newestTasting: string;
   };

@@ -6740,6 +6740,43 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  // Group responses for taste profile synthesis (raw rows — normalization in service layer)
+  async getGroupResponsesForProfile(email: string): Promise<Array<{
+    responseId: string;
+    selectedScore: number | null;
+    answeredAt: Date | null;
+    category: string | null;
+    scaleMax: number | null;
+    questionType: string | null;
+    packageWineId: string | null;
+  }>> {
+    const normalizedEmail = email.toLowerCase();
+
+    const rows = await db
+      .select({
+        responseId: responses.id,
+        selectedScore: sql<number | null>`(${responses.answerJson}->>'selectedScore')::numeric`,
+        answeredAt: responses.answeredAt,
+        category: sql<string | null>`${slides.payloadJson}->>'category'`,
+        scaleMax: sql<number | null>`(${slides.payloadJson}->>'scale_max')::int`,
+        questionType: sql<string | null>`${slides.payloadJson}->>'question_type'`,
+        packageWineId: slides.packageWineId,
+      })
+      .from(responses)
+      .innerJoin(slides, eq(responses.slideId, slides.id))
+      .innerJoin(participants, eq(responses.participantId, participants.id))
+      .where(
+        and(
+          sql`LOWER(${participants.email}) = ${normalizedEmail}`,
+          eq(slides.type, 'question'),
+        )
+      )
+      .orderBy(desc(responses.answeredAt))
+      .limit(500);
+
+    return rows;
+  }
+
   // AI Response Cache methods
   async getTastingFingerprint(email: string): Promise<string> {
     // Solo tasting stats

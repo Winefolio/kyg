@@ -9,6 +9,9 @@ import { z } from 'zod';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { getOpenAIClient } from '../lib/openai';
 import { storage } from '../storage';
+import { db } from '../db';
+import { users } from '@shared/schema';
+import { eq } from 'drizzle-orm';
 import { sanitizeForPrompt } from '../lib/sanitize';
 import type { TasteProfile, TraitName, TraitScore, RankedItem, WineCharacteristicsData } from '@shared/schema';
 
@@ -43,9 +46,17 @@ interface AggregatedTraitStats {
   count: number;
 }
 
+interface GroupTraitSignal {
+  trait: TraitName;
+  value: number;         // normalized to 1-5
+  packageWineId: string;
+  answeredAt: Date;
+}
+
 interface ProfileSignalSummary {
   explicitTraits: Record<TraitName, AggregatedTraitStats>;
   implicitTraits: Record<TraitName, AggregatedTraitStats>;
+  groupTraits: Record<TraitName, AggregatedTraitStats>;
   avgEnjoyment: number | null;
   wantMoreRatio: number | null;
   wouldBuyAgain: { yes: number; maybe: number; no: number };
@@ -58,7 +69,57 @@ interface ProfileSignalSummary {
   totalTastings: number;
   fullTastings: number;
   quickRates: number;
+  groupTastings: number;
   dateRange: { oldest: string; newest: string };
+}
+
+// ============================================
+// GROUP SIGNAL NORMALIZATION
+// ============================================
+
+const GROUP_CATEGORY_TO_TRAIT: ReadonlyMap<string, TraitName> = new Map([
+  ['body', 'body'],
+  ['tannins', 'tannins'],
+  ['acidity', 'acidity'],
+  ['sweetness', 'sweetness'],
+]);
+
+function mapCategoryToTrait(category: string): TraitName | null {
+  const trait = GROUP_CATEGORY_TO_TRAIT.get(category.toLowerCase()) ?? null;
+  if (!trait && category) {
+    console.warn(`[TasteProfile] Unmapped group category: "${category}"`);
+  }
+  return trait;
+}
+
+function normalizeToFivePointScale(value: number, scaleMax: number): number {
+  if (scaleMax <= 1) return 3; // degenerate scale — return midpoint
+  const clamped = Math.max(1, Math.min(value, scaleMax));
+  if (scaleMax === 5) return clamped;
+  return 1 + ((clamped - 1) / (scaleMax - 1)) * 4;
+}
+
+function normalizeGroupResponses(
+  rawRows: Awaited<ReturnType<typeof storage.getGroupResponsesForProfile>>
+): GroupTraitSignal[] {
+  const signals: GroupTraitSignal[] = [];
+
+  for (const row of rawRows) {
+    if (row.questionType !== 'scale') continue;
+    if (row.selectedScore == null || row.packageWineId == null) continue;
+
+    const trait = mapCategoryToTrait(row.category ?? '');
+    if (!trait) continue;
+
+    signals.push({
+      trait,
+      value: normalizeToFivePointScale(row.selectedScore, row.scaleMax ?? 10),
+      packageWineId: row.packageWineId,
+      answeredAt: row.answeredAt ?? new Date(),
+    });
+  }
+
+  return signals;
 }
 
 // ============================================
@@ -107,7 +168,10 @@ export async function getOrSynthesizeProfile(userId: number): Promise<{
 // SIGNAL AGGREGATION
 // ============================================
 
-function buildSignalSummary(signals: Awaited<ReturnType<typeof storage.getTastingSignalsForProfile>>): ProfileSignalSummary {
+function buildSignalSummary(
+  signals: Awaited<ReturnType<typeof storage.getTastingSignalsForProfile>>,
+  groupSignals: GroupTraitSignal[] = [],
+): ProfileSignalSummary {
   const { fullTastings, quickRatesWithCharacteristics } = signals;
 
   // Explicit trait stats from full tastings
@@ -165,6 +229,29 @@ function buildSignalSummary(signals: Awaited<ReturnType<typeof storage.getTastin
       implicitTraits[trait].mean = implicitSums[trait] / implicitTraits[trait].count;
     }
   }
+
+  // Group trait stats (from group tasting responses)
+  const groupTraits: Record<TraitName, AggregatedTraitStats> = {
+    sweetness: { mean: 0, count: 0 },
+    acidity: { mean: 0, count: 0 },
+    tannins: { mean: 0, count: 0 },
+    body: { mean: 0, count: 0 },
+  };
+
+  const groupSums: Record<TraitName, number> = { sweetness: 0, acidity: 0, tannins: 0, body: 0 };
+
+  for (const gs of groupSignals) {
+    groupSums[gs.trait] += gs.value;
+    groupTraits[gs.trait].count += 1;
+  }
+
+  for (const trait of traitNames) {
+    if (groupTraits[trait].count > 0) {
+      groupTraits[trait].mean = groupSums[trait] / groupTraits[trait].count;
+    }
+  }
+
+  const groupWineCount = new Set(groupSignals.map(s => s.packageWineId)).size;
 
   // Preference beat aggregation (enjoyment + wantMore)
   let enjoymentSum = 0, enjoymentCount = 0;
@@ -250,9 +337,16 @@ function buildSignalSummary(signals: Awaited<ReturnType<typeof storage.getTastin
   const oldest = allDates.length > 0 ? new Date(Math.min(...allDates.map(d => d.getTime()))).toISOString() : '';
   const newest = allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))).toISOString() : '';
 
+  // Include group dates in date range
+  const groupDates = groupSignals.map(s => s.answeredAt);
+  const allDatesIncludingGroup = [...allDates, ...groupDates];
+  const oldestAll = allDatesIncludingGroup.length > 0 ? new Date(Math.min(...allDatesIncludingGroup.map(d => d.getTime()))).toISOString() : oldest;
+  const newestAll = allDatesIncludingGroup.length > 0 ? new Date(Math.max(...allDatesIncludingGroup.map(d => d.getTime()))).toISOString() : newest;
+
   return {
     explicitTraits,
     implicitTraits,
+    groupTraits,
     avgEnjoyment: enjoymentCount > 0 ? enjoymentSum / enjoymentCount : null,
     wantMoreRatio: wantMoreTotal > 0 ? wantMoreYes / wantMoreTotal : null,
     wouldBuyAgain,
@@ -262,10 +356,11 @@ function buildSignalSummary(signals: Awaited<ReturnType<typeof storage.getTastin
     ratingsByRegion,
     ratingsByGrape,
     recentNotes: recentNotes.slice(0, 10),
-    totalTastings: fullTastings.length + quickRatesWithCharacteristics.length,
+    totalTastings: fullTastings.length + quickRatesWithCharacteristics.length + groupWineCount,
     fullTastings: fullTastings.length,
     quickRates: quickRatesWithCharacteristics.length,
-    dateRange: { oldest, newest },
+    groupTastings: groupWineCount,
+    dateRange: { oldest: oldestAll, newest: newestAll },
   };
 }
 
@@ -347,9 +442,9 @@ function computeTopItems(ratings: Record<string, { count: number; mean: number }
     .slice(0, 5);
 }
 
-function computeConfidenceLevel(fullCount: number, quickCount: number): 'low' | 'medium' | 'high' {
-  // Effective weight: full=1.0, quick=0.4
-  const effectiveWeight = fullCount * 1.0 + quickCount * 0.4;
+function computeConfidenceLevel(fullCount: number, quickCount: number, groupCount: number = 0): 'low' | 'medium' | 'high' {
+  // Effective weight: full=1.0, group=1.0, quick=0.4
+  const effectiveWeight = fullCount * 1.0 + groupCount * 1.0 + quickCount * 0.4;
   if (effectiveWeight >= 6) return 'high';
   if (effectiveWeight >= 3) return 'medium';
   return 'low';
@@ -374,10 +469,28 @@ async function synthesizeProfile(
   fingerprint: string,
   previousProfile: TasteProfile | null,
 ): Promise<TasteProfile> {
+  // Fetch solo signals
   const rawSignals = await storage.getTastingSignalsForProfile(userId);
-  const signals = buildSignalSummary(rawSignals);
+
+  // Fetch group signals (via user's email)
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { email: true },
+  });
+  let groupSignals: GroupTraitSignal[] = [];
+  if (user?.email) {
+    const rawGroupRows = await storage.getGroupResponsesForProfile(user.email);
+    groupSignals = normalizeGroupResponses(rawGroupRows);
+  }
+
+  const signals = buildSignalSummary(rawSignals, groupSignals);
 
   const openaiClient = getOpenAIClient();
+
+  // Add group context to GPT prompt when group data is present
+  const groupContext = signals.groupTastings > 0
+    ? `\n\nNote: Some trait data comes from group tasting sessions, which provide per-trait ratings but not flavor/aroma details. ${signals.groupTastings} wines were tasted in group settings.`
+    : '';
 
   let gptOutput: GptProfileOutput;
 
@@ -387,12 +500,13 @@ async function synthesizeProfile(
       const completion = await openaiClient.beta.chat.completions.parse({
         model: 'gpt-5.2',
         messages: [
-          { role: 'system', content: SYNTHESIS_PROMPT },
+          { role: 'system', content: SYNTHESIS_PROMPT + groupContext },
           {
             role: 'user',
             content: JSON.stringify({
               explicitTraits: signals.explicitTraits,
               implicitTraits: signals.implicitTraits,
+              groupTraits: signals.groupTraits,
               avgEnjoyment: signals.avgEnjoyment,
               wantMoreRatio: signals.wantMoreRatio,
               wouldBuyAgain: signals.wouldBuyAgain,
@@ -405,6 +519,7 @@ async function synthesizeProfile(
               totalTastings: signals.totalTastings,
               fullTastings: signals.fullTastings,
               quickRates: signals.quickRates,
+              groupTastings: signals.groupTastings,
               previousStyleIdentity: previousProfile?.styleIdentity ?? null,
             }),
           },
@@ -429,9 +544,6 @@ async function synthesizeProfile(
   }
 
   // Merge GPT output with deterministic fields
-  const allTastings = [...rawSignals.fullTastings, ...rawSignals.quickRatesWithCharacteristics];
-  const allDates = allTastings.map(t => t.tastedAt);
-
   const profile: TasteProfile = {
     traits: gptOutput.traits,
     styleIdentity: gptOutput.styleIdentity,
@@ -444,8 +556,9 @@ async function synthesizeProfile(
       totalTastings: signals.totalTastings,
       fullTastings: signals.fullTastings,
       quickRates: signals.quickRates,
-      oldestTasting: allDates.length > 0 ? new Date(Math.min(...allDates.map(d => d.getTime()))).toISOString() : '',
-      newestTasting: allDates.length > 0 ? new Date(Math.max(...allDates.map(d => d.getTime()))).toISOString() : '',
+      groupTastings: signals.groupTastings,
+      oldestTasting: signals.dateRange.oldest,
+      newestTasting: signals.dateRange.newest,
     },
     synthesizedAt: new Date().toISOString(),
   };
@@ -453,7 +566,7 @@ async function synthesizeProfile(
   // AWAIT the write (institutional learning: never fire-and-forget)
   await storage.upsertTasteProfile(userId, profile, fingerprint);
 
-  console.log(`[TasteProfile] Synthesized profile for user ${userId}: ${signals.fullTastings} full + ${signals.quickRates} quick rates`);
+  console.log(`[TasteProfile] Synthesized profile for user ${userId}: ${signals.fullTastings} full + ${signals.quickRates} quick + ${signals.groupTastings} group`);
 
   return profile;
 }
@@ -465,13 +578,14 @@ function buildDeterministicFallback(signals: ProfileSignalSummary): GptProfileOu
   for (const trait of traitNames) {
     const explicit = signals.explicitTraits[trait];
     const implicit = signals.implicitTraits[trait];
+    const group = signals.groupTraits[trait];
 
-    // Weighted average: explicit=1.0, implicit=0.5
-    const totalWeight = explicit.count * 1.0 + implicit.count * 0.5;
-    const weightedSum = explicit.mean * explicit.count * 1.0 + implicit.mean * implicit.count * 0.5;
+    // Weighted average: explicit=1.0, group=1.0, implicit=0.5
+    const totalWeight = explicit.count * 1.0 + group.count * 1.0 + implicit.count * 0.5;
+    const weightedSum = explicit.mean * explicit.count * 1.0 + group.mean * group.count * 1.0 + implicit.mean * implicit.count * 0.5;
     const value = totalWeight > 0 ? weightedSum / totalWeight : 3.0;
 
-    const totalDataPoints = explicit.count + implicit.count;
+    const totalDataPoints = explicit.count + group.count + implicit.count;
     let confidence = 0;
     if (totalDataPoints >= 10) confidence = 1.0;
     else if (totalDataPoints >= 6) confidence = 0.8;
@@ -486,6 +600,6 @@ function buildDeterministicFallback(signals: ProfileSignalSummary): GptProfileOu
     styleIdentity: signals.totalTastings < 3
       ? 'Your taste profile is just getting started. Keep tasting to unlock personalized insights!'
       : 'Your taste profile is building. A few more tastings will reveal your wine identity.',
-    confidence: computeConfidenceLevel(signals.fullTastings, signals.quickRates),
+    confidence: computeConfidenceLevel(signals.fullTastings, signals.quickRates, signals.groupTastings),
   };
 }
