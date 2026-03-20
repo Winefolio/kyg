@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Users, Wine, Map, CalendarDays, Activity, CheckCircle, User, UsersRound, ChevronDown, ChevronRight, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 type SortKey = 'email' | 'createdAt' | 'soloTastings' | 'groupTastings'
-  | 'tastingsCompleted' | 'lastTastingDate' | 'tastingLevel' | 'onboardingCompleted';
+  | 'tastingsCompleted' | 'lastTastingDate' | 'lastSeenAt' | 'tastingLevel' | 'onboardingCompleted';
 type SortDir = 'asc' | 'desc';
 
 interface EngagementData {
@@ -28,6 +28,7 @@ interface EngagementData {
     groupTastings: number;
     tastingsCompleted: number;
     lastTastingDate: string | null;
+    lastSeenAt: string | null;
     tastingLevel: string;
     onboardingCompleted: boolean;
   }>;
@@ -238,12 +239,16 @@ export default function AdminDashboard() {
         case 'tastingsCompleted':
           return dir * (a.tastingsCompleted - b.tastingsCompleted);
         case 'lastTastingDate': {
-          const aTime = a.lastTastingDate ? new Date(a.lastTastingDate).getTime() : 0;
-          const bTime = b.lastTastingDate ? new Date(b.lastTastingDate).getTime() : 0;
           if (!a.lastTastingDate && !b.lastTastingDate) return 0;
           if (!a.lastTastingDate) return 1;
           if (!b.lastTastingDate) return -1;
-          return dir * (aTime - bTime);
+          return dir * (new Date(a.lastTastingDate).getTime() - new Date(b.lastTastingDate).getTime());
+        }
+        case 'lastSeenAt': {
+          if (!a.lastSeenAt && !b.lastSeenAt) return 0;
+          if (!a.lastSeenAt) return 1;
+          if (!b.lastSeenAt) return -1;
+          return dir * (new Date(a.lastSeenAt).getTime() - new Date(b.lastSeenAt).getTime());
         }
         case 'tastingLevel': {
           const order: Record<string, number> = { intro: 0, intermediate: 1, advanced: 2 };
@@ -392,7 +397,10 @@ export default function AdminDashboard() {
                     Total <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="tastingsCompleted" />
                   </th>
                   <th className={thClass} onClick={() => handleSort('lastTastingDate')}>
-                    Last Active <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="lastTastingDate" />
+                    Last Tasting <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="lastTastingDate" />
+                  </th>
+                  <th className={thClass} onClick={() => handleSort('lastSeenAt')}>
+                    Last Seen <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="lastSeenAt" />
                   </th>
                   <th className={thClass} onClick={() => handleSort('tastingLevel')}>
                     Level <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="tastingLevel" />
@@ -423,6 +431,7 @@ export default function AdminDashboard() {
                         <td className="py-3 text-center">{user.groupTastings}</td>
                         <td className="py-3 text-center font-semibold">{user.tastingsCompleted}</td>
                         <td className="py-3">{formatDate(user.lastTastingDate)}</td>
+                        <td className="py-3">{formatDate(user.lastSeenAt)}</td>
                         <td className="py-3">
                           <Badge variant={levelColor(user.tastingLevel)}>{user.tastingLevel}</Badge>
                         </td>
@@ -430,7 +439,7 @@ export default function AdminDashboard() {
                       </tr>
                       {isExpanded && (
                         <tr>
-                          <td colSpan={9} className="bg-muted/30 p-0 border-b">
+                          <td colSpan={10} className="bg-muted/30 p-0 border-b">
                             <UserDetailPanel email={user.email} />
                           </td>
                         </tr>

@@ -68,7 +68,8 @@ export function registerAdminRoutes(app: Express) {
             GREATEST(
               (SELECT MAX(t.tasted_at) FROM tastings t WHERE t.user_id = u.id),
               (SELECT MAX(p.created_at) FROM participants p WHERE p.email = u.email)
-            ) as last_tasting_date
+            ) as last_tasting_date,
+            u.last_seen_at
           FROM users u
           ORDER BY COALESCE(
             GREATEST(
@@ -132,6 +133,7 @@ export function registerAdminRoutes(app: Express) {
           lastTastingDate: row.last_tasting_date,
           tastingLevel: row.tasting_level,
           onboardingCompleted: row.onboarding_completed,
+          lastSeenAt: row.last_seen_at,
         })),
         journeys: {
           activeJourneys: activeJourneysResult[0]?.count ?? 0,
