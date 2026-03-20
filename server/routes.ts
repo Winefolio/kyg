@@ -25,6 +25,7 @@ import { registerJourneyRoutes } from './routes/journeys';
 import { registerPlacesRoutes } from './routes/places';
 import { registerTranscriptionRoutes } from './routes/transcription';
 import { registerSommelierChatRoutes } from './routes/sommelier-chat';
+import { registerAdminRoutes } from './routes/admin';
 
 // Configure multer for file uploads with comprehensive image support
 const upload = multer({
@@ -2121,6 +2122,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register user routes (onboarding)
   registerUserRoutes(app);
+
+  // Register admin routes (engagement dashboard)
+  registerAdminRoutes(app);
 
   console.log("✅ All routes registered successfully!");
   const httpServer = createServer(app);
