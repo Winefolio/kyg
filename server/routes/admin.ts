@@ -16,13 +16,17 @@ export function registerAdminRoutes(app: Express) {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
       // Run all queries in parallel
+      // Total tastings = solo tastings + group session participations
       const [
         totalUsersResult,
         usersThisWeekResult,
         usersThisMonthResult,
-        totalTastingsResult,
-        tastingsThisWeekResult,
-        tastingsThisMonthResult,
+        soloTastingsResult,
+        soloTastingsThisWeekResult,
+        soloTastingsThisMonthResult,
+        groupTastingsResult,
+        groupTastingsThisWeekResult,
+        groupTastingsThisMonthResult,
         onboardingResult,
         recentUsersResult,
         activeJourneysResult,
@@ -31,30 +35,46 @@ export function registerAdminRoutes(app: Express) {
         totalParticipantsResult,
         sessionsThisMonthResult,
       ] = await Promise.all([
-        // Summary counts
+        // User counts
         db.select({ count: count() }).from(users),
         db.select({ count: count() }).from(users).where(gte(users.createdAt, startOfWeek)),
         db.select({ count: count() }).from(users).where(gte(users.createdAt, startOfMonth)),
+
+        // Solo tasting counts
         db.select({ count: count() }).from(tastings),
         db.select({ count: count() }).from(tastings).where(gte(tastings.tastedAt, startOfWeek)),
         db.select({ count: count() }).from(tastings).where(gte(tastings.tastedAt, startOfMonth)),
+
+        // Group tasting counts (each participant in a session = 1 tasting)
+        db.select({ count: count() }).from(participants),
+        db.select({ count: count() }).from(participants).where(gte(participants.createdAt, startOfWeek)),
+        db.select({ count: count() }).from(participants).where(gte(participants.createdAt, startOfMonth)),
+
+        // Onboarding
         db.select({
           total: count(),
           completed: count(sql`CASE WHEN ${users.onboardingCompleted} = true THEN 1 END`),
         }).from(users),
 
-        // Recent users with actual tasting counts, sorted by most recent activity
+        // Recent users: count solo + group tastings, sort by most recent activity
         db.execute(sql`
           SELECT
             u.email,
             u.created_at,
-            (SELECT count(*) FROM tastings t WHERE t.user_id = u.id)::int as tastings_completed,
+            (SELECT count(*) FROM tastings t WHERE t.user_id = u.id)::int as solo_tastings,
+            (SELECT count(*) FROM participants p WHERE p.email = u.email)::int as group_tastings,
             u.tasting_level,
             u.onboarding_completed,
-            (SELECT MAX(t.tasted_at) FROM tastings t WHERE t.user_id = u.id) as last_tasting_date
+            GREATEST(
+              (SELECT MAX(t.tasted_at) FROM tastings t WHERE t.user_id = u.id),
+              (SELECT MAX(p.created_at) FROM participants p WHERE p.email = u.email)
+            ) as last_tasting_date
           FROM users u
           ORDER BY COALESCE(
-            (SELECT MAX(t.tasted_at) FROM tastings t WHERE t.user_id = u.id),
+            GREATEST(
+              (SELECT MAX(t.tasted_at) FROM tastings t WHERE t.user_id = u.id),
+              (SELECT MAX(p.created_at) FROM participants p WHERE p.email = u.email)
+            ),
             u.created_at
           ) DESC
           LIMIT 30
@@ -85,20 +105,31 @@ export function registerAdminRoutes(app: Express) {
         ? Math.round((Number(onboardingCompleted) / Number(onboardingTotal)) * 100)
         : 0;
 
+      const soloTotal = Number(soloTastingsResult[0]?.count ?? 0);
+      const groupTotal = Number(groupTastingsResult[0]?.count ?? 0);
+      const soloWeek = Number(soloTastingsThisWeekResult[0]?.count ?? 0);
+      const groupWeek = Number(groupTastingsThisWeekResult[0]?.count ?? 0);
+      const soloMonth = Number(soloTastingsThisMonthResult[0]?.count ?? 0);
+      const groupMonth = Number(groupTastingsThisMonthResult[0]?.count ?? 0);
+
       res.json({
         summary: {
           totalUsers: totalUsersResult[0]?.count ?? 0,
           usersThisWeek: usersThisWeekResult[0]?.count ?? 0,
           usersThisMonth: usersThisMonthResult[0]?.count ?? 0,
-          totalTastings: totalTastingsResult[0]?.count ?? 0,
-          tastingsThisWeek: tastingsThisWeekResult[0]?.count ?? 0,
-          tastingsThisMonth: tastingsThisMonthResult[0]?.count ?? 0,
+          totalTastings: soloTotal + groupTotal,
+          tastingsThisWeek: soloWeek + groupWeek,
+          tastingsThisMonth: soloMonth + groupMonth,
+          soloTastings: soloTotal,
+          groupTastings: groupTotal,
           onboardingCompletionRate: onboardingRate,
         },
         recentUsers: (recentUsersResult as any[]).map((row: any) => ({
           email: row.email,
           createdAt: row.created_at,
-          tastingsCompleted: row.tastings_completed,
+          soloTastings: row.solo_tastings,
+          groupTastings: row.group_tastings,
+          tastingsCompleted: Number(row.solo_tastings) + Number(row.group_tastings),
           lastTastingDate: row.last_tasting_date,
           tastingLevel: row.tasting_level,
           onboardingCompleted: row.onboarding_completed,

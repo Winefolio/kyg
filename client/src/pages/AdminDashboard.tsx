@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Wine, Map, CalendarDays, Activity, CheckCircle } from 'lucide-react';
+import { Users, Wine, Map, CalendarDays, Activity, CheckCircle, User, UsersRound } from 'lucide-react';
 
 interface EngagementData {
   summary: {
@@ -11,11 +11,15 @@ interface EngagementData {
     totalTastings: number;
     tastingsThisWeek: number;
     tastingsThisMonth: number;
+    soloTastings: number;
+    groupTastings: number;
     onboardingCompletionRate: number;
   };
   recentUsers: Array<{
     email: string;
     createdAt: string;
+    soloTastings: number;
+    groupTastings: number;
     tastingsCompleted: number;
     lastTastingDate: string | null;
     tastingLevel: string;
@@ -116,7 +120,7 @@ export default function AdminDashboard() {
         <StatCard
           title="Total Tastings"
           value={summary.totalTastings}
-          subtitle={`${summary.tastingsThisWeek} this week / ${summary.tastingsThisMonth} this month`}
+          subtitle={`${summary.soloTastings} solo + ${summary.groupTastings} group`}
           icon={Wine}
         />
         <StatCard
@@ -128,7 +132,7 @@ export default function AdminDashboard() {
         <StatCard
           title="Tastings / User"
           value={summary.totalUsers > 0 ? (summary.totalTastings / summary.totalUsers).toFixed(1) : '0'}
-          subtitle="Average tastings per user"
+          subtitle={`${summary.tastingsThisWeek} this week / ${summary.tastingsThisMonth} this month`}
           icon={Activity}
         />
       </div>
@@ -157,7 +161,7 @@ export default function AdminDashboard() {
       {/* Recent Users Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Users</CardTitle>
+          <CardTitle>Users by Activity</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -166,8 +170,14 @@ export default function AdminDashboard() {
                 <tr className="border-b text-left">
                   <th className="pb-3 font-medium text-muted-foreground">Email</th>
                   <th className="pb-3 font-medium text-muted-foreground">Signed Up</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Tastings</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Last Tasting</th>
+                  <th className="pb-3 font-medium text-muted-foreground text-center" title="Solo tastings">
+                    <User className="h-3.5 w-3.5 inline" /> Solo
+                  </th>
+                  <th className="pb-3 font-medium text-muted-foreground text-center" title="Group tastings">
+                    <UsersRound className="h-3.5 w-3.5 inline" /> Group
+                  </th>
+                  <th className="pb-3 font-medium text-muted-foreground text-center">Total</th>
+                  <th className="pb-3 font-medium text-muted-foreground">Last Active</th>
                   <th className="pb-3 font-medium text-muted-foreground">Level</th>
                   <th className="pb-3 font-medium text-muted-foreground">Onboarded</th>
                 </tr>
@@ -177,7 +187,9 @@ export default function AdminDashboard() {
                   <tr key={user.email} className="border-b last:border-0">
                     <td className="py-3 font-mono text-xs">{user.email}</td>
                     <td className="py-3">{formatDate(user.createdAt)}</td>
-                    <td className="py-3">{user.tastingsCompleted}</td>
+                    <td className="py-3 text-center">{user.soloTastings}</td>
+                    <td className="py-3 text-center">{user.groupTastings}</td>
+                    <td className="py-3 text-center font-semibold">{user.tastingsCompleted}</td>
                     <td className="py-3">{formatDate(user.lastTastingDate)}</td>
                     <td className="py-3">
                       <Badge variant={levelColor(user.tastingLevel)}>{user.tastingLevel}</Badge>
