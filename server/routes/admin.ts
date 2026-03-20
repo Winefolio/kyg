@@ -43,18 +43,21 @@ export function registerAdminRoutes(app: Express) {
           completed: count(sql`CASE WHEN ${users.onboardingCompleted} = true THEN 1 END`),
         }).from(users),
 
-        // Recent users with tasting counts
+        // Recent users with actual tasting counts, sorted by most recent activity
         db.execute(sql`
           SELECT
             u.email,
             u.created_at,
-            u.tastings_completed,
+            (SELECT count(*) FROM tastings t WHERE t.user_id = u.id)::int as tastings_completed,
             u.tasting_level,
             u.onboarding_completed,
             (SELECT MAX(t.tasted_at) FROM tastings t WHERE t.user_id = u.id) as last_tasting_date
           FROM users u
-          ORDER BY u.created_at DESC
-          LIMIT 20
+          ORDER BY COALESCE(
+            (SELECT MAX(t.tasted_at) FROM tastings t WHERE t.user_id = u.id),
+            u.created_at
+          ) DESC
+          LIMIT 30
         `),
 
         // Journey stats
