@@ -77,7 +77,6 @@ export function registerAdminRoutes(app: Express) {
             ),
             u.created_at
           ) DESC
-          LIMIT 30
         `),
 
         // Journey stats
@@ -148,6 +147,47 @@ export function registerAdminRoutes(app: Express) {
     } catch (error) {
       console.error("Error fetching engagement metrics:", error);
       res.status(500).json({ message: "Failed to fetch engagement metrics" });
+    }
+  });
+
+  // User detail: tasting history for a specific user
+  app.get("/api/admin/user/:email", async (req, res) => {
+    try {
+      const email = decodeURIComponent(req.params.email);
+
+      const [soloTastings, groupSessions] = await Promise.all([
+        // Solo tastings
+        db.execute(sql`
+          SELECT t.id, t.wine_name, t.wine_type, t.wine_region, t.tasted_at, t.tasting_mode,
+                 'solo' as source
+          FROM tastings t
+          JOIN users u ON u.id = t.user_id
+          WHERE u.email = ${email}
+          ORDER BY t.tasted_at DESC
+        `),
+        // Group sessions
+        db.execute(sql`
+          SELECT p.id, p.display_name, p.created_at, p.is_host,
+                 s.short_code, s.status as session_status,
+                 pkg.name as package_name,
+                 (SELECT count(*) FROM responses r WHERE r.participant_id = p.id)::int as responses_count,
+                 'group' as source
+          FROM participants p
+          JOIN sessions s ON s.id = p.session_id
+          LEFT JOIN packages pkg ON pkg.id = s.package_id
+          WHERE p.email = ${email}
+          ORDER BY p.created_at DESC
+        `),
+      ]);
+
+      res.json({
+        email,
+        soloTastings: soloTastings as any[],
+        groupSessions: groupSessions as any[],
+      });
+    } catch (error) {
+      console.error("Error fetching user detail:", error);
+      res.status(500).json({ message: "Failed to fetch user detail" });
     }
   });
 }
