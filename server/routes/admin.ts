@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { db } from "../db";
-import { users, tastings, userJourneys, chapterCompletions, sessions, participants, journeys } from "@shared/schema";
-import { sql, count, eq, gte, and, desc, isNotNull } from "drizzle-orm";
+import { users, tastings, userJourneys, sessions, participants, journeys } from "@shared/schema";
+import { sql, count, eq, gte } from "drizzle-orm";
 
 export function registerAdminRoutes(app: Express) {
   console.log("📊 Registering admin engagement endpoints...");
@@ -27,7 +27,6 @@ export function registerAdminRoutes(app: Express) {
         recentUsersResult,
         activeJourneysResult,
         usersEnrolledResult,
-        chapterCompletionsResult,
         totalSessionsResult,
         totalParticipantsResult,
         sessionsThisMonthResult,
@@ -61,7 +60,6 @@ export function registerAdminRoutes(app: Express) {
         // Journey stats
         db.select({ count: count() }).from(journeys).where(eq(journeys.isPublished, true)),
         db.select({ count: count() }).from(userJourneys),
-        db.select({ count: count() }).from(chapterCompletions),
 
         // Session stats
         db.select({ count: count() }).from(sessions),
@@ -69,10 +67,18 @@ export function registerAdminRoutes(app: Express) {
         db.select({ count: count() }).from(sessions).where(gte(sessions.startedAt, startOfMonth)),
       ]);
 
-      const totalUsers = totalUsersResult[0]?.count ?? 0;
+      // chapter_completions table may not exist yet — query safely
+      let chapterCompletionsCount = 0;
+      try {
+        const result = await db.execute(sql`SELECT count(*)::int as count FROM chapter_completions`);
+        chapterCompletionsCount = (result as any[])[0]?.count ?? 0;
+      } catch {
+        // Table doesn't exist yet, that's fine
+      }
+
       const onboardingTotal = onboardingResult[0]?.total ?? 0;
       const onboardingCompleted = onboardingResult[0]?.completed ?? 0;
-      const onboardingRate = onboardingTotal > 0
+      const onboardingRate = Number(onboardingTotal) > 0
         ? Math.round((Number(onboardingCompleted) / Number(onboardingTotal)) * 100)
         : 0;
 
@@ -97,7 +103,7 @@ export function registerAdminRoutes(app: Express) {
         journeys: {
           activeJourneys: activeJourneysResult[0]?.count ?? 0,
           usersEnrolled: usersEnrolledResult[0]?.count ?? 0,
-          chapterCompletions: chapterCompletionsResult[0]?.count ?? 0,
+          chapterCompletions: chapterCompletionsCount,
         },
         sessions: {
           totalSessions: totalSessionsResult[0]?.count ?? 0,
