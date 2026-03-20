@@ -697,19 +697,19 @@ export function registerDashboardRoutes(app: Express) {
         .orderBy(desc(tastings.tastedAt))
         .limit(5);
 
-      // Get tasting stats
-      const statsResult = await db
-        .select({
+      // Get tasting stats (solo + group in parallel)
+      const [statsResult, unifiedStats, activeJourneys] = await Promise.all([
+        db.select({
           totalTastings: sql<number>`count(*)`,
           avgOverallRating: sql<number>`avg((responses->'overall'->>'rating')::numeric)`
         })
         .from(tastings)
-        .where(eq(tastings.userId, userId));
+        .where(eq(tastings.userId, userId)),
+        storage.getUnifiedTastingStats(userEmail),
+        storage.getUserActiveJourneys(userEmail),
+      ]);
 
       const stats = statsResult[0] || { totalTastings: 0, avgOverallRating: null };
-
-      // Get active journeys count
-      const activeJourneys = await storage.getUserActiveJourneys(userEmail);
 
       return res.json({
         user: {
@@ -722,6 +722,8 @@ export function registerDashboardRoutes(app: Express) {
         },
         stats: {
           totalSoloTastings: Number(stats.totalTastings),
+          totalGroupTastings: unifiedStats.group,
+          totalCombinedTastings: unifiedStats.total,
           averageRating: stats.avgOverallRating ? Number(stats.avgOverallRating).toFixed(1) : null,
           activeJourneys: activeJourneys.length
         },
@@ -734,7 +736,7 @@ export function registerDashboardRoutes(app: Express) {
         links: {
           // Agent-native: provide links for follow-up actions
           fullDashboard: `/api/dashboard/${encodeURIComponent(userEmail)}`,
-          preferences: '/api/solo/preferences',
+          preferences: `/api/dashboard/${encodeURIComponent(userEmail)}/preferences`,
           recommendations: '/api/solo/recommendations',
           levelStatus: '/api/solo/level',
           tastings: '/api/solo/tastings'

@@ -6646,22 +6646,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProfileFingerprint(userId: number): Promise<string> {
-    // Hash tasting IDs + updatedAt for content-aware fingerprint
-    const result = await db
-      .select({
-        id: tastings.id,
-        updatedAt: tastings.updatedAt,
-      })
-      .from(tastings)
-      .where(eq(tastings.userId, userId))
-      .orderBy(tastings.id);
+    // Fetch solo and user email in parallel
+    const [soloResult, user] = await Promise.all([
+      db.select({ id: tastings.id, updatedAt: tastings.updatedAt })
+        .from(tastings).where(eq(tastings.userId, userId)).orderBy(tastings.id),
+      db.query.users.findFirst({
+        where: eq(users.id, userId),
+        columns: { email: true },
+      }),
+    ]);
 
-    if (result.length === 0) return 'empty';
+    // Fetch group response IDs if user has email
+    let groupContent = '';
+    if (user?.email) {
+      const normalizedEmail = user.email.toLowerCase();
+      const groupResult = await db
+        .select({ id: responses.id, answeredAt: responses.answeredAt })
+        .from(responses)
+        .innerJoin(participants, eq(responses.participantId, participants.id))
+        .where(sql`LOWER(${participants.email}) = ${normalizedEmail}`)
+        .orderBy(responses.id);
 
-    const content = result
-      .map(t => `${t.id}:${t.updatedAt?.getTime() ?? 0}`)
-      .join(',');
-    return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
+      groupContent = groupResult.map(r => `g${r.id}:${r.answeredAt?.getTime() ?? 0}`).join(',');
+    }
+
+    const soloContent = soloResult.map(t => `${t.id}:${t.updatedAt?.getTime() ?? 0}`).join(',');
+    const combined = `${soloContent}|${groupContent}`;
+
+    if (!soloContent && !groupContent) return 'empty';
+    return crypto.createHash('sha256').update(combined).digest('hex').slice(0, 16);
   }
 
   async getTastingSignalsForProfile(userId: number): Promise<{
