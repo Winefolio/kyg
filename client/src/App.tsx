@@ -35,6 +35,7 @@ const TastingCompletion = lazy(() => import("@/pages/TastingCompletion"));
 const HostDashboard = lazy(() => import("@/pages/HostDashboard"));
 const OnboardingQuiz = lazy(() => import("@/pages/OnboardingQuiz"));
 const QuickRate = lazy(() => import("@/pages/QuickRate"));
+const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
 
 import { SommelierFAB } from "@/components/sommelier/SommelierFAB";
 
@@ -91,6 +92,7 @@ function Router() {
       <Route path="/login" component={Login} />
 
       {/* Admin routes */}
+      <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/journeys" component={JourneyAdmin} />
 
       <Route component={NotFound} />
