@@ -106,7 +106,7 @@ async function buildMessagesForAPI(
           type: "image_url",
           image_url: {
             url: `data:${imageMimeType};base64,${imageBase64}`,
-            detail: "high",
+            detail: "auto",
           },
         },
       ],
@@ -140,7 +140,17 @@ export async function streamChatResponse(
   const isNewChat = !chatId;
   const sanitizedMessage = sanitizeForPrompt(messageText, 2000);
 
-  // Save user message
+  // Build API messages BEFORE saving user message to avoid duplication:
+  // getSommelierChatMessages fetches recent messages from DB, and if we save first,
+  // the same message appears twice — once text-only from DB, once with image appended.
+  const ctx: ChatContext = { chat, userEmail };
+  if (imageBase64) {
+    const sizeKB = Math.round((imageBase64.length * 3) / 4 / 1024);
+    console.log(`[SommelierChat] Image: ${imageMimeType}, ~${sizeKB}KB, base64 len: ${imageBase64.length}`);
+  }
+  const apiMessages = await buildMessagesForAPI(ctx, sanitizedMessage, imageBase64, imageMimeType);
+
+  // Now save the user message to DB
   const userMsg = await storage.createSommelierMessage({
     chatId: chat.id,
     role: "user",
@@ -155,15 +165,14 @@ export async function streamChatResponse(
     });
   }
 
-  const ctx: ChatContext = { chat, userEmail };
-  const apiMessages = await buildMessagesForAPI(ctx, sanitizedMessage, imageBase64, imageMimeType);
-
+  console.log(`[SommelierChat] Calling OpenAI gpt-5.2 (vision: ${!!imageBase64})...`);
   const completion = await openai.chat.completions.create({
     model: "gpt-5.2",
     messages: apiMessages,
     max_completion_tokens: 1000,
     stream: true,
   });
+  console.log(`[SommelierChat] OpenAI stream created, starting iteration...`);
 
   // Create async iterable that yields SSE-formatted strings
   async function* generateSSE(): AsyncIterable<string> {
@@ -220,7 +229,11 @@ export async function sendChatMessage(
   const isNewChat = !chatId;
   const sanitizedMessage = sanitizeForPrompt(messageText, 2000);
 
-  // Save user message
+  // Build API messages BEFORE saving to avoid duplication (same fix as streamChatResponse)
+  const ctx: ChatContext = { chat, userEmail };
+  const apiMessages = await buildMessagesForAPI(ctx, sanitizedMessage, imageBase64, imageMimeType);
+
+  // Now save the user message to DB
   const userMessage = await storage.createSommelierMessage({
     chatId: chat.id,
     role: "user",
@@ -234,9 +247,6 @@ export async function sendChatMessage(
       console.error("[SommelierChat] Title generation failed:", err);
     });
   }
-
-  const ctx: ChatContext = { chat, userEmail };
-  const apiMessages = await buildMessagesForAPI(ctx, sanitizedMessage, imageBase64, imageMimeType);
 
   const completion = await openai.chat.completions.create({
     model: "gpt-5.2",

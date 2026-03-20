@@ -9,7 +9,7 @@ import multer from "multer";
 import { requireAuth } from "./auth";
 import { apiRateLimit, createRateLimit } from "../middleware/rateLimiter";
 import { storage } from "../storage";
-import { streamChatResponse, generateChatTitle } from "../services/sommelierChatService";
+import { streamChatResponse, sendChatMessage, generateChatTitle } from "../services/sommelierChatService";
 
 // Rate limit for chat messages: 15/min
 const sommelierChatRateLimit = createRateLimit({
@@ -215,7 +215,8 @@ export function registerSommelierChatRoutes(app: Express): void {
 
   /**
    * POST /api/sommelier-chat/message-with-image
-   * Send a text message with an image, returns SSE stream
+   * Send a text message with an image (non-streaming for reliability with vision).
+   * Returns SSE-formatted response for client compatibility.
    */
   app.post("/api/sommelier-chat/message-with-image", requireAuth, sommelierChatRateLimit, upload.single("image"), async (req: Request, res: Response) => {
     try {
@@ -230,18 +231,10 @@ export function registerSommelierChatRoutes(app: Express): void {
 
       const imageBase64 = req.file.buffer.toString("base64");
       const imageMimeType = req.file.mimetype;
+      console.log(`[SommelierChat] Vision request: ${imageMimeType}, ~${Math.round(imageBase64.length * 3 / 4 / 1024)}KB`);
 
-      // Set SSE headers
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-      res.setHeader("X-Accel-Buffering", "no");
-
-      // Detect client disconnect to stop streaming early
-      let clientDisconnected = false;
-      req.on("close", () => { clientDisconnected = true; });
-
-      const { stream } = await streamChatResponse(
+      // Use non-streaming for image messages — streaming with vision hangs
+      const { userMessage, assistantMessage } = await sendChatMessage(
         userId,
         userEmail,
         message.trim(),
@@ -250,14 +243,17 @@ export function registerSommelierChatRoutes(app: Express): void {
         chatId
       );
 
-      // Don't break on disconnect -- let generator complete so assistant message is saved
-      for await (const event of stream) {
-        if (!clientDisconnected) {
-          try { res.write(event); } catch { /* response already closed */ }
-        }
-      }
+      console.log(`[SommelierChat] Vision response: ${assistantMessage.content.slice(0, 100)}...`);
 
-      if (!clientDisconnected) res.end();
+      // Return as SSE events for client compatibility
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.write(`data: ${JSON.stringify({ type: "start", messageId: userMessage.id, chatId: userMessage.chatId })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: "token", content: assistantMessage.content })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: "done", messageId: assistantMessage.id, fullContent: assistantMessage.content })}\n\n`);
+      res.write(`data: [DONE]\n\n`);
+      res.end();
     } catch (error) {
       console.error("[SommelierChat] Error sending message with image:", error);
       if (res.headersSent) {

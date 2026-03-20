@@ -132,7 +132,6 @@ function WelcomeState({
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         onChange={handlePhotoSelect}
         className="hidden"
       />
@@ -410,7 +409,7 @@ export function SommelierChatSheet({ open, onOpenChange, isWelcome, initialMessa
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange} handleOnly>
-        <DrawerContent className="h-[92vh] bg-zinc-950 border-zinc-800 flex flex-col">
+        <DrawerContent className="h-[calc(var(--app-height,100dvh)*0.92)] bg-zinc-950 border-zinc-800 flex flex-col">
           <ChatContent {...chatProps} />
         </DrawerContent>
       </Drawer>

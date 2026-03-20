@@ -614,7 +614,7 @@ export default function OnboardingQuiz() {
               >
                 <SingleSelectStep
                   title="What brings you here?"
-                  subtitle="Helps Pierre give you the right kind of advice"
+                  subtitle="Helps us give you the right kind of advice"
                   options={OCCASION_OPTIONS}
                   selected={answers.occasion}
                   onSelect={(value) => {

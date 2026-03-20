@@ -1,7 +1,9 @@
-import { useState, useRef, useCallback } from "react";
-import { Send, Camera, X } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Send, Camera, X, Mic, MicOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useHaptics } from "@/hooks/useHaptics";
+import { useAudioRecorder } from "@/hooks/useAudioRecorder";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatInputProps {
   onSendMessage: (text: string) => void;
@@ -58,9 +60,61 @@ export function ChatInput({ onSendMessage, onSendMessageWithImage, isStreaming }
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { triggerHaptic } = useHaptics();
+  const { toast } = useToast();
+
+  // Voice-to-text transcription
+  const handleRecordingComplete = useCallback(async (blob: Blob) => {
+    setIsTranscribing(true);
+    triggerHaptic("success");
+    try {
+      const formData = new FormData();
+      formData.append("audio", blob, "recording.webm");
+      const response = await fetch("/api/transcribe", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (data.success && data.text) {
+        setText((prev) => (prev.trim() ? `${prev.trim()} ${data.text}` : data.text));
+      } else {
+        throw new Error(data.error || "Transcription failed");
+      }
+    } catch (error) {
+      toast({
+        title: "Transcription failed",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTranscribing(false);
+    }
+  }, [triggerHaptic, toast]);
+
+  const { isRecording, isSupported, startRecording, stopRecording, error: recorderError } = useAudioRecorder({
+    onRecordingComplete: handleRecordingComplete,
+    maxDuration: 60,
+  });
+
+  useEffect(() => {
+    if (recorderError) {
+      toast({ title: "Recording error", description: recorderError, variant: "destructive" });
+    }
+  }, [recorderError, toast]);
+
+  const toggleRecording = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+      triggerHaptic("success");
+    } else {
+      startRecording();
+      triggerHaptic("selection");
+    }
+  }, [isRecording, startRecording, stopRecording, triggerHaptic]);
 
   const handleSend = useCallback(async () => {
     if (isStreaming) return;
@@ -154,22 +208,53 @@ export function ChatInput({ onSendMessage, onSendMessageWithImage, isStreaming }
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={handleImageSelect}
           className="hidden"
         />
 
         {/* Text input */}
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={handleTextChange}
-          onKeyDown={handleKeyDown}
-          placeholder="Ask Pierre..."
-          disabled={isStreaming}
-          rows={1}
-          className="flex-1 resize-none bg-zinc-800 text-white text-sm rounded-xl px-4 py-2.5 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50 disabled:opacity-50"
-        />
+        <div className="relative flex-1">
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={handleTextChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask Pierre..."
+            disabled={isStreaming}
+            rows={1}
+            className="w-full resize-none bg-zinc-800 text-white text-sm rounded-xl px-4 py-2.5 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50 disabled:opacity-50"
+          />
+          {/* Recording indicator */}
+          {isRecording && (
+            <div className="absolute top-1 right-1 flex items-center gap-1.5 bg-red-500/20 px-2 py-0.5 rounded-full">
+              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+              <span className="text-[10px] text-red-400">Recording...</span>
+            </div>
+          )}
+        </div>
+
+        {/* Mic button */}
+        {isSupported && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleRecording}
+            disabled={isStreaming || isTranscribing}
+            className={`shrink-0 h-9 w-9 ${
+              isRecording
+                ? "text-red-400 hover:text-red-300"
+                : "text-zinc-400 hover:text-purple-400"
+            }`}
+          >
+            {isTranscribing ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : isRecording ? (
+              <MicOff className="w-5 h-5 animate-pulse" />
+            ) : (
+              <Mic className="w-5 h-5" />
+            )}
+          </Button>
+        )}
 
         {/* Send button */}
         <Button

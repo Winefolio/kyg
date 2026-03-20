@@ -1,7 +1,7 @@
 // client/public/service-worker.js
 
 // IMPORTANT: Increment this version string every time you deploy a new build!
-const CACHE_VERSION = "v2.0.0"; // Brand overhaul - renamed to Cata
+const CACHE_VERSION = "v2.0.1"; // Fix SW proxying breaking FormData uploads + SSE streaming
 const CACHE_PREFIX = "cata-shell-";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
@@ -74,9 +74,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // For API calls, always go to network - no caching
+  // For API calls, don't intercept - let browser handle directly.
+  // Using event.respondWith(fetch(request)) can break FormData uploads
+  // and buffers SSE streams, preventing real-time token delivery.
   if (url.pathname.startsWith("/api/")) {
-    event.respondWith(fetch(request));
     return;
   }
 
