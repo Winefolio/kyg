@@ -32,7 +32,7 @@ import {
   ChevronDown,
   Camera,
 } from "lucide-react";
-import type { User, Tasting } from "@shared/schema";
+import type { User, Tasting, StarterRecommendation } from "@shared/schema";
 import { TasteIdentityCard } from "@/components/dashboard/TasteIdentityCard";
 
 type TabKey = "solo" | "group" | "dashboard";
@@ -421,6 +421,21 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
     },
   });
 
+  // Get starter wine recommendations (only fetched when no solo tastings)
+  const { data: recommendationsData } = useQuery<{
+    recommendations: StarterRecommendation[];
+    basedOnTastings: number;
+    source: 'onboarding' | 'blended' | 'tastings' | 'default';
+  }>({
+    queryKey: ["/api/solo/recommendations"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/solo/recommendations", null);
+      return response.json();
+    },
+    staleTime: 10 * 60 * 1000,
+    enabled: (preferencesData?.tastingCount ?? 0) === 0,
+  });
+
   // Get active journey
   const { data: journeysData } = useQuery<{ journeys: any[] }>({
     queryKey: ["/api/journeys/user/progress"],
@@ -633,6 +648,53 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
                 </motion.div>
               ))}
             </div>
+          ) : recommendationsData?.source === 'onboarding' && recommendationsData.recommendations?.length > 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-5 h-5 text-purple-400" />
+                <h3 className="text-lg font-semibold text-white">Your Starter Picks</h3>
+              </div>
+              <p className="text-white/50 text-sm mb-4">
+                Based on your taste profile — try one of these to kick off your journal
+              </p>
+              <div className="space-y-3">
+                {recommendationsData.recommendations.map((rec, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 * i }}
+                    className={`bg-white/5 backdrop-blur-md rounded-xl p-4 border border-white/10 border-l-[3px] ${
+                      rec.wineType === 'red' ? 'border-l-red-500'
+                      : rec.wineType === 'white' ? 'border-l-yellow-400'
+                      : rec.wineType === 'rosé' ? 'border-l-pink-400'
+                      : rec.wineType === 'sparkling' ? 'border-l-amber-300'
+                      : rec.wineType === 'orange' ? 'border-l-orange-400'
+                      : 'border-l-purple-400'
+                    }`}
+                  >
+                    <h4 className="text-white font-medium">{rec.wineName}</h4>
+                    <div className="flex flex-wrap gap-2 text-sm text-white/60 mt-1">
+                      <span className="bg-white/10 px-2 py-0.5 rounded capitalize">{rec.wineType}</span>
+                      <span>{rec.grape}</span>
+                      <span className="text-white/30">·</span>
+                      <span>{rec.region}</span>
+                    </div>
+                    <p className="text-white/40 text-sm mt-2">{rec.reason}</p>
+                  </motion.div>
+                ))}
+              </div>
+              <Button
+                onClick={() => setLocation("/tasting/new")}
+                className="w-full mt-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Start Your First Tasting
+              </Button>
+            </motion.div>
           ) : (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}

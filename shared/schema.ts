@@ -659,6 +659,7 @@ export const users = pgTable("users", {
   // Onboarding quiz
   onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
   onboardingData: jsonb("onboarding_data"), // OnboardingData blob
+  starterRecommendations: jsonb("starter_recommendations"), // StarterRecommendation[] | null
   lastSeenAt: timestamp("last_seen_at"),
 }, (table) => ({
   emailIdx: index("idx_users_email").on(table.email)
@@ -736,7 +737,17 @@ export interface OnboardingData {
   foodPreferences: string[];
   drinkPreferences: string[];
   occasion: 'learning' | 'go_to_bottle' | 'impress' | 'date_night' | 'not_sure';
+  favoriteWines?: string;  // Free-text, optional (user can skip)
   completedAt: string;
+}
+
+// Starter wine recommendations generated from onboarding data
+export interface StarterRecommendation {
+  wineName: string;
+  wineType: 'red' | 'white' | 'rosé' | 'sparkling' | 'orange' | 'dessert';
+  grape: string;
+  region: string;
+  reason: string;  // 1 sentence connecting pick to user's answers
 }
 
 // Types for solo tasting

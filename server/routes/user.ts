@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { z } from "zod";
 import { validationError, internalError } from "../lib/api-error";
+import { generateAndStoreStarterRecs } from "../services/starterRecommendationService";
 
 const onboardingSchema = z.object({
   knowledgeLevel: z.enum(['beginner', 'casual', 'enthusiast', 'nerd', 'not_sure']),
@@ -12,6 +13,7 @@ const onboardingSchema = z.object({
   foodPreferences: z.array(z.string()).max(15),
   drinkPreferences: z.array(z.string()).max(10),
   occasion: z.enum(['learning', 'go_to_bottle', 'impress', 'date_night', 'not_sure']),
+  favoriteWines: z.string().max(500).optional(),
 });
 
 // Also accept skip requests (no data)
@@ -51,7 +53,7 @@ export function registerUserRoutes(app: Express): void {
         return validationError(res, "Invalid onboarding data");
       }
 
-      const { knowledgeLevel, wineVibe, foodPreferences, drinkPreferences, occasion } = parsed.data;
+      const { knowledgeLevel, wineVibe, foodPreferences, drinkPreferences, occasion, favoriteWines } = parsed.data;
 
       const onboardingData: OnboardingData = {
         knowledgeLevel,
@@ -59,6 +61,7 @@ export function registerUserRoutes(app: Express): void {
         foodPreferences,
         drinkPreferences,
         occasion,
+        favoriteWines: favoriteWines || undefined,
         completedAt: new Date().toISOString(),
       };
 
@@ -67,6 +70,11 @@ export function registerUserRoutes(app: Express): void {
         onboardingData,
         tastingLevel: tastingLevelMap[knowledgeLevel] || 'intro',
       }).where(eq(users.id, userId));
+
+      // Generate starter recommendations async (fire-and-forget)
+      generateAndStoreStarterRecs(userId, onboardingData).catch(err => {
+        console.error('[User] Starter recs generation failed:', err);
+      });
 
       const updatedUser = await db.query.users.findFirst({
         where: eq(users.id, userId),

@@ -11,7 +11,7 @@ import type { User } from "@shared/schema";
 // TYPES
 // ============================================================================
 
-type QuizStep = "knowledge" | "vibe" | "food" | "drinks" | "occasion";
+type QuizStep = "knowledge" | "vibe" | "food" | "drinks" | "occasion" | "wines";
 
 interface QuizAnswers {
   knowledgeLevel: string | null;
@@ -19,6 +19,7 @@ interface QuizAnswers {
   foodPreferences: string[];
   drinkPreferences: string[];
   occasion: string | null;
+  favoriteWines: string;
 }
 
 interface OptionCard {
@@ -358,6 +359,7 @@ export default function OnboardingQuiz() {
     foodPreferences: [],
     drinkPreferences: [],
     occasion: null,
+    favoriteWines: "",
   });
   const [saveError, setSaveError] = useState<string | null>(null);
   const justSaved = useRef(false);
@@ -420,7 +422,7 @@ export default function OnboardingQuiz() {
   });
 
   // Step navigation
-  const steps: QuizStep[] = ["knowledge", "vibe", "food", "drinks", "occasion"];
+  const steps: QuizStep[] = ["knowledge", "vibe", "food", "drinks", "occasion", "wines"];
   const currentStepIndex = steps.indexOf(step);
 
   const goNext = () => {
@@ -618,21 +620,79 @@ export default function OnboardingQuiz() {
                   options={OCCASION_OPTIONS}
                   selected={answers.occasion}
                   onSelect={(value) => {
-                    const updated = { ...answers, occasion: value };
-                    setAnswers(updated);
-                    // Final step — submit after selection
+                    setAnswers((prev) => ({ ...prev, occasion: value }));
                     setTimeout(() => {
-                      setSaveError(null);
-                      saveMutation.mutate(updated);
+                      setDirection(1);
+                      setStep("wines");
                     }, 300);
                   }}
                 />
+              </motion.div>
+            )}
 
-                {saveMutation.isPending && (
-                  <div className="flex justify-center mt-8">
-                    <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+            {step === "wines" && (
+              <motion.div
+                key="wines"
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.25, ease: "easeInOut" }}
+              >
+                <div className="space-y-4 mb-8">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white mb-2">
+                      Any wines you've enjoyed?
+                    </h2>
+                    <p className="text-white/50 text-sm">
+                      Even just names or colors — helps us pick your first wines.
+                    </p>
                   </div>
-                )}
+
+                  <div className="relative">
+                    <textarea
+                      value={answers.favoriteWines}
+                      onChange={(e) => {
+                        if (e.target.value.length <= 500) {
+                          setAnswers((prev) => ({ ...prev, favoriteWines: e.target.value }));
+                        }
+                      }}
+                      placeholder="e.g., I liked a Malbec from Argentina, or I usually drink Prosecco..."
+                      rows={4}
+                      className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-white placeholder:text-white/30 resize-none focus:outline-none focus:border-purple-400/50 focus:ring-1 focus:ring-purple-400/50 transition-colors"
+                    />
+                    <span className="absolute bottom-3 right-3 text-white/20 text-xs">
+                      {answers.favoriteWines.length}/500
+                    </span>
+                  </div>
+                </div>
+
+                <motion.button
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  onClick={handleComplete}
+                  disabled={saveMutation.isPending}
+                  className="w-full py-4 rounded-2xl font-semibold text-white transition-all duration-200 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 active:scale-[0.98] disabled:opacity-50"
+                >
+                  {saveMutation.isPending ? (
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                  ) : (
+                    "Get my picks"
+                  )}
+                </motion.button>
+
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  onClick={handleComplete}
+                  disabled={saveMutation.isPending}
+                  className="w-full text-white/30 hover:text-white/50 text-sm py-3 transition-colors"
+                >
+                  Skip this step
+                </motion.button>
               </motion.div>
             )}
           </AnimatePresence>

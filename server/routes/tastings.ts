@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { db, sql as pgClient } from "../db";
-import { tastings, users, insertTastingSchema, type TastingLevel, type TastingResponses } from "@shared/schema";
+import { tastings, users, insertTastingSchema, type TastingLevel, type TastingResponses, type OnboardingData } from "@shared/schema";
 import { eq, desc, sql, and, ilike } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { attachCharacteristicsToTasting } from "../wine-intelligence";
@@ -8,6 +8,7 @@ import { generateNextBottleRecommendations, generatePersonalWineNote, generateQu
 import { wineIntelQueue } from "../lib/background-queue";
 import { unauthorized, notFound, validationError, internalError, forbidden } from "../lib/api-error";
 import { trackTastingCompleted } from "../audos-integration";
+import { generateAndStoreStarterRecs } from "../services/starterRecommendationService";
 
 // User preferences derived from tasting history
 interface UserPreferences {
@@ -282,6 +283,47 @@ function generateRecommendations(prefs: UserPreferences): WineRecommendation[] {
   }
 
   return recommendations.slice(0, 4); // Return top 4 recommendations
+}
+
+/**
+ * Blend onboarding preferences with tasting data for users with 1-3 tastings.
+ * Weight decays: 1 tasting → 66% onboarding, 2 → 33%, 3 → 0%.
+ */
+function blendOnboardingPreferences(
+  prefs: UserPreferences,
+  onboardingData: OnboardingData,
+  tastingCount: number
+): UserPreferences {
+  // Weight decays linearly: at 1 tasting → 0.66, at 2 → 0.33, at 3 → 0
+  const weight = Math.max(0, (3 - tastingCount) / 3);
+  if (weight === 0) return prefs;
+
+  // Map onboarding vibe to preference biases (on 1-5 scale)
+  const vibeMap: Record<string, Partial<Record<'sweetness' | 'acidity' | 'tannins' | 'body', number>>> = {
+    bold: { body: 4.5, tannins: 4 },
+    light: { acidity: 4, body: 2 },
+    sweet: { sweetness: 4 },
+    adventurous: { body: 3, acidity: 3.5 },  // Balanced/exploratory
+    not_sure: {},
+  };
+
+  const vibeBias = vibeMap[onboardingData.wineVibe] || {};
+
+  // Blend each preference: weighted average of tasting data + onboarding bias
+  const blend = (tastingValue: string | null, onboardingValue: number | undefined, defaultValue: number): string => {
+    const tasting = tastingValue ? Number(tastingValue) : defaultValue;
+    if (onboardingValue === undefined) return String(tasting);
+    const blended = tasting * (1 - weight) + onboardingValue * weight;
+    return String(blended);
+  };
+
+  return {
+    sweetness: blend(prefs.sweetness, vibeBias.sweetness, 2),
+    acidity: blend(prefs.acidity, vibeBias.acidity, 3),
+    tannins: blend(prefs.tannins, vibeBias.tannins, 3),
+    body: blend(prefs.body, vibeBias.body, 3),
+    tasting_count: prefs.tasting_count,
+  };
 }
 
 /**
@@ -693,6 +735,7 @@ export function registerTastingsRoutes(app: Express): void {
   });
 
   // Get wine recommendations based on user preferences (authenticated)
+  // Context-aware: uses onboarding data for new users, blends for 1-3 tastings, pure data after
   app.get("/api/solo/recommendations", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId;
@@ -701,11 +744,67 @@ export function registerTastingsRoutes(app: Express): void {
       }
 
       const prefs = await getUserPreferences(userId);
-      const recommendations = generateRecommendations(prefs);
+      const tastingCount = Number(prefs.tasting_count);
 
+      // Case 1: Zero tastings — return onboarding-based starter picks
+      if (tastingCount === 0) {
+        const user = await db.query.users.findFirst({
+          where: eq(users.id, userId),
+          columns: { onboardingData: true, starterRecommendations: true },
+        });
+
+        // Return stored starter recs if available
+        if (user?.starterRecommendations) {
+          return res.json({
+            recommendations: user.starterRecommendations,
+            basedOnTastings: 0,
+            source: 'onboarding',
+          });
+        }
+
+        // Try generating on-demand (handles race condition where user arrives before async job finishes)
+        if (user?.onboardingData) {
+          const recs = await generateAndStoreStarterRecs(userId, user.onboardingData as OnboardingData);
+          if (recs) {
+            return res.json({
+              recommendations: recs,
+              basedOnTastings: 0,
+              source: 'onboarding',
+            });
+          }
+        }
+
+        // No onboarding data (skipped) or GPT failed — return static defaults
+        return res.json({
+          recommendations: generateRecommendations(prefs),
+          basedOnTastings: 0,
+          source: 'default',
+        });
+      }
+
+      // Case 2: 1-3 tastings — blend onboarding preferences with tasting data
+      if (tastingCount <= 3) {
+        const user = await db.query.users.findFirst({
+          where: eq(users.id, userId),
+          columns: { onboardingData: true },
+        });
+
+        const blendedPrefs = user?.onboardingData
+          ? blendOnboardingPreferences(prefs, user.onboardingData as OnboardingData, tastingCount)
+          : prefs;
+
+        return res.json({
+          recommendations: generateRecommendations(blendedPrefs),
+          basedOnTastings: tastingCount,
+          source: user?.onboardingData ? 'blended' : 'tastings',
+        });
+      }
+
+      // Case 3: 4+ tastings — pure data-driven (existing behavior)
       return res.json({
-        recommendations,
-        basedOnTastings: Number(prefs.tasting_count)
+        recommendations: generateRecommendations(prefs),
+        basedOnTastings: tastingCount,
+        source: 'tastings',
       });
     } catch (error) {
       console.error("Error fetching recommendations:", error);
