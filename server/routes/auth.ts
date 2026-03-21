@@ -114,7 +114,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   const lastUpdate = lastSeenCache.get(userId) ?? 0;
   if (now - lastUpdate > LAST_SEEN_THROTTLE_MS) {
     lastSeenCache.set(userId, now);
-    db.update(users).set({ lastSeenAt: sql`now()` }).where(eq(users.id, userId)).execute().catch(() => {});
+    db.execute(sql`UPDATE users SET last_seen_at = now() WHERE id = ${userId}`).catch(() => {});
   }
 
   next();
