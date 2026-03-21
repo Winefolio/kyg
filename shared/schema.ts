@@ -126,7 +126,8 @@ export const slides = pgTable("slides", {
   packageWinePositionIdx: index("idx_slides_package_wine_position").on(table.packageWineId, table.position),
   globalPositionIdx: index("idx_slides_global_position").on(table.packageWineId, table.globalPosition),
   packageWineIdx: index("idx_slides_package_wine_id").on(table.packageWineId),
-  packageIdIdx: index("idx_slides_package_id").on(table.packageId)
+  packageIdIdx: index("idx_slides_package_id").on(table.packageId),
+  typeIdx: index("idx_slides_type").on(table.type)
 }));
 
 // Sessions table
@@ -171,7 +172,8 @@ export const participants = pgTable("participants", {
   sommelier_feedback: text("sommelier_feedback"),
 }, (table) => ({
   sessionIdx: index("idx_participants_session").on(table.sessionId),
-  emailSessionIdx: index("idx_participants_email_session").on(table.email, table.sessionId)
+  emailSessionIdx: index("idx_participants_email_session").on(table.email, table.sessionId),
+  emailIdx: index("idx_participants_email").on(table.email)
 }));
 
 // Responses table
@@ -657,6 +659,7 @@ export const users = pgTable("users", {
   // Onboarding quiz
   onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
   onboardingData: jsonb("onboarding_data"), // OnboardingData blob
+  lastSeenAt: timestamp("last_seen_at"),
 }, (table) => ({
   emailIdx: index("idx_users_email").on(table.email)
 }));
@@ -1253,6 +1256,7 @@ export interface TasteProfile {
     totalTastings: number;
     fullTastings: number;
     quickRates: number;
+    groupTastings?: number;
     oldestTasting: string;
     newestTasting: string;
   };

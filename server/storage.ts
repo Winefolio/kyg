@@ -4746,8 +4746,9 @@ export class DatabaseStorage implements IStorage {
 
   // User Dashboard
   async getAllParticipantsByEmail(email: string): Promise<Participant[]> {
+    const normalizedEmail = email.toLowerCase();
     // Check memo cache (5s TTL)
-    const cached = this.participantMemo.get(email);
+    const cached = this.participantMemo.get(normalizedEmail);
     if (cached && (Date.now() - cached.timestamp) < DatabaseStorage.PARTICIPANT_MEMO_TTL_MS) {
       return cached.data;
     }
@@ -4755,17 +4756,17 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select()
       .from(participants)
-      .where(eq(participants.email, email));
+      .where(sql`LOWER(${participants.email}) = ${normalizedEmail}`);
 
     // Cap at 200 entries — evict oldest (FIFO via Map insertion order)
-    if (this.participantMemo.size >= 200 && !this.participantMemo.has(email)) {
+    if (this.participantMemo.size >= 200 && !this.participantMemo.has(normalizedEmail)) {
       const oldestKey = this.participantMemo.keys().next().value;
       if (oldestKey !== undefined) {
         this.participantMemo.delete(oldestKey);
       }
     }
 
-    this.participantMemo.set(email, { data: result, timestamp: Date.now() });
+    this.participantMemo.set(normalizedEmail, { data: result, timestamp: Date.now() });
     return result;
   }
 
@@ -4862,6 +4863,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Sprint 4.1: Get group tasting preferences for unified dashboard
+  // Fixed: JOIN through slides to read payloadJson.category + answerJson.selectedScore
   async getGroupTastingPreferences(email: string): Promise<{
     sweetness: number | null;
     acidity: number | null;
@@ -4869,7 +4871,6 @@ export class DatabaseStorage implements IStorage {
     body: number | null;
     count: number;
   }> {
-    // Get all participant records for this email
     const userParticipants = await this.getAllParticipantsByEmail(email);
 
     if (userParticipants.length === 0) {
@@ -4878,59 +4879,77 @@ export class DatabaseStorage implements IStorage {
 
     const participantIds = userParticipants.map(p => p.id);
 
-    // Query responses using drizzle's inArray for proper array handling
-    const responseRows = await db
+    // Query scale responses by JOINing through slides for category + score
+    // answer_json is a bare number in production; scale_max has both snake_case and camelCase
+    const scaleRows = await db
       .select({
-        sweetness: sql<string>`answer_json->>'sweetness'`,
-        acidity: sql<string>`answer_json->>'acidity'`,
-        tannins: sql<string>`answer_json->>'tannins'`,
-        body: sql<string>`answer_json->>'body'`,
+        category: sql<string>`${slides.payloadJson}->>'category'`,
+        title: sql<string>`${slides.payloadJson}->>'title'`,
+        scaleMax: sql<string>`COALESCE(${slides.payloadJson}->>'scale_max', ${slides.payloadJson}->>'scaleMax')`,
+        score: sql<string>`
+          CASE WHEN jsonb_typeof(${responses.answerJson}) = 'number'
+               THEN ${responses.answerJson}::text
+               ELSE ${responses.answerJson}->>'selectedScore'
+          END`,
       })
       .from(responses)
-      .where(inArray(responses.participantId, participantIds));
+      .innerJoin(slides, eq(responses.slideId, slides.id))
+      .where(
+        and(
+          inArray(responses.participantId, participantIds),
+          sql`${slides.payloadJson}->>'question_type' = 'scale'`,
+          sql`CASE WHEN jsonb_typeof(${responses.answerJson}) = 'number'
+               THEN ${responses.answerJson}::text
+               ELSE ${responses.answerJson}->>'selectedScore'
+          END IS NOT NULL`,
+        )
+      );
 
-    // Calculate averages manually
-    let sweetnessSum = 0, sweetnessCount = 0;
-    let aciditySum = 0, acidityCount = 0;
-    let tanninsSum = 0, tanninsCount = 0;
-    let bodySum = 0, bodyCount = 0;
+    // Map categories to traits and normalize scales
+    const CATEGORY_TO_TRAIT: Record<string, string> = {
+      body: 'body', tannins: 'tannins', acidity: 'acidity', sweetness: 'sweetness',
+    };
 
-    for (const row of responseRows) {
-      if (row.sweetness) { sweetnessSum += Number(row.sweetness); sweetnessCount++; }
-      if (row.acidity) { aciditySum += Number(row.acidity); acidityCount++; }
-      if (row.tannins) { tanninsSum += Number(row.tannins); tanninsCount++; }
-      if (row.body) { bodySum += Number(row.body); bodyCount++; }
+    const traitAccum: Record<string, number[]> = {
+      sweetness: [], acidity: [], tannins: [], body: [],
+    };
+
+    for (const row of scaleRows) {
+      // Try category first, then extract from title text as fallback
+      let trait: string | undefined;
+      const category = (row.category || '').toLowerCase();
+      trait = CATEGORY_TO_TRAIT[category];
+      if (!trait && row.title) {
+        const titleLower = row.title.toLowerCase();
+        if (titleLower.includes('body')) trait = 'body';
+        else if (titleLower.includes('tannin')) trait = 'tannins';
+        else if (titleLower.includes('acidity')) trait = 'acidity';
+        else if (titleLower.includes('sweetness') || titleLower.includes('sweet')) trait = 'sweetness';
+      }
+      if (!trait) continue;
+
+      const score = Number(row.score);
+      const scaleMax = Number(row.scaleMax) || 10;
+      if (isNaN(score) || score < 1) continue;
+
+      // Normalize to 1-5 scale
+      const clamped = Math.max(1, Math.min(score, scaleMax));
+      const normalized = scaleMax <= 1 ? 3 : scaleMax === 5 ? clamped : 1 + ((clamped - 1) / (scaleMax - 1)) * 4;
+      traitAccum[trait].push(normalized);
     }
 
-    const result = [{
-      sweetness: sweetnessCount > 0 ? sweetnessSum / sweetnessCount : null,
-      acidity: acidityCount > 0 ? aciditySum / acidityCount : null,
-      tannins: tanninsCount > 0 ? tanninsSum / tanninsCount : null,
-      body: bodyCount > 0 ? bodySum / bodyCount : null,
-      count: Math.max(sweetnessCount, acidityCount, tanninsCount, bodyCount)
-    }];
-
-    const row = Array.isArray(result) ? result[0] : (result as any).rows?.[0];
-
-    // If no explicit taste data, try alternative field paths
-    if (!row?.sweetness && !row?.acidity && !row?.tannins && !row?.body) {
-      // Fallback: count unique sessions as tastings
-      const uniqueSessions = new Set(userParticipants.map(p => p.sessionId).filter(Boolean));
-      return {
-        sweetness: null,
-        acidity: null,
-        tannins: null,
-        body: null,
-        count: uniqueSessions.size
-      };
-    }
+    const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+    const totalResponses = Math.max(
+      traitAccum.sweetness.length, traitAccum.acidity.length,
+      traitAccum.tannins.length, traitAccum.body.length,
+    );
 
     return {
-      sweetness: row?.sweetness ? Number(row.sweetness) : null,
-      acidity: row?.acidity ? Number(row.acidity) : null,
-      tannins: row?.tannins ? Number(row.tannins) : null,
-      body: row?.body ? Number(row.body) : null,
-      count: row?.count ? Number(row.count) : 0
+      sweetness: avg(traitAccum.sweetness),
+      acidity: avg(traitAccum.acidity),
+      tannins: avg(traitAccum.tannins),
+      body: avg(traitAccum.body),
+      count: totalResponses > 0 ? totalResponses : new Set(userParticipants.map(p => p.sessionId).filter(Boolean)).size,
     };
   }
 
@@ -6645,22 +6664,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProfileFingerprint(userId: number): Promise<string> {
-    // Hash tasting IDs + updatedAt for content-aware fingerprint
-    const result = await db
-      .select({
-        id: tastings.id,
-        updatedAt: tastings.updatedAt,
-      })
-      .from(tastings)
-      .where(eq(tastings.userId, userId))
-      .orderBy(tastings.id);
+    // Fetch solo and user email in parallel
+    const [soloResult, user] = await Promise.all([
+      db.select({ id: tastings.id, updatedAt: tastings.updatedAt })
+        .from(tastings).where(eq(tastings.userId, userId)).orderBy(tastings.id),
+      db.query.users.findFirst({
+        where: eq(users.id, userId),
+        columns: { email: true },
+      }),
+    ]);
 
-    if (result.length === 0) return 'empty';
+    // Fetch group response IDs if user has email
+    let groupContent = '';
+    if (user?.email) {
+      const normalizedEmail = user.email.toLowerCase();
+      const groupResult = await db
+        .select({ id: responses.id, answeredAt: responses.answeredAt })
+        .from(responses)
+        .innerJoin(participants, eq(responses.participantId, participants.id))
+        .where(sql`LOWER(${participants.email}) = ${normalizedEmail}`)
+        .orderBy(responses.id);
 
-    const content = result
-      .map(t => `${t.id}:${t.updatedAt?.getTime() ?? 0}`)
-      .join(',');
-    return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
+      groupContent = groupResult.map(r => `g${r.id}:${r.answeredAt?.getTime() ?? 0}`).join(',');
+    }
+
+    const soloContent = soloResult.map(t => `${t.id}:${t.updatedAt?.getTime() ?? 0}`).join(',');
+    const combined = `${soloContent}|${groupContent}`;
+
+    if (!soloContent && !groupContent) return 'empty';
+    return crypto.createHash('sha256').update(combined).digest('hex').slice(0, 16);
   }
 
   async getTastingSignalsForProfile(userId: number): Promise<{
@@ -6737,6 +6769,55 @@ export class DatabaseStorage implements IStorage {
       quickRatesWithCharacteristics,
       onboardingData: user?.onboardingData ?? null,
     };
+  }
+
+  // Group responses for taste profile synthesis (raw rows — normalization in service layer)
+  async getGroupResponsesForProfile(email: string): Promise<Array<{
+    responseId: string;
+    selectedScore: number | null;
+    answeredAt: Date | null;
+    category: string | null;
+    title: string | null;
+    scaleMax: number | null;
+    questionType: string | null;
+    packageWineId: string | null;
+  }>> {
+    const normalizedEmail = email.toLowerCase();
+
+    // answer_json is a bare number (not {selectedScore: N}) in production
+    // scale_max exists as both snake_case and camelCase depending on package age
+    // category is null on older packages — title is included for fallback trait extraction
+    const rows = await db
+      .select({
+        responseId: responses.id,
+        selectedScore: sql<number | null>`
+          CASE WHEN jsonb_typeof(${responses.answerJson}) = 'number'
+               THEN (${responses.answerJson}::text)::numeric
+               ELSE (${responses.answerJson}->>'selectedScore')::numeric
+          END`,
+        answeredAt: responses.answeredAt,
+        category: sql<string | null>`${slides.payloadJson}->>'category'`,
+        title: sql<string | null>`${slides.payloadJson}->>'title'`,
+        scaleMax: sql<number | null>`COALESCE(
+          (${slides.payloadJson}->>'scale_max')::int,
+          (${slides.payloadJson}->>'scaleMax')::int
+        )`,
+        questionType: sql<string | null>`${slides.payloadJson}->>'question_type'`,
+        packageWineId: slides.packageWineId,
+      })
+      .from(responses)
+      .innerJoin(slides, eq(responses.slideId, slides.id))
+      .innerJoin(participants, eq(responses.participantId, participants.id))
+      .where(
+        and(
+          sql`LOWER(${participants.email}) = ${normalizedEmail}`,
+          eq(slides.type, 'question'),
+        )
+      )
+      .orderBy(desc(responses.answeredAt))
+      .limit(500);
+
+    return rows;
   }
 
   // AI Response Cache methods

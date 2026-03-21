@@ -97,7 +97,7 @@ export default function HomeTastings() {
     },
   });
 
-  // Get preferences
+  // Get solo preferences (for summary display and fallback stats)
   const { data: preferencesData } = useQuery<PreferencesData>({
     queryKey: ["/api/solo/preferences"],
     queryFn: async () => {
@@ -321,7 +321,7 @@ export default function HomeTastings() {
               ))}
             </div>
           ) : (
-            <EmptyTastingsCard onStartTasting={() => setLocation("/tasting/new")} />
+            <EmptyTastingsCard onStartTasting={() => setLocation("/tasting/new")} groupCount={stats.group} />
           )}
         </motion.div>
       </div>
@@ -359,17 +359,21 @@ function StatCard({
 }
 
 // Empty State Card
-function EmptyTastingsCard({ onStartTasting }: { onStartTasting: () => void }) {
+function EmptyTastingsCard({ onStartTasting, groupCount = 0 }: { onStartTasting: () => void; groupCount?: number }) {
   return (
     <div className="text-center py-12 bg-gradient-to-br from-white/5 to-white/0 rounded-2xl border border-white/10">
       <Wine className="w-12 h-12 text-white/30 mx-auto mb-4" />
-      <p className="text-white/60 mb-4">No tastings yet</p>
+      <p className="text-white/60 mb-4">
+        {groupCount > 0
+          ? `You've tasted ${groupCount} wine${groupCount !== 1 ? 's' : ''} in group sessions. Try a solo tasting to deepen your profile.`
+          : "No tastings yet"}
+      </p>
       <Button
         onClick={onStartTasting}
         variant="outline"
         className="border-white/10 text-white hover:bg-white/10"
       >
-        Start Your First Tasting
+        {groupCount > 0 ? "Start Solo Tasting" : "Start Your First Tasting"}
       </Button>
     </div>
   );

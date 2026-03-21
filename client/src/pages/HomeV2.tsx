@@ -412,7 +412,7 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
     },
   });
 
-  // Get preferences
+  // Get solo preferences (fallback for stats when dashboard hasn't loaded)
   const { data: preferencesData } = useQuery<PreferencesData>({
     queryKey: ["/api/solo/preferences"],
     queryFn: async () => {
@@ -567,7 +567,7 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
           transition={{ delay: 0.3 }}
         >
           <h2 className="text-lg font-semibold text-white mb-4">
-            Recent Solo Tastings
+            Recent Tastings
           </h2>
 
           {tastingsLoading ? (
@@ -646,16 +646,20 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
               >
                 <Wine className="w-14 h-14 text-purple-400/40 mx-auto mb-4" />
               </motion.div>
-              <p className="text-white/70 text-lg font-medium mb-2">Your journal awaits</p>
+              <p className="text-white/70 text-lg font-medium mb-2">
+                {stats.group > 0 ? "Your solo journal awaits" : "Your journal awaits"}
+              </p>
               <p className="text-white/40 text-sm mb-6 max-w-[240px] mx-auto">
-                Taste your first wine and start building your personal palate profile
+                {stats.group > 0
+                  ? `You've tasted ${stats.group} wine${stats.group !== 1 ? 's' : ''} in group sessions. Try a solo tasting to deepen your personal profile.`
+                  : "Taste your first wine and start building your personal palate profile"}
               </p>
               <Button
                 onClick={() => setLocation("/tasting/new")}
                 className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                First Tasting
+                {stats.group > 0 ? "Start Solo Tasting" : "First Tasting"}
               </Button>
             </motion.div>
           )}
@@ -1164,7 +1168,7 @@ function DashboardTabContent({ user, onLogout }: TabContentProps) {
       enabled: !!user.email,
     });
 
-  // Fetch solo preferences
+  // Fetch solo preferences (fallback stats)
   const { data: soloPreferences } = useQuery<PreferencesData>({
     queryKey: ["/api/solo/preferences"],
   });

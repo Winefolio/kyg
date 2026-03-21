@@ -99,11 +99,24 @@ async function cleanupOldAttempts(): Promise<void> {
 /**
  * Middleware to require authentication
  */
+const lastSeenCache = new Map<number, number>(); // userId -> timestamp
+const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000; // 5 minutes
+
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   if (!req.session?.userId) {
     res.status(401).json({ error: "Authentication required" });
     return;
   }
+
+  // Throttled update of lastSeenAt
+  const userId = req.session.userId;
+  const now = Date.now();
+  const lastUpdate = lastSeenCache.get(userId) ?? 0;
+  if (now - lastUpdate > LAST_SEEN_THROTTLE_MS) {
+    lastSeenCache.set(userId, now);
+    db.update(users).set({ lastSeenAt: sql`now()` }).where(eq(users.id, userId)).execute().catch(() => {});
+  }
+
   next();
 }
 
