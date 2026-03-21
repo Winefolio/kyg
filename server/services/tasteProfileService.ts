@@ -84,12 +84,20 @@ const GROUP_CATEGORY_TO_TRAIT: ReadonlyMap<string, TraitName> = new Map([
   ['sweetness', 'sweetness'],
 ]);
 
-function mapCategoryToTrait(category: string): TraitName | null {
-  const trait = GROUP_CATEGORY_TO_TRAIT.get(category.toLowerCase()) ?? null;
-  if (!trait && category) {
-    console.warn(`[TasteProfile] Unmapped group category: "${category}"`);
+function mapCategoryToTrait(category: string | null, title: string | null): TraitName | null {
+  if (category) {
+    const trait = GROUP_CATEGORY_TO_TRAIT.get(category.toLowerCase()) ?? null;
+    if (trait) return trait;
   }
-  return trait;
+  // Fallback: extract trait from slide title text (older packages lack category)
+  if (title) {
+    const t = title.toLowerCase();
+    if (t.includes('body')) return 'body';
+    if (t.includes('tannin')) return 'tannins';
+    if (t.includes('acidity')) return 'acidity';
+    if (t.includes('sweetness') || t.includes('sweet')) return 'sweetness';
+  }
+  return null;
 }
 
 function normalizeToFivePointScale(value: number, scaleMax: number): number {
@@ -108,7 +116,7 @@ function normalizeGroupResponses(
     if (row.questionType !== 'scale') continue;
     if (row.selectedScore == null || row.packageWineId == null) continue;
 
-    const trait = mapCategoryToTrait(row.category ?? '');
+    const trait = mapCategoryToTrait(row.category, row.title);
     if (!trait) continue;
 
     signals.push({

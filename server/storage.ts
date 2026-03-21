@@ -4880,11 +4880,17 @@ export class DatabaseStorage implements IStorage {
     const participantIds = userParticipants.map(p => p.id);
 
     // Query scale responses by JOINing through slides for category + score
+    // answer_json is a bare number in production; scale_max has both snake_case and camelCase
     const scaleRows = await db
       .select({
         category: sql<string>`${slides.payloadJson}->>'category'`,
-        scaleMax: sql<string>`${slides.payloadJson}->>'scale_max'`,
-        score: sql<string>`${responses.answerJson}->>'selectedScore'`,
+        title: sql<string>`${slides.payloadJson}->>'title'`,
+        scaleMax: sql<string>`COALESCE(${slides.payloadJson}->>'scale_max', ${slides.payloadJson}->>'scaleMax')`,
+        score: sql<string>`
+          CASE WHEN jsonb_typeof(${responses.answerJson}) = 'number'
+               THEN ${responses.answerJson}::text
+               ELSE ${responses.answerJson}->>'selectedScore'
+          END`,
       })
       .from(responses)
       .innerJoin(slides, eq(responses.slideId, slides.id))
@@ -4892,7 +4898,10 @@ export class DatabaseStorage implements IStorage {
         and(
           inArray(responses.participantId, participantIds),
           sql`${slides.payloadJson}->>'question_type' = 'scale'`,
-          isNotNull(sql`${responses.answerJson}->>'selectedScore'`),
+          sql`CASE WHEN jsonb_typeof(${responses.answerJson}) = 'number'
+               THEN ${responses.answerJson}::text
+               ELSE ${responses.answerJson}->>'selectedScore'
+          END IS NOT NULL`,
         )
       );
 
@@ -4906,8 +4915,17 @@ export class DatabaseStorage implements IStorage {
     };
 
     for (const row of scaleRows) {
+      // Try category first, then extract from title text as fallback
+      let trait: string | undefined;
       const category = (row.category || '').toLowerCase();
-      const trait = CATEGORY_TO_TRAIT[category];
+      trait = CATEGORY_TO_TRAIT[category];
+      if (!trait && row.title) {
+        const titleLower = row.title.toLowerCase();
+        if (titleLower.includes('body')) trait = 'body';
+        else if (titleLower.includes('tannin')) trait = 'tannins';
+        else if (titleLower.includes('acidity')) trait = 'acidity';
+        else if (titleLower.includes('sweetness') || titleLower.includes('sweet')) trait = 'sweetness';
+      }
       if (!trait) continue;
 
       const score = Number(row.score);
@@ -6759,19 +6777,31 @@ export class DatabaseStorage implements IStorage {
     selectedScore: number | null;
     answeredAt: Date | null;
     category: string | null;
+    title: string | null;
     scaleMax: number | null;
     questionType: string | null;
     packageWineId: string | null;
   }>> {
     const normalizedEmail = email.toLowerCase();
 
+    // answer_json is a bare number (not {selectedScore: N}) in production
+    // scale_max exists as both snake_case and camelCase depending on package age
+    // category is null on older packages — title is included for fallback trait extraction
     const rows = await db
       .select({
         responseId: responses.id,
-        selectedScore: sql<number | null>`(${responses.answerJson}->>'selectedScore')::numeric`,
+        selectedScore: sql<number | null>`
+          CASE WHEN jsonb_typeof(${responses.answerJson}) = 'number'
+               THEN (${responses.answerJson}::text)::numeric
+               ELSE (${responses.answerJson}->>'selectedScore')::numeric
+          END`,
         answeredAt: responses.answeredAt,
         category: sql<string | null>`${slides.payloadJson}->>'category'`,
-        scaleMax: sql<number | null>`(${slides.payloadJson}->>'scale_max')::int`,
+        title: sql<string | null>`${slides.payloadJson}->>'title'`,
+        scaleMax: sql<number | null>`COALESCE(
+          (${slides.payloadJson}->>'scale_max')::int,
+          (${slides.payloadJson}->>'scaleMax')::int
+        )`,
         questionType: sql<string | null>`${slides.payloadJson}->>'question_type'`,
         packageWineId: slides.packageWineId,
       })
