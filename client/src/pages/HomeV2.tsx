@@ -433,6 +433,12 @@ function SoloTabContent({ user, onLogout }: TabContentProps) {
       return response.json();
     },
     staleTime: 10 * 60 * 1000,
+    // Retry every 5s if we got 'default' but user has onboarding data (GPT still generating)
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (data?.source === 'default' && user.onboardingCompleted) return 5000;
+      return false;
+    },
     enabled: (preferencesData?.tastingCount ?? 0) === 0,
   });
 

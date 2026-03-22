@@ -414,6 +414,8 @@ export default function OnboardingQuiz() {
         if (!old?.user) return old;
         return { ...old, user: { ...old.user, onboardingCompleted: true, onboardingData } };
       });
+      // Invalidate recommendations so they refetch after onboarding (starter recs generating async)
+      queryClient.invalidateQueries({ queryKey: ["/api/solo/recommendations"] });
       setLocation("/home");
     },
     onError: () => {
