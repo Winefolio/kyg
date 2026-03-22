@@ -5,3 +5,5 @@ server/public
 vite.config.ts.*
 *.tar.gz
 config.bat
+temp_auto_push.bat
+temp_interactive_push.bat
