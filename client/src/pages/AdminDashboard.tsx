@@ -3,10 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Users, Wine, Map, CalendarDays, Activity, CheckCircle, User, UsersRound, ChevronDown, ChevronRight, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Users, Wine, Map, CalendarDays, Activity, CheckCircle, User, UsersRound, ChevronDown, ChevronRight, Search, ArrowUpDown, ArrowUp, ArrowDown, MessageCircle, MessagesSquare, Bot, Sparkles } from 'lucide-react';
 
 type SortKey = 'email' | 'createdAt' | 'soloTastings' | 'groupTastings'
-  | 'tastingsCompleted' | 'lastTastingDate' | 'lastSeenAt' | 'tastingLevel' | 'onboardingCompleted';
+  | 'tastingsCompleted' | 'lastTastingDate' | 'lastSeenAt' | 'tastingLevel' | 'onboardingCompleted'
+  | 'pierreChats' | 'pierreMessages';
 type SortDir = 'asc' | 'desc';
 
 interface EngagementData {
@@ -21,11 +22,28 @@ interface EngagementData {
     groupTastings: number;
     onboardingCompletionRate: number;
   };
+  pierre: {
+    totalChats: number;
+    chatsThisWeek: number;
+    chatsThisMonth: number;
+    totalMessages: number;
+    messagesThisWeek: number;
+    messagesThisMonth: number;
+    distinctUsers: number;
+    distinctUsersPct: number;
+  };
+  recommendations: {
+    total: number;
+    thisWeek: number;
+    thisMonth: number;
+  };
   recentUsers: Array<{
     email: string;
     createdAt: string;
     soloTastings: number;
     groupTastings: number;
+    pierreChats: number;
+    pierreMessages: number;
     tastingsCompleted: number;
     lastTastingDate: string | null;
     lastSeenAt: string | null;
@@ -65,6 +83,14 @@ interface UserDetail {
     package_name: string | null;
     responses_count: number;
     source: 'group';
+  }>;
+  pierreChats: Array<{
+    id: number;
+    title: string | null;
+    message_count: number;
+    created_at: string;
+    updated_at: string;
+    last_message_at: string | null;
   }>;
 }
 
@@ -123,7 +149,7 @@ function UserDetailPanel({ email }: { email: string }) {
   if (isLoading) return <div className="px-4 py-3 text-sm text-muted-foreground">Loading...</div>;
   if (error || !data) return <div className="px-4 py-3 text-sm text-destructive">Failed to load</div>;
 
-  const hasActivity = data.soloTastings.length > 0 || data.groupSessions.length > 0;
+  const hasActivity = data.soloTastings.length > 0 || data.groupSessions.length > 0 || data.pierreChats.length > 0;
 
   if (!hasActivity) {
     return <div className="px-4 py-3 text-sm text-muted-foreground">No tasting activity yet.</div>;
@@ -158,6 +184,20 @@ function UserDetailPanel({ email }: { email: string }) {
                 <Badge variant="outline" className="text-[10px] py-0">{s.short_code}</Badge>
                 {s.is_host && <Badge variant="default" className="text-[10px] py-0">Host</Badge>}
                 <span className="text-muted-foreground">{s.responses_count} responses</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {data.pierreChats.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mb-1">Pierre Chats</p>
+          <div className="space-y-1">
+            {data.pierreChats.map((c) => (
+              <div key={c.id} className="flex items-center gap-3 text-xs py-1">
+                <span className="text-muted-foreground w-32">{formatDateTime(c.last_message_at || c.updated_at)}</span>
+                <span className="font-medium">{c.title || 'Untitled chat'}</span>
+                <Badge variant="outline" className="text-[10px] py-0">{c.message_count} msgs</Badge>
               </div>
             ))}
           </div>
@@ -256,6 +296,10 @@ export default function AdminDashboard() {
         }
         case 'onboardingCompleted':
           return dir * (Number(a.onboardingCompleted) - Number(b.onboardingCompleted));
+        case 'pierreChats':
+          return dir * (a.pierreChats - b.pierreChats);
+        case 'pierreMessages':
+          return dir * (a.pierreMessages - b.pierreMessages);
         default:
           return 0;
       }
@@ -278,7 +322,7 @@ export default function AdminDashboard() {
     );
   }
 
-  const { summary, journeys, sessions } = data;
+  const { summary, pierre, recommendations, journeys, sessions } = data;
 
   const thClass = "pb-3 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors";
 
@@ -314,6 +358,34 @@ export default function AdminDashboard() {
           value={summary.totalUsers > 0 ? (summary.totalTastings / summary.totalUsers).toFixed(1) : '0'}
           subtitle={`${summary.tastingsThisWeek} this week / ${summary.tastingsThisMonth} this month`}
           icon={Activity}
+        />
+      </div>
+
+      {/* Pierre & Recommendations */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <StatCard
+          title="Pierre Chats"
+          value={pierre.totalChats}
+          subtitle={`${pierre.chatsThisWeek} this week / ${pierre.chatsThisMonth} this month`}
+          icon={MessageCircle}
+        />
+        <StatCard
+          title="Chat Messages"
+          value={pierre.totalMessages}
+          subtitle={`${pierre.messagesThisWeek} this week / ${pierre.messagesThisMonth} this month`}
+          icon={MessagesSquare}
+        />
+        <StatCard
+          title="Pierre Users"
+          value={pierre.distinctUsers}
+          subtitle={`${pierre.distinctUsersPct}% of users`}
+          icon={Bot}
+        />
+        <StatCard
+          title="Recommendations"
+          value={recommendations.total}
+          subtitle={`${recommendations.thisWeek} this week / ${recommendations.thisMonth} this month`}
+          icon={Sparkles}
         />
       </div>
 
@@ -396,6 +468,14 @@ export default function AdminDashboard() {
                   <th className={`${thClass} text-center`} onClick={() => handleSort('tastingsCompleted')}>
                     Total <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="tastingsCompleted" />
                   </th>
+                  <th className={`${thClass} text-center`} onClick={() => handleSort('pierreChats')}>
+                    <Bot className="h-3.5 w-3.5 inline" /> Chats
+                    <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="pierreChats" />
+                  </th>
+                  <th className={`${thClass} text-center`} onClick={() => handleSort('pierreMessages')}>
+                    <MessageCircle className="h-3.5 w-3.5 inline" /> Msgs
+                    <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="pierreMessages" />
+                  </th>
                   <th className={thClass} onClick={() => handleSort('lastTastingDate')}>
                     Last Tasting <SortIcon sortKey={sortKey} sortDir={sortDir} columnKey="lastTastingDate" />
                   </th>
@@ -430,6 +510,8 @@ export default function AdminDashboard() {
                         <td className="py-3 text-center">{user.soloTastings}</td>
                         <td className="py-3 text-center">{user.groupTastings}</td>
                         <td className="py-3 text-center font-semibold">{user.tastingsCompleted}</td>
+                        <td className="py-3 text-center">{user.pierreChats || '—'}</td>
+                        <td className="py-3 text-center">{user.pierreMessages || '—'}</td>
                         <td className="py-3">{formatDate(user.lastTastingDate)}</td>
                         <td className="py-3">{formatDate(user.lastSeenAt)}</td>
                         <td className="py-3">
@@ -439,7 +521,7 @@ export default function AdminDashboard() {
                       </tr>
                       {isExpanded && (
                         <tr>
-                          <td colSpan={10} className="bg-muted/30 p-0 border-b">
+                          <td colSpan={12} className="bg-muted/30 p-0 border-b">
                             <UserDetailPanel email={user.email} />
                           </td>
                         </tr>

@@ -17,6 +17,9 @@ export function registerAdminRoutes(app: Express) {
 
       // Run all queries in parallel
       // Total tastings = solo tastings + group session participations
+      const weekIso = startOfWeek.toISOString();
+      const monthIso = startOfMonth.toISOString();
+
       const [
         totalUsersResult,
         usersThisWeekResult,
@@ -34,6 +37,7 @@ export function registerAdminRoutes(app: Express) {
         totalSessionsResult,
         totalParticipantsResult,
         sessionsThisMonthResult,
+        pierreStatsResult,
       ] = await Promise.all([
         // User counts
         db.select({ count: count() }).from(users),
@@ -56,28 +60,31 @@ export function registerAdminRoutes(app: Express) {
           completed: count(sql`CASE WHEN ${users.onboardingCompleted} = true THEN 1 END`),
         }).from(users),
 
-        // Recent users: count solo + group tastings, sort by most recent activity
+        // Recent users: count solo + group tastings + Pierre stats, sort by most recent activity
         db.execute(sql`
           SELECT
             u.email,
             u.created_at,
-            (SELECT count(*) FROM tastings t WHERE t.user_id = u.id)::int as solo_tastings,
-            (SELECT count(*) FROM participants p WHERE p.email = u.email)::int as group_tastings,
+            COALESCE(t_agg.cnt, 0)::int as solo_tastings,
+            COALESCE(p_agg.cnt, 0)::int as group_tastings,
+            COALESCE(sc_agg.cnt, 0)::int as pierre_chats,
+            COALESCE(sm_agg.cnt, 0)::int as pierre_messages,
             u.tasting_level,
             u.onboarding_completed,
-            GREATEST(
-              (SELECT MAX(t.tasted_at) FROM tastings t WHERE t.user_id = u.id),
-              (SELECT MAX(p.created_at) FROM participants p WHERE p.email = u.email)
-            ) as last_tasting_date,
+            GREATEST(t_agg.max_at, p_agg.max_at) as last_tasting_date,
             u.last_seen_at
           FROM users u
-          ORDER BY COALESCE(
-            GREATEST(
-              (SELECT MAX(t.tasted_at) FROM tastings t WHERE t.user_id = u.id),
-              (SELECT MAX(p.created_at) FROM participants p WHERE p.email = u.email)
-            ),
-            u.created_at
-          ) DESC
+          LEFT JOIN (SELECT user_id, count(*) as cnt, MAX(tasted_at) as max_at FROM tastings GROUP BY user_id) t_agg ON t_agg.user_id = u.id
+          LEFT JOIN (SELECT email, count(*) as cnt, MAX(created_at) as max_at FROM participants GROUP BY email) p_agg ON p_agg.email = u.email
+          LEFT JOIN (SELECT user_id, count(*) as cnt FROM sommelier_chats GROUP BY user_id) sc_agg ON sc_agg.user_id = u.id
+          LEFT JOIN (
+            SELECT sc2.user_id, count(*) as cnt
+            FROM sommelier_messages sm
+            JOIN sommelier_chats sc2 ON sc2.id = sm.chat_id
+            WHERE sm.role = 'user'
+            GROUP BY sc2.user_id
+          ) sm_agg ON sm_agg.user_id = u.id
+          ORDER BY COALESCE(GREATEST(t_agg.max_at, p_agg.max_at), u.created_at) DESC
         `),
 
         // Journey stats
@@ -88,6 +95,21 @@ export function registerAdminRoutes(app: Express) {
         db.select({ count: count() }).from(sessions),
         db.select({ count: count() }).from(participants),
         db.select({ count: count() }).from(sessions).where(gte(sessions.startedAt, startOfMonth)),
+
+        // Pierre + recommendation stats — single query
+        db.execute(sql`
+          SELECT
+            (SELECT count(*) FROM sommelier_chats)::int as total_chats,
+            (SELECT count(*) FROM sommelier_chats WHERE created_at >= ${weekIso}::timestamp)::int as chats_week,
+            (SELECT count(*) FROM sommelier_chats WHERE created_at >= ${monthIso}::timestamp)::int as chats_month,
+            (SELECT count(*) FROM sommelier_messages WHERE role = 'user')::int as total_messages,
+            (SELECT count(*) FROM sommelier_messages WHERE role = 'user' AND created_at >= ${weekIso}::timestamp)::int as messages_week,
+            (SELECT count(*) FROM sommelier_messages WHERE role = 'user' AND created_at >= ${monthIso}::timestamp)::int as messages_month,
+            (SELECT count(DISTINCT user_id) FROM sommelier_chats)::int as distinct_users,
+            (SELECT count(*) FROM tastings WHERE recommendations IS NOT NULL)::int as recs_total,
+            (SELECT count(*) FROM tastings WHERE recommendations IS NOT NULL AND tasted_at >= ${weekIso}::timestamp)::int as recs_week,
+            (SELECT count(*) FROM tastings WHERE recommendations IS NOT NULL AND tasted_at >= ${monthIso}::timestamp)::int as recs_month
+        `),
       ]);
 
       // chapter_completions table may not exist yet — query safely
@@ -112,6 +134,13 @@ export function registerAdminRoutes(app: Express) {
       const soloMonth = Number(soloTastingsThisMonthResult[0]?.count ?? 0);
       const groupMonth = Number(groupTastingsThisMonthResult[0]?.count ?? 0);
 
+      const ps = (pierreStatsResult as any[])[0] ?? {};
+      const totalUsersCount = Number(totalUsersResult[0]?.count ?? 0);
+      const pierreUsersCount = Number(ps.distinct_users ?? 0);
+      const pierreUsersPct = totalUsersCount > 0
+        ? Math.round((pierreUsersCount / totalUsersCount) * 100)
+        : 0;
+
       res.json({
         summary: {
           totalUsers: totalUsersResult[0]?.count ?? 0,
@@ -124,11 +153,28 @@ export function registerAdminRoutes(app: Express) {
           groupTastings: groupTotal,
           onboardingCompletionRate: onboardingRate,
         },
+        pierre: {
+          totalChats: Number(ps.total_chats ?? 0),
+          chatsThisWeek: Number(ps.chats_week ?? 0),
+          chatsThisMonth: Number(ps.chats_month ?? 0),
+          totalMessages: Number(ps.total_messages ?? 0),
+          messagesThisWeek: Number(ps.messages_week ?? 0),
+          messagesThisMonth: Number(ps.messages_month ?? 0),
+          distinctUsers: pierreUsersCount,
+          distinctUsersPct: pierreUsersPct,
+        },
+        recommendations: {
+          total: Number(ps.recs_total ?? 0),
+          thisWeek: Number(ps.recs_week ?? 0),
+          thisMonth: Number(ps.recs_month ?? 0),
+        },
         recentUsers: (recentUsersResult as any[]).map((row: any) => ({
           email: row.email,
           createdAt: row.created_at,
           soloTastings: row.solo_tastings,
           groupTastings: row.group_tastings,
+          pierreChats: Number(row.pierre_chats ?? 0),
+          pierreMessages: Number(row.pierre_messages ?? 0),
           tastingsCompleted: Number(row.solo_tastings) + Number(row.group_tastings),
           lastTastingDate: row.last_tasting_date,
           tastingLevel: row.tasting_level,
@@ -157,7 +203,7 @@ export function registerAdminRoutes(app: Express) {
     try {
       const email = decodeURIComponent(req.params.email);
 
-      const [soloTastings, groupSessions] = await Promise.all([
+      const [soloTastings, groupSessions, pierreChats] = await Promise.all([
         // Solo tastings
         db.execute(sql`
           SELECT t.id, t.wine_name, t.wine_type, t.wine_region, t.tasted_at, t.tasting_mode,
@@ -180,12 +226,23 @@ export function registerAdminRoutes(app: Express) {
           WHERE p.email = ${email}
           ORDER BY p.created_at DESC
         `),
+        // Pierre chats
+        db.execute(sql`
+          SELECT sc.id, sc.title, sc.message_count,
+                 sc.created_at, sc.updated_at,
+                 (SELECT MAX(sm.created_at) FROM sommelier_messages sm WHERE sm.chat_id = sc.id) as last_message_at
+          FROM sommelier_chats sc
+          JOIN users u ON u.id = sc.user_id
+          WHERE u.email = ${email}
+          ORDER BY sc.updated_at DESC
+        `),
       ]);
 
       res.json({
         email,
         soloTastings: soloTastings as any[],
         groupSessions: groupSessions as any[],
+        pierreChats: pierreChats as any[],
       });
     } catch (error) {
       console.error("Error fetching user detail:", error);
