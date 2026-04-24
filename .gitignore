@@ -5,3 +5,8 @@ server/public
 vite.config.ts.*
 *.tar.gz
 config.bat
+
+# Secrets — never commit. Use .env.example for documentation.
+.env
+.env.*
+!.env.example

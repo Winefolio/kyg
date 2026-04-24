@@ -2,11 +2,12 @@ import type { Express } from "express";
 import { db } from "../db";
 import { users, tastings, userJourneys, sessions, participants, journeys } from "@shared/schema";
 import { sql, count, eq, gte } from "drizzle-orm";
+import { requireAuth, requireAdmin } from "./auth";
 
 export function registerAdminRoutes(app: Express) {
   console.log("📊 Registering admin engagement endpoints...");
 
-  app.get("/api/admin/engagement", async (_req, res) => {
+  app.get("/api/admin/engagement", requireAuth, requireAdmin, async (_req, res) => {
     try {
       const now = new Date();
       const startOfWeek = new Date(now);
@@ -199,7 +200,7 @@ export function registerAdminRoutes(app: Express) {
   });
 
   // User detail: tasting history for a specific user
-  app.get("/api/admin/user/:email", async (req, res) => {
+  app.get("/api/admin/user/:email", requireAuth, requireAdmin, async (req, res) => {
     try {
       const email = decodeURIComponent(req.params.email);
 
