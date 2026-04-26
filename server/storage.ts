@@ -5841,51 +5841,55 @@ export class DatabaseStorage implements IStorage {
       const user = await this.getUserByEmail(email);
       if (!user) return null;
 
-      const userJourney = await db.query.userJourneys.findFirst({
-        where: and(
-          eq(userJourneys.userId, user.id),
-          eq(userJourneys.journeyId, journeyId)
-        )
-      });
-
-      if (!userJourney) return null;
-
-      // Get chapter info to determine next chapter
       const chapter = await db.query.chapters.findFirst({
         where: eq(chapters.id, chapterId)
       });
-
       if (!chapter) return null;
 
-      // Update completed chapters array
-      const completedChaptersArray = (userJourney.completedChapters as CompletedChapter[]) || [];
-      const alreadyCompleted = completedChaptersArray.some(c => c.chapterId === chapterId);
-
-      if (!alreadyCompleted) {
-        completedChaptersArray.push({
-          chapterId,
-          completedAt: new Date().toISOString(),
-          tastingId
-        });
-      }
-
-      // Check if journey is complete
       const journeyData = await this.getJourneyWithChapters(journeyId);
-      const isComplete = journeyData && completedChaptersArray.length >= journeyData.chapters.length;
 
-      // Update user journey
-      const [updated] = await db
-        .update(userJourneys)
-        .set({
-          completedChapters: completedChaptersArray,
-          currentChapter: isComplete ? chapter.chapterNumber : chapter.chapterNumber + 1,
-          lastActivityAt: sql`now()`,
-          completedAt: isComplete ? sql`now()` : null
-        })
-        .where(eq(userJourneys.id, userJourney.id))
-        .returning();
+      // Serialize concurrent completions on the same userJourney row.
+      // Without SELECT FOR UPDATE, two concurrent completions both read the
+      // same base array, push their own entry, and the second UPDATE
+      // overwrites the first — silently losing a completed chapter.
+      return await db.transaction(async (tx) => {
+        const [userJourney] = await tx
+          .select()
+          .from(userJourneys)
+          .where(and(
+            eq(userJourneys.userId, user.id),
+            eq(userJourneys.journeyId, journeyId)
+          ))
+          .for("update");
 
-      return updated;
+        if (!userJourney) return null;
+
+        const completedChaptersArray = (userJourney.completedChapters as CompletedChapter[]) || [];
+        const alreadyCompleted = completedChaptersArray.some(c => c.chapterId === chapterId);
+
+        if (!alreadyCompleted) {
+          completedChaptersArray.push({
+            chapterId,
+            completedAt: new Date().toISOString(),
+            tastingId
+          });
+        }
+
+        const isComplete = !!journeyData && completedChaptersArray.length >= journeyData.chapters.length;
+
+        const [updated] = await tx
+          .update(userJourneys)
+          .set({
+            completedChapters: completedChaptersArray,
+            currentChapter: isComplete ? chapter.chapterNumber : chapter.chapterNumber + 1,
+            lastActivityAt: sql`now()`,
+            completedAt: isComplete ? sql`now()` : null
+          })
+          .where(eq(userJourneys.id, userJourney.id))
+          .returning();
+
+        return updated;
+      });
     } catch (error) {
       console.error("Error completing chapter:", error);
       return null;
