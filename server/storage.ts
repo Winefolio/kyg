@@ -2705,78 +2705,77 @@ export class DatabaseStorage implements IStorage {
         inArray(responses.participantId, participantIds)
       ));
 
-    // 5. Calculate averages for each question slide
-    const questionAverages = [];
+    // 5. Calculate averages for each question slide. Text-summary slides hit
+    // OpenAI; running them in parallel turns N sequential GPT calls into a
+    // single max-latency wait without changing semantics.
+    const questionAverages = await Promise.all(
+      wineQuestionSlides.map(async (slide) => {
+        const slideResponses = allResponses.filter(r => r.slideId === slide.id);
 
-    for (const slide of wineQuestionSlides) {
-      const slideResponses = allResponses.filter(r => r.slideId === slide.id);
+        if (slideResponses.length === 0) {
+          return {
+            slideId: slide.id,
+            position: slide.position,
+            globalPosition: slide.globalPosition,
+            questionType: this.getQuestionType(slide),
+            questionTitle: this.getQuestionTitle(slide),
+            totalResponses: 0,
+            averageScore: null,
+            responseDistribution: {},
+            timestamp: new Date().toISOString()
+          };
+        }
 
-      if (slideResponses.length === 0) {
-        // No responses yet
-        questionAverages.push({
+        const questionType = this.getQuestionType(slide);
+        let averageScore: number | null = null;
+        let responseDistribution: any = {};
+
+        switch (questionType) {
+          case 'scale':
+            averageScore = this.calculateScaleAverage(slideResponses);
+            responseDistribution = this.getScaleDistribution(slideResponses);
+            break;
+
+          case 'multiple_choice':
+            responseDistribution = this.getMultipleChoiceDistributionWithUsers(slideResponses, slide);
+            averageScore = this.calculateMultipleChoiceScore(responseDistribution);
+            break;
+
+          case 'boolean':
+            responseDistribution = this.getBooleanDistributionWithUsers(slideResponses);
+            averageScore = this.calculateBooleanScore(responseDistribution);
+            break;
+
+          case 'text': {
+            const textSummary = await this.calculateTextSummaryAverage(sessionId, wineId, slide.id);
+            averageScore = null;
+            responseDistribution = {
+              textResponseCount: slideResponses.length,
+              summary: textSummary?.summary || 'No summary available',
+              keywords: textSummary?.keywords || [],
+              sentiment: textSummary?.sentiment || 'neutral'
+            };
+            break;
+          }
+
+          default:
+            averageScore = null;
+            responseDistribution = { unknownType: slideResponses.length };
+        }
+
+        return {
           slideId: slide.id,
           position: slide.position,
           globalPosition: slide.globalPosition,
-          questionType: this.getQuestionType(slide),
+          questionType,
           questionTitle: this.getQuestionTitle(slide),
-          totalResponses: 0,
-          averageScore: null,
-          responseDistribution: {},
+          totalResponses: slideResponses.length,
+          averageScore,
+          responseDistribution,
           timestamp: new Date().toISOString()
-        });
-        continue;
-      }
-
-      const questionType = this.getQuestionType(slide);
-      let averageScore: number | null = null;
-      let responseDistribution: any = {};
-
-      switch (questionType) {
-        case 'scale':
-          averageScore = this.calculateScaleAverage(slideResponses);
-          responseDistribution = this.getScaleDistribution(slideResponses);
-          break;
-
-        case 'multiple_choice':
-          responseDistribution = this.getMultipleChoiceDistributionWithUsers(slideResponses, slide);
-          averageScore = this.calculateMultipleChoiceScore(responseDistribution);
-          break;
-
-        case 'boolean':
-          responseDistribution = this.getBooleanDistributionWithUsers(slideResponses);
-          averageScore = this.calculateBooleanScore(responseDistribution);
-          break;
-
-        case 'text':
-          // For text questions, get the summary instead of sentiment scores
-          const textSummary = await this.calculateTextSummaryAverage(sessionId, wineId, slide.id);
-          averageScore = null; // No numerical score for text questions
-          responseDistribution = {
-            textResponseCount: slideResponses.length,
-            summary: textSummary?.summary || 'No summary available',
-            keywords: textSummary?.keywords || [],
-            sentiment: textSummary?.sentiment || 'neutral'
-          };
-          break;
-
-        default:
-          // Generic handling for unknown question types
-          averageScore = null;
-          responseDistribution = { unknownType: slideResponses.length };
-      }
-
-      questionAverages.push({
-        slideId: slide.id,
-        position: slide.position,
-        globalPosition: slide.globalPosition,
-        questionType,
-        questionTitle: this.getQuestionTitle(slide),
-        totalResponses: slideResponses.length,
-        averageScore,
-        responseDistribution,
-        timestamp: new Date().toISOString()
-      });
-    }
+        };
+      })
+    );
 
     return questionAverages;
   }

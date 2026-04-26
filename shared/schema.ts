@@ -186,6 +186,7 @@ export const responses = pgTable("responses", {
   synced: boolean("synced").default(true)
 }, (table) => ({
   participantIdx: index("idx_responses_participant").on(table.participantId),
+  slideIdx: index("idx_responses_slide_id").on(table.slideId),
   syncedIdx: index("idx_responses_synced").on(table.synced),
   uniqueParticipantSlide: unique().on(table.participantId, table.slideId)
 }));
