@@ -653,16 +653,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const pkg = await storage.getPackageById(session.packageId);
           if (pkg) {
             const packageWines = await storage.getPackageWines(pkg.id);
-            let allSlides: any[] = [];
-            
-            // Get all slides in order
-            for (const wine of packageWines) {
-              const wineSlides = await storage.getSlidesByPackageWineId(wine.id);
-              allSlides = allSlides.concat(wineSlides);
-            }
-            
-            // Sort by global position
-            allSlides.sort((a, b) => (a.globalPosition || 0) - (b.globalPosition || 0));
+            const wineIds = packageWines.map(w => w.id);
+            let allSlides: any[] = await storage.getSlidesByPackageWineIds(wineIds);
             
             // Filter host-only slides if participant is not host
             if (!participant.isHost) {

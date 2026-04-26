@@ -90,7 +90,7 @@ export default function HostDashboard() {
   } = useQuery<SessionAnalyticsData>({
     queryKey: [`/api/sessions/${sessionId}/analytics`],
     enabled: !!sessionId,
-    refetchInterval: 10000, // Refresh analytics every 10 seconds
+    refetchInterval: 20000,
   });
 
   // Generate QR and sharing functions
