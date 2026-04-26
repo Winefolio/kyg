@@ -18,7 +18,7 @@ import { z } from "zod";
 import { registerMediaProxyRoutes } from './routes/media-proxy';
 import { registerUserRoutes } from './routes/user';
 import { registerDashboardRoutes } from './routes/dashboard';
-import { registerAuthRoutes } from './routes/auth';
+import { registerAuthRoutes, requireAuth } from './routes/auth';
 import { registerTastingsRoutes } from './routes/tastings';
 import { registerWinesRoutes } from './routes/wines';
 import { registerJourneyRoutes } from './routes/journeys';
@@ -240,17 +240,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create session (with optional host participant)
-  app.post("/api/sessions", async (req, res) => {
+  app.post("/api/sessions", requireAuth, async (req, res) => {
     try {
       const { packageId, packageCode, name, hostName, hostDisplayName, hostEmail, createHost } = req.body;
       
       let pkg;
       if (packageId) {
-        // Find package by ID (for existing packages)
-        const packages = Array.from((storage as any).packages.values());
-        pkg = packages.find((p: any) => p.id === packageId);
+        pkg = await storage.getPackageById(packageId);
       } else if (packageCode) {
-        // Find package by code
         pkg = await storage.getPackageByCode(packageCode.toUpperCase());
       }
       
@@ -540,7 +537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update session status
-  app.patch("/api/sessions/:sessionIdOrShortCode/status", async (req, res) => {
+  app.patch("/api/sessions/:sessionIdOrShortCode/status", requireAuth, async (req, res) => {
     try {
       const { sessionIdOrShortCode } = req.params;
       const { status } = req.body;
@@ -594,7 +591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/sessions/:sessionId/wine-selections", async (req, res) => {
+  app.post("/api/sessions/:sessionId/wine-selections", requireAuth, async (req, res) => {
     try {
       const { sessionId } = req.params;
       const { selections } = req.body;
@@ -607,7 +604,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/sessions/:sessionIdOrShortCode/wine-selections", async (req, res) => {
+  app.put("/api/sessions/:sessionIdOrShortCode/wine-selections", requireAuth, async (req, res) => {
     try {
       const { sessionIdOrShortCode } = req.params;
       const { selections } = req.body;
@@ -860,7 +857,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analyze sentiment for wine text responses
-  app.post("/api/sessions/:sessionId/wines/:wineId/sentiment-analysis", async (req, res) => {
+  app.post("/api/sessions/:sessionId/wines/:wineId/sentiment-analysis", requireAuth, async (req, res) => {
     try {
       const { sessionId, wineId } = req.params;
       
@@ -944,7 +941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Step 4: Calculate question averages for a wine
-  app.post('/api/sessions/:sessionId/wines/:wineId/calculate-averages', async (req, res) => {
+  app.post('/api/sessions/:sessionId/wines/:wineId/calculate-averages', requireAuth, async (req, res) => {
     try {
       const { sessionId, wineId } = req.params;
       
@@ -1188,7 +1185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   //endpoint to update comparabel questions for a wine
-  app.put('/api/slides/:slideId/comparable-questions', async (req, res) => {
+  app.put('/api/slides/:slideId/comparable-questions', requireAuth, async (req, res) => {
     try {
       const { slideId } = req.params;
 
@@ -1219,7 +1216,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Data export endpoints
 
   // Export session analytics as CSV
-  app.get("/api/sessions/:sessionId/export/csv", async (req, res) => {
+  app.get("/api/sessions/:sessionId/export/csv", requireAuth, async (req, res) => {
     try {
       const { sessionId } = req.params;
       
@@ -1341,7 +1338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create package with server-generated code
-  app.post("/api/packages", async (req, res) => {
+  app.post("/api/packages", requireAuth, async (req, res) => {
     try {
       const { name, description, imageUrl } = req.body;
 
@@ -1367,7 +1364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create or update package intro slide
-  app.post("/api/packages/:packageId/intro", async (req, res) => {
+  app.post("/api/packages/:packageId/intro", requireAuth, async (req, res) => {
     try {
       const { packageId } = req.params;
       const { title, description, imageUrl } = req.body;
@@ -1423,7 +1420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mock profile endpoints removed -- no client references, returned hardcoded data
 
   // Slide templates endpoint
-  app.get("/api/slide-templates", async (req, res) => {
+  app.get("/api/slide-templates", requireAuth, async (req, res) => {
     try {
       // Return slide templates from our predefined list
       const slideTemplates = [
@@ -1444,7 +1441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Duplicate slides from one wine to another
-  app.post("/api/wines/:wineId/duplicate-slides", async (req: Request, res: Response) => {
+  app.post("/api/wines/:wineId/duplicate-slides", requireAuth, async (req: Request, res: Response) => {
     try {
       const { wineId } = req.params;
       const { targetWineId, replaceExisting } = req.body;
@@ -1478,7 +1475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Package management endpoints for sommelier dashboard
-  app.get("/api/packages", async (req, res) => {
+  app.get("/api/packages", requireAuth, async (req, res) => {
     try {
       const packages = await storage.getAllPackagesWithWines();
       res.json(packages);
@@ -1490,7 +1487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
 
-  app.patch("/api/packages/:id", async (req, res) => {
+  app.patch("/api/packages/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const updateData = req.body;
@@ -1502,7 +1499,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/packages/:id", async (req, res) => {
+  app.delete("/api/packages/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deletePackage(id);
@@ -1513,7 +1510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/sessions", async (req, res) => {
+  app.get("/api/sessions", requireAuth, async (req, res) => {
     try {
       const sessions = await storage.getAllSessions();
       res.json(sessions);
@@ -1536,7 +1533,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Duplicate GET /api/packages/:packageId/wines removed -- already registered at line 566
 
-  app.post("/api/packages/:packageId/wines", async (req, res) => {
+  app.post("/api/packages/:packageId/wines", requireAuth, async (req, res) => {
     try {
       const { packageId } = req.params;
       const wineData = { ...req.body, packageId };
@@ -1548,7 +1545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/packages/:packageId/wines/:id", async (req, res) => {
+  app.patch("/api/packages/:packageId/wines/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const updateData = req.body;
@@ -1560,7 +1557,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/packages/:packageId/wines/:id", async (req, res) => {
+  app.delete("/api/packages/:packageId/wines/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deletePackageWine(id);
@@ -1583,7 +1580,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/packages/:packageId/wines/:wineId/slides", async (req, res) => {
+  app.post("/api/packages/:packageId/wines/:wineId/slides", requireAuth, async (req, res) => {
     try {
       const { wineId } = req.params;
       const slideData = { ...req.body, packageWineId: wineId };
@@ -1607,7 +1604,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/slides", async (req, res) => {
+  app.post("/api/slides", requireAuth, async (req, res) => {
     try {
       const validatedData = insertSlideSchema.parse(req.body);
       const slide = await storage.createSlide(validatedData);
@@ -1649,7 +1646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/slides/:id", async (req, res) => {
+  app.patch("/api/slides/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       
@@ -1668,7 +1665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/slides/:id", async (req, res) => {
+  app.delete("/api/slides/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deleteSlide(id);
@@ -1680,7 +1677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update single slide position - using fractional indexing
-  app.put("/api/slides/:slideId/position", async (req, res) => {
+  app.put("/api/slides/:slideId/position", requireAuth, async (req, res) => {
     try {
       const { slideId } = req.params;
       const { newPosition } = req.body;
@@ -1718,7 +1715,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // NEW: Endpoint for the slide editor to get all package data
-  app.get("/api/packages/:code/editor", async (req, res) => {
+  app.get("/api/packages/:code/editor", requireAuth, async (req, res) => {
     try {
       const { code } = req.params;
       const data = await storage.getPackageWithWinesAndSlides(code);
@@ -1736,7 +1733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Position Recovery and Smart Reordering Endpoints
   
   // Detect and fix slides stuck at temporary positions
-  app.post("/api/slides/recover-positions", async (req, res) => {
+  app.post("/api/slides/recover-positions", requireAuth, async (req, res) => {
     try {
       console.log('🔧 Position recovery endpoint called');
       const result = await storage.performPositionRecovery();
@@ -1765,7 +1762,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Smart swap two slides (for adjacent moves)
-  app.post("/api/slides/smart-swap", async (req, res) => {
+  app.post("/api/slides/smart-swap", requireAuth, async (req, res) => {
     try {
       const { slideId1, slideId2 } = req.body;
       
@@ -1791,7 +1788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Direct position assignment (for quick repositioning)
-  app.post("/api/slides/assign-position", async (req, res) => {
+  app.post("/api/slides/assign-position", requireAuth, async (req, res) => {
     try {
       const { slideId, targetPosition, packageWineId } = req.body;
       
@@ -1817,7 +1814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Batch update slide positions
-  app.post("/api/slides/batch-update-positions", async (req, res) => {
+  app.post("/api/slides/batch-update-positions", requireAuth, async (req, res) => {
     try {
       const { updates } = req.body;
       
@@ -1855,7 +1852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // /api/packages-with-wines removed -- duplicate of /api/packages
 
   // Modern wine management endpoints
-  app.post("/api/wines", async (req, res) => {
+  app.post("/api/wines", requireAuth, async (req, res) => {
     try {
       const validatedData = insertPackageWineSchema.parse(req.body);
       const wine = await storage.createPackageWineFromDashboard(validatedData);
@@ -1866,7 +1863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/wines/:id", async (req, res) => {
+  app.patch("/api/wines/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const wine = await storage.updatePackageWine(id, req.body);
@@ -1877,7 +1874,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/wines/:id", async (req, res) => {
+  app.delete("/api/wines/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deletePackageWine(id);
@@ -1896,7 +1893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Comprehensive media upload endpoint supporting all image formats up to 10MB
   console.log("📁 Registering comprehensive media upload endpoints...");
   
-  app.post("/api/upload", upload.single('file'), async (req, res) => {
+  app.post("/api/upload", requireAuth, upload.single('file'), async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file provided" });
@@ -2047,7 +2044,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/upload/media", async (req, res) => {
+  app.delete("/api/upload/media", requireAuth, async (req, res) => {
     try {
       // Check if Supabase is configured
       if (!isSupabaseConfigured()) {
