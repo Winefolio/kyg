@@ -1,7 +1,19 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { storage, generateSommelierTips } from "../storage";
 import { openai } from "../lib/openai";
 import { requireAuth } from "./auth";
+
+// Ensures the `:email` URL param matches the authenticated session's email.
+// Must run AFTER requireAuth. Prevents authed user A from reading user B's dashboard.
+function requireEmailMatchesSession(req: Request, res: Response, next: NextFunction): void {
+  const sessionEmail = req.session?.userEmail?.toLowerCase();
+  const paramEmail = decodeURIComponent(req.params.email ?? "").toLowerCase();
+  if (!sessionEmail || !paramEmail || sessionEmail !== paramEmail) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  next();
+}
 import { db } from "../db";
 import { users, tastings, responses, slides } from "@shared/schema";
 import { eq, desc, sql, inArray } from "drizzle-orm";
@@ -55,12 +67,16 @@ export function registerDashboardRoutes(app: Express) {
   });
 
   // Find participant by email across all sessions
-  app.get("/api/participants/find-by-email", async (req, res) => {
+  app.get("/api/participants/find-by-email", requireAuth, async (req, res) => {
     try {
       const { email } = req.query;
-      
+
       if (!email || typeof email !== 'string') {
         return res.status(400).json({ message: "Email parameter is required" });
+      }
+
+      if (email.toLowerCase() !== req.session.userEmail?.toLowerCase()) {
+        return res.status(403).json({ error: "Forbidden" });
       }
 
       // Find all participants with this email across all sessions
@@ -78,7 +94,7 @@ export function registerDashboardRoutes(app: Express) {
   });
 
   // Get user dashboard data
-  app.get("/api/dashboard/:email", async (req, res) => {
+  app.get("/api/dashboard/:email", requireAuth, requireEmailMatchesSession, async (req, res) => {
     try {
       const { email } = req.params;
       const { login } = req.query;
@@ -109,7 +125,7 @@ export function registerDashboardRoutes(app: Express) {
   });
 
   // Get user's wine scores and ratings
-  app.get("/api/dashboard/:email/scores", async (req, res) => {
+  app.get("/api/dashboard/:email/scores", requireAuth, requireEmailMatchesSession, async (req, res) => {
     try {
       const { email } = req.params;
 
@@ -126,7 +142,7 @@ export function registerDashboardRoutes(app: Express) {
   });
 
   // Get user's tasting history
-  app.get("/api/dashboard/:email/history", async (req, res) => {
+  app.get("/api/dashboard/:email/history", requireAuth, requireEmailMatchesSession, async (req, res) => {
     try {
       const { email } = req.params;
       const { limit = 10, offset = 0 } = req.query;
@@ -147,7 +163,7 @@ export function registerDashboardRoutes(app: Express) {
     }
   });
 
-  app.get("/api/dashboard/:email/taste-profile", async (req, res) => {
+  app.get("/api/dashboard/:email/taste-profile", requireAuth, requireEmailMatchesSession, async (req, res) => {
     try {
       const { email } = req.params;
 
@@ -182,7 +198,7 @@ export function registerDashboardRoutes(app: Express) {
   });
 
   // Get unified preferences (combined from solo + group tastings)
-  app.get("/api/dashboard/:email/preferences", async (req, res) => {
+  app.get("/api/dashboard/:email/preferences", requireAuth, requireEmailMatchesSession, async (req, res) => {
     try {
       const { email } = req.params;
 
@@ -247,7 +263,7 @@ export function registerDashboardRoutes(app: Express) {
   });
 
   // Get user's sommelier feedback
-  app.get("/api/dashboard/:email/sommelier-feedback", async (req, res) => {
+  app.get("/api/dashboard/:email/sommelier-feedback", requireAuth, requireEmailMatchesSession, async (req, res) => {
     try {
       const { email } = req.params;
       
@@ -269,7 +285,7 @@ export function registerDashboardRoutes(app: Express) {
   });
 
   // Get wine collection with detailed filtering
-  app.get("/api/dashboard/:email/collection", async (req, res) => {
+  app.get("/api/dashboard/:email/collection", requireAuth, requireEmailMatchesSession, async (req, res) => {
     try {
       const { email } = req.params;
       const { 
@@ -376,7 +392,7 @@ export function registerDashboardRoutes(app: Express) {
 
   // Phase 1: Get always-available conversation starters from database
   // This endpoint returns immediately without waiting for GPT
-  app.get("/api/dashboard/:email/conversation-starters", async (req, res) => {
+  app.get("/api/dashboard/:email/conversation-starters", requireAuth, requireEmailMatchesSession, async (req, res) => {
     const { email } = req.params;
 
     if (!email) {
@@ -394,7 +410,7 @@ export function registerDashboardRoutes(app: Express) {
 
   // Phase 2: Get explore recommendations ("You liked X → Try Y")
   // Returns region or grape recommendations with explanations
-  app.get("/api/dashboard/:email/explore-recommendations", async (req, res) => {
+  app.get("/api/dashboard/:email/explore-recommendations", requireAuth, requireEmailMatchesSession, async (req, res) => {
     const { email } = req.params;
     const { type = 'region' } = req.query;
 
@@ -416,7 +432,7 @@ export function registerDashboardRoutes(app: Express) {
 
   // Phase 3: Get producer recommendations by price tier (LLM-powered)
   // Returns specific wines to buy based on user preferences and budget
-  app.get("/api/dashboard/:email/producer-recommendations", async (req, res) => {
+  app.get("/api/dashboard/:email/producer-recommendations", requireAuth, requireEmailMatchesSession, async (req, res) => {
     const { email } = req.params;
     const { tier = 'budget' } = req.query;
 
@@ -442,7 +458,7 @@ export function registerDashboardRoutes(app: Express) {
 
   // Phase 4: Get recommended journeys based on taste preferences
   // Returns journeys scored by alignment with user's wine preferences
-  app.get("/api/dashboard/:email/recommended-journeys", async (req, res) => {
+  app.get("/api/dashboard/:email/recommended-journeys", requireAuth, requireEmailMatchesSession, async (req, res) => {
     const { email } = req.params;
 
     if (!email) {
@@ -459,7 +475,7 @@ export function registerDashboardRoutes(app: Express) {
   });
 
   // Get AI-generated sommelier conversation starters
-  app.get("/api/dashboard/:email/sommelier-tips", async (req, res) => {
+  app.get("/api/dashboard/:email/sommelier-tips", requireAuth, requireEmailMatchesSession, async (req, res) => {
     const { email } = req.params;
     
     if (!email) {
@@ -498,7 +514,7 @@ export function registerDashboardRoutes(app: Express) {
   });
 
   // Get session details for a specific user
-  app.get("/api/dashboard/session/:sessionId/details", async (req, res) => {
+  app.get("/api/dashboard/session/:sessionId/details", requireAuth, async (req, res) => {
     console.log(`[SESSION_DETAILS] Starting request for session: ${req.params.sessionId}, user: ${req.query.userEmail}`);
     
     try {
@@ -649,7 +665,7 @@ export function registerDashboardRoutes(app: Express) {
   // Add a new route to update sommelier observations
   // TODO: Implement updateSommelierObservations method in storage
   /*
-  app.post('/api/dashboard/session/:sessionId/update-observations', async (req, res) => {
+  app.post('/api/dashboard/session/:sessionId/update-observations', requireAuth, async (req, res) => {
     const { sessionId } = req.params;
     const { observations } = req.body;
 
